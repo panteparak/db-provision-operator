@@ -1,0 +1,423 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: databaseusers.dbops.dbprovision.io
+spec:
+  group: dbops.dbprovision.io
+  names:
+    kind: DatabaseUser
+    listKind: DatabaseUserList
+    plural: databaseusers
+    shortNames:
+    - dbu
+    singular: databaseuser
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.instanceRef.name
+      name: Instance
+      type: string
+    - jsonPath: .spec.username
+      name: Username
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.secret.name
+      name: Secret
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: DatabaseUser is the Schema for the databaseusers API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DatabaseUserSpec defines the desired state of DatabaseUser.
+            properties:
+              existingPasswordSecret:
+                description: ExistingPasswordSecret references an existing secret
+                  containing the password
+                properties:
+                  key:
+                    description: Key within the secret containing the password
+                    type: string
+                  name:
+                    description: Name of the secret
+                    type: string
+                  namespace:
+                    description: Namespace of the secret (defaults to the resource
+                      namespace)
+                    type: string
+                required:
+                - key
+                - name
+                type: object
+              instanceRef:
+                description: InstanceRef references the DatabaseInstance to use
+                properties:
+                  name:
+                    description: Name of the DatabaseInstance
+                    type: string
+                  namespace:
+                    description: Namespace of the DatabaseInstance (defaults to the
+                      resource namespace)
+                    type: string
+                required:
+                - name
+                type: object
+              mysql:
+                description: MySQL-specific configuration
+                properties:
+                  accountLocked:
+                    description: AccountLocked locks the account
+                    type: boolean
+                  allowedHosts:
+                    default:
+                    - '%'
+                    description: AllowedHosts lists allowed host patterns for the
+                      user (e.g., "%", "localhost", "192.168.1.%")
+                    items:
+                      type: string
+                    type: array
+                  authPlugin:
+                    allOf:
+                    - enum:
+                      - mysql_native_password
+                      - caching_sha2_password
+                      - sha256_password
+                    - enum:
+                      - mysql_native_password
+                      - caching_sha2_password
+                      - sha256_password
+                    default: caching_sha2_password
+                    description: AuthPlugin specifies the authentication plugin
+                    type: string
+                  failedLoginAttempts:
+                    default: 0
+                    description: FailedLoginAttempts sets failed login attempts before
+                      locking (0 = disabled)
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  maxConnectionsPerHour:
+                    default: 0
+                    description: MaxConnectionsPerHour limits connections per hour
+                      (0 = unlimited)
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  maxQueriesPerHour:
+                    default: 0
+                    description: MaxQueriesPerHour limits queries per hour (0 = unlimited)
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  maxUpdatesPerHour:
+                    default: 0
+                    description: MaxUpdatesPerHour limits updates per hour (0 = unlimited)
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  maxUserConnections:
+                    default: 0
+                    description: MaxUserConnections limits concurrent connections
+                      (0 = unlimited)
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  passwordLockTime:
+                    default: 0
+                    description: PasswordLockTime sets lock time in days after failed
+                      attempts (0 = permanent)
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  requireSSL:
+                    description: RequireSSL requires SSL for connections
+                    type: boolean
+                  requireX509:
+                    description: RequireX509 requires X509 certificate for connections
+                    type: boolean
+                type: object
+              passwordRotation:
+                description: PasswordRotation configures automatic password rotation
+                properties:
+                  enabled:
+                    description: Enabled enables automatic password rotation
+                    type: boolean
+                  maxAge:
+                    description: MaxAge is the maximum age of a password before rotation
+                      (e.g., "90d")
+                    type: string
+                  schedule:
+                    description: Schedule is a cron expression for rotation (e.g.,
+                      "0 0 1 * *" for monthly)
+                    type: string
+                type: object
+              passwordSecret:
+                description: PasswordSecret configures password generation and secret
+                  output
+                properties:
+                  excludeChars:
+                    description: ExcludeChars specifies characters to exclude from
+                      the password
+                    type: string
+                  format:
+                    allOf:
+                    - enum:
+                      - kubernetes
+                      - vault
+                      - external-secrets
+                    - enum:
+                      - kubernetes
+                      - vault
+                      - external-secrets
+                    default: kubernetes
+                    description: Format specifies the secret format
+                    type: string
+                  generate:
+                    default: true
+                    description: Generate enables password generation
+                    type: boolean
+                  includeSpecialChars:
+                    default: true
+                    description: IncludeSpecialChars includes special characters in
+                      the password
+                    type: boolean
+                  length:
+                    default: 32
+                    description: 'Length of the generated password (default: 32)'
+                    format: int32
+                    maximum: 128
+                    minimum: 8
+                    type: integer
+                  secretName:
+                    description: SecretName is the name of the generated secret
+                    type: string
+                  secretNamespace:
+                    description: SecretNamespace is the namespace for the generated
+                      secret (defaults to resource namespace)
+                    type: string
+                  secretTemplate:
+                    description: SecretTemplate defines the secret template
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: Annotations to add to the secret
+                        type: object
+                      data:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Data defines templated data keys
+                          Available variables: .Username, .Password, .Host, .Port, .Database, .SSLMode
+                        type: object
+                      labels:
+                        additionalProperties:
+                          type: string
+                        description: Labels to add to the secret
+                        type: object
+                      type:
+                        default: Opaque
+                        description: 'Type is the secret type (default: Opaque)'
+                        type: string
+                    type: object
+                required:
+                - secretName
+                type: object
+              postgres:
+                description: PostgreSQL-specific configuration
+                properties:
+                  bypassRLS:
+                    description: BypassRLS allows bypassing row-level security
+                    type: boolean
+                  configParameters:
+                    additionalProperties:
+                      type: string
+                    description: ConfigParameters sets session parameters for this
+                      user
+                    type: object
+                  connectionLimit:
+                    default: -1
+                    description: ConnectionLimit sets the maximum concurrent connections
+                      (-1 = unlimited)
+                    format: int32
+                    minimum: -1
+                    type: integer
+                  createDB:
+                    description: CreateDB allows the user to create databases
+                    type: boolean
+                  createRole:
+                    description: CreateRole allows the user to create roles
+                    type: boolean
+                  inRoles:
+                    description: InRoles lists roles this user should be a member
+                      of
+                    items:
+                      type: string
+                    type: array
+                  inherit:
+                    default: true
+                    description: Inherit enables privilege inheritance
+                    type: boolean
+                  login:
+                    default: true
+                    description: Login enables login capability
+                    type: boolean
+                  replication:
+                    description: Replication enables replication privileges
+                    type: boolean
+                  superuser:
+                    description: Superuser grants superuser privileges
+                    type: boolean
+                  validUntil:
+                    description: ValidUntil sets the password expiration time (RFC3339
+                      format)
+                    type: string
+                type: object
+              username:
+                description: Username is the database username (immutable after creation)
+                maxLength: 63
+                minLength: 1
+                pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+                type: string
+                x-kubernetes-validations:
+                - message: username is immutable
+                  rule: self == oldSelf
+            required:
+            - instanceRef
+            - username
+            type: object
+          status:
+            description: DatabaseUserStatus defines the observed state of DatabaseUser.
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              message:
+                description: Message provides additional information about the current
+                  state
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the last observed generation of
+                  the resource
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current state
+                enum:
+                - Pending
+                - Creating
+                - Ready
+                - Failed
+                - Deleting
+                type: string
+              secret:
+                description: Secret contains generated secret information
+                properties:
+                  lastRotatedAt:
+                    description: LastRotatedAt is the last password rotation timestamp
+                    format: date-time
+                    type: string
+                  name:
+                    description: Name is the secret name
+                    type: string
+                  namespace:
+                    description: Namespace is the secret namespace
+                    type: string
+                type: object
+              user:
+                description: User contains user-specific status information
+                properties:
+                  createdAt:
+                    description: CreatedAt is the user creation timestamp
+                    format: date-time
+                    type: string
+                  username:
+                    description: Username is the actual database username
+                    type: string
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

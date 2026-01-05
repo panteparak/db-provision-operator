@@ -1,0 +1,547 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: databaserestores.dbops.dbprovision.io
+spec:
+  group: dbops.dbprovision.io
+  names:
+    kind: DatabaseRestore
+    listKind: DatabaseRestoreList
+    plural: databaserestores
+    shortNames:
+    - dbrestore
+    singular: databaserestore
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.backupRef.name
+      name: Backup
+      type: string
+    - jsonPath: .status.restore.targetDatabase
+      name: Target
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.progress.percentage
+      name: Progress
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: DatabaseRestore is the Schema for the databaserestores API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DatabaseRestoreSpec defines the desired state of DatabaseRestore.
+            properties:
+              activeDeadlineSeconds:
+                default: 7200
+                description: ActiveDeadlineSeconds is the timeout for the restore
+                  operation
+                format: int64
+                minimum: 1
+                type: integer
+              backupRef:
+                description: BackupRef references the DatabaseBackup to restore from
+                properties:
+                  name:
+                    description: Name of the DatabaseBackup resource
+                    type: string
+                  namespace:
+                    description: Namespace of the DatabaseBackup (defaults to the
+                      resource namespace)
+                    type: string
+                required:
+                - name
+                type: object
+              confirmation:
+                description: Confirmation contains safety confirmations for destructive
+                  operations
+                properties:
+                  acknowledgeDataLoss:
+                    description: AcknowledgeDataLoss must be set to "I-UNDERSTAND-DATA-LOSS"
+                      for destructive operations
+                    type: string
+                type: object
+              fromPath:
+                description: FromPath allows restoring from a direct path instead
+                  of a backup reference
+                properties:
+                  compression:
+                    description: Compression settings used for the backup
+                    properties:
+                      algorithm:
+                        allOf:
+                        - enum:
+                          - gzip
+                          - lz4
+                          - zstd
+                          - none
+                        - enum:
+                          - gzip
+                          - lz4
+                          - zstd
+                        default: gzip
+                        description: Algorithm specifies the compression algorithm
+                        type: string
+                      enabled:
+                        default: true
+                        description: Enabled enables compression
+                        type: boolean
+                      level:
+                        default: 6
+                        description: Level specifies the compression level (1-9)
+                        format: int32
+                        maximum: 9
+                        minimum: 1
+                        type: integer
+                    type: object
+                  encryption:
+                    description: Encryption settings used for the backup
+                    properties:
+                      algorithm:
+                        allOf:
+                        - enum:
+                          - aes-256-gcm
+                          - aes-256-cbc
+                        - enum:
+                          - aes-256-gcm
+                          - aes-256-cbc
+                        default: aes-256-gcm
+                        description: Algorithm specifies the encryption algorithm
+                        type: string
+                      enabled:
+                        description: Enabled enables encryption
+                        type: boolean
+                      secretRef:
+                        description: SecretRef references a secret containing the
+                          encryption key
+                        properties:
+                          key:
+                            description: Key within the secret
+                            type: string
+                          name:
+                            description: Name of the secret
+                            type: string
+                          namespace:
+                            description: Namespace of the secret (defaults to the
+                              resource namespace)
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                    type: object
+                  storage:
+                    description: Storage defines where the backup is stored
+                    properties:
+                      azure:
+                        description: Azure configuration (required when type is "azure")
+                        properties:
+                          container:
+                            description: Container name
+                            type: string
+                          prefix:
+                            description: Prefix (path prefix within the container)
+                            type: string
+                          secretRef:
+                            description: SecretRef references a secret containing
+                              Azure credentials
+                            properties:
+                              name:
+                                description: Name of the secret
+                                type: string
+                              namespace:
+                                description: Namespace of the secret (defaults to
+                                  the resource namespace)
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          storageAccount:
+                            description: StorageAccount name
+                            type: string
+                        required:
+                        - container
+                        - secretRef
+                        - storageAccount
+                        type: object
+                      gcs:
+                        description: GCS configuration (required when type is "gcs")
+                        properties:
+                          bucket:
+                            description: Bucket name
+                            type: string
+                          prefix:
+                            description: Prefix (path prefix within the bucket)
+                            type: string
+                          secretRef:
+                            description: SecretRef references a secret containing
+                              GCS credentials
+                            properties:
+                              key:
+                                description: Key within the secret
+                                type: string
+                              name:
+                                description: Name of the secret
+                                type: string
+                              namespace:
+                                description: Namespace of the secret (defaults to
+                                  the resource namespace)
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                        required:
+                        - bucket
+                        - secretRef
+                        type: object
+                      pvc:
+                        description: PVC configuration (required when type is "pvc")
+                        properties:
+                          claimName:
+                            description: ClaimName is the name of the PersistentVolumeClaim
+                            type: string
+                          subPath:
+                            description: SubPath within the PVC
+                            type: string
+                        required:
+                        - claimName
+                        type: object
+                      s3:
+                        description: S3 configuration (required when type is "s3")
+                        properties:
+                          bucket:
+                            description: Bucket name
+                            type: string
+                          endpoint:
+                            description: Endpoint for S3-compatible storage (e.g.,
+                              MinIO)
+                            type: string
+                          forcePathStyle:
+                            description: ForcePathStyle enables path-style addressing
+                              (required for MinIO)
+                            type: boolean
+                          prefix:
+                            description: Prefix (path prefix within the bucket)
+                            type: string
+                          region:
+                            description: Region of the S3 bucket
+                            type: string
+                          secretRef:
+                            description: SecretRef references a secret containing
+                              S3 credentials
+                            properties:
+                              keys:
+                                description: Keys defines the key names for S3 credentials
+                                properties:
+                                  accessKey:
+                                    default: AWS_ACCESS_KEY_ID
+                                    description: 'Access key ID (default: "AWS_ACCESS_KEY_ID")'
+                                    type: string
+                                  secretKey:
+                                    default: AWS_SECRET_ACCESS_KEY
+                                    description: 'Secret access key (default: "AWS_SECRET_ACCESS_KEY")'
+                                    type: string
+                                type: object
+                              name:
+                                description: Name of the secret
+                                type: string
+                            required:
+                            - name
+                            type: object
+                        required:
+                        - bucket
+                        - region
+                        - secretRef
+                        type: object
+                      type:
+                        description: Type of storage backend
+                        enum:
+                        - gcs
+                        - s3
+                        - azure
+                        - pvc
+                        type: string
+                    required:
+                    - type
+                    type: object
+                required:
+                - storage
+                type: object
+              mysql:
+                description: MySQL-specific restore configuration
+                properties:
+                  createDatabase:
+                    default: true
+                    description: CreateDatabase creates the database if it doesn't
+                      exist
+                    type: boolean
+                  disableBinlog:
+                    default: true
+                    description: DisableBinlog disables binary logging during restore
+                    type: boolean
+                  disableForeignKeyChecks:
+                    default: true
+                    description: DisableForeignKeyChecks disables foreign key checks
+                      during restore
+                    type: boolean
+                  dropExisting:
+                    description: DropExisting drops existing database before restore
+                    type: boolean
+                  events:
+                    default: true
+                    description: Events restores events
+                    type: boolean
+                  routines:
+                    default: true
+                    description: Routines restores stored procedures and functions
+                    type: boolean
+                  triggers:
+                    default: true
+                    description: Triggers restores triggers
+                    type: boolean
+                type: object
+              postgres:
+                description: PostgreSQL-specific restore configuration
+                properties:
+                  analyze:
+                    default: true
+                    description: Analyze runs ANALYZE after restore
+                    type: boolean
+                  createDatabase:
+                    default: true
+                    description: CreateDatabase creates the database if it doesn't
+                      exist
+                    type: boolean
+                  dataOnly:
+                    description: DataOnly restores only data, not schema
+                    type: boolean
+                  disableTriggers:
+                    description: DisableTriggers disables triggers during restore
+                    type: boolean
+                  dropExisting:
+                    description: DropExisting drops existing database before restore
+                    type: boolean
+                  jobs:
+                    default: 1
+                    description: Jobs sets the number of parallel jobs for restore
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  noOwner:
+                    default: true
+                    description: NoOwner omits ownership restoration
+                    type: boolean
+                  noPrivileges:
+                    description: NoPrivileges omits privilege restoration
+                    type: boolean
+                  roleMapping:
+                    additionalProperties:
+                      type: string
+                    description: RoleMapping maps old role names to new role names
+                    type: object
+                  schemaOnly:
+                    description: SchemaOnly restores only schema, not data
+                    type: boolean
+                  schemas:
+                    description: Schemas lists specific schemas to restore (empty
+                      = all)
+                    items:
+                      type: string
+                    type: array
+                  tables:
+                    description: Tables lists specific tables to restore (empty =
+                      all)
+                    items:
+                      type: string
+                    type: array
+                type: object
+              target:
+                description: Target defines where to restore the backup
+                properties:
+                  databaseName:
+                    description: DatabaseName is the target database name (for restore
+                      to new database)
+                    type: string
+                  databaseRef:
+                    description: DatabaseRef references the target Database for in-place
+                      restore
+                    properties:
+                      name:
+                        description: Name of the Database resource
+                        type: string
+                      namespace:
+                        description: Namespace of the Database (defaults to the resource
+                          namespace)
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  inPlace:
+                    description: InPlace enables in-place restore (destructive!)
+                    type: boolean
+                  instanceRef:
+                    description: InstanceRef references the target DatabaseInstance
+                    properties:
+                      name:
+                        description: Name of the DatabaseInstance
+                        type: string
+                      namespace:
+                        description: Namespace of the DatabaseInstance (defaults to
+                          the resource namespace)
+                        type: string
+                    required:
+                    - name
+                    type: object
+                type: object
+            required:
+            - target
+            type: object
+          status:
+            description: DatabaseRestoreStatus defines the observed state of DatabaseRestore.
+            properties:
+              completedAt:
+                description: CompletedAt is the restore completion time
+                format: date-time
+                type: string
+              conditions:
+                description: Conditions represent the latest available observations
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              message:
+                description: Message provides additional information about the current
+                  state
+                type: string
+              phase:
+                description: Phase represents the current state
+                enum:
+                - Pending
+                - Running
+                - Completed
+                - Failed
+                type: string
+              progress:
+                description: Progress contains restore progress information
+                properties:
+                  currentPhase:
+                    description: CurrentPhase is the current restore phase
+                    type: string
+                  percentage:
+                    description: Percentage is the restore progress percentage (0-100)
+                    format: int32
+                    type: integer
+                  tablesRestored:
+                    description: TablesRestored is the number of tables restored
+                    format: int32
+                    type: integer
+                  tablesTotal:
+                    description: TablesTotal is the total number of tables to restore
+                    format: int32
+                    type: integer
+                type: object
+              restore:
+                description: Restore contains restore-specific status information
+                properties:
+                  sourceBackup:
+                    description: SourceBackup is the source backup name
+                    type: string
+                  targetDatabase:
+                    description: TargetDatabase is the target database name
+                    type: string
+                  targetInstance:
+                    description: TargetInstance is the target instance name
+                    type: string
+                type: object
+              startedAt:
+                description: StartedAt is the restore start time
+                format: date-time
+                type: string
+              warnings:
+                description: Warnings contains any warnings encountered during restore
+                items:
+                  type: string
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

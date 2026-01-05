@@ -1,0 +1,53 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - dbops.dbprovision.io
+  resources:
+  - databasebackups
+  - databasebackupschedules
+  - databasegrants
+  - databaseinstances
+  - databaserestores
+  - databaseroles
+  - databases
+  - databaseusers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dbops.dbprovision.io
+  resources:
+  - databasebackups/finalizers
+  - databasebackupschedules/finalizers
+  - databasegrants/finalizers
+  - databaseinstances/finalizers
+  - databaserestores/finalizers
+  - databaseroles/finalizers
+  - databases/finalizers
+  - databaseusers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dbops.dbprovision.io
+  resources:
+  - databasebackups/status
+  - databasebackupschedules/status
+  - databasegrants/status
+  - databaseinstances/status
+  - databaserestores/status
+  - databaseroles/status
+  - databases/status
+  - databaseusers/status
+  verbs:
+  - get
+  - patch
+  - update

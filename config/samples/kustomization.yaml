@@ -1,0 +1,11 @@
+## Append samples of your project ##
+resources:
+- dbops_v1alpha1_databaseinstance.yaml
+- dbops_v1alpha1_database.yaml
+- dbops_v1alpha1_databaseuser.yaml
+- dbops_v1alpha1_databaserole.yaml
+- dbops_v1alpha1_databasegrant.yaml
+- dbops_v1alpha1_databasebackup.yaml
+- dbops_v1alpha1_databasebackupschedule.yaml
+- dbops_v1alpha1_databaserestore.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

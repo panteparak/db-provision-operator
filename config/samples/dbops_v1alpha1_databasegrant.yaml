@@ -1,0 +1,9 @@
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseGrant
+metadata:
+  labels:
+    app.kubernetes.io/name: db-provision-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: databasegrant-sample
+spec:
+  # TODO(user): Add fields here

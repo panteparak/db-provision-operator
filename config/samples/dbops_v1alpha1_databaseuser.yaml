@@ -1,0 +1,9 @@
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseUser
+metadata:
+  labels:
+    app.kubernetes.io/name: db-provision-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: databaseuser-sample
+spec:
+  # TODO(user): Add fields here
