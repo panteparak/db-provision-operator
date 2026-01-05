@@ -18,44 +18,403 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/adapter"
+	"github.com/db-provision-operator/internal/secret"
+	"github.com/db-provision-operator/internal/util"
 )
 
 // DatabaseReconciler reconciles a Database object
 type DatabaseReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme        *runtime.Scheme
+	SecretManager *secret.Manager
 }
 
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databases,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databases/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databases/finalizers,verbs=update
+// +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseinstances,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Database object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/reconcile
+// Reconcile reconciles a Database object
 func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = logf.FromContext(ctx)
+	log := logf.FromContext(ctx)
 
-	// TODO(user): your logic here
+	// Fetch the Database
+	database := &dbopsv1alpha1.Database{}
+	if err := r.Get(ctx, req.NamespacedName, database); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
 
+	// Check if reconciliation should be skipped
+	if util.ShouldSkipReconcile(database) {
+		log.Info("Skipping reconciliation due to annotation")
+		return ctrl.Result{}, nil
+	}
+
+	// Handle deletion
+	if util.IsMarkedForDeletion(database) {
+		return r.handleDeletion(ctx, database)
+	}
+
+	// Add finalizer if not present
+	if !controllerutil.ContainsFinalizer(database, util.FinalizerDatabase) {
+		controllerutil.AddFinalizer(database, util.FinalizerDatabase)
+		if err := r.Update(ctx, database); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	// Reconcile the database
+	result, err := r.reconcileDatabase(ctx, database)
+	if err != nil {
+		log.Error(err, "Failed to reconcile database")
+		database.Status.Phase = dbopsv1alpha1.PhaseFailed
+		database.Status.Message = err.Error()
+		util.SetReadyCondition(&database.Status.Conditions, metav1.ConditionFalse,
+			util.ReasonReconcileFailed, err.Error())
+		if statusErr := r.Status().Update(ctx, database); statusErr != nil {
+			log.Error(statusErr, "Failed to update status")
+		}
+		return result, err
+	}
+
+	return result, nil
+}
+
+// reconcileDatabase handles the main reconciliation logic
+func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, database *dbopsv1alpha1.Database) (ctrl.Result, error) {
+	log := logf.FromContext(ctx)
+
+	// Get the DatabaseInstance
+	instance := &dbopsv1alpha1.DatabaseInstance{}
+	instanceRef := database.Spec.InstanceRef
+	instanceNamespace := database.Namespace
+	if instanceRef.Namespace != "" {
+		instanceNamespace = instanceRef.Namespace
+	}
+
+	if err := r.Get(ctx, types.NamespacedName{
+		Namespace: instanceNamespace,
+		Name:      instanceRef.Name,
+	}, instance); err != nil {
+		database.Status.Phase = dbopsv1alpha1.PhaseFailed
+		database.Status.Message = fmt.Sprintf("DatabaseInstance not found: %v", err)
+		util.SetReadyCondition(&database.Status.Conditions, metav1.ConditionFalse,
+			util.ReasonInstanceNotFound, err.Error())
+		if statusErr := r.Status().Update(ctx, database); statusErr != nil {
+			log.Error(statusErr, "Failed to update status")
+		}
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
+	}
+
+	// Check if instance is ready
+	if instance.Status.Phase != dbopsv1alpha1.PhaseReady {
+		database.Status.Phase = dbopsv1alpha1.PhasePending
+		database.Status.Message = "Waiting for DatabaseInstance to be ready"
+		util.SetReadyCondition(&database.Status.Conditions, metav1.ConditionFalse,
+			util.ReasonInstanceNotReady, "DatabaseInstance is not ready")
+		if statusErr := r.Status().Update(ctx, database); statusErr != nil {
+			log.Error(statusErr, "Failed to update status")
+		}
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+
+	// Get credentials
+	creds, err := r.SecretManager.GetCredentials(ctx, instance.Namespace, instance.Spec.Connection.SecretRef)
+	if err != nil {
+		database.Status.Phase = dbopsv1alpha1.PhaseFailed
+		database.Status.Message = fmt.Sprintf("Failed to get credentials: %v", err)
+		util.SetReadyCondition(&database.Status.Conditions, metav1.ConditionFalse,
+			util.ReasonSecretNotFound, err.Error())
+		if statusErr := r.Status().Update(ctx, database); statusErr != nil {
+			log.Error(statusErr, "Failed to update status")
+		}
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
+	}
+
+	// Get TLS credentials if enabled
+	var tlsCreds *secret.TLSCredentials
+	if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
+		tlsCreds, err = r.SecretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
+		if err != nil {
+			log.Error(err, "Failed to get TLS credentials")
+		}
+	}
+
+	// Build connection config
+	var tlsCA, tlsCert, tlsKey []byte
+	if tlsCreds != nil {
+		tlsCA = tlsCreds.CA
+		tlsCert = tlsCreds.Cert
+		tlsKey = tlsCreds.Key
+	}
+	config := adapter.BuildConnectionConfig(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
+
+	// Create adapter
+	dbAdapter, err := adapter.NewAdapter(instance.Spec.Engine, config)
+	if err != nil {
+		database.Status.Phase = dbopsv1alpha1.PhaseFailed
+		database.Status.Message = fmt.Sprintf("Failed to create adapter: %v", err)
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
+	}
+	defer dbAdapter.Close()
+
+	// Connect to database
+	if err := dbAdapter.Connect(ctx); err != nil {
+		database.Status.Phase = dbopsv1alpha1.PhaseFailed
+		database.Status.Message = fmt.Sprintf("Failed to connect: %v", err)
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
+	}
+
+	// Check if database exists
+	dbName := database.Spec.Name
+	exists, err := dbAdapter.DatabaseExists(ctx, dbName)
+	if err != nil {
+		database.Status.Phase = dbopsv1alpha1.PhaseFailed
+		database.Status.Message = fmt.Sprintf("Failed to check database existence: %v", err)
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
+	}
+
+	if !exists {
+		// Create the database
+		log.Info("Creating database", "name", dbName)
+		database.Status.Phase = dbopsv1alpha1.PhaseCreating
+		database.Status.Message = "Creating database"
+		if statusErr := r.Status().Update(ctx, database); statusErr != nil {
+			log.Error(statusErr, "Failed to update status")
+		}
+
+		opts := r.buildCreateDatabaseOptions(database, instance.Spec.Engine)
+		if err := dbAdapter.CreateDatabase(ctx, opts); err != nil {
+			database.Status.Phase = dbopsv1alpha1.PhaseFailed
+			database.Status.Message = fmt.Sprintf("Failed to create database: %v", err)
+			util.SetReadyCondition(&database.Status.Conditions, metav1.ConditionFalse,
+				util.ReasonCreateFailed, err.Error())
+			if statusErr := r.Status().Update(ctx, database); statusErr != nil {
+				log.Error(statusErr, "Failed to update status")
+			}
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, err
+		}
+
+		log.Info("Successfully created database", "name", dbName)
+	}
+
+	// Update database settings if needed
+	updateOpts := r.buildUpdateDatabaseOptions(database, instance.Spec.Engine)
+	if err := dbAdapter.UpdateDatabase(ctx, dbName, updateOpts); err != nil {
+		log.Error(err, "Failed to update database settings", "name", dbName)
+		// Don't fail, just log the error
+	}
+
+	// Get database info
+	dbInfo, err := dbAdapter.GetDatabaseInfo(ctx, dbName)
+	if err != nil {
+		log.Error(err, "Failed to get database info")
+	}
+
+	// Update status
+	database.Status.Phase = dbopsv1alpha1.PhaseReady
+	database.Status.Message = "Database is ready"
+	if dbInfo != nil {
+		database.Status.Database = &dbopsv1alpha1.DatabaseInfo{
+			Name:      dbName,
+			Owner:     dbInfo.Owner,
+			SizeBytes: dbInfo.SizeBytes,
+		}
+	}
+
+	// Set conditions
+	util.SetSyncedCondition(&database.Status.Conditions, metav1.ConditionTrue,
+		util.ReasonReconcileSuccess, "Database is synced")
+	util.SetReadyCondition(&database.Status.Conditions, metav1.ConditionTrue,
+		util.ReasonReconcileSuccess, "Database is ready")
+
+	if err := r.Status().Update(ctx, database); err != nil {
+		log.Error(err, "Failed to update status")
+		return ctrl.Result{}, err
+	}
+
+	log.Info("Successfully reconciled Database", "name", database.Name, "database", dbName)
+
+	return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
+}
+
+// buildCreateDatabaseOptions builds options for creating a database
+func (r *DatabaseReconciler) buildCreateDatabaseOptions(database *dbopsv1alpha1.Database, engine dbopsv1alpha1.EngineType) adapter.CreateDatabaseOptions {
+	opts := adapter.CreateDatabaseOptions{
+		Name: database.Spec.Name,
+	}
+
+	switch engine {
+	case dbopsv1alpha1.EngineTypePostgres:
+		if database.Spec.Postgres != nil {
+			opts.Encoding = database.Spec.Postgres.Encoding
+			opts.LCCollate = database.Spec.Postgres.LCCollate
+			opts.LCCtype = database.Spec.Postgres.LCCtype
+			opts.Tablespace = database.Spec.Postgres.Tablespace
+			opts.Template = database.Spec.Postgres.Template
+			opts.ConnectionLimit = database.Spec.Postgres.ConnectionLimit
+			opts.IsTemplate = database.Spec.Postgres.IsTemplate
+			opts.AllowConnections = database.Spec.Postgres.AllowConnections
+		}
+	case dbopsv1alpha1.EngineTypeMySQL:
+		if database.Spec.MySQL != nil {
+			opts.Charset = database.Spec.MySQL.Charset
+			opts.Collation = database.Spec.MySQL.Collation
+		}
+	}
+
+	return opts
+}
+
+// buildUpdateDatabaseOptions builds options for updating a database
+func (r *DatabaseReconciler) buildUpdateDatabaseOptions(database *dbopsv1alpha1.Database, engine dbopsv1alpha1.EngineType) adapter.UpdateDatabaseOptions {
+	opts := adapter.UpdateDatabaseOptions{}
+
+	switch engine {
+	case dbopsv1alpha1.EngineTypePostgres:
+		if database.Spec.Postgres != nil {
+			// Extensions
+			for _, ext := range database.Spec.Postgres.Extensions {
+				opts.Extensions = append(opts.Extensions, adapter.ExtensionOptions{
+					Name:    ext.Name,
+					Schema:  ext.Schema,
+					Version: ext.Version,
+				})
+			}
+			// Schemas
+			for _, schema := range database.Spec.Postgres.Schemas {
+				opts.Schemas = append(opts.Schemas, adapter.SchemaOptions{
+					Name:  schema.Name,
+					Owner: schema.Owner,
+				})
+			}
+			// Default privileges
+			for _, dp := range database.Spec.Postgres.DefaultPrivileges {
+				opts.DefaultPrivileges = append(opts.DefaultPrivileges, adapter.DefaultPrivilegeOptions{
+					Role:       dp.Role,
+					Schema:     dp.Schema,
+					ObjectType: dp.ObjectType,
+					Privileges: dp.Privileges,
+				})
+			}
+		}
+	case dbopsv1alpha1.EngineTypeMySQL:
+		if database.Spec.MySQL != nil {
+			opts.Charset = database.Spec.MySQL.Charset
+			opts.Collation = database.Spec.MySQL.Collation
+		}
+	}
+
+	return opts
+}
+
+// handleDeletion handles the deletion of a Database
+func (r *DatabaseReconciler) handleDeletion(ctx context.Context, database *dbopsv1alpha1.Database) (ctrl.Result, error) {
+	log := logf.FromContext(ctx)
+
+	if !controllerutil.ContainsFinalizer(database, util.FinalizerDatabase) {
+		return ctrl.Result{}, nil
+	}
+
+	log.Info("Handling deletion of Database", "name", database.Name)
+
+	// Check deletion policy
+	deletionPolicy := database.Spec.DeletionPolicy
+	if deletionPolicy == "" {
+		deletionPolicy = dbopsv1alpha1.DeletionPolicyRetain
+	}
+
+	// Check for deletion protection
+	if database.Spec.DeletionProtection && !util.HasForceDeleteAnnotation(database) {
+		database.Status.Phase = dbopsv1alpha1.PhaseFailed
+		database.Status.Message = "Deletion blocked by deletion protection. Set force-delete annotation to proceed."
+		util.SetReadyCondition(&database.Status.Conditions, metav1.ConditionFalse,
+			util.ReasonDeletionProtected, "Deletion protection is enabled")
+		if err := r.Status().Update(ctx, database); err != nil {
+			log.Error(err, "Failed to update status")
+		}
+		return ctrl.Result{}, fmt.Errorf("deletion protection enabled")
+	}
+
+	// Handle based on deletion policy
+	if deletionPolicy == dbopsv1alpha1.DeletionPolicyDelete {
+		// Get the DatabaseInstance
+		instance := &dbopsv1alpha1.DatabaseInstance{}
+		instanceRef := database.Spec.InstanceRef
+		instanceNamespace := database.Namespace
+		if instanceRef.Namespace != "" {
+			instanceNamespace = instanceRef.Namespace
+		}
+
+		if err := r.Get(ctx, types.NamespacedName{
+			Namespace: instanceNamespace,
+			Name:      instanceRef.Name,
+		}, instance); err == nil {
+			// Get credentials and connect
+			creds, err := r.SecretManager.GetCredentials(ctx, instance.Namespace, instance.Spec.Connection.SecretRef)
+			if err == nil {
+				var tlsCreds *secret.TLSCredentials
+				if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
+					tlsCreds, _ = r.SecretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
+				}
+
+				var tlsCA, tlsCert, tlsKey []byte
+				if tlsCreds != nil {
+					tlsCA = tlsCreds.CA
+					tlsCert = tlsCreds.Cert
+					tlsKey = tlsCreds.Key
+				}
+				config := adapter.BuildConnectionConfig(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
+
+				dbAdapter, err := adapter.NewAdapter(instance.Spec.Engine, config)
+				if err == nil {
+					defer dbAdapter.Close()
+					if err := dbAdapter.Connect(ctx); err == nil {
+						log.Info("Dropping database", "name", database.Spec.Name)
+						opts := adapter.DropDatabaseOptions{
+							Force: util.HasForceDeleteAnnotation(database),
+						}
+						if err := dbAdapter.DropDatabase(ctx, database.Spec.Name, opts); err != nil {
+							log.Error(err, "Failed to drop database", "name", database.Spec.Name)
+						} else {
+							log.Info("Successfully dropped database", "name", database.Spec.Name)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Remove finalizer
+	controllerutil.RemoveFinalizer(database, util.FinalizerDatabase)
+	if err := r.Update(ctx, database); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	log.Info("Successfully deleted Database", "name", database.Name)
 	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *DatabaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.SecretManager == nil {
+		r.SecretManager = secret.NewManager(r.Client)
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dbopsv1alpha1.Database{}).
 		Named("database").
