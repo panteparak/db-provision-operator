@@ -19,7 +19,6 @@ limitations under the License.
 package e2e
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -29,13 +28,22 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/db-provision-operator/test/utils"
 )
 
 // namespace where the project is deployed in
 const namespace = "db-provision-operator-system"
+
+// projectImage is the image to use for the controller
+var projectImage = getEnvOrDefault("IMG", "db-provision-operator:e2e")
+
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
 
 // serviceAccountName created for the project
 const serviceAccountName = "db-provision-operator-controller-manager"

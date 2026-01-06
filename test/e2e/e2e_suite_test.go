@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -171,14 +172,20 @@ func createDatabaseInstance(ctx context.Context, name, namespace, engine, host s
 
 // waitForPhase waits for a CR to reach the specified phase
 func waitForPhase(ctx context.Context, gvr schema.GroupVersionResource, name, namespace, expectedPhase string, timeout time.Duration) error {
-	return Eventually(func() string {
+	var lastPhase string
+	err := wait.PollUntilContextTimeout(ctx, pollingInterval, timeout, true, func(ctx context.Context) (bool, error) {
 		obj, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
-			return ""
+			return false, nil // Keep polling on error
 		}
 		phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
-		return phase
-	}, timeout, pollingInterval).Should(Equal(expectedPhase))
+		lastPhase = phase
+		return phase == expectedPhase, nil
+	})
+	if err != nil {
+		return fmt.Errorf("timeout waiting for phase %s, last phase was %s: %w", expectedPhase, lastPhase, err)
+	}
+	return nil
 }
 
 // deleteResource deletes a CR by name and namespace
