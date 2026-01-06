@@ -4,9 +4,9 @@ description: A Kubernetes operator for managing database instances, users, roles
 type: application
 version: 0.0.1
 appVersion: "0.0.1"
-home: https://github.com/db-provision-operator/db-provision-operator
+home: https://github.com/panteparak/db-provision-operator
 sources:
-  - https://github.com/db-provision-operator/db-provision-operator
+  - https://github.com/panteparak/db-provision-operator
 keywords:
   - kubernetes
   - operator

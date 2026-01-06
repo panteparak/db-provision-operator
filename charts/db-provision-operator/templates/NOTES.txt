@@ -55,5 +55,5 @@ Namespace: {{ .Release.Namespace }}
 {{- end }}
 
 For more information, visit:
-- Documentation: https://github.com/db-provision-operator/db-provision-operator
-- Issues: https://github.com/db-provision-operator/db-provision-operator/issues
+- Documentation: https://github.com/panteparak/db-provision-operator
+- Issues: https://github.com/panteparak/db-provision-operator/issues

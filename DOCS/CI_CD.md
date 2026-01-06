@@ -70,20 +70,20 @@ Triggered when a version tag is pushed (e.g., `v1.0.0`).
 Images are published to GitHub Container Registry:
 
 ```
-ghcr.io/<owner>/db-provision-operator:<tag>
+ghcr.io/panteparak/db-provision-operator:<tag>
 ```
 
 ### Pulling Images
 
 ```bash
 # Latest from main branch
-docker pull ghcr.io/db-provision-operator/db-provision-operator:latest
+docker pull ghcr.io/panteparak/db-provision-operator:latest
 
 # Specific version
-docker pull ghcr.io/db-provision-operator/db-provision-operator:1.0.0
+docker pull ghcr.io/panteparak/db-provision-operator:1.0.0
 
 # Specific commit
-docker pull ghcr.io/db-provision-operator/db-provision-operator:sha-abc1234
+docker pull ghcr.io/panteparak/db-provision-operator:sha-abc1234
 ```
 
 ## Release Process
@@ -134,10 +134,10 @@ Pre-release tags are marked as pre-releases on GitHub.
 
 ```bash
 # Install specific version
-kubectl apply -f https://github.com/<owner>/db-provision-operator/releases/download/v1.0.0/db-provision-operator-1.0.0.yaml
+kubectl apply -f https://github.com/panteparak/db-provision-operator/releases/download/v1.0.0/db-provision-operator-1.0.0.yaml
 
 # Or download and apply
-curl -LO https://github.com/<owner>/db-provision-operator/releases/download/v1.0.0/db-provision-operator-1.0.0.yaml
+curl -LO https://github.com/panteparak/db-provision-operator/releases/download/v1.0.0/db-provision-operator-1.0.0.yaml
 kubectl apply -f db-provision-operator-1.0.0.yaml
 ```
 
@@ -145,7 +145,7 @@ kubectl apply -f db-provision-operator-1.0.0.yaml
 
 ```bash
 # Add Helm repository (if using gh-pages)
-helm repo add db-provision-operator https://<owner>.github.io/db-provision-operator/charts
+helm repo add db-provision-operator https://panteparak.github.io/db-provision-operator/charts
 helm repo update
 
 # Install
@@ -154,7 +154,7 @@ helm install db-provision-operator db-provision-operator/db-provision-operator \
   --create-namespace
 
 # Or install from release tarball
-curl -LO https://github.com/<owner>/db-provision-operator/releases/download/v1.0.0/db-provision-operator-1.0.0.tgz
+curl -LO https://github.com/panteparak/db-provision-operator/releases/download/v1.0.0/db-provision-operator-1.0.0.tgz
 helm install db-provision-operator db-provision-operator-1.0.0.tgz \
   --namespace db-provision-operator-system \
   --create-namespace
@@ -164,14 +164,14 @@ helm install db-provision-operator db-provision-operator-1.0.0.tgz \
 
 ```bash
 # Clone repository
-git clone https://github.com/<owner>/db-provision-operator.git
+git clone https://github.com/panteparak/db-provision-operator.git
 cd db-provision-operator
 
 # Install CRDs
 make install
 
 # Deploy operator
-make deploy IMG=ghcr.io/<owner>/db-provision-operator:1.0.0
+make deploy IMG=ghcr.io/panteparak/db-provision-operator:1.0.0
 ```
 
 ## Makefile Targets
@@ -271,7 +271,7 @@ If you see `ImagePullBackOff`:
 
 ```bash
 # Check if image exists
-docker pull ghcr.io/<owner>/db-provision-operator:1.0.0
+docker pull ghcr.io/panteparak/db-provision-operator:1.0.0
 
 # For private repos, create image pull secret
 kubectl create secret docker-registry ghcr-secret \
