@@ -56,19 +56,18 @@ var _ = Describe("postgresql", Ordered, func() {
 						"namespace": testNamespace,
 					},
 					"spec": map[string]interface{}{
-						"engine": "postgresql",
+						"engine": "postgres",
 						"connection": map[string]interface{}{
 							"host":     postgresHost,
 							"port":     int64(5432),
 							"database": "postgres",
 							"secretRef": map[string]interface{}{
-								"name":      secretName,
-								"namespace": secretNamespace,
+								"name": secretName,
 							},
 						},
 						"healthCheck": map[string]interface{}{
-							"enabled":  true,
-							"interval": "30s",
+							"enabled":         true,
+							"intervalSeconds": int64(30),
 						},
 					},
 				},
