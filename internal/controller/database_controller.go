@@ -172,7 +172,7 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, database *db
 		database.Status.Message = fmt.Sprintf("Failed to create adapter: %v", err)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
-	defer dbAdapter.Close()
+	defer func() { _ = dbAdapter.Close() }()
 
 	// Connect to database
 	if err := dbAdapter.Connect(ctx); err != nil {
@@ -392,7 +392,7 @@ func (r *DatabaseReconciler) handleDeletion(ctx context.Context, database *dbops
 
 				dbAdapter, err := adapter.NewAdapter(instance.Spec.Engine, config)
 				if err == nil {
-					defer dbAdapter.Close()
+					defer func() { _ = dbAdapter.Close() }()
 					if err := dbAdapter.Connect(ctx); err == nil {
 						log.Info("Dropping database", "name", database.Spec.Name)
 						engine := string(instance.Spec.Engine)

@@ -64,14 +64,14 @@ func NewBackupWriter(ctx context.Context, cfg *BackupWriterConfig) (*BackupWrite
 	// Create compressor
 	compressor, err := NewCompressor(cfg.CompressionConfig)
 	if err != nil {
-		backend.Close()
+		_ = backend.Close()
 		return nil, fmt.Errorf("failed to create compressor: %w", err)
 	}
 
 	// Create encryptor
 	encryptor, err := NewEncryptor(ctx, cfg.EncryptionConfig, cfg.SecretManager, cfg.Namespace)
 	if err != nil {
-		backend.Close()
+		_ = backend.Close()
 		return nil, fmt.Errorf("failed to create encryptor: %w", err)
 	}
 
@@ -145,7 +145,7 @@ func (w *BackupWriter) Close() error {
 		return fmt.Errorf("failed to create compression writer: %w", err)
 	}
 	if _, err := compWriter.Write(w.buffer.Bytes()); err != nil {
-		compWriter.Close()
+		_ = compWriter.Close()
 		return fmt.Errorf("failed to compress data: %w", err)
 	}
 	if err := compWriter.Close(); err != nil {
@@ -214,43 +214,43 @@ func NewRestoreReader(ctx context.Context, cfg *RestoreReaderConfig) (*RestoreRe
 	// Create compressor (for decompression)
 	compressor, err := NewCompressor(cfg.CompressionConfig)
 	if err != nil {
-		backend.Close()
+		_ = backend.Close()
 		return nil, fmt.Errorf("failed to create compressor: %w", err)
 	}
 
 	// Create encryptor (for decryption)
 	encryptor, err := NewEncryptor(ctx, cfg.EncryptionConfig, cfg.SecretManager, cfg.Namespace)
 	if err != nil {
-		backend.Close()
+		_ = backend.Close()
 		return nil, fmt.Errorf("failed to create encryptor: %w", err)
 	}
 
 	// Read the encrypted data from storage
 	storageReader, err := backend.Read(ctx, cfg.BackupPath)
 	if err != nil {
-		backend.Close()
+		_ = backend.Close()
 		return nil, fmt.Errorf("failed to read from storage: %w", err)
 	}
 
 	// Read all encrypted data
 	encryptedData, err := io.ReadAll(storageReader)
-	storageReader.Close()
+	_ = storageReader.Close()
 	if err != nil {
-		backend.Close()
+		_ = backend.Close()
 		return nil, fmt.Errorf("failed to read encrypted data: %w", err)
 	}
 
 	// Decrypt the data
 	compressedData, err := encryptor.Decrypt(encryptedData)
 	if err != nil {
-		backend.Close()
+		_ = backend.Close()
 		return nil, fmt.Errorf("failed to decrypt data: %w", err)
 	}
 
 	// Create decompression reader
 	decompReader, err := compressor.Decompress(bytes.NewReader(compressedData))
 	if err != nil {
-		backend.Close()
+		_ = backend.Close()
 		return nil, fmt.Errorf("failed to create decompression reader: %w", err)
 	}
 
@@ -270,7 +270,7 @@ func (r *RestoreReader) Read(p []byte) (n int, err error) {
 // Close closes the restore reader and backend
 func (r *RestoreReader) Close() error {
 	if err := r.reader.Close(); err != nil {
-		r.backend.Close()
+		_ = r.backend.Close()
 		return err
 	}
 	return r.backend.Close()
@@ -287,7 +287,7 @@ func DeleteBackup(ctx context.Context, cfg *Config, path string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create storage backend: %w", err)
 	}
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	return backend.Delete(ctx, path)
 }
@@ -298,7 +298,7 @@ func GetBackupSize(ctx context.Context, cfg *Config, path string) (int64, error)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create storage backend: %w", err)
 	}
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	return backend.GetSize(ctx, path)
 }
@@ -309,7 +309,7 @@ func ListBackups(ctx context.Context, cfg *Config, prefix string) ([]ObjectInfo,
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage backend: %w", err)
 	}
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	return backend.List(ctx, prefix)
 }

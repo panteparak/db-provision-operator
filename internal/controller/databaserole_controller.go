@@ -171,7 +171,7 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *dbopsv
 		role.Status.Message = fmt.Sprintf("Failed to create adapter: %v", err)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
-	defer dbAdapter.Close()
+	defer func() { _ = dbAdapter.Close() }()
 
 	// Connect to database with retry
 	retryResult = util.RetryWithBackoff(ctx, retryConfig, func() error {
@@ -435,7 +435,7 @@ func (r *DatabaseRoleReconciler) handleDeletion(ctx context.Context, role *dbops
 
 				dbAdapter, err := adapter.NewAdapter(instance.Spec.Engine, config)
 				if err == nil {
-					defer dbAdapter.Close()
+					defer func() { _ = dbAdapter.Close() }()
 					if err := dbAdapter.Connect(ctx); err == nil {
 						log.Info("Dropping role", "roleName", role.Spec.RoleName)
 						engine := string(instance.Spec.Engine)

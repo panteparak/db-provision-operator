@@ -145,7 +145,7 @@ func (a *Adapter) DropUser(ctx context.Context, username string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get user hosts: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var hosts []string
 	for rows.Next() {
@@ -202,7 +202,7 @@ func (a *Adapter) UpdateUser(ctx context.Context, username string, opts types.Up
 	if err != nil {
 		return fmt.Errorf("failed to get user hosts: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var hosts []string
 	for rows.Next() {
@@ -297,7 +297,7 @@ func (a *Adapter) UpdatePassword(ctx context.Context, username, password string)
 	if err != nil {
 		return fmt.Errorf("failed to get user hosts: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var hosts []string
 	for rows.Next() {
@@ -340,7 +340,7 @@ func (a *Adapter) GetUserInfo(ctx context.Context, username string) (*types.User
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user info: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var host string

@@ -74,7 +74,7 @@ func (a *Adapter) Connect(ctx context.Context) error {
 
 	// Test the connection
 	if err := db.PingContext(ctx); err != nil {
-		db.Close()
+		_ = db.Close()
 		return fmt.Errorf("failed to ping database: %w", err)
 	}
 
@@ -169,7 +169,9 @@ func (a *Adapter) buildDSN() (string, error) {
 		}
 		if tlsConfig != nil {
 			tlsConfigName := "custom"
-			mysql.RegisterTLSConfig(tlsConfigName, tlsConfig)
+			if err := mysql.RegisterTLSConfig(tlsConfigName, tlsConfig); err != nil {
+				return "", fmt.Errorf("failed to register TLS config: %w", err)
+			}
 			cfg.TLSConfig = tlsConfigName
 		}
 	}

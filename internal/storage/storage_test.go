@@ -219,7 +219,7 @@ func TestCompressingWriter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read decompressed data: %v", err)
 	}
-	reader.Close()
+	_ = reader.Close()
 
 	if !bytes.Equal(decompressed, testData) {
 		t.Error("Decompressed data doesn't match original")
@@ -235,8 +235,8 @@ func TestDecompressingReader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create compressor: %v", err)
 	}
-	writer.Write(testData)
-	writer.Close()
+	_, _ = writer.Write(testData)
+	_ = writer.Close()
 
 	// Create a decompressing reader
 	dr, err := NewDecompressingReader(io.NopCloser(&compressedBuf), compressor)
@@ -249,7 +249,7 @@ func TestDecompressingReader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read: %v", err)
 	}
-	dr.Close()
+	_ = dr.Close()
 
 	if !bytes.Equal(decompressed, testData) {
 		t.Error("Decompressed data doesn't match original")
@@ -331,7 +331,7 @@ func TestAESGCMEncryptor(t *testing.T) {
 
 func TestAESGCMEncryptorWithDifferentDataSizes(t *testing.T) {
 	key := make([]byte, 32)
-	rand.Read(key)
+	_, _ = rand.Read(key)
 
 	encryptor, err := newAESGCMEncryptor(key)
 	if err != nil {
@@ -342,7 +342,7 @@ func TestAESGCMEncryptorWithDifferentDataSizes(t *testing.T) {
 	for _, size := range sizes {
 		t.Run("size="+string(rune('0'+size%10)), func(t *testing.T) {
 			data := make([]byte, size)
-			rand.Read(data)
+			_, _ = rand.Read(data)
 			testEncryptDecryptRoundtrip(t, encryptor, data)
 		})
 	}
@@ -371,7 +371,7 @@ func TestAESCBCEncryptor(t *testing.T) {
 
 func TestAESCBCEncryptorWithDifferentDataSizes(t *testing.T) {
 	key := make([]byte, 32)
-	rand.Read(key)
+	_, _ = rand.Read(key)
 
 	encryptor, err := newAESCBCEncryptor(key)
 	if err != nil {
@@ -382,7 +382,7 @@ func TestAESCBCEncryptorWithDifferentDataSizes(t *testing.T) {
 	for _, size := range sizes {
 		t.Run("size="+string(rune('0'+size%10)), func(t *testing.T) {
 			data := make([]byte, size)
-			rand.Read(data)
+			_, _ = rand.Read(data)
 			testEncryptDecryptRoundtrip(t, encryptor, data)
 		})
 	}
@@ -411,7 +411,7 @@ func TestAESGCMEncryptorInvalidKey(t *testing.T) {
 
 func TestEncryptionDeterminism(t *testing.T) {
 	key := make([]byte, 32)
-	rand.Read(key)
+	_, _ = rand.Read(key)
 
 	encryptor, _ := newAESGCMEncryptor(key)
 
@@ -435,7 +435,7 @@ func TestEncryptionDeterminism(t *testing.T) {
 
 func TestEncryptingWriter(t *testing.T) {
 	key := make([]byte, 32)
-	rand.Read(key)
+	_, _ = rand.Read(key)
 
 	encryptor, _ := newAESGCMEncryptor(key)
 
@@ -474,7 +474,7 @@ func TestEncryptingWriter(t *testing.T) {
 
 func TestDecryptingReader(t *testing.T) {
 	key := make([]byte, 32)
-	rand.Read(key)
+	_, _ = rand.Read(key)
 
 	encryptor, _ := newAESGCMEncryptor(key)
 
@@ -492,7 +492,7 @@ func TestDecryptingReader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read: %v", err)
 	}
-	dr.Close()
+	_ = dr.Close()
 
 	if !bytes.Equal(decrypted, testData) {
 		t.Error("Decrypted data doesn't match original")
@@ -527,7 +527,7 @@ func testEncryptDecryptRoundtrip(t *testing.T, encryptor Encryptor, data []byte)
 
 func TestPVCBackendWrite(t *testing.T) {
 	backend, tempDir := setupTestPVCBackend(t)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	ctx := context.Background()
 
@@ -555,22 +555,22 @@ func TestPVCBackendWrite(t *testing.T) {
 
 func TestPVCBackendRead(t *testing.T) {
 	backend, tempDir := setupTestPVCBackend(t)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	ctx := context.Background()
 
 	// Create test file
 	testPath := "test/read.txt"
 	fullPath := filepath.Join(tempDir, testPath)
-	os.MkdirAll(filepath.Dir(fullPath), 0755)
-	os.WriteFile(fullPath, testData, 0644)
+	_ = os.MkdirAll(filepath.Dir(fullPath), 0755)
+	_ = os.WriteFile(fullPath, testData, 0644)
 
 	// Read using backend
 	reader, err := backend.Read(ctx, testPath)
 	if err != nil {
 		t.Fatalf("Failed to read: %v", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	content, err := io.ReadAll(reader)
 	if err != nil {
@@ -584,7 +584,7 @@ func TestPVCBackendRead(t *testing.T) {
 
 func TestPVCBackendReadNotFound(t *testing.T) {
 	backend, tempDir := setupTestPVCBackend(t)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	ctx := context.Background()
 
@@ -599,15 +599,15 @@ func TestPVCBackendReadNotFound(t *testing.T) {
 
 func TestPVCBackendDelete(t *testing.T) {
 	backend, tempDir := setupTestPVCBackend(t)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	ctx := context.Background()
 
 	// Create test file
 	testPath := "test/delete.txt"
 	fullPath := filepath.Join(tempDir, testPath)
-	os.MkdirAll(filepath.Dir(fullPath), 0755)
-	os.WriteFile(fullPath, testData, 0644)
+	_ = os.MkdirAll(filepath.Dir(fullPath), 0755)
+	_ = os.WriteFile(fullPath, testData, 0644)
 
 	// Verify exists
 	if _, err := os.Stat(fullPath); err != nil {
@@ -628,7 +628,7 @@ func TestPVCBackendDelete(t *testing.T) {
 
 func TestPVCBackendDeleteNonExistent(t *testing.T) {
 	backend, tempDir := setupTestPVCBackend(t)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	ctx := context.Background()
 
@@ -641,15 +641,15 @@ func TestPVCBackendDeleteNonExistent(t *testing.T) {
 
 func TestPVCBackendExists(t *testing.T) {
 	backend, tempDir := setupTestPVCBackend(t)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	ctx := context.Background()
 
 	// Create test file
 	testPath := "test/exists.txt"
 	fullPath := filepath.Join(tempDir, testPath)
-	os.MkdirAll(filepath.Dir(fullPath), 0755)
-	os.WriteFile(fullPath, testData, 0644)
+	_ = os.MkdirAll(filepath.Dir(fullPath), 0755)
+	_ = os.WriteFile(fullPath, testData, 0644)
 
 	// Check exists
 	exists, err := backend.Exists(ctx, testPath)
@@ -672,15 +672,15 @@ func TestPVCBackendExists(t *testing.T) {
 
 func TestPVCBackendGetSize(t *testing.T) {
 	backend, tempDir := setupTestPVCBackend(t)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	ctx := context.Background()
 
 	// Create test file
 	testPath := "test/size.txt"
 	fullPath := filepath.Join(tempDir, testPath)
-	os.MkdirAll(filepath.Dir(fullPath), 0755)
-	os.WriteFile(fullPath, testData, 0644)
+	_ = os.MkdirAll(filepath.Dir(fullPath), 0755)
+	_ = os.WriteFile(fullPath, testData, 0644)
 
 	// Get size
 	size, err := backend.GetSize(ctx, testPath)
@@ -694,7 +694,7 @@ func TestPVCBackendGetSize(t *testing.T) {
 
 func TestPVCBackendList(t *testing.T) {
 	backend, tempDir := setupTestPVCBackend(t)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	ctx := context.Background()
 
@@ -707,8 +707,8 @@ func TestPVCBackendList(t *testing.T) {
 
 	for _, f := range files {
 		fullPath := filepath.Join(tempDir, f)
-		os.MkdirAll(filepath.Dir(fullPath), 0755)
-		os.WriteFile(fullPath, []byte("test"), 0644)
+		_ = os.MkdirAll(filepath.Dir(fullPath), 0755)
+		_ = os.WriteFile(fullPath, []byte("test"), 0644)
 	}
 
 	// List files
@@ -736,7 +736,7 @@ func TestPVCBackendList(t *testing.T) {
 
 func TestPVCBackendClose(t *testing.T) {
 	backend, tempDir := setupTestPVCBackend(t)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Close should be a no-op and not error
 	if err := backend.Close(); err != nil {
@@ -758,7 +758,7 @@ func TestPVCBackendWithSubPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	backend, err := NewPVCBackend(&dbopsv1alpha1.PVCStorageConfig{
 		ClaimName: "test-pvc",
@@ -770,7 +770,7 @@ func TestPVCBackendWithSubPath(t *testing.T) {
 
 	// Override base path for testing
 	backend.SetBasePath(filepath.Join(tempDir, "mybackups"))
-	os.MkdirAll(backend.GetBasePath(), 0755)
+	_ = os.MkdirAll(backend.GetBasePath(), 0755)
 
 	ctx := context.Background()
 
@@ -800,7 +800,7 @@ func setupTestPVCBackend(t *testing.T) (*PVCBackend, string) {
 		ClaimName: "test-pvc",
 	})
 	if err != nil {
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir)
 		t.Fatalf("Failed to create backend: %v", err)
 	}
 
@@ -817,7 +817,7 @@ func setupTestPVCBackend(t *testing.T) (*PVCBackend, string) {
 func TestCompressionAndEncryptionChain(t *testing.T) {
 	// Test that compression and encryption can be chained together
 	key := make([]byte, 32)
-	rand.Read(key)
+	_, _ = rand.Read(key)
 
 	compressor := &gzipCompressor{level: 6}
 	encryptor, _ := newAESGCMEncryptor(key)
@@ -825,8 +825,8 @@ func TestCompressionAndEncryptionChain(t *testing.T) {
 	// Compress first
 	var compressedBuf bytes.Buffer
 	compWriter, _ := compressor.Compress(&compressedBuf)
-	compWriter.Write(testData)
-	compWriter.Close()
+	_, _ = compWriter.Write(testData)
+	_ = compWriter.Close()
 
 	// Then encrypt
 	encrypted, _ := encryptor.Encrypt(compressedBuf.Bytes())
@@ -837,7 +837,7 @@ func TestCompressionAndEncryptionChain(t *testing.T) {
 	// Then decompress
 	decompReader, _ := compressor.Decompress(bytes.NewReader(decrypted))
 	final, _ := io.ReadAll(decompReader)
-	decompReader.Close()
+	_ = decompReader.Close()
 
 	if !bytes.Equal(final, testData) {
 		t.Error("Data mismatch after compression+encryption chain")
@@ -846,10 +846,10 @@ func TestCompressionAndEncryptionChain(t *testing.T) {
 
 func TestPVCBackendWithCompressionAndEncryption(t *testing.T) {
 	backend, tempDir := setupTestPVCBackend(t)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	key := make([]byte, 32)
-	rand.Read(key)
+	_, _ = rand.Read(key)
 
 	compressor := &zstdCompressor{level: 3}
 	encryptor, _ := newAESGCMEncryptor(key)
@@ -859,8 +859,8 @@ func TestPVCBackendWithCompressionAndEncryption(t *testing.T) {
 	// Compress and encrypt data
 	var compressedBuf bytes.Buffer
 	compWriter, _ := compressor.Compress(&compressedBuf)
-	compWriter.Write(testData)
-	compWriter.Close()
+	_, _ = compWriter.Write(testData)
+	_ = compWriter.Close()
 
 	encrypted, _ := encryptor.Encrypt(compressedBuf.Bytes())
 
@@ -877,7 +877,7 @@ func TestPVCBackendWithCompressionAndEncryption(t *testing.T) {
 	}
 
 	encryptedData, _ := io.ReadAll(reader)
-	reader.Close()
+	_ = reader.Close()
 
 	// Decrypt and decompress
 	decrypted, err := encryptor.Decrypt(encryptedData)
@@ -891,7 +891,7 @@ func TestPVCBackendWithCompressionAndEncryption(t *testing.T) {
 	}
 
 	final, _ := io.ReadAll(decompReader)
-	decompReader.Close()
+	_ = decompReader.Close()
 
 	if !bytes.Equal(final, testData) {
 		t.Error("Data mismatch after full roundtrip through PVC backend with compression and encryption")

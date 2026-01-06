@@ -239,7 +239,7 @@ func (r *DatabaseGrantReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 		return ctrl.Result{}, nil
 	}
-	defer dbAdapter.Close()
+	defer func() { _ = dbAdapter.Close() }()
 
 	result = util.RetryWithBackoff(ctx, retryConfig, func() error {
 		return dbAdapter.Connect(ctx)
@@ -510,7 +510,7 @@ func (r *DatabaseGrantReconciler) handleDeletion(ctx context.Context, grant *dbo
 		log.Error(err, "Failed to create adapter for revocation")
 		return nil
 	}
-	defer dbAdapter.Close()
+	defer func() { _ = dbAdapter.Close() }()
 
 	if err := dbAdapter.Connect(ctx); err != nil {
 		log.Error(err, "Failed to connect for revocation")

@@ -148,7 +148,7 @@ func (r *DatabaseInstanceReconciler) reconcileInstance(ctx context.Context, inst
 		}
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
-	defer dbAdapter.Close()
+	defer func() { _ = dbAdapter.Close() }()
 
 	// Connect to database with metrics
 	engine := string(instance.Spec.Engine)

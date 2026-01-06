@@ -256,13 +256,13 @@ func (w *EncryptingWriter) Close() error {
 	// Encrypt buffered data
 	encrypted, err := w.encryptor.Encrypt(w.buffer)
 	if err != nil {
-		w.underlying.Close()
+		_ = w.underlying.Close()
 		return fmt.Errorf("failed to encrypt data: %w", err)
 	}
 
 	// Write encrypted data
 	if _, err := w.underlying.Write(encrypted); err != nil {
-		w.underlying.Close()
+		_ = w.underlying.Close()
 		return fmt.Errorf("failed to write encrypted data: %w", err)
 	}
 

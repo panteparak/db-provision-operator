@@ -359,7 +359,7 @@ func (r *DatabaseRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 		return ctrl.Result{}, nil
 	}
-	defer dbAdapter.Close()
+	defer func() { _ = dbAdapter.Close() }()
 
 	// Connect with retry
 	result = util.RetryWithBackoff(ctx, retryConfig, func() error {
@@ -456,7 +456,7 @@ func (r *DatabaseRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 	restoreReader = reader
-	defer restoreReader.Close()
+	defer func() { _ = restoreReader.Close() }()
 
 	// Build restore options
 	restoreOpts := r.buildRestoreOptions(&restore, sourceBackup, targetDatabaseName, targetInstance.Spec.Engine, restoreReader)

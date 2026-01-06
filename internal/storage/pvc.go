@@ -69,12 +69,12 @@ func (b *PVCBackend) Write(ctx context.Context, path string, reader io.Reader) e
 	if err != nil {
 		return fmt.Errorf("failed to create file %s: %w", fullPath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Copy data
 	if _, err := io.Copy(file, reader); err != nil {
 		// Clean up partial file on error
-		os.Remove(fullPath)
+		_ = os.Remove(fullPath)
 		return fmt.Errorf("failed to write data to %s: %w", fullPath, err)
 	}
 

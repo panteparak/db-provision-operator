@@ -66,7 +66,7 @@ func (a *Adapter) DropDatabase(ctx context.Context, name string, opts types.Drop
 			WHERE db = ?`
 		rows, err := db.QueryContext(ctx, killQuery, name)
 		if err == nil {
-			defer rows.Close()
+			defer func() { _ = rows.Close() }()
 			for rows.Next() {
 				var killCmd string
 				if err := rows.Scan(&killCmd); err == nil {

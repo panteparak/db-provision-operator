@@ -134,7 +134,7 @@ func (a *Adapter) GetGrants(ctx context.Context, grantee string) ([]types.GrantI
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user hosts: %w", err)
 	}
-	defer hostRows.Close()
+	defer func() { _ = hostRows.Close() }()
 
 	var hosts []string
 	for hostRows.Next() {
@@ -160,7 +160,7 @@ func (a *Adapter) GetGrants(ctx context.Context, grantee string) ([]types.GrantI
 		for rows.Next() {
 			var grantStr string
 			if err := rows.Scan(&grantStr); err != nil {
-				rows.Close()
+				_ = rows.Close()
 				continue
 			}
 
@@ -170,7 +170,7 @@ func (a *Adapter) GetGrants(ctx context.Context, grantee string) ([]types.GrantI
 				grants = append(grants, *grant)
 			}
 		}
-		rows.Close()
+		_ = rows.Close()
 	}
 
 	return grants, nil

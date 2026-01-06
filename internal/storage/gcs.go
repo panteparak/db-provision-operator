@@ -101,7 +101,7 @@ func (b *GCSBackend) Write(ctx context.Context, objectPath string, reader io.Rea
 	writer := obj.NewWriter(ctx)
 
 	if _, err := io.Copy(writer, reader); err != nil {
-		writer.Close()
+		_ = writer.Close()
 		return fmt.Errorf("failed to write to GCS: %w", err)
 	}
 

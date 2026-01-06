@@ -245,7 +245,7 @@ func (a *Adapter) execWithNewConnection(ctx context.Context, database, query str
 	if err != nil {
 		return fmt.Errorf("failed to connect to database %s: %w", database, err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	_, err = conn.Exec(ctx, query, args...)
 	return err
@@ -274,13 +274,13 @@ func (a *Adapter) queryWithNewConnection(ctx context.Context, database, query st
 
 	rows, err := conn.Query(ctx, query, args...)
 	if err != nil {
-		conn.Close(ctx)
+		_ = conn.Close(ctx)
 		return nil, nil, err
 	}
 
 	cleanup := func() {
 		rows.Close()
-		conn.Close(ctx)
+		_ = conn.Close(ctx)
 	}
 
 	return rows, cleanup, nil

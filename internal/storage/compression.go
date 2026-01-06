@@ -208,7 +208,7 @@ func (w *CompressingWriter) Write(p []byte) (n int, err error) {
 func (w *CompressingWriter) Close() error {
 	// Close compressor first to flush any buffered data
 	if err := w.compressor.Close(); err != nil {
-		w.underlying.Close()
+		_ = w.underlying.Close()
 		return err
 	}
 	return w.underlying.Close()
@@ -239,7 +239,7 @@ func (r *DecompressingReader) Read(p []byte) (n int, err error) {
 func (r *DecompressingReader) Close() error {
 	// Close decompressor first
 	if err := r.decompressor.Close(); err != nil {
-		r.underlying.Close()
+		_ = r.underlying.Close()
 		return err
 	}
 	return r.underlying.Close()

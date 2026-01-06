@@ -262,7 +262,7 @@ func (r *DatabaseBackupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 		return ctrl.Result{}, nil
 	}
-	defer dbAdapter.Close()
+	defer func() { _ = dbAdapter.Close() }()
 
 	// Connect with retry
 	result = util.RetryWithBackoff(ctx, retryConfig, func() error {
