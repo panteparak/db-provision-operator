@@ -174,6 +174,25 @@ func (m *Manager) getSecretData(ctx context.Context, namespace, secretName, key 
 	return data, nil
 }
 
+// GetSecretData retrieves all data from a secret as a map of string keys to string values
+func (m *Manager) GetSecretData(ctx context.Context, secretName, namespace string) (map[string]string, error) {
+	secret := &corev1.Secret{}
+	err := m.client.Get(ctx, types.NamespacedName{
+		Namespace: namespace,
+		Name:      secretName,
+	}, secret)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]string)
+	for key, value := range secret.Data {
+		result[key] = string(value)
+	}
+
+	return result, nil
+}
+
 // GeneratePassword generates a random password based on PasswordConfig
 func GeneratePassword(opts *dbopsv1alpha1.PasswordConfig) (string, error) {
 	length := 32

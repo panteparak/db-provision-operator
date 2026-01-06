@@ -83,9 +83,9 @@ type MySQLDatabaseConfig struct {
 type MySQLAuthPlugin string
 
 const (
-	MySQLAuthPluginNative       MySQLAuthPlugin = "mysql_native_password"
-	MySQLAuthPluginCachingSHA2  MySQLAuthPlugin = "caching_sha2_password"
-	MySQLAuthPluginSHA256       MySQLAuthPlugin = "sha256_password"
+	MySQLAuthPluginNative      MySQLAuthPlugin = "mysql_native_password"
+	MySQLAuthPluginCachingSHA2 MySQLAuthPlugin = "caching_sha2_password"
+	MySQLAuthPluginSHA256      MySQLAuthPlugin = "sha256_password"
 )
 
 // MySQLUserConfig defines MySQL-specific user configuration

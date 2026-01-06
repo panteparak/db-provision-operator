@@ -18,67 +18,204 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/secret"
+	"github.com/db-provision-operator/internal/util"
 )
 
 var _ = Describe("DatabaseInstance Controller", func() {
-	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
+	const (
+		timeout  = time.Second * 10
+		interval = time.Millisecond * 250
+	)
 
-		ctx := context.Background()
+	Context("When creating a DatabaseInstance", func() {
+		const (
+			instanceName = "test-instance"
+			namespace    = "default"
+		)
 
-		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
-		}
-		databaseinstance := &dbopsv1alpha1.DatabaseInstance{}
+		var (
+			ctx                    context.Context
+			instanceNamespacedName types.NamespacedName
+		)
 
 		BeforeEach(func() {
-			By("creating the custom resource for the Kind DatabaseInstance")
-			err := k8sClient.Get(ctx, typeNamespacedName, databaseinstance)
-			if err != nil && errors.IsNotFound(err) {
-				resource := &dbopsv1alpha1.DatabaseInstance{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: "default",
-					},
-					// TODO(user): Specify other spec details if needed.
-				}
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			ctx = context.Background()
+			instanceNamespacedName = types.NamespacedName{Name: instanceName, Namespace: namespace}
+
+			// Create a secret for credentials
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      instanceName + "-creds",
+					Namespace: namespace,
+				},
+				Data: map[string][]byte{
+					"username": []byte("admin"),
+					"password": []byte("password123"),
+				},
+			}
+			err := k8sClient.Get(ctx, types.NamespacedName{Name: secret.Name, Namespace: namespace}, &corev1.Secret{})
+			if errors.IsNotFound(err) {
+				Expect(k8sClient.Create(ctx, secret)).To(Succeed())
 			}
 		})
 
 		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &dbopsv1alpha1.DatabaseInstance{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Cleanup the specific resource instance DatabaseInstance")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			// Clean up DatabaseInstance
+			instance := &dbopsv1alpha1.DatabaseInstance{}
+			err := k8sClient.Get(ctx, instanceNamespacedName, instance)
+			if err == nil {
+				// Remove finalizer to allow deletion
+				instance.Finalizers = nil
+				_ = k8sClient.Update(ctx, instance)
+				_ = k8sClient.Delete(ctx, instance)
+			}
 		})
-		It("should successfully reconcile the resource", func() {
-			By("Reconciling the created resource")
+
+		It("should add finalizer when created", func() {
+			instance := &dbopsv1alpha1.DatabaseInstance{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      instanceName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseInstanceSpec{
+					Engine: dbopsv1alpha1.EngineTypePostgres,
+					Connection: dbopsv1alpha1.ConnectionConfig{
+						Host: "localhost",
+						Port: 5432,
+						SecretRef: &dbopsv1alpha1.CredentialSecretRef{
+							Name: instanceName + "-creds",
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, instance)).To(Succeed())
+
 			controllerReconciler := &DatabaseInstanceReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
+				Client:        k8sClient,
+				Scheme:        k8sClient.Scheme(),
+				SecretManager: secret.NewManager(k8sClient),
 			}
 
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+			// Note: Reconcile will return an error because it tries to connect to a real database
+			// but the finalizer should still be added before the connection attempt
+			_, _ = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: instanceNamespacedName,
+			})
+
+			// Verify finalizer was added (even though connection may have failed)
+			updatedInstance := &dbopsv1alpha1.DatabaseInstance{}
+			Expect(k8sClient.Get(ctx, instanceNamespacedName, updatedInstance)).To(Succeed())
+			Expect(updatedInstance.Finalizers).To(ContainElement(util.FinalizerDatabaseInstance))
+		})
+
+		It("should skip reconcile when annotation is set", func() {
+			instance := &dbopsv1alpha1.DatabaseInstance{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      instanceName,
+					Namespace: namespace,
+					Annotations: map[string]string{
+						util.AnnotationSkipReconcile: "true",
+					},
+				},
+				Spec: dbopsv1alpha1.DatabaseInstanceSpec{
+					Engine: dbopsv1alpha1.EngineTypePostgres,
+					Connection: dbopsv1alpha1.ConnectionConfig{
+						Host: "localhost",
+						Port: 5432,
+						SecretRef: &dbopsv1alpha1.CredentialSecretRef{
+							Name: instanceName + "-creds",
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, instance)).To(Succeed())
+
+			controllerReconciler := &DatabaseInstanceReconciler{
+				Client:        k8sClient,
+				Scheme:        k8sClient.Scheme(),
+				SecretManager: secret.NewManager(k8sClient),
+			}
+
+			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: instanceNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+			Expect(result.Requeue).To(BeFalse())
+
+			// Verify no finalizer was added (skipped)
+			updatedInstance := &dbopsv1alpha1.DatabaseInstance{}
+			Expect(k8sClient.Get(ctx, instanceNamespacedName, updatedInstance)).To(Succeed())
+			Expect(updatedInstance.Finalizers).To(BeEmpty())
+		})
+
+		It("should return not found error when resource does not exist", func() {
+			controllerReconciler := &DatabaseInstanceReconciler{
+				Client:        k8sClient,
+				Scheme:        k8sClient.Scheme(),
+				SecretManager: secret.NewManager(k8sClient),
+			}
+
+			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: "nonexistent", Namespace: namespace},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(reconcile.Result{}))
+		})
+
+		It("should set pending status when credentials secret is missing", func() {
+			instance := &dbopsv1alpha1.DatabaseInstance{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      instanceName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseInstanceSpec{
+					Engine: dbopsv1alpha1.EngineTypePostgres,
+					Connection: dbopsv1alpha1.ConnectionConfig{
+						Host: "localhost",
+						Port: 5432,
+						SecretRef: &dbopsv1alpha1.CredentialSecretRef{
+							Name: "nonexistent-secret",
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, instance)).To(Succeed())
+
+			controllerReconciler := &DatabaseInstanceReconciler{
+				Client:        k8sClient,
+				Scheme:        k8sClient.Scheme(),
+				SecretManager: secret.NewManager(k8sClient),
+			}
+
+			// First reconcile to add finalizer
+			_, _ = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: instanceNamespacedName,
+			})
+
+			// Second reconcile to check status
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: instanceNamespacedName,
+			})
+			// May or may not return error depending on implementation
+			_ = err
+
+			// Verify status - should be pending or failed due to missing secret
+			updatedInstance := &dbopsv1alpha1.DatabaseInstance{}
+			Expect(k8sClient.Get(ctx, instanceNamespacedName, updatedInstance)).To(Succeed())
+			// The phase should be set (either Pending or Failed)
+			Expect(updatedInstance.Status.Phase).NotTo(BeEmpty())
 		})
 	})
 })

@@ -112,34 +112,65 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet setup-envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
-# TODO(user): To use a different vendor for e2e tests, modify the setup under 'tests/e2e'.
-# The default setup assumes Kind is pre-installed and builds/loads the Manager Docker image locally.
-# CertManager is installed by default; skip with:
-# - CERT_MANAGER_INSTALL_SKIP=true
-KIND_CLUSTER ?= db-provision-operator-test-e2e
+##@ E2E Testing (k3d)
 
-.PHONY: setup-test-e2e
-setup-test-e2e: ## Set up a Kind cluster for e2e tests if it does not exist
-	@command -v $(KIND) >/dev/null 2>&1 || { \
-		echo "Kind is not installed. Please install Kind manually."; \
-		exit 1; \
-	}
-	@case "$$($(KIND) get clusters)" in \
-		*"$(KIND_CLUSTER)"*) \
-			echo "Kind cluster '$(KIND_CLUSTER)' already exists. Skipping creation." ;; \
-		*) \
-			echo "Creating Kind cluster '$(KIND_CLUSTER)'..."; \
-			$(KIND) create cluster --name $(KIND_CLUSTER) ;; \
-	esac
+# E2E Testing with k3d
+E2E_K3D_CLUSTER ?= db-provision-operator-e2e
+E2E_IMG ?= db-provision-operator:e2e
 
-.PHONY: test-e2e
-test-e2e: setup-test-e2e manifests generate fmt vet ## Run the e2e tests. Expected an isolated environment using Kind.
-	KIND_CLUSTER=$(KIND_CLUSTER) go test ./test/e2e/ -v -ginkgo.v
-	$(MAKE) cleanup-test-e2e
+.PHONY: test-e2e-postgresql
+test-e2e-postgresql: ## Run E2E tests with PostgreSQL
+	$(MAKE) e2e-setup-cluster E2E_DATABASE=postgresql
+	$(MAKE) e2e-run-tests E2E_DATABASE=postgresql || ($(MAKE) e2e-cleanup E2E_DATABASE=postgresql && exit 1)
+	$(MAKE) e2e-cleanup E2E_DATABASE=postgresql
 
-.PHONY: cleanup-test-e2e
-cleanup-test-e2e: ## Tear down the Kind cluster used for e2e tests
-	@$(KIND) delete cluster --name $(KIND_CLUSTER)
+.PHONY: test-e2e-mysql
+test-e2e-mysql: ## Run E2E tests with MySQL
+	$(MAKE) e2e-setup-cluster E2E_DATABASE=mysql
+	$(MAKE) e2e-run-tests E2E_DATABASE=mysql || ($(MAKE) e2e-cleanup E2E_DATABASE=mysql && exit 1)
+	$(MAKE) e2e-cleanup E2E_DATABASE=mysql
+
+.PHONY: e2e-setup-cluster
+e2e-setup-cluster: ## Set up k3d cluster with database for E2E tests
+	@command -v k3d >/dev/null 2>&1 || { echo "Error: k3d not installed. Install with: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash"; exit 1; }
+	@echo "Creating k3d cluster $(E2E_K3D_CLUSTER)-$(E2E_DATABASE)..."
+	k3d cluster create $(E2E_K3D_CLUSTER)-$(E2E_DATABASE) --agents 1 --wait --timeout 120s || true
+	kubectl wait --for=condition=Ready nodes --all --timeout=60s
+	@echo "Deploying $(E2E_DATABASE)..."
+	kubectl apply -f test/e2e/fixtures/$(E2E_DATABASE).yaml
+	@if [ "$(E2E_DATABASE)" = "postgresql" ]; then \
+		echo "Waiting for PostgreSQL to be ready..."; \
+		kubectl wait --for=condition=Ready pod/postgres-0 -n postgres --timeout=180s; \
+	elif [ "$(E2E_DATABASE)" = "mysql" ]; then \
+		echo "Waiting for MySQL to be ready..."; \
+		kubectl wait --for=condition=Ready pod/mysql-0 -n mysql --timeout=180s; \
+	fi
+	@echo "Building operator image..."
+	$(MAKE) docker-build IMG=$(E2E_IMG)
+	@echo "Loading image into k3d..."
+	k3d image import $(E2E_IMG) -c $(E2E_K3D_CLUSTER)-$(E2E_DATABASE)
+	@echo "Installing CRDs..."
+	$(MAKE) install
+	@echo "Deploying operator..."
+	$(MAKE) deploy IMG=$(E2E_IMG)
+	@echo "Waiting for operator to be ready..."
+	kubectl wait --for=condition=Available deployment/db-provision-operator-controller-manager \
+		-n db-provision-operator-system --timeout=120s
+	@echo "E2E setup complete for $(E2E_DATABASE)"
+
+.PHONY: e2e-run-tests
+e2e-run-tests: ## Run E2E tests for specified database
+	@echo "Running E2E tests for $(E2E_DATABASE)..."
+	go test ./test/e2e/... -v -tags=e2e -ginkgo.focus="$(E2E_DATABASE)" -ginkgo.v -timeout=10m
+
+.PHONY: e2e-cleanup
+e2e-cleanup: ## Clean up k3d cluster
+	@echo "Cleaning up k3d cluster $(E2E_K3D_CLUSTER)-$(E2E_DATABASE)..."
+	k3d cluster delete $(E2E_K3D_CLUSTER)-$(E2E_DATABASE) || true
+
+.PHONY: e2e-logs
+e2e-logs: ## Show operator logs from E2E cluster
+	kubectl logs -n db-provision-operator-system -l control-plane=controller-manager -f
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
@@ -196,6 +227,61 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	mkdir -p dist
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > dist/install.yaml
+
+##@ Helm
+
+HELM ?= helm
+CHART_DIR ?= charts/db-provision-operator
+
+.PHONY: helm-lint
+helm-lint: ## Lint Helm chart
+	$(HELM) lint $(CHART_DIR)
+
+.PHONY: helm-template
+helm-template: ## Render Helm chart templates locally
+	$(HELM) template db-provision-operator $(CHART_DIR) --namespace db-provision-operator-system
+
+.PHONY: helm-package
+helm-package: ## Package Helm chart
+	mkdir -p dist
+	$(HELM) package $(CHART_DIR) -d dist/
+
+.PHONY: helm-install
+helm-install: ## Install Helm chart to current cluster
+	$(HELM) install db-provision-operator $(CHART_DIR) \
+		--namespace db-provision-operator-system \
+		--create-namespace \
+		--set image.repository=$(IMAGE_TAG_BASE) \
+		--set image.tag=$(VERSION)
+
+.PHONY: helm-upgrade
+helm-upgrade: ## Upgrade Helm release
+	$(HELM) upgrade db-provision-operator $(CHART_DIR) \
+		--namespace db-provision-operator-system \
+		--set image.repository=$(IMAGE_TAG_BASE) \
+		--set image.tag=$(VERSION)
+
+.PHONY: helm-uninstall
+helm-uninstall: ## Uninstall Helm release
+	$(HELM) uninstall db-provision-operator --namespace db-provision-operator-system
+
+.PHONY: helm-update-crds
+helm-update-crds: manifests ## Copy CRDs to Helm chart
+	cp config/crd/bases/*.yaml $(CHART_DIR)/crds/
+
+##@ Release
+
+.PHONY: release-manifests
+release-manifests: manifests kustomize ## Generate release manifests
+	mkdir -p dist
+	$(KUSTOMIZE) build config/crd > dist/crds.yaml
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	$(KUSTOMIZE) build config/default > dist/install.yaml
+
+.PHONY: release
+release: release-manifests helm-package ## Build all release artifacts
+	@echo "Release artifacts generated in dist/"
+	@ls -la dist/
 
 ##@ Deployment
 

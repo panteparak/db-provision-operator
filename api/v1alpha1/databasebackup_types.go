@@ -22,8 +22,8 @@ import (
 
 // Labels for backups
 const (
-	LabelDatabaseBackup  = "dbops.dbprovision.io/database"
-	LabelBackupSchedule  = "dbops.dbprovision.io/schedule"
+	LabelDatabaseBackup = "dbops.dbprovision.io/database"
+	LabelBackupSchedule = "dbops.dbprovision.io/schedule"
 )
 
 // DatabaseBackupSpec defines the desired state of DatabaseBackup.

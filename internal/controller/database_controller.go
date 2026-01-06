@@ -31,6 +31,7 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/adapter"
+	"github.com/db-provision-operator/internal/metrics"
 	"github.com/db-provision-operator/internal/secret"
 	"github.com/db-provision-operator/internal/util"
 )
@@ -117,7 +118,8 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, database *db
 		if statusErr := r.Status().Update(ctx, database); statusErr != nil {
 			log.Error(statusErr, "Failed to update status")
 		}
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
+		// Don't return error for not found - status is updated, requeue to check if instance is created later
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	// Check if instance is ready
@@ -188,6 +190,7 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, database *db
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
 
+	engine := string(instance.Spec.Engine)
 	if !exists {
 		// Create the database
 		log.Info("Creating database", "name", dbName)
@@ -197,8 +200,10 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, database *db
 			log.Error(statusErr, "Failed to update status")
 		}
 
+		createStart := time.Now()
 		opts := r.buildCreateDatabaseOptions(database, instance.Spec.Engine)
 		if err := dbAdapter.CreateDatabase(ctx, opts); err != nil {
+			metrics.RecordDatabaseOperation(metrics.OperationCreate, engine, database.Namespace, metrics.StatusFailure)
 			database.Status.Phase = dbopsv1alpha1.PhaseFailed
 			database.Status.Message = fmt.Sprintf("Failed to create database: %v", err)
 			util.SetReadyCondition(&database.Status.Conditions, metav1.ConditionFalse,
@@ -208,6 +213,9 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, database *db
 			}
 			return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 		}
+		createDuration := time.Since(createStart).Seconds()
+		metrics.RecordDatabaseOperation(metrics.OperationCreate, engine, database.Namespace, metrics.StatusSuccess)
+		metrics.RecordDatabaseOperationDuration(metrics.OperationCreate, engine, database.Namespace, createDuration)
 
 		log.Info("Successfully created database", "name", dbName)
 	}
@@ -234,6 +242,8 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, database *db
 			Owner:     dbInfo.Owner,
 			SizeBytes: dbInfo.SizeBytes,
 		}
+		// Record database size metric
+		metrics.SetDatabaseSize(dbName, instance.Name, engine, database.Namespace, float64(dbInfo.SizeBytes))
 	}
 
 	// Set conditions
@@ -385,13 +395,21 @@ func (r *DatabaseReconciler) handleDeletion(ctx context.Context, database *dbops
 					defer dbAdapter.Close()
 					if err := dbAdapter.Connect(ctx); err == nil {
 						log.Info("Dropping database", "name", database.Spec.Name)
+						engine := string(instance.Spec.Engine)
+						deleteStart := time.Now()
 						opts := adapter.DropDatabaseOptions{
 							Force: util.HasForceDeleteAnnotation(database),
 						}
 						if err := dbAdapter.DropDatabase(ctx, database.Spec.Name, opts); err != nil {
 							log.Error(err, "Failed to drop database", "name", database.Spec.Name)
+							metrics.RecordDatabaseOperation(metrics.OperationDelete, engine, database.Namespace, metrics.StatusFailure)
 						} else {
 							log.Info("Successfully dropped database", "name", database.Spec.Name)
+							deleteDuration := time.Since(deleteStart).Seconds()
+							metrics.RecordDatabaseOperation(metrics.OperationDelete, engine, database.Namespace, metrics.StatusSuccess)
+							metrics.RecordDatabaseOperationDuration(metrics.OperationDelete, engine, database.Namespace, deleteDuration)
+							// Clean up database size metric
+							metrics.DeleteDatabaseMetrics(database.Spec.Name, instance.Name, engine, database.Namespace)
 						}
 					}
 				}

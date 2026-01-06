@@ -31,6 +31,7 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/adapter"
+	"github.com/db-provision-operator/internal/metrics"
 	"github.com/db-provision-operator/internal/secret"
 	"github.com/db-provision-operator/internal/util"
 )
@@ -117,7 +118,8 @@ func (r *DatabaseUserReconciler) reconcileUser(ctx context.Context, user *dbopsv
 		if statusErr := r.Status().Update(ctx, user); statusErr != nil {
 			log.Error(statusErr, "Failed to update status")
 		}
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
+		// Don't return error for not found - status is updated, requeue to check if instance is created later
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	// Check if instance is ready
@@ -188,6 +190,7 @@ func (r *DatabaseUserReconciler) reconcileUser(ctx context.Context, user *dbopsv
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
 
+	engine := string(instance.Spec.Engine)
 	if !exists {
 		// Create the user
 		log.Info("Creating user", "username", username)
@@ -199,6 +202,7 @@ func (r *DatabaseUserReconciler) reconcileUser(ctx context.Context, user *dbopsv
 
 		opts := r.buildCreateUserOptions(user, userPassword, instance.Spec.Engine)
 		if err := dbAdapter.CreateUser(ctx, opts); err != nil {
+			metrics.RecordUserOperation(metrics.OperationCreate, engine, user.Namespace, metrics.StatusFailure)
 			user.Status.Phase = dbopsv1alpha1.PhaseFailed
 			user.Status.Message = fmt.Sprintf("Failed to create user: %v", err)
 			util.SetReadyCondition(&user.Status.Conditions, metav1.ConditionFalse,
@@ -208,13 +212,17 @@ func (r *DatabaseUserReconciler) reconcileUser(ctx context.Context, user *dbopsv
 			}
 			return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 		}
+		metrics.RecordUserOperation(metrics.OperationCreate, engine, user.Namespace, metrics.StatusSuccess)
 
 		log.Info("Successfully created user", "username", username)
 	} else {
 		// Update user if needed
 		updateOpts := r.buildUpdateUserOptions(user, instance.Spec.Engine)
 		if err := dbAdapter.UpdateUser(ctx, username, updateOpts); err != nil {
+			metrics.RecordUserOperation(metrics.OperationUpdate, engine, user.Namespace, metrics.StatusFailure)
 			log.Error(err, "Failed to update user", "username", username)
+		} else {
+			metrics.RecordUserOperation(metrics.OperationUpdate, engine, user.Namespace, metrics.StatusSuccess)
 		}
 	}
 
@@ -437,9 +445,12 @@ func (r *DatabaseUserReconciler) handleDeletion(ctx context.Context, user *dbops
 					defer dbAdapter.Close()
 					if err := dbAdapter.Connect(ctx); err == nil {
 						log.Info("Dropping user", "username", user.Spec.Username)
+						engine := string(instance.Spec.Engine)
 						if err := dbAdapter.DropUser(ctx, user.Spec.Username); err != nil {
+							metrics.RecordUserOperation(metrics.OperationDelete, engine, user.Namespace, metrics.StatusFailure)
 							log.Error(err, "Failed to drop user", "username", user.Spec.Username)
 						} else {
+							metrics.RecordUserOperation(metrics.OperationDelete, engine, user.Namespace, metrics.StatusSuccess)
 							log.Info("Successfully dropped user", "username", user.Spec.Username)
 						}
 					}

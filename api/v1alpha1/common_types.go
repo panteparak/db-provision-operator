@@ -556,18 +556,18 @@ type Condition struct {
 
 // Condition types
 const (
-	ConditionTypeReady              = "Ready"
-	ConditionTypeConnected          = "Connected"
-	ConditionTypeTLSVerified        = "TLSVerified"
-	ConditionTypeSecretCreated      = "SecretCreated"
-	ConditionTypePasswordRotated    = "PasswordRotated"
+	ConditionTypeReady               = "Ready"
+	ConditionTypeConnected           = "Connected"
+	ConditionTypeTLSVerified         = "TLSVerified"
+	ConditionTypeSecretCreated       = "SecretCreated"
+	ConditionTypePasswordRotated     = "PasswordRotated"
 	ConditionTypeExtensionsInstalled = "ExtensionsInstalled"
-	ConditionTypeSchemasCreated     = "SchemasCreated"
-	ConditionTypeGrantsApplied      = "GrantsApplied"
-	ConditionTypeRolesAssigned      = "RolesAssigned"
-	ConditionTypeComplete           = "Complete"
-	ConditionTypeScheduled          = "Scheduled"
-	ConditionTypeRetentionEnforced  = "RetentionEnforced"
+	ConditionTypeSchemasCreated      = "SchemasCreated"
+	ConditionTypeGrantsApplied       = "GrantsApplied"
+	ConditionTypeRolesAssigned       = "RolesAssigned"
+	ConditionTypeComplete            = "Complete"
+	ConditionTypeScheduled           = "Scheduled"
+	ConditionTypeRetentionEnforced   = "RetentionEnforced"
 )
 
 // Condition reasons

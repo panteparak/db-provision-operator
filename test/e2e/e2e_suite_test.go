@@ -1,3 +1,5 @@
+//go:build e2e
+
 /*
 Copyright 2026.
 
@@ -17,73 +19,179 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/db-provision-operator/test/utils"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 var (
-	// Optional Environment Variables:
-	// - CERT_MANAGER_INSTALL_SKIP=true: Skips CertManager installation during test setup.
-	// These variables are useful if CertManager is already installed, avoiding
-	// re-installation and conflicts.
-	skipCertManagerInstall = os.Getenv("CERT_MANAGER_INSTALL_SKIP") == "true"
-	// isCertManagerAlreadyInstalled will be set true when CertManager CRDs be found on the cluster
-	isCertManagerAlreadyInstalled = false
+	// k8sClient is the standard Kubernetes client for core resources
+	k8sClient kubernetes.Interface
 
-	// projectImage is the name of the image which will be build and loaded
-	// with the code source changes to be tested.
-	projectImage = "example.com/db-provision-operator:v0.0.1"
+	// dynamicClient is used to interact with CRDs (DatabaseInstance, Database, etc.)
+	dynamicClient dynamic.Interface
+
+	// E2E_DATABASE_ENGINE environment variable specifies which database to test (postgresql or mysql)
+	databaseEngine = os.Getenv("E2E_DATABASE_ENGINE")
+
+	// Default test timeout
+	defaultTimeout = 2 * time.Minute
+
+	// Polling interval for Eventually checks
+	pollingInterval = 2 * time.Second
 )
 
-// TestE2E runs the end-to-end (e2e) test suite for the project. These tests execute in an isolated,
-// temporary environment to validate project changes with the purposed to be used in CI jobs.
-// The default setup requires Kind, builds/loads the Manager Docker image locally, and installs
-// CertManager.
+// GVRs for custom resources
+var (
+	databaseInstanceGVR = schema.GroupVersionResource{
+		Group:    "dbops.dbprovision.io",
+		Version:  "v1alpha1",
+		Resource: "databaseinstances",
+	}
+
+	databaseGVR = schema.GroupVersionResource{
+		Group:    "dbops.dbprovision.io",
+		Version:  "v1alpha1",
+		Resource: "databases",
+	}
+
+	databaseUserGVR = schema.GroupVersionResource{
+		Group:    "dbops.dbprovision.io",
+		Version:  "v1alpha1",
+		Resource: "databaseusers",
+	}
+
+	databaseRoleGVR = schema.GroupVersionResource{
+		Group:    "dbops.dbprovision.io",
+		Version:  "v1alpha1",
+		Resource: "databaseroles",
+	}
+
+	databaseGrantGVR = schema.GroupVersionResource{
+		Group:    "dbops.dbprovision.io",
+		Version:  "v1alpha1",
+		Resource: "databasegrants",
+	}
+)
+
+// TestE2E runs the end-to-end (e2e) test suite for the project.
+// These tests execute against a real Kubernetes cluster (k3d) with real database instances.
 func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
-	_, _ = fmt.Fprintf(GinkgoWriter, "Starting db-provision-operator integration test suite\n")
-	RunSpecs(t, "e2e suite")
+	_, _ = fmt.Fprintf(GinkgoWriter, "Starting db-provision-operator E2E test suite\n")
+	_, _ = fmt.Fprintf(GinkgoWriter, "Database engine: %s\n", databaseEngine)
+	RunSpecs(t, "E2E Suite")
 }
 
 var _ = BeforeSuite(func() {
-	By("building the manager(Operator) image")
-	cmd := exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectImage))
-	_, err := utils.Run(cmd)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to build the manager(Operator) image")
+	By("setting up Kubernetes clients")
 
-	// TODO(user): If you want to change the e2e test vendor from Kind, ensure the image is
-	// built and available before running the tests. Also, remove the following block.
-	By("loading the manager(Operator) image on Kind")
-	err = utils.LoadImageToKindClusterWithName(projectImage)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to load the manager(Operator) image into Kind")
+	cfg, err := config.GetConfig()
+	Expect(err).NotTo(HaveOccurred(), "Failed to get kubeconfig")
 
-	// The tests-e2e are intended to run on a temporary cluster that is created and destroyed for testing.
-	// To prevent errors when tests run in environments with CertManager already installed,
-	// we check for its presence before execution.
-	// Setup CertManager before the suite if not skipped and if not already installed
-	if !skipCertManagerInstall {
-		By("checking if cert manager is installed already")
-		isCertManagerAlreadyInstalled = utils.IsCertManagerCRDsInstalled()
-		if !isCertManagerAlreadyInstalled {
-			_, _ = fmt.Fprintf(GinkgoWriter, "Installing CertManager...\n")
-			Expect(utils.InstallCertManager()).To(Succeed(), "Failed to install CertManager")
-		} else {
-			_, _ = fmt.Fprintf(GinkgoWriter, "WARNING: CertManager is already installed. Skipping installation...\n")
+	k8sClient, err = kubernetes.NewForConfig(cfg)
+	Expect(err).NotTo(HaveOccurred(), "Failed to create Kubernetes client")
+
+	dynamicClient, err = dynamic.NewForConfig(cfg)
+	Expect(err).NotTo(HaveOccurred(), "Failed to create dynamic client")
+
+	By("verifying cluster connectivity")
+	_, err = k8sClient.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{})
+	Expect(err).NotTo(HaveOccurred(), "Failed to connect to Kubernetes cluster")
+
+	By("verifying operator is running")
+	Eventually(func() bool {
+		pods, err := k8sClient.CoreV1().Pods("db-provision-operator-system").List(
+			context.Background(),
+			metav1.ListOptions{LabelSelector: "control-plane=controller-manager"},
+		)
+		if err != nil {
+			return false
 		}
-	}
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == "Running" {
+				return true
+			}
+		}
+		return false
+	}, defaultTimeout, pollingInterval).Should(BeTrue(), "Operator pod should be running")
+
+	_, _ = fmt.Fprintf(GinkgoWriter, "E2E test setup complete\n")
 })
 
 var _ = AfterSuite(func() {
-	// Teardown CertManager after the suite if not skipped and if it was not already installed
-	if !skipCertManagerInstall && !isCertManagerAlreadyInstalled {
-		_, _ = fmt.Fprintf(GinkgoWriter, "Uninstalling CertManager...\n")
-		utils.UninstallCertManager()
-	}
+	By("E2E test suite cleanup complete")
 })
+
+// Helper functions for tests
+
+// createDatabaseInstance creates a DatabaseInstance CR and waits for it to become ready
+func createDatabaseInstance(ctx context.Context, name, namespace, engine, host string, port int32, secretName, secretNamespace string) error {
+	instance := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "dbops.dbprovision.io/v1alpha1",
+			"kind":       "DatabaseInstance",
+			"metadata": map[string]interface{}{
+				"name":      name,
+				"namespace": namespace,
+			},
+			"spec": map[string]interface{}{
+				"engine": engine,
+				"connection": map[string]interface{}{
+					"host":     host,
+					"port":     port,
+					"database": "postgres",
+					"secretRef": map[string]interface{}{
+						"name":      secretName,
+						"namespace": secretNamespace,
+					},
+				},
+			},
+		},
+	}
+
+	if engine == "mysql" {
+		instance.Object["spec"].(map[string]interface{})["connection"].(map[string]interface{})["database"] = "mysql"
+	}
+
+	_, err := dynamicClient.Resource(databaseInstanceGVR).Namespace(namespace).Create(ctx, instance, metav1.CreateOptions{})
+	return err
+}
+
+// waitForPhase waits for a CR to reach the specified phase
+func waitForPhase(ctx context.Context, gvr schema.GroupVersionResource, name, namespace, expectedPhase string, timeout time.Duration) error {
+	return Eventually(func() string {
+		obj, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return ""
+		}
+		phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+		return phase
+	}, timeout, pollingInterval).Should(Equal(expectedPhase))
+}
+
+// deleteResource deletes a CR by name and namespace
+func deleteResource(ctx context.Context, gvr schema.GroupVersionResource, name, namespace string) error {
+	return dynamicClient.Resource(gvr).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+}
+
+// getResourcePhase returns the current phase of a CR
+func getResourcePhase(ctx context.Context, gvr schema.GroupVersionResource, name, namespace string) (string, error) {
+	obj, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	phase, _, err := unstructured.NestedString(obj.Object, "status", "phase")
+	return phase, err
+}

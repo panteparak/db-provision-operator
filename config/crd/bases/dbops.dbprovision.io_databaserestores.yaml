@@ -90,6 +90,10 @@ spec:
                 description: FromPath allows restoring from a direct path instead
                   of a backup reference
                 properties:
+                  backupPath:
+                    description: BackupPath is the path to the backup file within
+                      the storage
+                    type: string
                   compression:
                     description: Compression settings used for the backup
                     properties:
@@ -291,6 +295,7 @@ spec:
                     - type
                     type: object
                 required:
+                - backupPath
                 - storage
                 type: object
               mysql:

@@ -18,67 +18,256 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/util"
 )
 
 var _ = Describe("Database Controller", func() {
-	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
+	const (
+		timeout  = time.Second * 10
+		interval = time.Millisecond * 250
+	)
 
-		ctx := context.Background()
+	Context("When creating a Database", func() {
+		const (
+			databaseName = "test-database"
+			instanceName = "test-instance"
+			namespace    = "default"
+		)
 
-		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
-		}
-		database := &dbopsv1alpha1.Database{}
+		var (
+			ctx                    context.Context
+			databaseNamespacedName types.NamespacedName
+			instanceNamespacedName types.NamespacedName
+		)
 
 		BeforeEach(func() {
-			By("creating the custom resource for the Kind Database")
-			err := k8sClient.Get(ctx, typeNamespacedName, database)
-			if err != nil && errors.IsNotFound(err) {
-				resource := &dbopsv1alpha1.Database{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: "default",
+			ctx = context.Background()
+			databaseNamespacedName = types.NamespacedName{Name: databaseName, Namespace: namespace}
+			instanceNamespacedName = types.NamespacedName{Name: instanceName, Namespace: namespace}
+
+			// Create a secret for the instance
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      instanceName + "-creds",
+					Namespace: namespace,
+				},
+				Data: map[string][]byte{
+					"username": []byte("admin"),
+					"password": []byte("password123"),
+				},
+			}
+			err := k8sClient.Get(ctx, types.NamespacedName{Name: secret.Name, Namespace: namespace}, &corev1.Secret{})
+			if errors.IsNotFound(err) {
+				Expect(k8sClient.Create(ctx, secret)).To(Succeed())
+			}
+
+			// Create a DatabaseInstance
+			instance := &dbopsv1alpha1.DatabaseInstance{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      instanceName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseInstanceSpec{
+					Engine: dbopsv1alpha1.EngineTypePostgres,
+					Connection: dbopsv1alpha1.ConnectionConfig{
+						Host: "localhost",
+						Port: 5432,
+						SecretRef: &dbopsv1alpha1.CredentialSecretRef{
+							Name: instanceName + "-creds",
+						},
 					},
-					// TODO(user): Specify other spec details if needed.
-				}
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+				},
+			}
+			err = k8sClient.Get(ctx, instanceNamespacedName, &dbopsv1alpha1.DatabaseInstance{})
+			if errors.IsNotFound(err) {
+				Expect(k8sClient.Create(ctx, instance)).To(Succeed())
 			}
 		})
 
 		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &dbopsv1alpha1.Database{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			Expect(err).NotTo(HaveOccurred())
+			// Clean up Database
+			database := &dbopsv1alpha1.Database{}
+			err := k8sClient.Get(ctx, databaseNamespacedName, database)
+			if err == nil {
+				// Remove finalizer to allow deletion
+				database.Finalizers = nil
+				_ = k8sClient.Update(ctx, database)
+				_ = k8sClient.Delete(ctx, database)
+			}
 
-			By("Cleanup the specific resource instance Database")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			// Clean up DatabaseInstance
+			instance := &dbopsv1alpha1.DatabaseInstance{}
+			err = k8sClient.Get(ctx, instanceNamespacedName, instance)
+			if err == nil {
+				instance.Finalizers = nil
+				_ = k8sClient.Update(ctx, instance)
+				_ = k8sClient.Delete(ctx, instance)
+			}
 		})
-		It("should successfully reconcile the resource", func() {
-			By("Reconciling the created resource")
+
+		It("should add finalizer when created", func() {
+			database := &dbopsv1alpha1.Database{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      databaseName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseSpec{
+					Name: "testdb",
+					InstanceRef: dbopsv1alpha1.InstanceReference{
+						Name: instanceName,
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, database)).To(Succeed())
+
 			controllerReconciler := &DatabaseReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+				NamespacedName: databaseNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+
+			// Verify finalizer was added
+			updatedDatabase := &dbopsv1alpha1.Database{}
+			Expect(k8sClient.Get(ctx, databaseNamespacedName, updatedDatabase)).To(Succeed())
+			Expect(updatedDatabase.Finalizers).To(ContainElement(util.FinalizerDatabase))
+		})
+
+		It("should set pending phase when instance is not ready", func() {
+			database := &dbopsv1alpha1.Database{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      databaseName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseSpec{
+					Name: "testdb",
+					InstanceRef: dbopsv1alpha1.InstanceReference{
+						Name: instanceName,
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, database)).To(Succeed())
+
+			controllerReconciler := &DatabaseReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			// First reconcile to add finalizer
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: databaseNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Second reconcile to check phase (instance not ready)
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: databaseNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify status
+			updatedDatabase := &dbopsv1alpha1.Database{}
+			Expect(k8sClient.Get(ctx, databaseNamespacedName, updatedDatabase)).To(Succeed())
+			Expect(updatedDatabase.Status.Phase).To(Equal(dbopsv1alpha1.PhasePending))
+		})
+
+		It("should skip reconcile when annotation is set", func() {
+			database := &dbopsv1alpha1.Database{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      databaseName,
+					Namespace: namespace,
+					Annotations: map[string]string{
+						util.AnnotationSkipReconcile: "true",
+					},
+				},
+				Spec: dbopsv1alpha1.DatabaseSpec{
+					Name: "testdb",
+					InstanceRef: dbopsv1alpha1.InstanceReference{
+						Name: instanceName,
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, database)).To(Succeed())
+
+			controllerReconciler := &DatabaseReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: databaseNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.Requeue).To(BeFalse())
+
+			// Verify no finalizer was added (skipped)
+			updatedDatabase := &dbopsv1alpha1.Database{}
+			Expect(k8sClient.Get(ctx, databaseNamespacedName, updatedDatabase)).To(Succeed())
+			Expect(updatedDatabase.Finalizers).To(BeEmpty())
+		})
+
+		It("should fail when instance does not exist", func() {
+			database := &dbopsv1alpha1.Database{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      databaseName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseSpec{
+					Name: "testdb",
+					InstanceRef: dbopsv1alpha1.InstanceReference{
+						Name: "nonexistent-instance",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, database)).To(Succeed())
+
+			controllerReconciler := &DatabaseReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			// First reconcile adds finalizer
+			_, _ = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: databaseNamespacedName,
+			})
+
+			// Second reconcile handles the missing instance
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: databaseNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify status is failed
+			updatedDatabase := &dbopsv1alpha1.Database{}
+			Expect(k8sClient.Get(ctx, databaseNamespacedName, updatedDatabase)).To(Succeed())
+			Expect(updatedDatabase.Status.Phase).To(Equal(dbopsv1alpha1.PhaseFailed))
+		})
+
+		It("should return not found error when resource does not exist", func() {
+			controllerReconciler := &DatabaseReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: "nonexistent", Namespace: namespace},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(reconcile.Result{}))
 		})
 	})
 })

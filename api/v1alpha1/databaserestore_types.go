@@ -63,6 +63,10 @@ type RestoreFromPath struct {
 	// +kubebuilder:validation:Required
 	Storage StorageConfig `json:"storage"`
 
+	// BackupPath is the path to the backup file within the storage
+	// +kubebuilder:validation:Required
+	BackupPath string `json:"backupPath"`
+
 	// Compression settings used for the backup
 	// +optional
 	Compression *CompressionConfig `json:"compression,omitempty"`

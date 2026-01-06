@@ -23,11 +23,24 @@ COPY internal/ internal/
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/static:nonroot
+# Production image with database client tools for backup/restore operations
+# Using Alpine instead of distroless to include pg_dump, mysqldump, etc.
+FROM alpine:3.21
+
+# Install PostgreSQL and MySQL client tools required for backup/restore
+RUN apk add --no-cache \
+    postgresql16-client \
+    mysql-client \
+    ca-certificates \
+    tzdata
+
+# Create non-root user matching distroless UID/GID
+RUN adduser -D -u 65532 -g 65532 nonroot
+
 WORKDIR /
 COPY --from=builder /workspace/manager .
+
+# Run as non-root user
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]

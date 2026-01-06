@@ -30,6 +30,7 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/adapter"
+	"github.com/db-provision-operator/internal/metrics"
 	"github.com/db-provision-operator/internal/secret"
 	"github.com/db-provision-operator/internal/util"
 )
@@ -149,8 +150,12 @@ func (r *DatabaseInstanceReconciler) reconcileInstance(ctx context.Context, inst
 	}
 	defer dbAdapter.Close()
 
-	// Connect to database
+	// Connect to database with metrics
+	engine := string(instance.Spec.Engine)
+	connectStart := time.Now()
 	if err := dbAdapter.Connect(ctx); err != nil {
+		metrics.RecordConnectionAttempt(instance.Name, engine, instance.Namespace, metrics.StatusFailure)
+		metrics.SetInstanceHealth(instance.Name, engine, instance.Namespace, false)
 		instance.Status.Phase = dbopsv1alpha1.PhaseFailed
 		instance.Status.Message = fmt.Sprintf("Failed to connect: %v", err)
 		util.SetConnectedCondition(&instance.Status.Conditions, metav1.ConditionFalse,
@@ -160,9 +165,13 @@ func (r *DatabaseInstanceReconciler) reconcileInstance(ctx context.Context, inst
 		}
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
+	connectDuration := time.Since(connectStart).Seconds()
+	metrics.RecordConnectionLatency(instance.Name, engine, instance.Namespace, connectDuration)
 
 	// Ping to verify connection
 	if err := dbAdapter.Ping(ctx); err != nil {
+		metrics.RecordConnectionAttempt(instance.Name, engine, instance.Namespace, metrics.StatusFailure)
+		metrics.SetInstanceHealth(instance.Name, engine, instance.Namespace, false)
 		instance.Status.Phase = dbopsv1alpha1.PhaseFailed
 		instance.Status.Message = fmt.Sprintf("Failed to ping: %v", err)
 		util.SetConnectedCondition(&instance.Status.Conditions, metav1.ConditionFalse,
@@ -172,6 +181,11 @@ func (r *DatabaseInstanceReconciler) reconcileInstance(ctx context.Context, inst
 		}
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
+
+	// Record successful connection
+	metrics.RecordConnectionAttempt(instance.Name, engine, instance.Namespace, metrics.StatusSuccess)
+	metrics.SetInstanceHealth(instance.Name, engine, instance.Namespace, true)
+	metrics.SetInstanceLastHealthCheck(instance.Name, engine, instance.Namespace, float64(time.Now().Unix()))
 
 	// Get version
 	version, err := dbAdapter.GetVersion(ctx)
@@ -222,6 +236,10 @@ func (r *DatabaseInstanceReconciler) handleDeletion(ctx context.Context, instanc
 	}
 
 	log.Info("Handling deletion of DatabaseInstance", "name", instance.Name)
+
+	// Clean up metrics for this instance
+	engine := string(instance.Spec.Engine)
+	metrics.DeleteInstanceMetrics(instance.Name, engine, instance.Namespace)
 
 	// Remove finalizer
 	controllerutil.RemoveFinalizer(instance, util.FinalizerDatabaseInstance)

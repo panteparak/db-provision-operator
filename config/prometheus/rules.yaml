@@ -1,0 +1,111 @@
+# Prometheus alerting rules for db-provision-operator
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    control-plane: controller-manager
+    app.kubernetes.io/name: db-provision-operator
+    app.kubernetes.io/component: alerting
+    app.kubernetes.io/managed-by: kustomize
+  name: db-provision-operator-alerts
+  namespace: system
+spec:
+  groups:
+    - name: db-provision-operator.alerts
+      rules:
+        # Instance health alerts
+        - alert: DatabaseInstanceUnhealthy
+          expr: dbops_instance_healthy == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Database instance {{ $labels.instance }} is unhealthy"
+            description: "Database instance {{ $labels.instance }} ({{ $labels.engine }}) in namespace {{ $labels.namespace }} has been unhealthy for more than 5 minutes."
+
+        - alert: DatabaseInstanceConnectionFailures
+          expr: rate(dbops_connection_attempts_total{status="failure"}[5m]) > 0.1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High connection failure rate for instance {{ $labels.instance }}"
+            description: "Database instance {{ $labels.instance }} ({{ $labels.engine }}) in namespace {{ $labels.namespace }} is experiencing connection failures."
+
+        - alert: DatabaseInstanceHighConnectionLatency
+          expr: histogram_quantile(0.95, rate(dbops_connection_latency_seconds_bucket[5m])) > 5
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High connection latency for instance {{ $labels.instance }}"
+            description: "Database instance {{ $labels.instance }} ({{ $labels.engine }}) in namespace {{ $labels.namespace }} has P95 connection latency > 5 seconds."
+
+        # Backup alerts
+        - alert: DatabaseBackupFailed
+          expr: increase(dbops_backup_operations_total{status="failure"}[1h]) > 0
+          for: 0m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Database backup failed"
+            description: "A database backup operation failed in namespace {{ $labels.namespace }} for engine {{ $labels.engine }}."
+
+        - alert: DatabaseBackupStale
+          expr: time() - dbops_backup_last_success_timestamp_seconds > 86400
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Database backup is stale for {{ $labels.database }}"
+            description: "Database {{ $labels.database }} ({{ $labels.engine }}) in namespace {{ $labels.namespace }} has not had a successful backup in over 24 hours."
+
+        - alert: DatabaseBackupSlow
+          expr: histogram_quantile(0.95, rate(dbops_backup_duration_seconds_bucket[1h])) > 3600
+          for: 0m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Database backup is taking too long"
+            description: "P95 backup duration for {{ $labels.engine }} in namespace {{ $labels.namespace }} exceeds 1 hour."
+
+        # Restore alerts
+        - alert: DatabaseRestoreFailed
+          expr: increase(dbops_restore_operations_total{status="failure"}[1h]) > 0
+          for: 0m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Database restore failed"
+            description: "A database restore operation failed in namespace {{ $labels.namespace }} for engine {{ $labels.engine }}."
+
+        # Operation failure alerts
+        - alert: DatabaseOperationFailures
+          expr: rate(dbops_database_operations_total{status="failure"}[5m]) > 0.05
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High database operation failure rate"
+            description: "Database operations ({{ $labels.operation }}) are failing at a high rate for engine {{ $labels.engine }} in namespace {{ $labels.namespace }}."
+
+        - alert: UserOperationFailures
+          expr: rate(dbops_user_operations_total{status="failure"}[5m]) > 0.05
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High user operation failure rate"
+            description: "User operations ({{ $labels.operation }}) are failing at a high rate for engine {{ $labels.engine }} in namespace {{ $labels.namespace }}."
+
+    - name: db-provision-operator.recording
+      rules:
+        # Recording rules for efficiency
+        - record: dbops:connection_success_rate:5m
+          expr: sum(rate(dbops_connection_attempts_total{status="success"}[5m])) by (instance, engine, namespace) / sum(rate(dbops_connection_attempts_total[5m])) by (instance, engine, namespace)
+
+        - record: dbops:backup_success_rate:1h
+          expr: sum(rate(dbops_backup_operations_total{status="success"}[1h])) by (engine, namespace) / sum(rate(dbops_backup_operations_total[1h])) by (engine, namespace)
+
+        - record: dbops:database_operation_success_rate:5m
+          expr: sum(rate(dbops_database_operations_total{status="success"}[5m])) by (operation, engine, namespace) / sum(rate(dbops_database_operations_total[5m])) by (operation, engine, namespace)
