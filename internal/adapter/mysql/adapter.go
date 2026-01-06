@@ -232,42 +232,6 @@ func (a *Adapter) getDB() (*sql.DB, error) {
 	return a.db, nil
 }
 
-// execWithDatabase executes a query on a specific database
-func (a *Adapter) execWithDatabase(ctx context.Context, database, query string, args ...interface{}) error {
-	db, err := a.getDB()
-	if err != nil {
-		return err
-	}
-
-	if database != "" && database != a.config.Database {
-		// Use the specified database
-		_, err = db.ExecContext(ctx, fmt.Sprintf("USE %s", escapeIdentifier(database)))
-		if err != nil {
-			return fmt.Errorf("failed to use database %s: %w", database, err)
-		}
-	}
-
-	_, err = db.ExecContext(ctx, query, args...)
-	return err
-}
-
-// queryWithDatabase executes a query and returns rows on a specific database
-func (a *Adapter) queryWithDatabase(ctx context.Context, database, query string, args ...interface{}) (*sql.Rows, error) {
-	db, err := a.getDB()
-	if err != nil {
-		return nil, err
-	}
-
-	if database != "" && database != a.config.Database {
-		_, err = db.ExecContext(ctx, fmt.Sprintf("USE %s", escapeIdentifier(database)))
-		if err != nil {
-			return nil, fmt.Errorf("failed to use database %s: %w", database, err)
-		}
-	}
-
-	return db.QueryContext(ctx, query, args...)
-}
-
 // escapeIdentifier escapes a MySQL identifier (database, table, column names)
 func escapeIdentifier(s string) string {
 	// Escape backticks by doubling them

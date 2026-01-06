@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -33,11 +32,6 @@ import (
 )
 
 var _ = Describe("DatabaseRestore Controller", func() {
-	const (
-		timeout  = time.Second * 10
-		interval = time.Millisecond * 250
-	)
-
 	Context("When creating a DatabaseRestore", func() {
 		const (
 			restoreName  = "test-restore"

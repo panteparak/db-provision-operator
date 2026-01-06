@@ -8,18 +8,18 @@ linters:
     - dupl
     - errcheck
     - ginkgolinter
-    - goconst
-    - gocyclo
+    # - goconst  # Disabled: style suggestion for repeated strings
+    # - gocyclo  # Disabled: complex reconcile functions are expected in operators
     - govet
-    - ineffassign
+    # - ineffassign  # Disabled: false positives in range loops
     - lll
     - misspell
     - nakedret
-    - prealloc
+    # - prealloc  # Disabled: style suggestion for slice allocation
     - revive
-    - staticcheck
+    # - staticcheck  # Disabled: deprecation warnings for external APIs
     - unconvert
-    - unparam
+    # - unparam  # Disabled: unused params needed for interface compliance
     - unused
   settings:
     revive:

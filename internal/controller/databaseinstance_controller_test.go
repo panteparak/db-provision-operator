@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,11 +33,6 @@ import (
 )
 
 var _ = Describe("DatabaseInstance Controller", func() {
-	const (
-		timeout  = time.Second * 10
-		interval = time.Millisecond * 250
-	)
-
 	Context("When creating a DatabaseInstance", func() {
 		const (
 			instanceName = "test-instance"
