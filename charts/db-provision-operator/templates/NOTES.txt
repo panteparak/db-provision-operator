@@ -1,0 +1,59 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Your release is named: {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+
+1. Verify the operator is running:
+
+   kubectl get pods -n {{ .Release.Namespace }} -l control-plane=controller-manager
+
+2. Check the operator logs:
+
+   kubectl logs -n {{ .Release.Namespace }} -l control-plane=controller-manager -f
+
+3. Verify CRDs are installed:
+
+   kubectl get crds | grep dbprovision.io
+
+4. Create your first DatabaseInstance:
+
+   cat <<EOF | kubectl apply -f -
+   apiVersion: dbops.dbprovision.io/v1alpha1
+   kind: DatabaseInstance
+   metadata:
+     name: my-postgres
+     namespace: default
+   spec:
+     engine: postgresql
+     connection:
+       host: postgres.database.svc.cluster.local
+       port: 5432
+       database: postgres
+       secretRef:
+         name: postgres-credentials
+         namespace: database-secrets
+     healthCheck:
+       enabled: true
+       interval: 30s
+   EOF
+
+5. Check the DatabaseInstance status:
+
+   kubectl get databaseinstance my-postgres -o yaml
+
+{{- if .Values.metrics.enabled }}
+
+6. Access metrics:
+
+   The metrics service is available at:
+   {{ include "db-provision-operator.fullname" . }}-metrics-service.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.metrics.service.port }}
+
+{{- if .Values.metrics.serviceMonitor.enabled }}
+
+   ServiceMonitor is enabled - metrics will be automatically scraped by Prometheus.
+{{- end }}
+{{- end }}
+
+For more information, visit:
+- Documentation: https://github.com/db-provision-operator/db-provision-operator
+- Issues: https://github.com/db-provision-operator/db-provision-operator/issues

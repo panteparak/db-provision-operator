@@ -17,6 +17,33 @@ This document provides the necessary context for continuing development in futur
 | Controllers | ✅ Complete | Reconciliation, finalizers, status |
 | Build | ✅ Passing | `go build ./...` and `go vet ./...` |
 
+### Completed (Phase 2 - Extended Controllers)
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| DatabaseRole CRD | ✅ Complete | Role management for PostgreSQL/MySQL |
+| DatabaseGrant CRD | ✅ Complete | Fine-grained grant management |
+| DatabaseBackup CRD | ✅ Complete | Backup lifecycle management |
+| DatabaseRestore CRD | ✅ Complete | Restore from backup or path |
+| DatabaseBackupSchedule CRD | ✅ Complete | Cron scheduling, retention policies |
+| Retry Utility | ✅ Complete | Exponential backoff with jitter |
+| Tests | ✅ Complete | 45 controller tests passing |
+
+### Completed (Phase 2.5 - Storage & Monitoring)
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| S3 Storage Backend | ✅ Complete | AWS S3 compatible with custom endpoints |
+| GCS Storage Backend | ✅ Complete | Google Cloud Storage |
+| Azure Blob Backend | ✅ Complete | Azure Blob Storage |
+| PVC Storage Backend | ✅ Complete | Kubernetes PVC storage |
+| Compression | ✅ Complete | gzip, lz4, zstd algorithms |
+| Encryption | ✅ Complete | AES-256-GCM encryption |
+| Prometheus Metrics | ✅ Complete | 25 metrics, 100% coverage |
+| ServiceMonitor | ✅ Complete | Auto-discovery for Prometheus |
+| PrometheusRules | ✅ Complete | 10+ alerting rules |
+| Tests | ✅ Complete | 70+ tests passing |
+
 ### Build Status
 
 ```bash
@@ -65,103 +92,6 @@ The backup and restore operations shell out to:
 - `mysqldump` / `mysql` (MySQL)
 
 These must be included in the operator container image.
-
-## Phase 2 Planned Work
-
-### 2.1 DatabaseGrant CRD
-
-**Purpose**: Fine-grained, declarative grant management
-
-**Proposed Spec**:
-```yaml
-apiVersion: dbops.dbprovision.io/v1alpha1
-kind: DatabaseGrant
-metadata:
-  name: myapp-readonly-grant
-spec:
-  userRef:
-    name: myapp-readonly
-  databaseRef:
-    name: myapp-db
-  grants:
-    - type: SELECT
-      objects:
-        - schema: public
-          tables: ["*"]
-    - type: USAGE
-      objects:
-        - schema: public
-```
-
-**Implementation Notes**:
-- Use existing `GrantOperations` interface in adapters
-- Controller watches DatabaseGrant resources
-- Reconcile grants on target database
-- Handle grant revocation on deletion
-
-### 2.2 DatabaseBackup CRD
-
-**Purpose**: Declarative backup management
-
-**Proposed Spec**:
-```yaml
-apiVersion: dbops.dbprovision.io/v1alpha1
-kind: DatabaseBackup
-metadata:
-  name: myapp-backup-2024
-spec:
-  databaseRef:
-    name: myapp-db
-  schedule: "0 2 * * *"  # cron format
-  retention:
-    count: 7
-    days: 30
-  storage:
-    type: s3
-    bucket: backups
-    path: /postgres/myapp/
-  options:
-    format: custom
-    compress: true
-    parallelJobs: 4
-```
-
-**Implementation Notes**:
-- Use existing `BackupOperations` interface
-- Add CronJob-like scheduling
-- Implement storage backends (S3, GCS, local)
-- Track backup history in status
-
-### 2.3 Cross-Namespace RBAC
-
-**Current Limitation**: Cross-namespace references work but RBAC may block access.
-
-**Enhancement**:
-- Add `clusterrole` for cross-namespace Secret access
-- Document RBAC setup for multi-namespace deployments
-- Consider ReferenceGrant pattern (similar to Gateway API)
-
-### 2.4 Metrics and Monitoring
-
-**Proposed Metrics**:
-```
-# Connection metrics
-dbops_connection_attempts_total{instance, engine, status}
-dbops_connection_latency_seconds{instance, engine}
-
-# Operation metrics
-dbops_database_operations_total{operation, engine, status}
-dbops_user_operations_total{operation, engine, status}
-
-# Health metrics
-dbops_instance_healthy{instance, engine}
-dbops_database_size_bytes{database, instance}
-```
-
-**Implementation**:
-- Use controller-runtime metrics
-- Prometheus exposition format
-- ServiceMonitor for automatic discovery
 
 ## Phase 3 Planned Work
 
@@ -266,7 +196,26 @@ db-provision-operator/
 │   ├── controller/
 │   │   ├── databaseinstance_controller.go
 │   │   ├── database_controller.go
-│   │   └── databaseuser_controller.go
+│   │   ├── databaseuser_controller.go
+│   │   ├── databaserole_controller.go
+│   │   ├── databasegrant_controller.go
+│   │   ├── databasebackup_controller.go
+│   │   ├── databaserestore_controller.go
+│   │   └── databasebackupschedule_controller.go
+│   │
+│   ├── metrics/
+│   │   ├── metrics.go            # Prometheus metrics definitions
+│   │   └── metrics_test.go       # Metrics tests (100% coverage)
+│   │
+│   ├── storage/
+│   │   ├── storage.go            # Storage interface
+│   │   ├── s3.go                 # AWS S3 backend
+│   │   ├── gcs.go                # Google Cloud Storage backend
+│   │   ├── azure.go              # Azure Blob Storage backend
+│   │   ├── pvc.go                # PVC storage backend
+│   │   ├── compression.go        # gzip, lz4, zstd compression
+│   │   ├── encryption.go         # AES-256-GCM encryption
+│   │   └── storage_test.go       # Storage tests
 │   │
 │   ├── secret/
 │   │   └── manager.go            # Secret management
@@ -274,11 +223,16 @@ db-provision-operator/
 │   └── util/
 │       ├── conditions.go         # Status condition helpers
 │       ├── finalizers.go         # Finalizer constants
-│       └── annotations.go        # Annotation helpers
+│       ├── annotations.go        # Annotation helpers
+│       └── retry.go              # Exponential backoff retry
 │
 ├── config/
 │   ├── crd/bases/                # Generated CRD manifests
 │   ├── rbac/                     # Generated RBAC manifests
+│   ├── prometheus/
+│   │   ├── monitor.yaml          # ServiceMonitor for Prometheus
+│   │   ├── rules.yaml            # PrometheusRule for alerts
+│   │   └── kustomization.yaml
 │   └── samples/                  # Example resources
 │
 ├── cmd/

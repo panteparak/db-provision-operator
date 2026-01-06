@@ -1,0 +1,698 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: databasebackupschedules.dbops.dbprovision.io
+spec:
+  group: dbops.dbprovision.io
+  names:
+    kind: DatabaseBackupSchedule
+    listKind: DatabaseBackupScheduleList
+    plural: databasebackupschedules
+    shortNames:
+    - dbbaksched
+    singular: databasebackupschedule
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.schedule
+      name: Schedule
+      type: string
+    - jsonPath: .spec.paused
+      name: Paused
+      type: boolean
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.lastBackup.name
+      name: Last Backup
+      type: string
+    - jsonPath: .status.nextBackupTime
+      name: Next Backup
+      type: date
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: DatabaseBackupSchedule is the Schema for the databasebackupschedules
+          API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DatabaseBackupScheduleSpec defines the desired state of DatabaseBackupSchedule.
+            properties:
+              concurrencyPolicy:
+                allOf:
+                - enum:
+                  - Allow
+                  - Forbid
+                  - Replace
+                - enum:
+                  - Allow
+                  - Forbid
+                  - Replace
+                default: Forbid
+                description: ConcurrencyPolicy defines how to handle concurrent backups
+                type: string
+              failedBackupsHistoryLimit:
+                default: 3
+                description: FailedBackupsHistoryLimit is the number of failed backups
+                  to keep in status
+                format: int32
+                minimum: 0
+                type: integer
+              paused:
+                description: Paused suspends the schedule
+                type: boolean
+              retention:
+                description: Retention defines the backup retention policy
+                properties:
+                  keepDaily:
+                    description: KeepDaily keeps N daily backups
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  keepHourly:
+                    description: KeepHourly keeps N hourly backups
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  keepLast:
+                    description: KeepLast keeps the N most recent backups
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  keepMonthly:
+                    description: KeepMonthly keeps N monthly backups
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  keepWeekly:
+                    description: KeepWeekly keeps N weekly backups
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  keepYearly:
+                    description: KeepYearly keeps N yearly backups
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  minAge:
+                    description: MinAge is the minimum age before a backup can be
+                      deleted
+                    type: string
+                type: object
+              schedule:
+                description: Schedule is the cron expression for the backup schedule
+                minLength: 1
+                type: string
+              successfulBackupsHistoryLimit:
+                default: 5
+                description: SuccessfulBackupsHistoryLimit is the number of successful
+                  backups to keep in status
+                format: int32
+                minimum: 0
+                type: integer
+              template:
+                description: Template defines the DatabaseBackup to create
+                properties:
+                  metadata:
+                    description: Metadata for the created backup
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: Annotations to add to created backups
+                        type: object
+                      labels:
+                        additionalProperties:
+                          type: string
+                        description: Labels to add to created backups
+                        type: object
+                    type: object
+                  spec:
+                    description: Spec for the created backup
+                    properties:
+                      activeDeadlineSeconds:
+                        default: 3600
+                        description: ActiveDeadlineSeconds is the timeout for the
+                          backup operation
+                        format: int64
+                        minimum: 1
+                        type: integer
+                      compression:
+                        description: Compression configures backup compression
+                        properties:
+                          algorithm:
+                            allOf:
+                            - enum:
+                              - gzip
+                              - lz4
+                              - zstd
+                              - none
+                            - enum:
+                              - gzip
+                              - lz4
+                              - zstd
+                            default: gzip
+                            description: Algorithm specifies the compression algorithm
+                            type: string
+                          enabled:
+                            default: true
+                            description: Enabled enables compression
+                            type: boolean
+                          level:
+                            default: 6
+                            description: Level specifies the compression level (1-9)
+                            format: int32
+                            maximum: 9
+                            minimum: 1
+                            type: integer
+                        type: object
+                      databaseRef:
+                        description: DatabaseRef references the Database to backup
+                        properties:
+                          name:
+                            description: Name of the Database resource
+                            type: string
+                          namespace:
+                            description: Namespace of the Database (defaults to the
+                              resource namespace)
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      encryption:
+                        description: Encryption configures backup encryption
+                        properties:
+                          algorithm:
+                            allOf:
+                            - enum:
+                              - aes-256-gcm
+                              - aes-256-cbc
+                            - enum:
+                              - aes-256-gcm
+                              - aes-256-cbc
+                            default: aes-256-gcm
+                            description: Algorithm specifies the encryption algorithm
+                            type: string
+                          enabled:
+                            description: Enabled enables encryption
+                            type: boolean
+                          secretRef:
+                            description: SecretRef references a secret containing
+                              the encryption key
+                            properties:
+                              key:
+                                description: Key within the secret
+                                type: string
+                              name:
+                                description: Name of the secret
+                                type: string
+                              namespace:
+                                description: Namespace of the secret (defaults to
+                                  the resource namespace)
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                        type: object
+                      mysql:
+                        description: MySQL-specific backup configuration
+                        properties:
+                          databases:
+                            description: Databases lists specific databases to backup
+                              (empty = all)
+                            items:
+                              type: string
+                            type: array
+                          events:
+                            default: true
+                            description: Events includes events
+                            type: boolean
+                          excludeTables:
+                            description: ExcludeTables lists tables to exclude
+                            items:
+                              type: string
+                            type: array
+                          extendedInsert:
+                            default: true
+                            description: ExtendedInsert uses extended INSERT statements
+                            type: boolean
+                          lockTables:
+                            description: LockTables locks all tables before backup
+                            type: boolean
+                          method:
+                            allOf:
+                            - enum:
+                              - mysqldump
+                              - xtrabackup
+                              - mysqlpump
+                            - enum:
+                              - mysqldump
+                              - xtrabackup
+                              - mysqlpump
+                            default: mysqldump
+                            description: Method specifies the backup method
+                            type: string
+                          quick:
+                            default: true
+                            description: Quick retrieves rows one at a time instead
+                              of buffering
+                            type: boolean
+                          routines:
+                            default: true
+                            description: Routines includes stored procedures and functions
+                            type: boolean
+                          setGtidPurged:
+                            allOf:
+                            - enum:
+                              - "OFF"
+                              - "ON"
+                              - AUTO
+                            - enum:
+                              - "OFF"
+                              - "ON"
+                              - AUTO
+                            default: AUTO
+                            description: SetGtidPurged controls SET @@GLOBAL.GTID_PURGED
+                            type: string
+                          singleTransaction:
+                            default: true
+                            description: SingleTransaction uses a single transaction
+                              for InnoDB tables
+                            type: boolean
+                          tables:
+                            description: Tables lists specific tables to backup (empty
+                              = all)
+                            items:
+                              type: string
+                            type: array
+                          triggers:
+                            default: true
+                            description: Triggers includes triggers
+                            type: boolean
+                        type: object
+                      postgres:
+                        description: PostgreSQL-specific backup configuration
+                        properties:
+                          blobs:
+                            default: true
+                            description: Blobs includes large objects in the backup
+                            type: boolean
+                          dataOnly:
+                            description: DataOnly backs up only data, not schema
+                            type: boolean
+                          excludeSchemas:
+                            description: ExcludeSchemas lists schemas to exclude
+                            items:
+                              type: string
+                            type: array
+                          excludeTables:
+                            description: 'ExcludeTables lists tables to exclude (format:
+                              schema.table)'
+                            items:
+                              type: string
+                            type: array
+                          format:
+                            allOf:
+                            - enum:
+                              - plain
+                              - custom
+                              - directory
+                              - tar
+                            - enum:
+                              - plain
+                              - custom
+                              - directory
+                              - tar
+                            default: custom
+                            description: Format specifies the output format (for pg_dump)
+                            type: string
+                          jobs:
+                            default: 1
+                            description: Jobs sets the number of parallel jobs (for
+                              directory format)
+                            format: int32
+                            minimum: 1
+                            type: integer
+                          lockWaitTimeout:
+                            default: 60s
+                            description: LockWaitTimeout sets the lock wait timeout
+                              (e.g., "60s")
+                            type: string
+                          method:
+                            allOf:
+                            - enum:
+                              - pg_dump
+                              - pg_basebackup
+                            - enum:
+                              - pg_dump
+                              - pg_basebackup
+                            default: pg_dump
+                            description: Method specifies the backup method
+                            type: string
+                          noOwner:
+                            description: NoOwner omits ownership information
+                            type: boolean
+                          noPrivileges:
+                            description: NoPrivileges omits privilege (GRANT/REVOKE)
+                              information
+                            type: boolean
+                          noSync:
+                            description: NoSync disables fsync after backup
+                            type: boolean
+                          schemaOnly:
+                            description: SchemaOnly backs up only schema, not data
+                            type: boolean
+                          schemas:
+                            description: Schemas lists specific schemas to include
+                              (empty = all)
+                            items:
+                              type: string
+                            type: array
+                          tables:
+                            description: Tables lists specific tables to include (empty
+                              = all)
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                      storage:
+                        description: Storage defines where to store the backup
+                        properties:
+                          azure:
+                            description: Azure configuration (required when type is
+                              "azure")
+                            properties:
+                              container:
+                                description: Container name
+                                type: string
+                              prefix:
+                                description: Prefix (path prefix within the container)
+                                type: string
+                              secretRef:
+                                description: SecretRef references a secret containing
+                                  Azure credentials
+                                properties:
+                                  name:
+                                    description: Name of the secret
+                                    type: string
+                                  namespace:
+                                    description: Namespace of the secret (defaults
+                                      to the resource namespace)
+                                    type: string
+                                required:
+                                - name
+                                type: object
+                              storageAccount:
+                                description: StorageAccount name
+                                type: string
+                            required:
+                            - container
+                            - secretRef
+                            - storageAccount
+                            type: object
+                          gcs:
+                            description: GCS configuration (required when type is
+                              "gcs")
+                            properties:
+                              bucket:
+                                description: Bucket name
+                                type: string
+                              prefix:
+                                description: Prefix (path prefix within the bucket)
+                                type: string
+                              secretRef:
+                                description: SecretRef references a secret containing
+                                  GCS credentials
+                                properties:
+                                  key:
+                                    description: Key within the secret
+                                    type: string
+                                  name:
+                                    description: Name of the secret
+                                    type: string
+                                  namespace:
+                                    description: Namespace of the secret (defaults
+                                      to the resource namespace)
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            required:
+                            - bucket
+                            - secretRef
+                            type: object
+                          pvc:
+                            description: PVC configuration (required when type is
+                              "pvc")
+                            properties:
+                              claimName:
+                                description: ClaimName is the name of the PersistentVolumeClaim
+                                type: string
+                              subPath:
+                                description: SubPath within the PVC
+                                type: string
+                            required:
+                            - claimName
+                            type: object
+                          s3:
+                            description: S3 configuration (required when type is "s3")
+                            properties:
+                              bucket:
+                                description: Bucket name
+                                type: string
+                              endpoint:
+                                description: Endpoint for S3-compatible storage (e.g.,
+                                  MinIO)
+                                type: string
+                              forcePathStyle:
+                                description: ForcePathStyle enables path-style addressing
+                                  (required for MinIO)
+                                type: boolean
+                              prefix:
+                                description: Prefix (path prefix within the bucket)
+                                type: string
+                              region:
+                                description: Region of the S3 bucket
+                                type: string
+                              secretRef:
+                                description: SecretRef references a secret containing
+                                  S3 credentials
+                                properties:
+                                  keys:
+                                    description: Keys defines the key names for S3
+                                      credentials
+                                    properties:
+                                      accessKey:
+                                        default: AWS_ACCESS_KEY_ID
+                                        description: 'Access key ID (default: "AWS_ACCESS_KEY_ID")'
+                                        type: string
+                                      secretKey:
+                                        default: AWS_SECRET_ACCESS_KEY
+                                        description: 'Secret access key (default:
+                                          "AWS_SECRET_ACCESS_KEY")'
+                                        type: string
+                                    type: object
+                                  name:
+                                    description: Name of the secret
+                                    type: string
+                                required:
+                                - name
+                                type: object
+                            required:
+                            - bucket
+                            - region
+                            - secretRef
+                            type: object
+                          type:
+                            description: Type of storage backend
+                            enum:
+                            - gcs
+                            - s3
+                            - azure
+                            - pvc
+                            type: string
+                        required:
+                        - type
+                        type: object
+                      ttl:
+                        description: TTL is the time-to-live for the backup (e.g.,
+                          "168h" for 7 days)
+                        type: string
+                    required:
+                    - databaseRef
+                    - storage
+                    type: object
+                required:
+                - spec
+                type: object
+              timezone:
+                default: UTC
+                description: Timezone is the timezone for the schedule (e.g., "Asia/Bangkok")
+                type: string
+            required:
+            - schedule
+            - template
+            type: object
+          status:
+            description: DatabaseBackupScheduleStatus defines the observed state of
+              DatabaseBackupSchedule.
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              lastBackup:
+                description: LastBackup contains information about the last backup
+                properties:
+                  completedAt:
+                    description: CompletedAt is when the backup completed
+                    format: date-time
+                    type: string
+                  name:
+                    description: Name of the backup
+                    type: string
+                  startedAt:
+                    description: StartedAt is when the backup started
+                    format: date-time
+                    type: string
+                  status:
+                    description: Status of the backup
+                    type: string
+                type: object
+              nextBackupTime:
+                description: NextBackupTime is the next scheduled backup time
+                format: date-time
+                type: string
+              phase:
+                description: Phase represents the current state
+                enum:
+                - Active
+                - Paused
+                type: string
+              recentBackups:
+                description: RecentBackups lists recent backup names and statuses
+                items:
+                  description: RecentBackupInfo contains information about a recent
+                    backup
+                  properties:
+                    name:
+                      description: Name of the backup
+                      type: string
+                    status:
+                      description: Status of the backup
+                      type: string
+                  type: object
+                type: array
+              statistics:
+                description: Statistics contains backup statistics
+                properties:
+                  averageDurationSeconds:
+                    description: AverageDurationSeconds is the average backup duration
+                    format: int64
+                    type: integer
+                  averageSizeBytes:
+                    description: AverageSizeBytes is the average backup size
+                    format: int64
+                    type: integer
+                  failedBackups:
+                    description: FailedBackups is the number of failed backups
+                    format: int64
+                    type: integer
+                  successfulBackups:
+                    description: SuccessfulBackups is the number of successful backups
+                    format: int64
+                    type: integer
+                  totalBackups:
+                    description: TotalBackups is the total number of backups created
+                    format: int64
+                    type: integer
+                  totalStorageBytes:
+                    description: TotalStorageBytes is the total storage used by all
+                      backups
+                    format: int64
+                    type: integer
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

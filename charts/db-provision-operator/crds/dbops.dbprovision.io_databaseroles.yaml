@@ -1,0 +1,325 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: databaseroles.dbops.dbprovision.io
+spec:
+  group: dbops.dbprovision.io
+  names:
+    kind: DatabaseRole
+    listKind: DatabaseRoleList
+    plural: databaseroles
+    shortNames:
+    - dbr
+    singular: databaserole
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.instanceRef.name
+      name: Instance
+      type: string
+    - jsonPath: .spec.roleName
+      name: Role
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: DatabaseRole is the Schema for the databaseroles API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DatabaseRoleSpec defines the desired state of DatabaseRole.
+            properties:
+              instanceRef:
+                description: InstanceRef references the DatabaseInstance to use
+                properties:
+                  name:
+                    description: Name of the DatabaseInstance
+                    type: string
+                  namespace:
+                    description: Namespace of the DatabaseInstance (defaults to the
+                      resource namespace)
+                    type: string
+                required:
+                - name
+                type: object
+              mysql:
+                description: MySQL-specific configuration
+                properties:
+                  grants:
+                    description: Grants defines the permissions this role grants
+                    items:
+                      description: MySQLGrant defines a MySQL privilege grant
+                      properties:
+                        columns:
+                          description: Columns lists target columns (for column level)
+                          items:
+                            type: string
+                          type: array
+                        database:
+                          description: Database is the target database (for database/table/column/procedure/function
+                            levels)
+                          type: string
+                        function:
+                          description: Function is the target function (for function
+                            level)
+                          type: string
+                        level:
+                          allOf:
+                          - enum:
+                            - global
+                            - database
+                            - table
+                            - column
+                            - procedure
+                            - function
+                          - enum:
+                            - global
+                            - database
+                            - table
+                            - column
+                            - procedure
+                            - function
+                          description: Level is the grant level
+                          type: string
+                        privileges:
+                          description: Privileges to grant (SELECT, INSERT, UPDATE,
+                            DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER, etc.)
+                          items:
+                            type: string
+                          minItems: 1
+                          type: array
+                        procedure:
+                          description: Procedure is the target procedure (for procedure
+                            level)
+                          type: string
+                        table:
+                          description: Table is the target table (for table/column
+                            levels)
+                          type: string
+                        withGrantOption:
+                          description: WithGrantOption allows the grantee to grant
+                            these privileges to others
+                          type: boolean
+                      required:
+                      - level
+                      - privileges
+                      type: object
+                    type: array
+                  useNativeRoles:
+                    default: true
+                    description: UseNativeRoles enables MySQL 8.0+ native roles
+                    type: boolean
+                type: object
+              postgres:
+                description: PostgreSQL-specific configuration
+                properties:
+                  bypassRLS:
+                    description: BypassRLS allows bypassing row-level security
+                    type: boolean
+                  createDB:
+                    description: CreateDB allows the role to create databases
+                    type: boolean
+                  createRole:
+                    description: CreateRole allows the role to create other roles
+                    type: boolean
+                  grants:
+                    description: Grants defines the permissions this role grants
+                    items:
+                      description: PostgresGrant defines a PostgreSQL privilege grant
+                      properties:
+                        database:
+                          description: Database is the target database
+                          type: string
+                        functions:
+                          description: Functions lists specific functions or "*" for
+                            all functions
+                          items:
+                            type: string
+                          type: array
+                        privileges:
+                          description: Privileges to grant (SELECT, INSERT, UPDATE,
+                            DELETE, TRUNCATE, REFERENCES, TRIGGER, CREATE, CONNECT,
+                            TEMPORARY, EXECUTE, USAGE)
+                          items:
+                            type: string
+                          minItems: 1
+                          type: array
+                        schema:
+                          description: Schema is the target schema (optional, for
+                            schema-level grants)
+                          type: string
+                        sequences:
+                          description: Sequences lists specific sequences or "*" for
+                            all sequences
+                          items:
+                            type: string
+                          type: array
+                        tables:
+                          description: Tables lists specific tables or "*" for all
+                            tables
+                          items:
+                            type: string
+                          type: array
+                        withGrantOption:
+                          description: WithGrantOption allows the grantee to grant
+                            these privileges to others
+                          type: boolean
+                      required:
+                      - database
+                      - privileges
+                      type: object
+                    type: array
+                  inRoles:
+                    description: InRoles lists roles this role should inherit from
+                    items:
+                      type: string
+                    type: array
+                  inherit:
+                    default: true
+                    description: Inherit enables privilege inheritance
+                    type: boolean
+                  login:
+                    description: Login enables login capability (usually false for
+                      group roles)
+                    type: boolean
+                  replication:
+                    description: Replication enables replication privileges
+                    type: boolean
+                  superuser:
+                    description: Superuser grants superuser privileges
+                    type: boolean
+                type: object
+              roleName:
+                description: RoleName is the role name in the database (immutable
+                  after creation)
+                maxLength: 63
+                minLength: 1
+                pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+                type: string
+                x-kubernetes-validations:
+                - message: roleName is immutable
+                  rule: self == oldSelf
+            required:
+            - instanceRef
+            - roleName
+            type: object
+          status:
+            description: DatabaseRoleStatus defines the observed state of DatabaseRole.
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              message:
+                description: Message provides additional information about the current
+                  state
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the last observed generation of
+                  the resource
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current state
+                enum:
+                - Pending
+                - Creating
+                - Ready
+                - Failed
+                - Deleting
+                type: string
+              role:
+                description: Role contains role-specific status information
+                properties:
+                  createdAt:
+                    description: CreatedAt is the role creation timestamp
+                    format: date-time
+                    type: string
+                  name:
+                    description: Name is the actual role name
+                    type: string
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

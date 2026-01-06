@@ -1,0 +1,141 @@
+# Default values for db-provision-operator.
+
+# Number of replicas for the controller manager
+replicaCount: 1
+
+image:
+  repository: ghcr.io/db-provision-operator/db-provision-operator
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod labels
+podLabels: {}
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65532
+
+# Resource limits and requests
+resources:
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 64Mi
+
+# Liveness probe configuration
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8081
+  initialDelaySeconds: 15
+  periodSeconds: 20
+
+# Readiness probe configuration
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: 8081
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+# Node selector for pod scheduling
+nodeSelector: {}
+
+# Tolerations for pod scheduling
+tolerations: []
+
+# Affinity rules for pod scheduling
+affinity: {}
+
+# Leader election configuration
+leaderElection:
+  enabled: true
+
+# Metrics configuration
+metrics:
+  enabled: true
+  # Service for metrics
+  service:
+    type: ClusterIP
+    port: 8443
+  # ServiceMonitor for Prometheus Operator
+  serviceMonitor:
+    enabled: false
+    namespace: ""
+    interval: 30s
+    scrapeTimeout: 10s
+    labels: {}
+    honorLabels: false
+    relabelings: []
+    metricRelabelings: []
+
+# Webhook configuration (if webhooks are enabled)
+webhook:
+  enabled: false
+  port: 9443
+  certManager:
+    enabled: false
+    issuerRef: {}
+
+# RBAC configuration
+rbac:
+  # Create ClusterRole and ClusterRoleBinding
+  create: true
+
+# CRD configuration
+crds:
+  # Install CRDs (set to false if CRDs are managed separately)
+  install: true
+  # Keep CRDs on chart uninstall
+  keep: true
+
+# Controller manager configuration
+manager:
+  # Arguments to pass to the manager
+  args:
+    - --leader-elect
+    - --health-probe-bind-address=:8081
+    - --metrics-bind-address=:8443
+    - --metrics-secure=true
+
+# Additional environment variables
+env: []
+  # - name: LOG_LEVEL
+  #   value: "debug"
+
+# Additional volumes
+volumes: []
+
+# Additional volume mounts
+volumeMounts: []

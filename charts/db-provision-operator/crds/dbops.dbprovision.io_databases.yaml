@@ -1,0 +1,377 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: databases.dbops.dbprovision.io
+spec:
+  group: dbops.dbprovision.io
+  names:
+    kind: Database
+    listKind: DatabaseList
+    plural: databases
+    shortNames:
+    - db
+    singular: database
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.instanceRef.name
+      name: Instance
+      type: string
+    - jsonPath: .spec.name
+      name: Database
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.database.sizeBytes
+      name: Size
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Database is the Schema for the databases API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DatabaseSpec defines the desired state of Database.
+            properties:
+              deletionPolicy:
+                allOf:
+                - enum:
+                  - Retain
+                  - Delete
+                  - Snapshot
+                - enum:
+                  - Retain
+                  - Delete
+                  - Snapshot
+                default: Retain
+                description: DeletionPolicy defines what happens on CR deletion
+                type: string
+              deletionProtection:
+                default: true
+                description: DeletionProtection prevents accidental deletion
+                type: boolean
+              instanceRef:
+                description: InstanceRef references the DatabaseInstance to use
+                properties:
+                  name:
+                    description: Name of the DatabaseInstance
+                    type: string
+                  namespace:
+                    description: Namespace of the DatabaseInstance (defaults to the
+                      resource namespace)
+                    type: string
+                required:
+                - name
+                type: object
+              mysql:
+                description: MySQL-specific configuration (required when instance
+                  engine is "mysql")
+                properties:
+                  charset:
+                    default: utf8mb4
+                    description: Charset sets the database character set
+                    type: string
+                  collation:
+                    default: utf8mb4_unicode_ci
+                    description: Collation sets the database collation
+                    type: string
+                  defaultStorageEngine:
+                    default: InnoDB
+                    description: DefaultStorageEngine sets the default storage engine
+                    type: string
+                  sqlMode:
+                    description: SQLMode sets the SQL mode for the database
+                    type: string
+                type: object
+              name:
+                description: Name is the database name in the database server (immutable
+                  after creation)
+                maxLength: 63
+                minLength: 1
+                pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+                type: string
+                x-kubernetes-validations:
+                - message: database name is immutable
+                  rule: self == oldSelf
+              postgres:
+                description: PostgreSQL-specific configuration (required when instance
+                  engine is "postgres")
+                properties:
+                  allowConnections:
+                    default: true
+                    description: AllowConnections allows/disallows connections to
+                      this database
+                    type: boolean
+                  connectionLimit:
+                    default: -1
+                    description: ConnectionLimit sets the maximum concurrent connections
+                      (-1 = unlimited)
+                    format: int32
+                    minimum: -1
+                    type: integer
+                  defaultPrivileges:
+                    description: DefaultPrivileges sets default privileges for new
+                      objects
+                    items:
+                      description: PostgresDefaultPrivilege defines default privileges
+                        for new objects
+                      properties:
+                        objectType:
+                          description: ObjectType is the type of objects (tables,
+                            sequences, functions, types)
+                          enum:
+                          - tables
+                          - sequences
+                          - functions
+                          - types
+                          type: string
+                        privileges:
+                          description: Privileges to grant
+                          items:
+                            type: string
+                          minItems: 1
+                          type: array
+                        role:
+                          description: Role to grant privileges to
+                          type: string
+                        schema:
+                          description: Schema where the default applies
+                          type: string
+                      required:
+                      - objectType
+                      - privileges
+                      - role
+                      - schema
+                      type: object
+                    type: array
+                  encoding:
+                    default: UTF8
+                    description: 'Encoding sets the database encoding (default: UTF8)'
+                    type: string
+                  extensions:
+                    description: Extensions to install in the database
+                    items:
+                      description: PostgresExtension defines a PostgreSQL extension
+                        to install
+                      properties:
+                        name:
+                          description: Name of the extension
+                          type: string
+                        schema:
+                          default: public
+                          description: 'Schema to install the extension in (default:
+                            public)'
+                          type: string
+                        version:
+                          description: Version of the extension (optional, uses default
+                            if not specified)
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  isTemplate:
+                    description: IsTemplate marks this as a template database
+                    type: boolean
+                  lcCollate:
+                    description: LCCollate sets the collation order
+                    type: string
+                  lcCtype:
+                    description: LCCtype sets the character classification
+                    type: string
+                  schemas:
+                    description: Schemas to create in the database
+                    items:
+                      description: PostgresSchema defines a schema to create
+                      properties:
+                        name:
+                          description: Name of the schema
+                          type: string
+                        owner:
+                          description: Owner of the schema (optional)
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  tablespace:
+                    default: pg_default
+                    description: Tablespace sets the default tablespace
+                    type: string
+                  template:
+                    default: template0
+                    description: Template is the template database to use
+                    type: string
+                type: object
+            required:
+            - instanceRef
+            - name
+            type: object
+          status:
+            description: DatabaseStatus defines the observed state of Database.
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              database:
+                description: Database contains database-specific status information
+                properties:
+                  createdAt:
+                    description: CreatedAt is the creation timestamp
+                    format: date-time
+                    type: string
+                  name:
+                    description: Name is the actual database name
+                    type: string
+                  owner:
+                    description: Owner is the database owner
+                    type: string
+                  sizeBytes:
+                    description: SizeBytes is the database size in bytes
+                    format: int64
+                    type: integer
+                type: object
+              message:
+                description: Message provides additional information about the current
+                  state
+                type: string
+              mysql:
+                description: MySQL contains MySQL-specific status information
+                properties:
+                  charset:
+                    description: Charset is the database character set
+                    type: string
+                  collation:
+                    description: Collation is the database collation
+                    type: string
+                type: object
+              observedGeneration:
+                description: ObservedGeneration is the last observed generation of
+                  the resource
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current state of the database
+                enum:
+                - Pending
+                - Creating
+                - Ready
+                - Failed
+                - Deleting
+                type: string
+              postgres:
+                description: Postgres contains PostgreSQL-specific status information
+                properties:
+                  collation:
+                    description: Collation is the database collation
+                    type: string
+                  encoding:
+                    description: Encoding is the database encoding
+                    type: string
+                  installedExtensions:
+                    description: InstalledExtensions lists installed extensions
+                    items:
+                      description: PostgresExtensionStatus contains extension status
+                        information
+                      properties:
+                        name:
+                          description: Name of the extension
+                          type: string
+                        version:
+                          description: Version of the extension
+                          type: string
+                      required:
+                      - name
+                      - version
+                      type: object
+                    type: array
+                  schemas:
+                    description: Schemas lists schemas in the database
+                    items:
+                      type: string
+                    type: array
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
