@@ -62,7 +62,8 @@ var _ = Describe("postgresql", Ordered, func() {
 							"port":     int64(5432),
 							"database": "postgres",
 							"secretRef": map[string]interface{}{
-								"name": secretName,
+								"name":      secretName,
+								"namespace": secretNamespace,
 							},
 						},
 						"healthCheck": map[string]interface{}{

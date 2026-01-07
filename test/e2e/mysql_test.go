@@ -67,8 +67,8 @@ var _ = Describe("mysql", Ordered, func() {
 							},
 						},
 						"healthCheck": map[string]interface{}{
-							"enabled":  true,
-							"interval": "30s",
+							"enabled":         true,
+							"intervalSeconds": int64(30),
 						},
 					},
 				},
