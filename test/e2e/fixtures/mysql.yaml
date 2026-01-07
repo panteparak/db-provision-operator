@@ -77,25 +77,25 @@ spec:
             limits:
               cpu: 500m
               memory: 1Gi
-          # startupProbe waits for MySQL to be fully ready (using exec, not TCP)
-          # TCP check succeeds too early before MySQL can accept queries
+          # startupProbe waits for MySQL to be fully ready
+          # Uses mysqladmin ping via socket (more reliable than TCP during init)
           startupProbe:
             exec:
               command:
-                - sh
+                - /bin/sh
                 - -c
-                - mysql -h localhost -uroot -p"$MYSQL_ROOT_PASSWORD" -e "SELECT 1" 2>/dev/null
-            initialDelaySeconds: 30
+                - mysqladmin ping -uroot -p"${MYSQL_ROOT_PASSWORD}" 2>/dev/null || exit 1
+            initialDelaySeconds: 60
             periodSeconds: 10
-            timeoutSeconds: 5
+            timeoutSeconds: 10
             failureThreshold: 30
           # readinessProbe for traffic routing (only runs after startup succeeds)
           readinessProbe:
             exec:
               command:
-                - sh
+                - /bin/sh
                 - -c
-                - mysql -h localhost -uroot -p"$MYSQL_ROOT_PASSWORD" -e "SELECT 1" 2>/dev/null
+                - mysqladmin ping -uroot -p"${MYSQL_ROOT_PASSWORD}" 2>/dev/null || exit 1
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
