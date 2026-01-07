@@ -88,6 +88,10 @@ type CredentialSecretRef struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
+	// Namespace of the secret (defaults to the resource's namespace if not specified)
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
 	// Keys defines the key names for username and password
 	// +optional
 	Keys *CredentialKeys `json:"keys,omitempty"`

@@ -63,9 +63,15 @@ func (m *Manager) GetCredentials(ctx context.Context, namespace string, ref *dbo
 		return nil, fmt.Errorf("credential reference is nil")
 	}
 
+	// Use secretRef namespace if specified, otherwise fall back to resource namespace
+	secretNamespace := namespace
+	if ref.Namespace != "" {
+		secretNamespace = ref.Namespace
+	}
+
 	secret := &corev1.Secret{}
 	err := m.client.Get(ctx, types.NamespacedName{
-		Namespace: namespace,
+		Namespace: secretNamespace,
 		Name:      ref.Name,
 	}, secret)
 	if err != nil {
