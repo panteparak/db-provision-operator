@@ -20,7 +20,6 @@ package e2e
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -155,10 +154,7 @@ var _ = Describe("postgresql", Ordered, func() {
 						"instanceRef": map[string]interface{}{
 							"name": instanceName,
 						},
-						"name": userName,
-						"secretTemplate": map[string]interface{}{
-							"name": fmt.Sprintf("%s-credentials", userName),
-						},
+						"username": userName,
 					},
 				},
 			}
@@ -176,11 +172,15 @@ var _ = Describe("postgresql", Ordered, func() {
 				return phase
 			}, timeout, interval).Should(Equal("Ready"), "DatabaseUser should become Ready")
 
-			By("verifying the credentials Secret was created")
+			By("verifying the user status shows the secret info")
 			Eventually(func() bool {
-				_, err := k8sClient.CoreV1().Secrets(testNamespace).Get(ctx, fmt.Sprintf("%s-credentials", userName), metav1.GetOptions{})
-				return err == nil
-			}, timeout, interval).Should(BeTrue(), "Credentials secret should be created")
+				obj, err := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Get(ctx, userName, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				secretInfo, _, _ := unstructured.NestedMap(obj.Object, "status", "secret")
+				return secretInfo != nil && secretInfo["name"] != nil
+			}, timeout, interval).Should(BeTrue(), "User status should contain secret info")
 		})
 	})
 
