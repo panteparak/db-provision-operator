@@ -77,23 +77,34 @@ spec:
             limits:
               cpu: 500m
               memory: 1Gi
+          # startupProbe handles slow first-time initialization
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - mysqladmin ping -h localhost -uroot -p"$MYSQL_ROOT_PASSWORD"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          # readinessProbe for traffic routing (only runs after startup succeeds)
           readinessProbe:
             exec:
               command:
                 - sh
                 - -c
                 - mysqladmin ping -h localhost -uroot -p"$MYSQL_ROOT_PASSWORD"
-            initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 6
+            failureThreshold: 3
+          # livenessProbe for restart on hang (only runs after startup succeeds)
           livenessProbe:
             exec:
               command:
                 - sh
                 - -c
                 - mysqladmin ping -h localhost -uroot -p"$MYSQL_ROOT_PASSWORD"
-            initialDelaySeconds: 60
             periodSeconds: 15
             timeoutSeconds: 5
             failureThreshold: 3
