@@ -20,11 +20,13 @@ jobs:
             namespace: postgres
             pod: postgres-0
             port: 5432
+            db_timeout: 180s
           - database: mysql
             fixture: test/e2e/fixtures/mysql.yaml
             namespace: mysql
             pod: mysql-0
             port: 3306
+            db_timeout: 300s
 
     steps:
       - name: Checkout code
@@ -57,9 +59,9 @@ jobs:
       - name: Deploy ${{ matrix.database }}
         run: |
           kubectl apply -f ${{ matrix.fixture }}
-          echo "Waiting for ${{ matrix.database }} pod to be ready..."
+          echo "Waiting for ${{ matrix.database }} pod to be ready (timeout: ${{ matrix.db_timeout }})..."
           kubectl wait --for=condition=Ready pod/${{ matrix.pod }} \
-            -n ${{ matrix.namespace }} --timeout=180s
+            -n ${{ matrix.namespace }} --timeout=${{ matrix.db_timeout }}
 
       - name: Verify database is accessible
         run: |
