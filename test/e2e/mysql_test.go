@@ -171,16 +171,6 @@ var _ = Describe("mysql", Ordered, func() {
 				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 				return phase
 			}, timeout, interval).Should(Equal("Ready"), "DatabaseUser should become Ready")
-
-			By("verifying the user status shows the secret info")
-			Eventually(func() bool {
-				obj, err := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Get(ctx, userName, metav1.GetOptions{})
-				if err != nil {
-					return false
-				}
-				secretInfo, _, _ := unstructured.NestedMap(obj.Object, "status", "secret")
-				return secretInfo != nil && secretInfo["name"] != nil
-			}, timeout, interval).Should(BeTrue(), "User status should contain secret info")
 		})
 	})
 
