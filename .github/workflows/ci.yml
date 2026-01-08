@@ -73,9 +73,10 @@ jobs:
         include:
           - platform: linux/amd64
             required: true
-          - platform: linux/arm64
-            required: false  # ARM64 is optional, won't block pipeline
-    # Continue on error for optional platforms
+          # Uncomment to add ARM64 support (builds are slow due to QEMU)
+          # - platform: linux/arm64
+          #   required: false  # ARM64 is optional, won't block pipeline
+    # Continue on error for optional platforms (when added)
     continue-on-error: ${{ !matrix.required }}
     steps:
       - name: Checkout code
