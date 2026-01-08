@@ -137,7 +137,7 @@ func (a *Adapter) GetDatabaseInfo(ctx context.Context, name string) (*types.Data
 	var info types.DatabaseInfo
 	var ownerOid int64
 	err = pool.QueryRow(ctx, `
-		SELECT d.datname, d.datdba, pg_database_size(d.datname),
+		SELECT d.datname, d.datdba::int8, pg_database_size(d.datname),
 		       pg_encoding_to_char(d.encoding), d.datcollate
 		FROM pg_database d
 		WHERE d.datname = $1`,
