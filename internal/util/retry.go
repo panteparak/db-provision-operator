@@ -182,6 +182,7 @@ func IsRetryableError(err error) bool {
 		"too many connections",
 		"server is starting up",
 		"the database system is starting up",
+		"not currently accepting connections", // PostgreSQL SQLSTATE 55000
 		"connection timed out",
 		"network is unreachable",
 		"no route to host",
