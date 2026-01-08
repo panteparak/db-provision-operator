@@ -3,13 +3,20 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
     branches: [main]
 
 env:
   GO_VERSION_FILE: go.mod
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  # ============================================================================
+  # Stage 1: Parallel Jobs (Lint, Unit Tests, Docker Build)
+  # ============================================================================
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -53,26 +60,108 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-  build:
-    name: Build
+  docker-build:
+    name: Docker Build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-sha: sha-${{ steps.short-sha.outputs.sha }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - name: Get short SHA
+        id: short-sha
+        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
         with:
-          go-version-file: ${{ env.GO_VERSION_FILE }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Download dependencies
-        run: go mod download
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # Set latest tag for main branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            # Tag with commit SHA (sha-<short-sha>)
+            type=sha,prefix=sha-,format=short
+            # Tag with branch name
+            type=ref,event=branch
+            # Tag with PR number
+            type=ref,event=pr
+            # Tag with semver (v1.0.0 -> 1.0.0, latest)
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
 
-      - name: Build binary
-        run: make build
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Build Docker image
-        run: make docker-build IMG=db-provision-operator:ci-${{ github.sha }}
+      # For PRs, build locally and export for later use
+      - name: Build image for PR (local)
+        if: github.event_name == 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.short-sha.outputs.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Save image for PR
+        if: github.event_name == 'pull_request'
+        run: |
+          docker save ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.short-sha.outputs.sha }} \
+            -o /tmp/operator-image.tar
+
+      - name: Upload image artifact for PR
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: operator-image
+          path: /tmp/operator-image.tar
+          retention-days: 1
+
+      - name: Generate SBOM
+        if: github.event_name != 'pull_request'
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.short-sha.outputs.sha }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      - name: Upload SBOM
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.spdx.json
 
   manifests:
     name: Verify Manifests
@@ -119,3 +208,191 @@ jobs:
             git diff
             exit 1
           fi
+
+  # ============================================================================
+  # Stage 2: Gate (Wait for all parallel jobs)
+  # ============================================================================
+
+  gate:
+    name: Gate
+    runs-on: ubuntu-latest
+    needs: [lint, unit-test, docker-build, manifests, generate]
+    steps:
+      - name: All checks passed
+        run: echo "All parallel jobs completed successfully"
+
+  # ============================================================================
+  # Stage 3: E2E Tests (Matrix: PostgreSQL, MySQL)
+  # ============================================================================
+
+  e2e:
+    name: E2E (${{ matrix.database }})
+    runs-on: ubuntu-latest
+    needs: [gate]
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [postgresql, mysql]
+        include:
+          - database: postgresql
+            fixture: test/e2e/fixtures/postgresql.yaml
+            namespace: postgres
+            pod: postgres-0
+            port: 5432
+            db_timeout: 180s
+          - database: mysql
+            fixture: test/e2e/fixtures/mysql.yaml
+            namespace: mysql
+            pod: mysql-0
+            port: 3306
+            db_timeout: 600s
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Get short SHA
+        id: short-sha
+        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Install k3d
+        run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+
+      - name: Verify k3d installation
+        run: k3d version
+
+      - name: Create k3d cluster
+        run: |
+          k3d cluster create e2e-${{ matrix.database }} \
+            --agents 1 \
+            --wait \
+            --timeout 120s
+
+      - name: Wait for cluster ready
+        run: |
+          kubectl wait --for=condition=Ready nodes --all --timeout=60s
+          kubectl cluster-info
+          kubectl get nodes
+
+      - name: Deploy ${{ matrix.database }}
+        run: |
+          kubectl apply -f ${{ matrix.fixture }}
+          echo "Waiting for ${{ matrix.database }} pod to be ready (timeout: ${{ matrix.db_timeout }})..."
+          kubectl wait --for=condition=Ready pod/${{ matrix.pod }} \
+            -n ${{ matrix.namespace }} --timeout=${{ matrix.db_timeout }}
+
+      - name: Verify database is accessible
+        run: |
+          echo "=== Pods in ${{ matrix.namespace }} namespace ==="
+          kubectl get pods -n ${{ matrix.namespace }}
+          echo "=== Database pod logs ==="
+          kubectl logs ${{ matrix.pod }} -n ${{ matrix.namespace }} --tail=30
+
+      - name: Install CRDs
+        run: make install
+
+      # For push events: Pull image from registry
+      - name: Pull operator image from registry
+        if: github.event_name != 'pull_request'
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.short-sha.outputs.sha }}
+
+      # For PRs: Download and load image from artifact
+      - name: Download operator image artifact
+        if: github.event_name == 'pull_request'
+        uses: actions/download-artifact@v4
+        with:
+          name: operator-image
+          path: /tmp
+
+      - name: Load operator image for PR
+        if: github.event_name == 'pull_request'
+        run: |
+          docker load -i /tmp/operator-image.tar
+
+      - name: Load image into k3d
+        run: |
+          k3d image import ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.short-sha.outputs.sha }} \
+            -c e2e-${{ matrix.database }}
+
+      - name: Deploy operator
+        run: |
+          make deploy IMG=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.short-sha.outputs.sha }}
+
+      - name: Wait for operator ready
+        run: |
+          echo "Waiting for operator deployment..."
+          kubectl wait --for=condition=Available \
+            deployment/db-provision-operator-controller-manager \
+            -n db-provision-operator-system \
+            --timeout=120s
+          echo "=== Operator pods ==="
+          kubectl get pods -n db-provision-operator-system
+
+      - name: Run E2E tests for ${{ matrix.database }}
+        env:
+          E2E_DATABASE_ENGINE: ${{ matrix.database }}
+        run: |
+          go test ./test/e2e/... -v -tags=e2e \
+            -ginkgo.focus="${{ matrix.database }}" \
+            -ginkgo.v \
+            -timeout=10m
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          echo "=== Operator logs ==="
+          kubectl logs -n db-provision-operator-system \
+            -l control-plane=controller-manager --tail=200 || true
+          echo ""
+          echo "=== Database pod logs ==="
+          kubectl logs ${{ matrix.pod }} -n ${{ matrix.namespace }} --tail=100 || true
+          echo ""
+          echo "=== All DatabaseInstance CRs ==="
+          kubectl get databaseinstances -A -o yaml || true
+          echo ""
+          echo "=== All Database CRs ==="
+          kubectl get databases -A -o yaml || true
+          echo ""
+          echo "=== All DatabaseUser CRs ==="
+          kubectl get databaseusers -A -o yaml || true
+          echo ""
+          echo "=== All DatabaseRole CRs ==="
+          kubectl get databaseroles -A -o yaml || true
+          echo ""
+          echo "=== All DatabaseGrant CRs ==="
+          kubectl get databasegrants -A -o yaml || true
+          echo ""
+          echo "=== Events ==="
+          kubectl get events -A --sort-by='.lastTimestamp' | tail -50 || true
+
+      - name: Cleanup
+        if: always()
+        run: k3d cluster delete e2e-${{ matrix.database }} || true
+
+  # ============================================================================
+  # Stage 4: CI Success
+  # ============================================================================
+
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [e2e]
+    steps:
+      - name: CI pipeline completed
+        run: |
+          echo "🎉 All CI checks and E2E tests passed!"
+          echo ""
+          echo "Pipeline summary:"
+          echo "  ✅ Lint"
+          echo "  ✅ Unit Tests"
+          echo "  ✅ Docker Build"
+          echo "  ✅ Manifests Verification"
+          echo "  ✅ Generated Code Verification"
+          echo "  ✅ E2E Tests (PostgreSQL)"
+          echo "  ✅ E2E Tests (MySQL)"
