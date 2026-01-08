@@ -70,9 +70,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform:
-          - linux/amd64
-          # - linux/arm64
+        include:
+          - platform: linux/amd64
+            required: true
+          - platform: linux/arm64
+            required: false  # ARM64 is optional, won't block pipeline
+    # Continue on error for optional platforms
+    continue-on-error: ${{ !matrix.required }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -305,41 +309,39 @@ jobs:
     name: Gate
     runs-on: ubuntu-latest
     # For push: wait for docker-merge (multi-arch manifest)
-    # For PR: docker-merge is skipped, so we check docker-build
+    # For PR: docker-merge is skipped, so we only check docker-build
     needs: [lint, unit-test, docker-build, docker-merge, manifests, generate]
     if: always()
     steps:
       - name: Check job results
         run: |
-          # Check required jobs
-          if [[ "${{ needs.lint.result }}" != "success" ]]; then
-            echo "Lint failed"
-            exit 1
-          fi
-          if [[ "${{ needs.unit-test.result }}" != "success" ]]; then
-            echo "Unit tests failed"
-            exit 1
-          fi
-          if [[ "${{ needs.docker-build.result }}" != "success" ]]; then
-            echo "Docker build failed"
-            exit 1
-          fi
-          if [[ "${{ needs.manifests.result }}" != "success" ]]; then
-            echo "Manifests verification failed"
-            exit 1
-          fi
-          if [[ "${{ needs.generate.result }}" != "success" ]]; then
-            echo "Generated code verification failed"
-            exit 1
-          fi
-          # docker-merge is skipped for PRs, only check it for push events
+          echo "Job results:"
+          echo "  lint: ${{ needs.lint.result }}"
+          echo "  unit-test: ${{ needs.unit-test.result }}"
+          echo "  docker-build: ${{ needs.docker-build.result }}"
+          echo "  docker-merge: ${{ needs.docker-merge.result }}"
+          echo "  manifests: ${{ needs.manifests.result }}"
+          echo "  generate: ${{ needs.generate.result }}"
+
+          # Check required jobs (must be success)
+          FAILED=""
+          [[ "${{ needs.lint.result }}" != "success" ]] && FAILED="${FAILED} lint"
+          [[ "${{ needs.unit-test.result }}" != "success" ]] && FAILED="${FAILED} unit-test"
+          [[ "${{ needs.docker-build.result }}" != "success" ]] && FAILED="${FAILED} docker-build"
+          [[ "${{ needs.manifests.result }}" != "success" ]] && FAILED="${FAILED} manifests"
+          [[ "${{ needs.generate.result }}" != "success" ]] && FAILED="${FAILED} generate"
+
+          # docker-merge is only required for push events (skipped for PRs)
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
-            if [[ "${{ needs.docker-merge.result }}" != "success" ]]; then
-              echo "Docker merge failed"
-              exit 1
-            fi
+            [[ "${{ needs.docker-merge.result }}" != "success" ]] && FAILED="${FAILED} docker-merge"
           fi
-          echo "All checks passed successfully"
+
+          if [[ -n "$FAILED" ]]; then
+            echo "::error::Failed jobs:$FAILED"
+            exit 1
+          fi
+
+          echo "All required checks passed successfully"
 
   # ============================================================================
   # Stage 3: E2E Tests (Matrix: Database x Installation Method)
