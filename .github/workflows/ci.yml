@@ -381,30 +381,77 @@ jobs:
       - name: Collect logs on failure
         if: failure()
         run: |
-          echo "=== Operator logs ==="
+          echo "=============================================="
+          echo "=== OPERATOR LOGS (last 500 lines) ==="
+          echo "=============================================="
           kubectl logs -n db-provision-operator-system \
-            -l control-plane=controller-manager --tail=200 || true
+            -l control-plane=controller-manager --tail=500 || true
           echo ""
-          echo "=== Database pod logs ==="
+          echo "=============================================="
+          echo "=== OPERATOR POD DESCRIPTION ==="
+          echo "=============================================="
+          kubectl describe pods -n db-provision-operator-system \
+            -l control-plane=controller-manager || true
+          echo ""
+          echo "=============================================="
+          echo "=== DATABASE POD LOGS ==="
+          echo "=============================================="
           kubectl logs ${{ matrix.pod }} -n ${{ matrix.namespace }} --tail=100 || true
           echo ""
-          echo "=== All DatabaseInstance CRs ==="
+          echo "=============================================="
+          echo "=== DATABASE POD DESCRIPTION ==="
+          echo "=============================================="
+          kubectl describe pod ${{ matrix.pod }} -n ${{ matrix.namespace }} || true
+          echo ""
+          echo "=============================================="
+          echo "=== DatabaseInstance CRs (with status) ==="
+          echo "=============================================="
           kubectl get databaseinstances -A -o yaml || true
           echo ""
-          echo "=== All Database CRs ==="
+          echo "=== DatabaseInstance Description ==="
+          kubectl describe databaseinstances -A || true
+          echo ""
+          echo "=============================================="
+          echo "=== Database CRs (with status) ==="
+          echo "=============================================="
           kubectl get databases -A -o yaml || true
           echo ""
-          echo "=== All DatabaseUser CRs ==="
+          echo "=== Database Description ==="
+          kubectl describe databases -A || true
+          echo ""
+          echo "=============================================="
+          echo "=== DatabaseUser CRs (with status) ==="
+          echo "=============================================="
           kubectl get databaseusers -A -o yaml || true
           echo ""
-          echo "=== All DatabaseRole CRs ==="
+          echo "=== DatabaseUser Description ==="
+          kubectl describe databaseusers -A || true
+          echo ""
+          echo "=============================================="
+          echo "=== DatabaseRole CRs (with status) ==="
+          echo "=============================================="
           kubectl get databaseroles -A -o yaml || true
           echo ""
-          echo "=== All DatabaseGrant CRs ==="
+          echo "=== DatabaseRole Description ==="
+          kubectl describe databaseroles -A || true
+          echo ""
+          echo "=============================================="
+          echo "=== DatabaseGrant CRs (with status) ==="
+          echo "=============================================="
           kubectl get databasegrants -A -o yaml || true
           echo ""
-          echo "=== Events ==="
-          kubectl get events -A --sort-by='.lastTimestamp' | tail -50 || true
+          echo "=== DatabaseGrant Description ==="
+          kubectl describe databasegrants -A || true
+          echo ""
+          echo "=============================================="
+          echo "=== KUBERNETES EVENTS (last 100) ==="
+          echo "=============================================="
+          kubectl get events -A --sort-by='.lastTimestamp' | tail -100 || true
+          echo ""
+          echo "=============================================="
+          echo "=== ALL PODS STATUS ==="
+          echo "=============================================="
+          kubectl get pods -A || true
 
       - name: Cleanup
         if: always()

@@ -1,6 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: {{ include "db-provision-operator.namespace" . }}
-  labels:
-    {{- include "db-provision-operator.labels" . | nindent 4 }}

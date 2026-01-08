@@ -63,8 +63,8 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Create the namespace
+Create the namespace - uses the release namespace from helm install --namespace flag
 */}}
 {{- define "db-provision-operator.namespace" -}}
-{{- default .Values.namespace .Release.Namespace }}
+{{- .Release.Namespace }}
 {{- end }}

@@ -130,6 +130,3 @@ crds:
   install: true
   # -- Keep CRDs on chart uninstall
   keep: true
-
-# -- Namespace to install the operator
-namespace: db-provision-operator-system
