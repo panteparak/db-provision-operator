@@ -58,7 +58,7 @@ var _ = Describe("Retry", func() {
 
 				result := RetryWithBackoff(ctx, config, fn)
 
-				Expect(result.LastError).To(BeNil())
+				Expect(result.LastError).ToNot(HaveOccurred())
 				Expect(result.Attempts).To(Equal(1))
 				Expect(callCount).To(Equal(1))
 			})
@@ -77,7 +77,7 @@ var _ = Describe("Retry", func() {
 
 				result := RetryWithBackoff(ctx, config, fn)
 
-				Expect(result.LastError).To(BeNil())
+				Expect(result.LastError).ToNot(HaveOccurred())
 				Expect(result.Attempts).To(Equal(3))
 				Expect(callCount).To(Equal(3))
 			})
@@ -95,7 +95,7 @@ var _ = Describe("Retry", func() {
 
 				result := RetryWithBackoff(ctx, config, fn)
 
-				Expect(result.LastError).To(BeNil())
+				Expect(result.LastError).ToNot(HaveOccurred())
 				Expect(result.Attempts).To(Equal(2))
 				// First attempt is immediate, second attempt after InitialInterval
 				Expect(time.Since(startTime)).To(BeNumerically(">=", config.InitialInterval))
@@ -129,7 +129,7 @@ var _ = Describe("Retry", func() {
 
 				result := RetryWithBackoff(ctx, config, fn)
 
-				Expect(result.LastError).NotTo(BeNil())
+				Expect(result.LastError).To(HaveOccurred())
 				// Last interval should be capped at MaxInterval
 				Expect(result.LastInterval).To(BeNumerically("<=", config.MaxInterval))
 			})
@@ -204,7 +204,7 @@ var _ = Describe("Retry", func() {
 
 				result := RetryWithBackoff(ctx, config, fn)
 
-				Expect(result.LastError).NotTo(BeNil())
+				Expect(result.LastError).To(HaveOccurred())
 				// With jitter, interval can vary by +/- 50%
 				Expect(result.LastInterval).To(BeNumerically(">", 0))
 			})

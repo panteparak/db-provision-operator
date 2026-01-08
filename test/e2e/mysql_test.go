@@ -246,12 +246,21 @@ var _ = Describe("mysql", Ordered, func() {
 						"namespace": testNamespace,
 					},
 					"spec": map[string]interface{}{
-						"instanceRef": map[string]interface{}{
-							"name": instanceName,
+						"userRef": map[string]interface{}{
+							"name": userName,
 						},
-						"grantee":    userName,
-						"privileges": []interface{}{"SELECT", "INSERT"},
-						"database":   databaseName,
+						"databaseRef": map[string]interface{}{
+							"name": databaseName,
+						},
+						"mysql": map[string]interface{}{
+							"grants": []interface{}{
+								map[string]interface{}{
+									"level":      "database",
+									"database":   databaseName,
+									"privileges": []interface{}{"SELECT", "INSERT"},
+								},
+							},
+						},
 					},
 				},
 			}

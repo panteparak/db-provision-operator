@@ -59,7 +59,7 @@ var _ = Describe("Grant Operations", func() {
 			// GRANT USAGE ON SCHEMA "public" TO "testuser"
 			Expect(opt.Schema).To(Equal("public"))
 			Expect(opt.Privileges).To(ContainElements("SELECT", "INSERT", "UPDATE"))
-			Expect(len(opt.Tables)).To(Equal(0))
+			Expect(opt.Tables).To(BeEmpty())
 		})
 
 		It("should grant USAGE ON SCHEMA", func() {
@@ -131,7 +131,7 @@ var _ = Describe("Grant Operations", func() {
 			// Should generate: REVOKE SELECT, INSERT ON ALL TABLES IN SCHEMA "public" FROM "testuser"
 			Expect(opt.Schema).To(Equal("public"))
 			Expect(opt.Privileges).To(ContainElements("SELECT", "INSERT"))
-			Expect(len(opt.Tables)).To(Equal(0))
+			Expect(opt.Tables).To(BeEmpty())
 		})
 
 		It("should revoke privileges on specific tables", func() {

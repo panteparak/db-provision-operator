@@ -46,7 +46,7 @@ var _ = Describe("Database Operations", func() {
 
 	AfterEach(func() {
 		if db != nil {
-			db.Close()
+			_ = db.Close()
 		}
 	})
 

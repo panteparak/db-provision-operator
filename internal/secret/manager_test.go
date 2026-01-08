@@ -41,10 +41,10 @@ func TestSecretManager(t *testing.T) {
 
 var _ = Describe("Secret Manager", func() {
 	var (
-		ctx       context.Context
-		scheme    *runtime.Scheme
+		ctx        context.Context
+		scheme     *runtime.Scheme
 		fakeClient client.Client
-		manager   *Manager
+		manager    *Manager
 	)
 
 	BeforeEach(func() {
@@ -900,7 +900,7 @@ var _ = Describe("RenderSecretTemplate", func() {
 			result, err := RenderSecretTemplate(tmpl, data)
 
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(HaveLen(0))
+			Expect(result).To(BeEmpty())
 		})
 	})
 

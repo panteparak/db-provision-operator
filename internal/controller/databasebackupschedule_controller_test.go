@@ -808,7 +808,7 @@ var _ = Describe("DatabaseBackupSchedule Controller", func() {
 					Namespace: namespace,
 				},
 				Spec: dbopsv1alpha1.DatabaseBackupScheduleSpec{
-					Schedule: "0 2 * * *",
+					Schedule:                      "0 2 * * *",
 					SuccessfulBackupsHistoryLimit: 10,
 					FailedBackupsHistoryLimit:     5,
 					Template: dbopsv1alpha1.BackupTemplateSpec{

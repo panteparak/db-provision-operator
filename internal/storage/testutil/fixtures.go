@@ -29,13 +29,13 @@ const (
 	TestNamespace = "test-namespace"
 
 	// S3 constants
-	TestS3Bucket       = "test-backup-bucket"
-	TestS3Region       = "us-east-1"
-	TestS3Prefix       = "backups/"
-	TestS3SecretName   = "s3-credentials"
-	TestS3AccessKey    = "AKIAIOSFODNN7EXAMPLE"
-	TestS3SecretKey    = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-	TestMinIOEndpoint  = "minio.minio-system.svc.cluster.local:9000"
+	TestS3Bucket      = "test-backup-bucket"
+	TestS3Region      = "us-east-1"
+	TestS3Prefix      = "backups/"
+	TestS3SecretName  = "s3-credentials"
+	TestS3AccessKey   = "AKIAIOSFODNN7EXAMPLE"
+	TestS3SecretKey   = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+	TestMinIOEndpoint = "minio.minio-system.svc.cluster.local:9000"
 
 	// GCS constants
 	TestGCSBucket     = "test-gcs-backup-bucket"
@@ -627,7 +627,7 @@ var (
 	// SampleBackupData provides sample backup data for testing
 	SampleBackupData = map[string][]byte{
 		"backups/testdb/backup-001.sql":    []byte("-- SQL dump for testdb\nCREATE TABLE users (id INT);\n"),
-		"backups/testdb/backup-002.sql.gz": []byte{0x1f, 0x8b, 0x08, 0x00}, // gzip magic bytes
+		"backups/testdb/backup-002.sql.gz": {0x1f, 0x8b, 0x08, 0x00}, // gzip magic bytes
 		"backups/myapp/backup-001.sql":     []byte("-- SQL dump for myapp\nCREATE TABLE orders (id INT);\n"),
 	}
 )
