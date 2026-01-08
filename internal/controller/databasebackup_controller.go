@@ -548,6 +548,11 @@ func (r *DatabaseBackupReconciler) buildBackupOptions(backup *dbopsv1alpha1.Data
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *DatabaseBackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// Initialize SecretManager if not provided (allows for dependency injection in tests)
+	if r.SecretManager == nil {
+		r.SecretManager = secret.NewManager(r.Client)
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dbopsv1alpha1.DatabaseBackup{}).
 		Named("databasebackup").

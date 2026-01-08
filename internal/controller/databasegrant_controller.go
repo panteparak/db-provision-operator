@@ -634,6 +634,11 @@ func (r *DatabaseGrantReconciler) buildDefaultPrivilegeOptions(defPrivs []dbopsv
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *DatabaseGrantReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// Initialize SecretManager if not provided (allows for dependency injection in tests)
+	if r.SecretManager == nil {
+		r.SecretManager = secret.NewManager(r.Client)
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dbopsv1alpha1.DatabaseGrant{}).
 		Named("databasegrant").
