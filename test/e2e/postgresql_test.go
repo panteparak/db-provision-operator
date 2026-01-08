@@ -195,11 +195,93 @@ var _ = Describe("postgresql", Ordered, func() {
 		})
 	})
 
+	Context("DatabaseRole lifecycle", func() {
+		const roleName = "testrole"
+
+		It("should create a DatabaseRole and become Ready", func() {
+			By("creating a DatabaseRole CR")
+			role := &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "dbops.dbprovision.io/v1alpha1",
+					"kind":       "DatabaseRole",
+					"metadata": map[string]interface{}{
+						"name":      roleName,
+						"namespace": testNamespace,
+					},
+					"spec": map[string]interface{}{
+						"instanceRef": map[string]interface{}{
+							"name": instanceName,
+						},
+						"roleName": roleName,
+					},
+				},
+			}
+
+			_, err := dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Create(ctx, role, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred(), "Failed to create DatabaseRole")
+
+			By("waiting for DatabaseRole to become Ready")
+			Eventually(func() string {
+				obj, err := dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Get(ctx, roleName, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				return phase
+			}, timeout, interval).Should(Equal("Ready"), "DatabaseRole should become Ready")
+		})
+	})
+
+	Context("DatabaseGrant lifecycle", func() {
+		const grantName = "testgrant"
+
+		It("should create a DatabaseGrant and become Ready", func() {
+			By("creating a DatabaseGrant CR")
+			grant := &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "dbops.dbprovision.io/v1alpha1",
+					"kind":       "DatabaseGrant",
+					"metadata": map[string]interface{}{
+						"name":      grantName,
+						"namespace": testNamespace,
+					},
+					"spec": map[string]interface{}{
+						"instanceRef": map[string]interface{}{
+							"name": instanceName,
+						},
+						"grantee":    userName,
+						"privileges": []interface{}{"SELECT", "INSERT"},
+						"database":   databaseName,
+					},
+				},
+			}
+
+			_, err := dynamicClient.Resource(databaseGrantGVR).Namespace(testNamespace).Create(ctx, grant, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred(), "Failed to create DatabaseGrant")
+
+			By("waiting for DatabaseGrant to become Ready")
+			Eventually(func() string {
+				obj, err := dynamicClient.Resource(databaseGrantGVR).Namespace(testNamespace).Get(ctx, grantName, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				return phase
+			}, timeout, interval).Should(Equal("Ready"), "DatabaseGrant should become Ready")
+		})
+	})
+
 	// Cleanup after all tests
 	AfterAll(func() {
 		By("cleaning up test resources")
 
 		// Delete in reverse order of creation
+		By("deleting DatabaseGrant")
+		_ = dynamicClient.Resource(databaseGrantGVR).Namespace(testNamespace).Delete(ctx, "testgrant", metav1.DeleteOptions{})
+
+		By("deleting DatabaseRole")
+		_ = dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Delete(ctx, "testrole", metav1.DeleteOptions{})
+
 		By("deleting DatabaseUser")
 		_ = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Delete(ctx, userName, metav1.DeleteOptions{})
 

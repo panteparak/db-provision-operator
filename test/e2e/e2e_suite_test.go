@@ -84,6 +84,24 @@ var (
 		Version:  "v1alpha1",
 		Resource: "databasegrants",
 	}
+
+	databaseBackupGVR = schema.GroupVersionResource{
+		Group:    "dbops.dbprovision.io",
+		Version:  "v1alpha1",
+		Resource: "databasebackups",
+	}
+
+	databaseRestoreGVR = schema.GroupVersionResource{
+		Group:    "dbops.dbprovision.io",
+		Version:  "v1alpha1",
+		Resource: "databaserestores",
+	}
+
+	databaseBackupScheduleGVR = schema.GroupVersionResource{
+		Group:    "dbops.dbprovision.io",
+		Version:  "v1alpha1",
+		Resource: "databasebackupschedules",
+	}
 )
 
 // TestE2E runs the end-to-end (e2e) test suite for the project.

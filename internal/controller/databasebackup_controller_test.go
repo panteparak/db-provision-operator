@@ -317,6 +317,406 @@ var _ = Describe("DatabaseBackup Controller", func() {
 			Expect(result).To(Equal(reconcile.Result{}))
 		})
 
+		It("should correctly parse S3 storage configuration", func() {
+			s3BackupName := "test-backup-s3"
+			backup := &dbopsv1alpha1.DatabaseBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      s3BackupName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseBackupSpec{
+					DatabaseRef: dbopsv1alpha1.DatabaseReference{
+						Name: databaseName,
+					},
+					Storage: dbopsv1alpha1.StorageConfig{
+						Type: dbopsv1alpha1.StorageTypeS3,
+						S3: &dbopsv1alpha1.S3StorageConfig{
+							Bucket:         "my-backup-bucket",
+							Region:         "us-west-2",
+							Prefix:         "backups/postgres",
+							Endpoint:       "https://s3.us-west-2.amazonaws.com",
+							ForcePathStyle: false,
+							SecretRef: dbopsv1alpha1.S3SecretRef{
+								Name: "s3-credentials",
+								Keys: &dbopsv1alpha1.S3SecretKeys{
+									AccessKey: "AWS_ACCESS_KEY_ID",
+									SecretKey: "AWS_SECRET_ACCESS_KEY",
+								},
+							},
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, backup)).To(Succeed())
+
+			// Verify the S3 storage spec was stored correctly
+			fetchedBackup := &dbopsv1alpha1.DatabaseBackup{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: s3BackupName, Namespace: namespace}, fetchedBackup)).To(Succeed())
+
+			Expect(fetchedBackup.Spec.Storage.Type).To(Equal(dbopsv1alpha1.StorageTypeS3))
+			Expect(fetchedBackup.Spec.Storage.S3).NotTo(BeNil())
+			Expect(fetchedBackup.Spec.Storage.S3.Bucket).To(Equal("my-backup-bucket"))
+			Expect(fetchedBackup.Spec.Storage.S3.Region).To(Equal("us-west-2"))
+			Expect(fetchedBackup.Spec.Storage.S3.Prefix).To(Equal("backups/postgres"))
+			Expect(fetchedBackup.Spec.Storage.S3.Endpoint).To(Equal("https://s3.us-west-2.amazonaws.com"))
+			Expect(fetchedBackup.Spec.Storage.S3.ForcePathStyle).To(BeFalse())
+			Expect(fetchedBackup.Spec.Storage.S3.SecretRef.Name).To(Equal("s3-credentials"))
+
+			// Clean up
+			_ = k8sClient.Delete(ctx, backup)
+		})
+
+		It("should correctly parse GCS storage configuration", func() {
+			gcsBackupName := "test-backup-gcs"
+			backup := &dbopsv1alpha1.DatabaseBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      gcsBackupName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseBackupSpec{
+					DatabaseRef: dbopsv1alpha1.DatabaseReference{
+						Name: databaseName,
+					},
+					Storage: dbopsv1alpha1.StorageConfig{
+						Type: dbopsv1alpha1.StorageTypeGCS,
+						GCS: &dbopsv1alpha1.GCSStorageConfig{
+							Bucket: "gcs-backup-bucket",
+							Prefix: "db-backups/daily",
+							SecretRef: dbopsv1alpha1.SecretKeySelector{
+								Name: "gcs-service-account",
+								Key:  "service-account.json",
+							},
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, backup)).To(Succeed())
+
+			fetchedBackup := &dbopsv1alpha1.DatabaseBackup{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: gcsBackupName, Namespace: namespace}, fetchedBackup)).To(Succeed())
+
+			Expect(fetchedBackup.Spec.Storage.Type).To(Equal(dbopsv1alpha1.StorageTypeGCS))
+			Expect(fetchedBackup.Spec.Storage.GCS).NotTo(BeNil())
+			Expect(fetchedBackup.Spec.Storage.GCS.Bucket).To(Equal("gcs-backup-bucket"))
+			Expect(fetchedBackup.Spec.Storage.GCS.Prefix).To(Equal("db-backups/daily"))
+			Expect(fetchedBackup.Spec.Storage.GCS.SecretRef.Name).To(Equal("gcs-service-account"))
+			Expect(fetchedBackup.Spec.Storage.GCS.SecretRef.Key).To(Equal("service-account.json"))
+
+			_ = k8sClient.Delete(ctx, backup)
+		})
+
+		It("should correctly parse Azure storage configuration", func() {
+			azureBackupName := "test-backup-azure"
+			backup := &dbopsv1alpha1.DatabaseBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      azureBackupName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseBackupSpec{
+					DatabaseRef: dbopsv1alpha1.DatabaseReference{
+						Name: databaseName,
+					},
+					Storage: dbopsv1alpha1.StorageConfig{
+						Type: dbopsv1alpha1.StorageTypeAzure,
+						Azure: &dbopsv1alpha1.AzureStorageConfig{
+							Container:      "backup-container",
+							StorageAccount: "mystorageaccount",
+							Prefix:         "postgres/production",
+							SecretRef: dbopsv1alpha1.SecretReference{
+								Name: "azure-storage-credentials",
+							},
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, backup)).To(Succeed())
+
+			fetchedBackup := &dbopsv1alpha1.DatabaseBackup{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: azureBackupName, Namespace: namespace}, fetchedBackup)).To(Succeed())
+
+			Expect(fetchedBackup.Spec.Storage.Type).To(Equal(dbopsv1alpha1.StorageTypeAzure))
+			Expect(fetchedBackup.Spec.Storage.Azure).NotTo(BeNil())
+			Expect(fetchedBackup.Spec.Storage.Azure.Container).To(Equal("backup-container"))
+			Expect(fetchedBackup.Spec.Storage.Azure.StorageAccount).To(Equal("mystorageaccount"))
+			Expect(fetchedBackup.Spec.Storage.Azure.Prefix).To(Equal("postgres/production"))
+			Expect(fetchedBackup.Spec.Storage.Azure.SecretRef.Name).To(Equal("azure-storage-credentials"))
+
+			_ = k8sClient.Delete(ctx, backup)
+		})
+
+		It("should correctly parse compression configuration", func() {
+			compBackupName := "test-backup-compression"
+			backup := &dbopsv1alpha1.DatabaseBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      compBackupName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseBackupSpec{
+					DatabaseRef: dbopsv1alpha1.DatabaseReference{
+						Name: databaseName,
+					},
+					Storage: dbopsv1alpha1.StorageConfig{
+						Type: dbopsv1alpha1.StorageTypePVC,
+						PVC: &dbopsv1alpha1.PVCStorageConfig{
+							ClaimName: "backup-pvc",
+							SubPath:   "compressed",
+						},
+					},
+					Compression: &dbopsv1alpha1.CompressionConfig{
+						Enabled:   true,
+						Algorithm: dbopsv1alpha1.CompressionZstd,
+						Level:     9,
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, backup)).To(Succeed())
+
+			fetchedBackup := &dbopsv1alpha1.DatabaseBackup{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: compBackupName, Namespace: namespace}, fetchedBackup)).To(Succeed())
+
+			Expect(fetchedBackup.Spec.Compression).NotTo(BeNil())
+			Expect(fetchedBackup.Spec.Compression.Enabled).To(BeTrue())
+			Expect(fetchedBackup.Spec.Compression.Algorithm).To(Equal(dbopsv1alpha1.CompressionZstd))
+			Expect(fetchedBackup.Spec.Compression.Level).To(Equal(int32(9)))
+
+			_ = k8sClient.Delete(ctx, backup)
+		})
+
+		It("should correctly parse different compression algorithms", func() {
+			// Test gzip compression
+			gzipBackupName := "test-backup-gzip"
+			gzipBackup := &dbopsv1alpha1.DatabaseBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      gzipBackupName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseBackupSpec{
+					DatabaseRef: dbopsv1alpha1.DatabaseReference{
+						Name: databaseName,
+					},
+					Storage: dbopsv1alpha1.StorageConfig{
+						Type: dbopsv1alpha1.StorageTypePVC,
+						PVC: &dbopsv1alpha1.PVCStorageConfig{
+							ClaimName: "backup-pvc",
+						},
+					},
+					Compression: &dbopsv1alpha1.CompressionConfig{
+						Enabled:   true,
+						Algorithm: dbopsv1alpha1.CompressionGzip,
+						Level:     6,
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, gzipBackup)).To(Succeed())
+
+			fetchedGzip := &dbopsv1alpha1.DatabaseBackup{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: gzipBackupName, Namespace: namespace}, fetchedGzip)).To(Succeed())
+			Expect(fetchedGzip.Spec.Compression.Algorithm).To(Equal(dbopsv1alpha1.CompressionGzip))
+
+			// Test LZ4 compression
+			lz4BackupName := "test-backup-lz4"
+			lz4Backup := &dbopsv1alpha1.DatabaseBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      lz4BackupName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseBackupSpec{
+					DatabaseRef: dbopsv1alpha1.DatabaseReference{
+						Name: databaseName,
+					},
+					Storage: dbopsv1alpha1.StorageConfig{
+						Type: dbopsv1alpha1.StorageTypePVC,
+						PVC: &dbopsv1alpha1.PVCStorageConfig{
+							ClaimName: "backup-pvc",
+						},
+					},
+					Compression: &dbopsv1alpha1.CompressionConfig{
+						Enabled:   true,
+						Algorithm: dbopsv1alpha1.CompressionLZ4,
+						Level:     3,
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, lz4Backup)).To(Succeed())
+
+			fetchedLz4 := &dbopsv1alpha1.DatabaseBackup{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: lz4BackupName, Namespace: namespace}, fetchedLz4)).To(Succeed())
+			Expect(fetchedLz4.Spec.Compression.Algorithm).To(Equal(dbopsv1alpha1.CompressionLZ4))
+
+			_ = k8sClient.Delete(ctx, gzipBackup)
+			_ = k8sClient.Delete(ctx, lz4Backup)
+		})
+
+		It("should correctly parse encryption configuration", func() {
+			encBackupName := "test-backup-encryption"
+			backup := &dbopsv1alpha1.DatabaseBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      encBackupName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseBackupSpec{
+					DatabaseRef: dbopsv1alpha1.DatabaseReference{
+						Name: databaseName,
+					},
+					Storage: dbopsv1alpha1.StorageConfig{
+						Type: dbopsv1alpha1.StorageTypePVC,
+						PVC: &dbopsv1alpha1.PVCStorageConfig{
+							ClaimName: "backup-pvc",
+							SubPath:   "encrypted",
+						},
+					},
+					Encryption: &dbopsv1alpha1.EncryptionConfig{
+						Enabled:   true,
+						Algorithm: dbopsv1alpha1.EncryptionAES256GCM,
+						SecretRef: &dbopsv1alpha1.SecretKeySelector{
+							Name: "encryption-key-secret",
+							Key:  "encryption-key",
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, backup)).To(Succeed())
+
+			fetchedBackup := &dbopsv1alpha1.DatabaseBackup{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: encBackupName, Namespace: namespace}, fetchedBackup)).To(Succeed())
+
+			Expect(fetchedBackup.Spec.Encryption).NotTo(BeNil())
+			Expect(fetchedBackup.Spec.Encryption.Enabled).To(BeTrue())
+			Expect(fetchedBackup.Spec.Encryption.Algorithm).To(Equal(dbopsv1alpha1.EncryptionAES256GCM))
+			Expect(fetchedBackup.Spec.Encryption.SecretRef).NotTo(BeNil())
+			Expect(fetchedBackup.Spec.Encryption.SecretRef.Name).To(Equal("encryption-key-secret"))
+			Expect(fetchedBackup.Spec.Encryption.SecretRef.Key).To(Equal("encryption-key"))
+
+			_ = k8sClient.Delete(ctx, backup)
+		})
+
+		It("should correctly parse AES-256-CBC encryption algorithm", func() {
+			cbcBackupName := "test-backup-aes-cbc"
+			backup := &dbopsv1alpha1.DatabaseBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      cbcBackupName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseBackupSpec{
+					DatabaseRef: dbopsv1alpha1.DatabaseReference{
+						Name: databaseName,
+					},
+					Storage: dbopsv1alpha1.StorageConfig{
+						Type: dbopsv1alpha1.StorageTypePVC,
+						PVC: &dbopsv1alpha1.PVCStorageConfig{
+							ClaimName: "backup-pvc",
+						},
+					},
+					Encryption: &dbopsv1alpha1.EncryptionConfig{
+						Enabled:   true,
+						Algorithm: dbopsv1alpha1.EncryptionAES256CBC,
+						SecretRef: &dbopsv1alpha1.SecretKeySelector{
+							Name: "cbc-key-secret",
+							Key:  "key",
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, backup)).To(Succeed())
+
+			fetchedBackup := &dbopsv1alpha1.DatabaseBackup{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: cbcBackupName, Namespace: namespace}, fetchedBackup)).To(Succeed())
+
+			Expect(fetchedBackup.Spec.Encryption.Algorithm).To(Equal(dbopsv1alpha1.EncryptionAES256CBC))
+
+			_ = k8sClient.Delete(ctx, backup)
+		})
+
+		It("should correctly parse TTL/expiration spec", func() {
+			ttlBackupName := "test-backup-ttl"
+			backup := &dbopsv1alpha1.DatabaseBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      ttlBackupName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseBackupSpec{
+					DatabaseRef: dbopsv1alpha1.DatabaseReference{
+						Name: databaseName,
+					},
+					Storage: dbopsv1alpha1.StorageConfig{
+						Type: dbopsv1alpha1.StorageTypePVC,
+						PVC: &dbopsv1alpha1.PVCStorageConfig{
+							ClaimName: "backup-pvc",
+							SubPath:   "ttl-backups",
+						},
+					},
+					TTL:                   "168h", // 7 days
+					ActiveDeadlineSeconds: 7200,
+				},
+			}
+			Expect(k8sClient.Create(ctx, backup)).To(Succeed())
+
+			fetchedBackup := &dbopsv1alpha1.DatabaseBackup{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: ttlBackupName, Namespace: namespace}, fetchedBackup)).To(Succeed())
+
+			Expect(fetchedBackup.Spec.TTL).To(Equal("168h"))
+			Expect(fetchedBackup.Spec.ActiveDeadlineSeconds).To(Equal(int64(7200)))
+
+			_ = k8sClient.Delete(ctx, backup)
+		})
+
+		It("should correctly parse various TTL durations", func() {
+			// Test short TTL (24 hours)
+			shortTtlName := "test-backup-short-ttl"
+			shortTtlBackup := &dbopsv1alpha1.DatabaseBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      shortTtlName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseBackupSpec{
+					DatabaseRef: dbopsv1alpha1.DatabaseReference{
+						Name: databaseName,
+					},
+					Storage: dbopsv1alpha1.StorageConfig{
+						Type: dbopsv1alpha1.StorageTypePVC,
+						PVC: &dbopsv1alpha1.PVCStorageConfig{
+							ClaimName: "backup-pvc",
+						},
+					},
+					TTL: "24h",
+				},
+			}
+			Expect(k8sClient.Create(ctx, shortTtlBackup)).To(Succeed())
+
+			fetchedShort := &dbopsv1alpha1.DatabaseBackup{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: shortTtlName, Namespace: namespace}, fetchedShort)).To(Succeed())
+			Expect(fetchedShort.Spec.TTL).To(Equal("24h"))
+
+			// Test long TTL (30 days = 720 hours)
+			longTtlName := "test-backup-long-ttl"
+			longTtlBackup := &dbopsv1alpha1.DatabaseBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      longTtlName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseBackupSpec{
+					DatabaseRef: dbopsv1alpha1.DatabaseReference{
+						Name: databaseName,
+					},
+					Storage: dbopsv1alpha1.StorageConfig{
+						Type: dbopsv1alpha1.StorageTypePVC,
+						PVC: &dbopsv1alpha1.PVCStorageConfig{
+							ClaimName: "backup-pvc",
+						},
+					},
+					TTL: "720h",
+				},
+			}
+			Expect(k8sClient.Create(ctx, longTtlBackup)).To(Succeed())
+
+			fetchedLong := &dbopsv1alpha1.DatabaseBackup{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: longTtlName, Namespace: namespace}, fetchedLong)).To(Succeed())
+			Expect(fetchedLong.Spec.TTL).To(Equal("720h"))
+
+			_ = k8sClient.Delete(ctx, shortTtlBackup)
+			_ = k8sClient.Delete(ctx, longTtlBackup)
+		})
+
 		It("should not allow backup when already completed", func() {
 			backup := &dbopsv1alpha1.DatabaseBackup{
 				ObjectMeta: metav1.ObjectMeta{

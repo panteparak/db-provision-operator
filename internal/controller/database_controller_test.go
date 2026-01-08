@@ -263,5 +263,220 @@ var _ = Describe("Database Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal(reconcile.Result{}))
 		})
+
+		It("should block deletion when DeletionProtection is true", func() {
+			database := &dbopsv1alpha1.Database{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       databaseName,
+					Namespace:  namespace,
+					Finalizers: []string{util.FinalizerDatabase},
+				},
+				Spec: dbopsv1alpha1.DatabaseSpec{
+					Name: "protected_db",
+					InstanceRef: dbopsv1alpha1.InstanceReference{
+						Name: instanceName,
+					},
+					DeletionProtection: true,
+					DeletionPolicy:     dbopsv1alpha1.DeletionPolicyDelete,
+				},
+			}
+			Expect(k8sClient.Create(ctx, database)).To(Succeed())
+
+			// Mark for deletion
+			Expect(k8sClient.Delete(ctx, database)).To(Succeed())
+
+			controllerReconciler := &DatabaseReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			// Reconcile should fail due to deletion protection
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: databaseNamespacedName,
+			})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("deletion protection"))
+
+			// Verify status shows deletion blocked
+			updatedDatabase := &dbopsv1alpha1.Database{}
+			Expect(k8sClient.Get(ctx, databaseNamespacedName, updatedDatabase)).To(Succeed())
+			Expect(updatedDatabase.Status.Phase).To(Equal(dbopsv1alpha1.PhaseFailed))
+			Expect(updatedDatabase.Status.Message).To(ContainSubstring("Deletion blocked"))
+
+			// Verify the Ready condition shows DeletionProtected reason
+			readyCond := util.GetCondition(updatedDatabase.Status.Conditions, util.ConditionTypeReady)
+			if readyCond != nil {
+				Expect(readyCond.Reason).To(Equal(util.ReasonDeletionProtected))
+			}
+		})
+
+		It("should allow deletion when force-delete annotation is set", func() {
+			database := &dbopsv1alpha1.Database{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       databaseName,
+					Namespace:  namespace,
+					Finalizers: []string{util.FinalizerDatabase},
+					Annotations: map[string]string{
+						util.AnnotationForceDelete: "true",
+					},
+				},
+				Spec: dbopsv1alpha1.DatabaseSpec{
+					Name: "force_delete_db",
+					InstanceRef: dbopsv1alpha1.InstanceReference{
+						Name: instanceName,
+					},
+					DeletionProtection: true,
+					DeletionPolicy:     dbopsv1alpha1.DeletionPolicyRetain,
+				},
+			}
+			Expect(k8sClient.Create(ctx, database)).To(Succeed())
+
+			// Mark for deletion
+			Expect(k8sClient.Delete(ctx, database)).To(Succeed())
+
+			controllerReconciler := &DatabaseReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			// Reconcile should succeed (force-delete bypasses deletion protection)
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: databaseNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify finalizer was removed (database should be deleted)
+			deletedDatabase := &dbopsv1alpha1.Database{}
+			err = k8sClient.Get(ctx, databaseNamespacedName, deletedDatabase)
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+		})
+
+		It("should set owner reference to DatabaseInstance", func() {
+			database := &dbopsv1alpha1.Database{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      databaseName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseSpec{
+					Name: "owned_db",
+					InstanceRef: dbopsv1alpha1.InstanceReference{
+						Name: instanceName,
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, database)).To(Succeed())
+
+			// Verify the database was created
+			createdDatabase := &dbopsv1alpha1.Database{}
+			Expect(k8sClient.Get(ctx, databaseNamespacedName, createdDatabase)).To(Succeed())
+
+			// Verify instanceRef is set correctly
+			Expect(createdDatabase.Spec.InstanceRef.Name).To(Equal(instanceName))
+			Expect(createdDatabase.Spec.InstanceRef.Namespace).To(BeEmpty()) // Same namespace
+		})
+
+		It("should update status message on error", func() {
+			database := &dbopsv1alpha1.Database{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      databaseName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseSpec{
+					Name: "error_db",
+					InstanceRef: dbopsv1alpha1.InstanceReference{
+						Name: "nonexistent-instance",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, database)).To(Succeed())
+
+			controllerReconciler := &DatabaseReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			// First reconcile to add finalizer
+			_, _ = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: databaseNamespacedName,
+			})
+
+			// Second reconcile to check error handling
+			_, _ = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: databaseNamespacedName,
+			})
+
+			// Verify status message contains error information
+			updatedDatabase := &dbopsv1alpha1.Database{}
+			Expect(k8sClient.Get(ctx, databaseNamespacedName, updatedDatabase)).To(Succeed())
+			Expect(updatedDatabase.Status.Phase).To(Equal(dbopsv1alpha1.PhaseFailed))
+			Expect(updatedDatabase.Status.Message).NotTo(BeEmpty())
+			Expect(updatedDatabase.Status.Message).To(ContainSubstring("not found"))
+		})
+
+		It("should read PostgreSQL extensions spec correctly", func() {
+			database := &dbopsv1alpha1.Database{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      databaseName,
+					Namespace: namespace,
+				},
+				Spec: dbopsv1alpha1.DatabaseSpec{
+					Name: "extensions_db",
+					InstanceRef: dbopsv1alpha1.InstanceReference{
+						Name: instanceName,
+					},
+					Postgres: &dbopsv1alpha1.PostgresDatabaseConfig{
+						Encoding:   "UTF8",
+						Tablespace: "pg_default",
+						Template:   "template0",
+						Extensions: []dbopsv1alpha1.PostgresExtension{
+							{
+								Name:    "uuid-ossp",
+								Schema:  "public",
+								Version: "1.1",
+							},
+							{
+								Name:   "pg_stat_statements",
+								Schema: "public",
+							},
+							{
+								Name: "hstore",
+							},
+						},
+						Schemas: []dbopsv1alpha1.PostgresSchema{
+							{
+								Name:  "app",
+								Owner: "app_user",
+							},
+							{
+								Name: "analytics",
+							},
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, database)).To(Succeed())
+
+			// Verify the database was created with PostgreSQL config
+			createdDatabase := &dbopsv1alpha1.Database{}
+			Expect(k8sClient.Get(ctx, databaseNamespacedName, createdDatabase)).To(Succeed())
+			Expect(createdDatabase.Spec.Postgres).NotTo(BeNil())
+			Expect(createdDatabase.Spec.Postgres.Encoding).To(Equal("UTF8"))
+			Expect(createdDatabase.Spec.Postgres.Tablespace).To(Equal("pg_default"))
+			Expect(createdDatabase.Spec.Postgres.Template).To(Equal("template0"))
+
+			// Verify extensions
+			Expect(createdDatabase.Spec.Postgres.Extensions).To(HaveLen(3))
+			Expect(createdDatabase.Spec.Postgres.Extensions[0].Name).To(Equal("uuid-ossp"))
+			Expect(createdDatabase.Spec.Postgres.Extensions[0].Schema).To(Equal("public"))
+			Expect(createdDatabase.Spec.Postgres.Extensions[0].Version).To(Equal("1.1"))
+			Expect(createdDatabase.Spec.Postgres.Extensions[1].Name).To(Equal("pg_stat_statements"))
+			Expect(createdDatabase.Spec.Postgres.Extensions[2].Name).To(Equal("hstore"))
+
+			// Verify schemas
+			Expect(createdDatabase.Spec.Postgres.Schemas).To(HaveLen(2))
+			Expect(createdDatabase.Spec.Postgres.Schemas[0].Name).To(Equal("app"))
+			Expect(createdDatabase.Spec.Postgres.Schemas[0].Owner).To(Equal("app_user"))
+			Expect(createdDatabase.Spec.Postgres.Schemas[1].Name).To(Equal("analytics"))
+		})
 	})
 })
