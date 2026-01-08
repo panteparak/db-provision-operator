@@ -1,50 +1,56 @@
-# Default values for db-provision-operator.
+# Default values for db-provision-operator
+# This is a YAML-formatted file.
 
-# Number of replicas for the controller manager
+# -- Number of replicas for the operator deployment
 replicaCount: 1
 
 image:
+  # -- Image repository
   repository: ghcr.io/panteparak/db-provision-operator
+  # -- Image pull policy
   pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
+  # -- Overrides the image tag whose default is the chart appVersion
   tag: ""
 
+# -- Image pull secrets for private registries
 imagePullSecrets: []
+
+# -- Override the name of the chart
 nameOverride: ""
+
+# -- Override the full name of the chart
 fullnameOverride: ""
 
 serviceAccount:
-  # Specifies whether a service account should be created
+  # -- Specifies whether a service account should be created
   create: true
-  # Annotations to add to the service account
+  # -- Annotations to add to the service account
   annotations: {}
-  # The name of the service account to use.
+  # -- The name of the service account to use
   # If not set and create is true, a name is generated using the fullname template
   name: ""
 
-# Pod annotations
-podAnnotations: {}
+# -- Pod annotations
+podAnnotations:
+  kubectl.kubernetes.io/default-container: manager
 
-# Pod labels
-podLabels: {}
+# -- Pod labels
+podLabels:
+  control-plane: controller-manager
 
-# Pod security context
+# -- Pod security context
 podSecurityContext:
   runAsNonRoot: true
   seccompProfile:
     type: RuntimeDefault
 
-# Container security context
+# -- Container security context
 securityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop:
       - ALL
-  readOnlyRootFilesystem: true
-  runAsNonRoot: true
-  runAsUser: 65532
 
-# Resource limits and requests
 resources:
   limits:
     cpu: 500m
@@ -53,7 +59,57 @@ resources:
     cpu: 10m
     memory: 64Mi
 
-# Liveness probe configuration
+# -- Node selector for pod scheduling
+nodeSelector: {}
+
+# -- Tolerations for pod scheduling
+tolerations: []
+
+# -- Affinity rules for pod scheduling
+affinity: {}
+
+# -- Leader election configuration (simple flag for deployment args)
+leaderElect: true
+
+# Leader election RBAC configuration
+leaderElection:
+  # -- Enable leader election RBAC
+  enabled: true
+
+# -- Health probe bind address
+healthProbeBindAddress: ":8081"
+
+# -- Metrics bind address
+metricsBindAddress: "0"
+
+# Metrics configuration
+metrics:
+  # -- Enable metrics
+  enabled: false
+  service:
+    # -- Metrics service type
+    type: ClusterIP
+    # -- Metrics service port
+    port: 8443
+  serviceMonitor:
+    # -- Enable ServiceMonitor
+    enabled: false
+    # -- ServiceMonitor namespace (defaults to release namespace)
+    namespace: ""
+    # -- Additional labels for ServiceMonitor
+    labels: {}
+    # -- Scrape interval
+    interval: ""
+    # -- Scrape timeout
+    scrapeTimeout: ""
+    # -- Honor labels
+    honorLabels: false
+    # -- Relabelings
+    relabelings: []
+    # -- Metric relabelings
+    metricRelabelings: []
+
+# Probes configuration
 livenessProbe:
   httpGet:
     path: /healthz
@@ -61,7 +117,6 @@ livenessProbe:
   initialDelaySeconds: 15
   periodSeconds: 20
 
-# Readiness probe configuration
 readinessProbe:
   httpGet:
     path: /readyz
@@ -69,73 +124,12 @@ readinessProbe:
   initialDelaySeconds: 5
   periodSeconds: 10
 
-# Node selector for pod scheduling
-nodeSelector: {}
-
-# Tolerations for pod scheduling
-tolerations: []
-
-# Affinity rules for pod scheduling
-affinity: {}
-
-# Leader election configuration
-leaderElection:
-  enabled: true
-
-# Metrics configuration
-metrics:
-  enabled: true
-  # Service for metrics
-  service:
-    type: ClusterIP
-    port: 8443
-  # ServiceMonitor for Prometheus Operator
-  serviceMonitor:
-    enabled: false
-    namespace: ""
-    interval: 30s
-    scrapeTimeout: 10s
-    labels: {}
-    honorLabels: false
-    relabelings: []
-    metricRelabelings: []
-
-# Webhook configuration (if webhooks are enabled)
-webhook:
-  enabled: false
-  port: 9443
-  certManager:
-    enabled: false
-    issuerRef: {}
-
-# RBAC configuration
-rbac:
-  # Create ClusterRole and ClusterRoleBinding
-  create: true
-
-# CRD configuration
+# CRD installation
 crds:
-  # Install CRDs (set to false if CRDs are managed separately)
+  # -- Install CRDs
   install: true
-  # Keep CRDs on chart uninstall
+  # -- Keep CRDs on chart uninstall
   keep: true
 
-# Controller manager configuration
-manager:
-  # Arguments to pass to the manager
-  args:
-    - --leader-elect
-    - --health-probe-bind-address=:8081
-    - --metrics-bind-address=:8443
-    - --metrics-secure=true
-
-# Additional environment variables
-env: []
-  # - name: LOG_LEVEL
-  #   value: "debug"
-
-# Additional volumes
-volumes: []
-
-# Additional volume mounts
-volumeMounts: []
+# -- Namespace to install the operator
+namespace: db-provision-operator-system

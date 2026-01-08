@@ -56,16 +56,15 @@ Create the name of the service account to use
 */}}
 {{- define "db-provision-operator.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "db-provision-operator.fullname" .) .Values.serviceAccount.name }}
+{{- default (printf "%s-controller-manager" (include "db-provision-operator.fullname" .)) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
 
 {{/*
-Create the image name
+Create the namespace
 */}}
-{{- define "db-provision-operator.image" -}}
-{{- $tag := default .Chart.AppVersion .Values.image.tag }}
-{{- printf "%s:%s" .Values.image.repository $tag }}
+{{- define "db-provision-operator.namespace" -}}
+{{- default .Values.namespace .Release.Namespace }}
 {{- end }}

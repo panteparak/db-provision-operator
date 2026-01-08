@@ -186,6 +186,20 @@ jobs:
             exit 1
           fi
 
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.14.0'
+
+      - name: Lint Helm chart
+        run: helm lint charts/db-provision-operator
+
+      - name: Test Helm chart template
+        run: |
+          helm template test-release charts/db-provision-operator \
+            --set image.tag=test \
+            --debug > /dev/null
+
   generate:
     name: Verify Generated Code
     runs-on: ubuntu-latest
@@ -222,17 +236,18 @@ jobs:
         run: echo "All parallel jobs completed successfully"
 
   # ============================================================================
-  # Stage 3: E2E Tests (Matrix: PostgreSQL, MySQL)
+  # Stage 3: E2E Tests (Matrix: Database x Installation Method)
   # ============================================================================
 
   e2e:
-    name: E2E (${{ matrix.database }})
+    name: E2E (${{ matrix.database }}/${{ matrix.install_method }})
     runs-on: ubuntu-latest
     needs: [gate]
     strategy:
       fail-fast: false
       matrix:
         database: [postgresql, mysql]
+        install_method: [kustomize, helm]
         include:
           - database: postgresql
             fixture: test/e2e/fixtures/postgresql.yaml
@@ -293,7 +308,8 @@ jobs:
           echo "=== Database pod logs ==="
           kubectl logs ${{ matrix.pod }} -n ${{ matrix.namespace }} --tail=30
 
-      - name: Install CRDs
+      - name: Install CRDs (kustomize)
+        if: matrix.install_method == 'kustomize'
         run: make install
 
       # For push events: Pull image from registry
@@ -320,15 +336,34 @@ jobs:
           k3d image import ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.short-sha.outputs.sha }} \
             -c e2e-${{ matrix.database }}
 
-      - name: Deploy operator
+      - name: Install Helm
+        if: matrix.install_method == 'helm'
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.14.0'
+
+      - name: Deploy operator (kustomize)
+        if: matrix.install_method == 'kustomize'
         run: |
           make deploy IMG=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.short-sha.outputs.sha }}
+
+      - name: Deploy operator (helm)
+        if: matrix.install_method == 'helm'
+        run: |
+          helm install db-provision-operator ./charts/db-provision-operator \
+            --namespace db-provision-operator-system \
+            --create-namespace \
+            --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
+            --set image.tag=sha-${{ steps.short-sha.outputs.sha }} \
+            --set image.pullPolicy=IfNotPresent \
+            --wait \
+            --timeout 5m
 
       - name: Wait for operator ready
         run: |
           echo "Waiting for operator deployment..."
           kubectl wait --for=condition=Available \
-            deployment/db-provision-operator-controller-manager \
+            deployment -l app.kubernetes.io/name=db-provision-operator \
             -n db-provision-operator-system \
             --timeout=120s
           echo "=== Operator pods ==="
@@ -394,5 +429,7 @@ jobs:
           echo "  ✅ Docker Build"
           echo "  ✅ Manifests Verification"
           echo "  ✅ Generated Code Verification"
-          echo "  ✅ E2E Tests (PostgreSQL)"
-          echo "  ✅ E2E Tests (MySQL)"
+          echo "  ✅ E2E Tests (PostgreSQL + kustomize)"
+          echo "  ✅ E2E Tests (PostgreSQL + helm)"
+          echo "  ✅ E2E Tests (MySQL + kustomize)"
+          echo "  ✅ E2E Tests (MySQL + helm)"

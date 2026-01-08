@@ -85,6 +85,10 @@ spec:
                       name:
                         description: Name of the secret containing credentials
                         type: string
+                      namespace:
+                        description: Namespace of the secret (defaults to the resource's
+                          namespace if not specified)
+                        type: string
                     required:
                     - name
                     type: object
@@ -116,6 +120,10 @@ spec:
                         type: object
                       name:
                         description: Name of the secret containing credentials
+                        type: string
+                      namespace:
+                        description: Namespace of the secret (defaults to the resource's
+                          namespace if not specified)
                         type: string
                     required:
                     - name
