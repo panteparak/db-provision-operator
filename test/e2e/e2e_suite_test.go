@@ -220,3 +220,16 @@ func getResourcePhase(ctx context.Context, gvr schema.GroupVersionResource, name
 	phase, _, err := unstructured.NestedString(obj.Object, "status", "phase")
 	return phase, err
 }
+
+// getSecretValue retrieves a value from a Kubernetes secret
+func getSecretValue(ctx context.Context, namespace, secretName, key string) (string, error) {
+	secret, err := k8sClient.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to get secret %s/%s: %w", namespace, secretName, err)
+	}
+	data, ok := secret.Data[key]
+	if !ok {
+		return "", fmt.Errorf("key %s not found in secret %s/%s", key, namespace, secretName)
+	}
+	return string(data), nil
+}

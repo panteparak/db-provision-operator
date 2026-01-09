@@ -283,8 +283,18 @@ func (r *DatabaseGrantReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		if grant.Spec.Postgres != nil {
 			// Apply role assignments
 			if len(grant.Spec.Postgres.Roles) > 0 {
+				attemptCount := 0
 				result := util.RetryWithBackoff(ctx, defaultRetryConfig, func() error {
-					return dbAdapter.GrantRole(ctx, username, grant.Spec.Postgres.Roles)
+					attemptCount++
+					err := dbAdapter.GrantRole(ctx, username, grant.Spec.Postgres.Roles)
+					if err != nil && attemptCount > 1 {
+						// Update status to show retry in progress
+						grant.Status.Message = fmt.Sprintf("Retrying role grants (attempt %d): %v", attemptCount, err)
+						if statusErr := r.Status().Update(ctx, &grant); statusErr != nil {
+							log.Error(statusErr, "Failed to update retry status")
+						}
+					}
+					return err
 				})
 				if result.LastError != nil {
 					log.Error(result.LastError, "Failed to grant roles",
@@ -307,8 +317,18 @@ func (r *DatabaseGrantReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			// Apply direct grants
 			if len(grant.Spec.Postgres.Grants) > 0 {
 				grantOpts := r.buildPostgresGrantOptions(grant.Spec.Postgres.Grants)
+				attemptCount := 0
 				result := util.RetryWithBackoff(ctx, defaultRetryConfig, func() error {
-					return dbAdapter.Grant(ctx, username, grantOpts)
+					attemptCount++
+					err := dbAdapter.Grant(ctx, username, grantOpts)
+					if err != nil && attemptCount > 1 {
+						// Update status to show retry in progress
+						grant.Status.Message = fmt.Sprintf("Retrying direct grants (attempt %d): %v", attemptCount, err)
+						if statusErr := r.Status().Update(ctx, &grant); statusErr != nil {
+							log.Error(statusErr, "Failed to update retry status")
+						}
+					}
+					return err
 				})
 				if result.LastError != nil {
 					log.Error(result.LastError, "Failed to apply direct grants",
@@ -330,8 +350,18 @@ func (r *DatabaseGrantReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			// Apply default privileges
 			if len(grant.Spec.Postgres.DefaultPrivileges) > 0 {
 				defPrivOpts := r.buildDefaultPrivilegeOptions(grant.Spec.Postgres.DefaultPrivileges)
+				attemptCount := 0
 				result := util.RetryWithBackoff(ctx, defaultRetryConfig, func() error {
-					return dbAdapter.SetDefaultPrivileges(ctx, username, defPrivOpts)
+					attemptCount++
+					err := dbAdapter.SetDefaultPrivileges(ctx, username, defPrivOpts)
+					if err != nil && attemptCount > 1 {
+						// Update status to show retry in progress
+						grant.Status.Message = fmt.Sprintf("Retrying default privileges (attempt %d): %v", attemptCount, err)
+						if statusErr := r.Status().Update(ctx, &grant); statusErr != nil {
+							log.Error(statusErr, "Failed to update retry status")
+						}
+					}
+					return err
 				})
 				if result.LastError != nil {
 					log.Error(result.LastError, "Failed to set default privileges",
@@ -355,8 +385,18 @@ func (r *DatabaseGrantReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		if grant.Spec.MySQL != nil {
 			// Apply role assignments (MySQL 8.0+)
 			if len(grant.Spec.MySQL.Roles) > 0 {
+				attemptCount := 0
 				result := util.RetryWithBackoff(ctx, defaultRetryConfig, func() error {
-					return dbAdapter.GrantRole(ctx, username, grant.Spec.MySQL.Roles)
+					attemptCount++
+					err := dbAdapter.GrantRole(ctx, username, grant.Spec.MySQL.Roles)
+					if err != nil && attemptCount > 1 {
+						// Update status to show retry in progress
+						grant.Status.Message = fmt.Sprintf("Retrying role grants (attempt %d): %v", attemptCount, err)
+						if statusErr := r.Status().Update(ctx, &grant); statusErr != nil {
+							log.Error(statusErr, "Failed to update retry status")
+						}
+					}
+					return err
 				})
 				if result.LastError != nil {
 					log.Error(result.LastError, "Failed to grant roles",
@@ -379,8 +419,18 @@ func (r *DatabaseGrantReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			// Apply direct grants
 			if len(grant.Spec.MySQL.Grants) > 0 {
 				grantOpts := r.buildMySQLGrantOptions(grant.Spec.MySQL.Grants)
+				attemptCount := 0
 				result := util.RetryWithBackoff(ctx, defaultRetryConfig, func() error {
-					return dbAdapter.Grant(ctx, username, grantOpts)
+					attemptCount++
+					err := dbAdapter.Grant(ctx, username, grantOpts)
+					if err != nil && attemptCount > 1 {
+						// Update status to show retry in progress
+						grant.Status.Message = fmt.Sprintf("Retrying direct grants (attempt %d): %v", attemptCount, err)
+						if statusErr := r.Status().Update(ctx, &grant); statusErr != nil {
+							log.Error(statusErr, "Failed to update retry status")
+						}
+					}
+					return err
 				})
 				if result.LastError != nil {
 					log.Error(result.LastError, "Failed to apply direct grants",

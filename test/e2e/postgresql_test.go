@@ -26,6 +26,8 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/db-provision-operator/test/e2e/testutil"
 )
 
 var _ = Describe("postgresql", Ordered, func() {
@@ -42,6 +44,24 @@ var _ = Describe("postgresql", Ordered, func() {
 	)
 
 	ctx := context.Background()
+
+	// Database verifier for validating actual database state
+	var verifier *testutil.PostgresVerifier
+
+	BeforeAll(func() {
+		By("setting up PostgreSQL verifier")
+		// Get the admin password from the secret
+		password, err := getSecretValue(ctx, secretNamespace, secretName, "password")
+		Expect(err).NotTo(HaveOccurred(), "Failed to get PostgreSQL password from secret")
+
+		cfg := testutil.PostgresEngineConfig(postgresHost, 5432, "postgres", password)
+		verifier = testutil.NewPostgresVerifier(cfg)
+
+		// Connect with retry since database may still be starting
+		Eventually(func() error {
+			return verifier.Connect(ctx)
+		}, timeout, interval).Should(Succeed(), "Should connect to PostgreSQL for verification")
+	})
 
 	Context("DatabaseInstance lifecycle", func() {
 		It("should create a DatabaseInstance and become Ready", func() {
@@ -136,6 +156,16 @@ var _ = Describe("postgresql", Ordered, func() {
 				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 				return phase
 			}, timeout, interval).Should(Equal("Ready"), "Database should become Ready")
+
+			By("verifying database actually exists in PostgreSQL")
+			Eventually(func() bool {
+				exists, err := verifier.DatabaseExists(ctx, databaseName)
+				if err != nil {
+					GinkgoWriter.Printf("Error checking database existence: %v\n", err)
+					return false
+				}
+				return exists
+			}, timeout, interval).Should(BeTrue(), "Database '%s' should exist in PostgreSQL", databaseName)
 		})
 	})
 
@@ -171,6 +201,16 @@ var _ = Describe("postgresql", Ordered, func() {
 				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 				return phase
 			}, timeout, interval).Should(Equal("Ready"), "DatabaseUser should become Ready")
+
+			By("verifying user actually exists in PostgreSQL")
+			Eventually(func() bool {
+				exists, err := verifier.UserExists(ctx, userName)
+				if err != nil {
+					GinkgoWriter.Printf("Error checking user existence: %v\n", err)
+					return false
+				}
+				return exists
+			}, timeout, interval).Should(BeTrue(), "User '%s' should exist in PostgreSQL", userName)
 		})
 	})
 
@@ -229,6 +269,16 @@ var _ = Describe("postgresql", Ordered, func() {
 				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 				return phase
 			}, timeout, interval).Should(Equal("Ready"), "DatabaseRole should become Ready")
+
+			By("verifying role actually exists in PostgreSQL")
+			Eventually(func() bool {
+				exists, err := verifier.RoleExists(ctx, roleName)
+				if err != nil {
+					GinkgoWriter.Printf("Error checking role existence: %v\n", err)
+					return false
+				}
+				return exists
+			}, timeout, interval).Should(BeTrue(), "Role '%s' should exist in PostgreSQL", roleName)
 		})
 	})
 
@@ -277,11 +327,27 @@ var _ = Describe("postgresql", Ordered, func() {
 				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 				return phase
 			}, timeout, interval).Should(Equal("Ready"), "DatabaseGrant should become Ready")
+
+			By("verifying user has USAGE privilege on public schema in testdb")
+			Eventually(func() bool {
+				// Must check on the specific database where grants were applied
+				hasPriv, err := verifier.HasPrivilegeOnDatabase(ctx, userName, "USAGE", "schema", "public", databaseName)
+				if err != nil {
+					GinkgoWriter.Printf("Error checking schema privilege: %v\n", err)
+					return false
+				}
+				return hasPriv
+			}, timeout, interval).Should(BeTrue(), "User '%s' should have USAGE privilege on public schema in database '%s'", userName, databaseName)
 		})
 	})
 
 	// Cleanup after all tests
 	AfterAll(func() {
+		By("closing database verifier connection")
+		if verifier != nil {
+			_ = verifier.Close()
+		}
+
 		By("cleaning up test resources")
 
 		// Delete in reverse order of creation
