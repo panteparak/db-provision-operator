@@ -362,12 +362,14 @@ jobs:
           - database: postgresql
             fixture: test/e2e/fixtures/postgresql.yaml
             namespace: postgres
+            service: postgres
             pod: postgres-0
             port: 5432
             db_timeout: 180s
           - database: mysql
             fixture: test/e2e/fixtures/mysql.yaml
             namespace: mysql
+            service: mysql
             pod: mysql-0
             port: 3306
             db_timeout: 600s
@@ -481,8 +483,8 @@ jobs:
 
       - name: Start port-forward for database access
         run: |
-          echo "Starting port-forward to ${{ matrix.database }}..."
-          kubectl port-forward -n ${{ matrix.namespace }} svc/${{ matrix.database }} ${{ matrix.port }}:${{ matrix.port }} &
+          echo "Starting port-forward to ${{ matrix.service }} service..."
+          kubectl port-forward -n ${{ matrix.namespace }} svc/${{ matrix.service }} ${{ matrix.port }}:${{ matrix.port }} &
           echo $! > /tmp/port-forward.pid
           # Wait for port-forward to be ready
           sleep 3
