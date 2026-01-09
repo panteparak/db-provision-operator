@@ -20,6 +20,7 @@ package e2e
 
 import (
 	"context"
+	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -36,7 +37,7 @@ var _ = Describe("postgresql", Ordered, func() {
 		databaseName    = "testdb"
 		userName        = "testuser"
 		testNamespace   = "default"
-		postgresHost    = "postgres.postgres.svc.cluster.local"
+		postgresHost    = "postgres.postgres.svc.cluster.local" // K8s DNS for CR (runs inside cluster)
 		secretName      = "postgres-credentials"
 		secretNamespace = "postgres"
 		timeout         = 2 * time.Minute
@@ -48,13 +49,26 @@ var _ = Describe("postgresql", Ordered, func() {
 	// Database verifier for validating actual database state
 	var verifier *testutil.PostgresVerifier
 
+	// getVerifierHost returns the host for the verifier to connect to.
+	// In CI, we use port-forwarding so the verifier connects to localhost.
+	// Locally, we may connect directly to the K8s service.
+	getVerifierHost := func() string {
+		if host := os.Getenv("E2E_DATABASE_HOST"); host != "" {
+			return host
+		}
+		return postgresHost
+	}
+
 	BeforeAll(func() {
 		By("setting up PostgreSQL verifier")
 		// Get the admin password from the secret
 		password, err := getSecretValue(ctx, secretNamespace, secretName, "password")
 		Expect(err).NotTo(HaveOccurred(), "Failed to get PostgreSQL password from secret")
 
-		cfg := testutil.PostgresEngineConfig(postgresHost, 5432, "postgres", password)
+		verifierHost := getVerifierHost()
+		GinkgoWriter.Printf("Using verifier host: %s\n", verifierHost)
+
+		cfg := testutil.PostgresEngineConfig(verifierHost, 5432, "postgres", password)
 		verifier = testutil.NewPostgresVerifier(cfg)
 
 		// Connect with retry since database may still be starting

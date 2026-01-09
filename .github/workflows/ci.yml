@@ -479,9 +479,25 @@ jobs:
           echo "=== Operator pods ==="
           kubectl get pods -n db-provision-operator-system
 
+      - name: Start port-forward for database access
+        run: |
+          echo "Starting port-forward to ${{ matrix.database }}..."
+          kubectl port-forward -n ${{ matrix.namespace }} svc/${{ matrix.database }} ${{ matrix.port }}:${{ matrix.port }} &
+          echo $! > /tmp/port-forward.pid
+          # Wait for port-forward to be ready
+          sleep 3
+          # Verify port-forward is working
+          if ! nc -z localhost ${{ matrix.port }}; then
+            echo "Port-forward failed to start"
+            exit 1
+          fi
+          echo "Port-forward ready on localhost:${{ matrix.port }}"
+
       - name: Run E2E tests for ${{ matrix.database }}
         env:
           E2E_DATABASE_ENGINE: ${{ matrix.database }}
+          E2E_DATABASE_HOST: localhost
+          E2E_DATABASE_PORT: ${{ matrix.port }}
         run: |
           go test ./test/e2e/... -v -tags=e2e \
             -ginkgo.focus="${{ matrix.database }}" \
