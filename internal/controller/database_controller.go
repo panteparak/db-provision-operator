@@ -30,9 +30,9 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
-	"github.com/db-provision-operator/internal/adapter"
 	"github.com/db-provision-operator/internal/metrics"
 	"github.com/db-provision-operator/internal/secret"
+	"github.com/db-provision-operator/internal/service"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -148,51 +148,50 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, database *db
 	}
 
 	// Get TLS credentials if enabled
-	var tlsCreds *secret.TLSCredentials
+	var tlsCA, tlsCert, tlsKey []byte
 	if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
-		tlsCreds, err = r.SecretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
+		tlsCreds, err := r.SecretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
 		if err != nil {
 			log.Error(err, "Failed to get TLS credentials")
+		} else {
+			tlsCA = tlsCreds.CA
+			tlsCert = tlsCreds.Cert
+			tlsKey = tlsCreds.Key
 		}
 	}
 
-	// Build connection config
-	var tlsCA, tlsCert, tlsKey []byte
-	if tlsCreds != nil {
-		tlsCA = tlsCreds.CA
-		tlsCert = tlsCreds.Cert
-		tlsKey = tlsCreds.Key
-	}
-	config := adapter.BuildConnectionConfig(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
+	// Build service config from instance and credentials
+	cfg := service.ConfigFromInstance(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
 
-	// Create adapter
-	dbAdapter, err := adapter.NewAdapter(instance.Spec.Engine, config)
+	// Create database service
+	svc, err := service.NewDatabaseService(cfg)
 	if err != nil {
 		database.Status.Phase = dbopsv1alpha1.PhaseFailed
-		database.Status.Message = fmt.Sprintf("Failed to create adapter: %v", err)
+		database.Status.Message = fmt.Sprintf("Failed to create service: %v", err)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
-	defer func() { _ = dbAdapter.Close() }()
+	defer svc.Close()
 
 	// Connect to database
-	if err := dbAdapter.Connect(ctx); err != nil {
+	if err := svc.Connect(ctx); err != nil {
 		database.Status.Phase = dbopsv1alpha1.PhaseFailed
 		database.Status.Message = fmt.Sprintf("Failed to connect: %v", err)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
 
-	// Check if database exists
 	dbName := database.Spec.Name
-	exists, err := dbAdapter.DatabaseExists(ctx, dbName)
+	engine := cfg.Engine
+
+	// Check if database exists and create if needed
+	exists, err := svc.Exists(ctx, dbName)
 	if err != nil {
 		database.Status.Phase = dbopsv1alpha1.PhaseFailed
 		database.Status.Message = fmt.Sprintf("Failed to check database existence: %v", err)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
 
-	engine := string(instance.Spec.Engine)
 	if !exists {
-		// Create the database
+		// Update status to Creating
 		log.Info("Creating database", "name", dbName)
 		database.Status.Phase = dbopsv1alpha1.PhaseCreating
 		database.Status.Message = "Creating database"
@@ -200,9 +199,10 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, database *db
 			log.Error(statusErr, "Failed to update status")
 		}
 
+		// Create the database using service layer
 		createStart := time.Now()
-		opts := r.buildCreateDatabaseOptions(database, instance.Spec.Engine)
-		if err := dbAdapter.CreateDatabase(ctx, opts); err != nil {
+		result, err := svc.CreateOnly(ctx, &database.Spec)
+		if err != nil {
 			metrics.RecordDatabaseOperation(metrics.OperationCreate, engine, database.Namespace, metrics.StatusFailure)
 			database.Status.Phase = dbopsv1alpha1.PhaseFailed
 			database.Status.Message = fmt.Sprintf("Failed to create database: %v", err)
@@ -213,17 +213,19 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, database *db
 			}
 			return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 		}
-		createDuration := time.Since(createStart).Seconds()
-		metrics.RecordDatabaseOperation(metrics.OperationCreate, engine, database.Namespace, metrics.StatusSuccess)
-		metrics.RecordDatabaseOperationDuration(metrics.OperationCreate, engine, database.Namespace, createDuration)
 
-		log.Info("Successfully created database", "name", dbName)
+		if result.Created {
+			createDuration := time.Since(createStart).Seconds()
+			metrics.RecordDatabaseOperation(metrics.OperationCreate, engine, database.Namespace, metrics.StatusSuccess)
+			metrics.RecordDatabaseOperationDuration(metrics.OperationCreate, engine, database.Namespace, createDuration)
+			log.Info("Successfully created database", "name", dbName)
+		}
 	}
 
 	// Verify the database is accepting connections before marking it as Ready.
 	// This is particularly important for PostgreSQL where a newly created database
 	// may temporarily not accept connections while being initialized from a template.
-	if err := dbAdapter.VerifyDatabaseAccess(ctx, dbName); err != nil {
+	if err := svc.VerifyAccess(ctx, dbName); err != nil {
 		log.Info("Database not yet accepting connections, will retry", "name", dbName, "error", err)
 		database.Status.Phase = dbopsv1alpha1.PhaseCreating
 		database.Status.Message = "Waiting for database to accept connections"
@@ -236,15 +238,14 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, database *db
 		return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 	}
 
-	// Update database settings if needed
-	updateOpts := r.buildUpdateDatabaseOptions(database, instance.Spec.Engine)
-	if err := dbAdapter.UpdateDatabase(ctx, dbName, updateOpts); err != nil {
+	// Update database settings if needed (extensions, schemas, etc.)
+	if _, err := svc.Update(ctx, dbName, &database.Spec); err != nil {
 		log.Error(err, "Failed to update database settings", "name", dbName)
 		// Don't fail, just log the error
 	}
 
 	// Get database info
-	dbInfo, err := dbAdapter.GetDatabaseInfo(ctx, dbName)
+	dbInfo, err := svc.Get(ctx, dbName)
 	if err != nil {
 		log.Error(err, "Failed to get database info")
 	}
@@ -276,76 +277,6 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, database *db
 	log.Info("Successfully reconciled Database", "name", database.Name, "database", dbName)
 
 	return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
-}
-
-// buildCreateDatabaseOptions builds options for creating a database
-func (r *DatabaseReconciler) buildCreateDatabaseOptions(database *dbopsv1alpha1.Database, engine dbopsv1alpha1.EngineType) adapter.CreateDatabaseOptions {
-	opts := adapter.CreateDatabaseOptions{
-		Name: database.Spec.Name,
-	}
-
-	switch engine {
-	case dbopsv1alpha1.EngineTypePostgres:
-		if database.Spec.Postgres != nil {
-			opts.Encoding = database.Spec.Postgres.Encoding
-			opts.LCCollate = database.Spec.Postgres.LCCollate
-			opts.LCCtype = database.Spec.Postgres.LCCtype
-			opts.Tablespace = database.Spec.Postgres.Tablespace
-			opts.Template = database.Spec.Postgres.Template
-			opts.ConnectionLimit = database.Spec.Postgres.ConnectionLimit
-			opts.IsTemplate = database.Spec.Postgres.IsTemplate
-			opts.AllowConnections = database.Spec.Postgres.AllowConnections
-		}
-	case dbopsv1alpha1.EngineTypeMySQL:
-		if database.Spec.MySQL != nil {
-			opts.Charset = database.Spec.MySQL.Charset
-			opts.Collation = database.Spec.MySQL.Collation
-		}
-	}
-
-	return opts
-}
-
-// buildUpdateDatabaseOptions builds options for updating a database
-func (r *DatabaseReconciler) buildUpdateDatabaseOptions(database *dbopsv1alpha1.Database, engine dbopsv1alpha1.EngineType) adapter.UpdateDatabaseOptions {
-	opts := adapter.UpdateDatabaseOptions{}
-
-	switch engine {
-	case dbopsv1alpha1.EngineTypePostgres:
-		if database.Spec.Postgres != nil {
-			// Extensions
-			for _, ext := range database.Spec.Postgres.Extensions {
-				opts.Extensions = append(opts.Extensions, adapter.ExtensionOptions{
-					Name:    ext.Name,
-					Schema:  ext.Schema,
-					Version: ext.Version,
-				})
-			}
-			// Schemas
-			for _, schema := range database.Spec.Postgres.Schemas {
-				opts.Schemas = append(opts.Schemas, adapter.SchemaOptions{
-					Name:  schema.Name,
-					Owner: schema.Owner,
-				})
-			}
-			// Default privileges
-			for _, dp := range database.Spec.Postgres.DefaultPrivileges {
-				opts.DefaultPrivileges = append(opts.DefaultPrivileges, adapter.DefaultPrivilegeOptions{
-					Role:       dp.Role,
-					Schema:     dp.Schema,
-					ObjectType: dp.ObjectType,
-					Privileges: dp.Privileges,
-				})
-			}
-		}
-	case dbopsv1alpha1.EngineTypeMySQL:
-		if database.Spec.MySQL != nil {
-			opts.Charset = database.Spec.MySQL.Charset
-			opts.Collation = database.Spec.MySQL.Collation
-		}
-	}
-
-	return opts
 }
 
 // handleDeletion handles the deletion of a Database
@@ -390,33 +321,32 @@ func (r *DatabaseReconciler) handleDeletion(ctx context.Context, database *dbops
 			Namespace: instanceNamespace,
 			Name:      instanceRef.Name,
 		}, instance); err == nil {
-			// Get credentials and connect
+			// Get credentials
 			creds, err := r.SecretManager.GetCredentials(ctx, instance.Namespace, instance.Spec.Connection.SecretRef)
 			if err == nil {
-				var tlsCreds *secret.TLSCredentials
-				if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
-					tlsCreds, _ = r.SecretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
-				}
-
+				// Get TLS credentials if enabled
 				var tlsCA, tlsCert, tlsKey []byte
-				if tlsCreds != nil {
-					tlsCA = tlsCreds.CA
-					tlsCert = tlsCreds.Cert
-					tlsKey = tlsCreds.Key
+				if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
+					tlsCreds, err := r.SecretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
+					if err == nil {
+						tlsCA = tlsCreds.CA
+						tlsCert = tlsCreds.Cert
+						tlsKey = tlsCreds.Key
+					}
 				}
-				config := adapter.BuildConnectionConfig(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
 
-				dbAdapter, err := adapter.NewAdapter(instance.Spec.Engine, config)
+				// Build service config and create service
+				cfg := service.ConfigFromInstance(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
+				svc, err := service.NewDatabaseService(cfg)
 				if err == nil {
-					defer func() { _ = dbAdapter.Close() }()
-					if err := dbAdapter.Connect(ctx); err == nil {
+					defer svc.Close()
+					if err := svc.Connect(ctx); err == nil {
 						log.Info("Dropping database", "name", database.Spec.Name)
-						engine := string(instance.Spec.Engine)
+						engine := cfg.Engine
 						deleteStart := time.Now()
-						opts := adapter.DropDatabaseOptions{
-							Force: util.HasForceDeleteAnnotation(database),
-						}
-						if err := dbAdapter.DropDatabase(ctx, database.Spec.Name, opts); err != nil {
+						force := util.HasForceDeleteAnnotation(database)
+
+						if _, err := svc.Delete(ctx, database.Spec.Name, force); err != nil {
 							log.Error(err, "Failed to drop database", "name", database.Spec.Name)
 							metrics.RecordDatabaseOperation(metrics.OperationDelete, engine, database.Namespace, metrics.StatusFailure)
 						} else {

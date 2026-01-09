@@ -30,9 +30,9 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
-	"github.com/db-provision-operator/internal/adapter"
 	"github.com/db-provision-operator/internal/metrics"
 	"github.com/db-provision-operator/internal/secret"
+	"github.com/db-provision-operator/internal/service"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -143,31 +143,30 @@ func (r *DatabaseUserReconciler) reconcileUser(ctx context.Context, user *dbopsv
 	}
 
 	// Get TLS credentials if enabled
-	var tlsCreds *secret.TLSCredentials
-	if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
-		tlsCreds, _ = r.SecretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
-	}
-
-	// Build connection config
 	var tlsCA, tlsCert, tlsKey []byte
-	if tlsCreds != nil {
-		tlsCA = tlsCreds.CA
-		tlsCert = tlsCreds.Cert
-		tlsKey = tlsCreds.Key
+	if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
+		tlsCreds, err := r.SecretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
+		if err == nil {
+			tlsCA = tlsCreds.CA
+			tlsCert = tlsCreds.Cert
+			tlsKey = tlsCreds.Key
+		}
 	}
-	config := adapter.BuildConnectionConfig(&instance.Spec, adminCreds.Username, adminCreds.Password, tlsCA, tlsCert, tlsKey)
 
-	// Create adapter
-	dbAdapter, err := adapter.NewAdapter(instance.Spec.Engine, config)
+	// Build service config from instance and credentials
+	cfg := service.ConfigFromInstance(&instance.Spec, adminCreds.Username, adminCreds.Password, tlsCA, tlsCert, tlsKey)
+
+	// Create user service
+	svc, err := service.NewUserService(cfg)
 	if err != nil {
 		user.Status.Phase = dbopsv1alpha1.PhaseFailed
-		user.Status.Message = fmt.Sprintf("Failed to create adapter: %v", err)
+		user.Status.Message = fmt.Sprintf("Failed to create service: %v", err)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
-	defer func() { _ = dbAdapter.Close() }()
+	defer svc.Close()
 
 	// Connect to database
-	if err := dbAdapter.Connect(ctx); err != nil {
+	if err := svc.Connect(ctx); err != nil {
 		user.Status.Phase = dbopsv1alpha1.PhaseFailed
 		user.Status.Message = fmt.Sprintf("Failed to connect: %v", err)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
@@ -181,16 +180,17 @@ func (r *DatabaseUserReconciler) reconcileUser(ctx context.Context, user *dbopsv
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
 
-	// Check if user exists
 	username := user.Spec.Username
-	exists, err := dbAdapter.UserExists(ctx, username)
+	engine := cfg.Engine
+
+	// Check if user exists
+	exists, err := svc.Exists(ctx, username)
 	if err != nil {
 		user.Status.Phase = dbopsv1alpha1.PhaseFailed
 		user.Status.Message = fmt.Sprintf("Failed to check user existence: %v", err)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
 
-	engine := string(instance.Spec.Engine)
 	if !exists {
 		// Create the user
 		log.Info("Creating user", "username", username)
@@ -200,8 +200,11 @@ func (r *DatabaseUserReconciler) reconcileUser(ctx context.Context, user *dbopsv
 			log.Error(statusErr, "Failed to update status")
 		}
 
-		opts := r.buildCreateUserOptions(user, userPassword, instance.Spec.Engine)
-		if err := dbAdapter.CreateUser(ctx, opts); err != nil {
+		result, err := svc.Create(ctx, service.CreateUserServiceOptions{
+			Spec:     &user.Spec,
+			Password: userPassword,
+		})
+		if err != nil {
 			metrics.RecordUserOperation(metrics.OperationCreate, engine, user.Namespace, metrics.StatusFailure)
 			user.Status.Phase = dbopsv1alpha1.PhaseFailed
 			user.Status.Message = fmt.Sprintf("Failed to create user: %v", err)
@@ -212,13 +215,14 @@ func (r *DatabaseUserReconciler) reconcileUser(ctx context.Context, user *dbopsv
 			}
 			return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 		}
-		metrics.RecordUserOperation(metrics.OperationCreate, engine, user.Namespace, metrics.StatusSuccess)
 
-		log.Info("Successfully created user", "username", username)
+		if result.Created {
+			metrics.RecordUserOperation(metrics.OperationCreate, engine, user.Namespace, metrics.StatusSuccess)
+			log.Info("Successfully created user", "username", username)
+		}
 	} else {
 		// Update user if needed
-		updateOpts := r.buildUpdateUserOptions(user, instance.Spec.Engine)
-		if err := dbAdapter.UpdateUser(ctx, username, updateOpts); err != nil {
+		if _, err := svc.Update(ctx, username, &user.Spec); err != nil {
 			metrics.RecordUserOperation(metrics.OperationUpdate, engine, user.Namespace, metrics.StatusFailure)
 			log.Error(err, "Failed to update user", "username", username)
 		} else {
@@ -323,83 +327,6 @@ func (r *DatabaseUserReconciler) getOrGeneratePassword(ctx context.Context, user
 	return secret.GeneratePassword(user.Spec.PasswordSecret)
 }
 
-// buildCreateUserOptions builds options for creating a user
-func (r *DatabaseUserReconciler) buildCreateUserOptions(user *dbopsv1alpha1.DatabaseUser, password string, engine dbopsv1alpha1.EngineType) adapter.CreateUserOptions {
-	opts := adapter.CreateUserOptions{
-		Username: user.Spec.Username,
-		Password: password,
-		Login:    true,
-		Inherit:  true,
-	}
-
-	switch engine {
-	case dbopsv1alpha1.EngineTypePostgres:
-		if user.Spec.Postgres != nil {
-			opts.ConnectionLimit = user.Spec.Postgres.ConnectionLimit
-			opts.ValidUntil = user.Spec.Postgres.ValidUntil
-			opts.Superuser = user.Spec.Postgres.Superuser
-			opts.CreateDB = user.Spec.Postgres.CreateDB
-			opts.CreateRole = user.Spec.Postgres.CreateRole
-			opts.Inherit = user.Spec.Postgres.Inherit
-			opts.Login = user.Spec.Postgres.Login
-			opts.Replication = user.Spec.Postgres.Replication
-			opts.BypassRLS = user.Spec.Postgres.BypassRLS
-			opts.InRoles = user.Spec.Postgres.InRoles
-			opts.ConfigParams = user.Spec.Postgres.ConfigParameters
-		}
-	case dbopsv1alpha1.EngineTypeMySQL:
-		if user.Spec.MySQL != nil {
-			opts.MaxQueriesPerHour = user.Spec.MySQL.MaxQueriesPerHour
-			opts.MaxUpdatesPerHour = user.Spec.MySQL.MaxUpdatesPerHour
-			opts.MaxConnectionsPerHour = user.Spec.MySQL.MaxConnectionsPerHour
-			opts.MaxUserConnections = user.Spec.MySQL.MaxUserConnections
-			opts.AuthPlugin = string(user.Spec.MySQL.AuthPlugin)
-			opts.RequireSSL = user.Spec.MySQL.RequireSSL
-			opts.RequireX509 = user.Spec.MySQL.RequireX509
-			opts.AllowedHosts = user.Spec.MySQL.AllowedHosts
-			opts.AccountLocked = user.Spec.MySQL.AccountLocked
-		}
-	}
-
-	return opts
-}
-
-// buildUpdateUserOptions builds options for updating a user
-func (r *DatabaseUserReconciler) buildUpdateUserOptions(user *dbopsv1alpha1.DatabaseUser, engine dbopsv1alpha1.EngineType) adapter.UpdateUserOptions {
-	opts := adapter.UpdateUserOptions{}
-
-	switch engine {
-	case dbopsv1alpha1.EngineTypePostgres:
-		if user.Spec.Postgres != nil {
-			if user.Spec.Postgres.ConnectionLimit != 0 {
-				opts.ConnectionLimit = &user.Spec.Postgres.ConnectionLimit
-			}
-			if user.Spec.Postgres.ValidUntil != "" {
-				opts.ValidUntil = &user.Spec.Postgres.ValidUntil
-			}
-			opts.InRoles = user.Spec.Postgres.InRoles
-			opts.ConfigParams = user.Spec.Postgres.ConfigParameters
-		}
-	case dbopsv1alpha1.EngineTypeMySQL:
-		if user.Spec.MySQL != nil {
-			if user.Spec.MySQL.MaxQueriesPerHour != 0 {
-				opts.MaxQueriesPerHour = &user.Spec.MySQL.MaxQueriesPerHour
-			}
-			if user.Spec.MySQL.MaxUpdatesPerHour != 0 {
-				opts.MaxUpdatesPerHour = &user.Spec.MySQL.MaxUpdatesPerHour
-			}
-			if user.Spec.MySQL.MaxConnectionsPerHour != 0 {
-				opts.MaxConnectionsPerHour = &user.Spec.MySQL.MaxConnectionsPerHour
-			}
-			if user.Spec.MySQL.MaxUserConnections != 0 {
-				opts.MaxUserConnections = &user.Spec.MySQL.MaxUserConnections
-			}
-		}
-	}
-
-	return opts
-}
-
 // handleDeletion handles the deletion of a DatabaseUser
 func (r *DatabaseUserReconciler) handleDeletion(ctx context.Context, user *dbopsv1alpha1.DatabaseUser) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
@@ -424,29 +351,29 @@ func (r *DatabaseUserReconciler) handleDeletion(ctx context.Context, user *dbops
 			Namespace: instanceNamespace,
 			Name:      instanceRef.Name,
 		}, instance); err == nil {
-			// Get credentials and connect
+			// Get credentials
 			adminCreds, err := r.SecretManager.GetCredentials(ctx, instance.Namespace, instance.Spec.Connection.SecretRef)
 			if err == nil {
-				var tlsCreds *secret.TLSCredentials
-				if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
-					tlsCreds, _ = r.SecretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
-				}
-
+				// Get TLS credentials if enabled
 				var tlsCA, tlsCert, tlsKey []byte
-				if tlsCreds != nil {
-					tlsCA = tlsCreds.CA
-					tlsCert = tlsCreds.Cert
-					tlsKey = tlsCreds.Key
+				if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
+					tlsCreds, err := r.SecretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
+					if err == nil {
+						tlsCA = tlsCreds.CA
+						tlsCert = tlsCreds.Cert
+						tlsKey = tlsCreds.Key
+					}
 				}
-				config := adapter.BuildConnectionConfig(&instance.Spec, adminCreds.Username, adminCreds.Password, tlsCA, tlsCert, tlsKey)
 
-				dbAdapter, err := adapter.NewAdapter(instance.Spec.Engine, config)
+				// Build service config and create service
+				cfg := service.ConfigFromInstance(&instance.Spec, adminCreds.Username, adminCreds.Password, tlsCA, tlsCert, tlsKey)
+				svc, err := service.NewUserService(cfg)
 				if err == nil {
-					defer func() { _ = dbAdapter.Close() }()
-					if err := dbAdapter.Connect(ctx); err == nil {
+					defer svc.Close()
+					if err := svc.Connect(ctx); err == nil {
 						log.Info("Dropping user", "username", user.Spec.Username)
-						engine := string(instance.Spec.Engine)
-						if err := dbAdapter.DropUser(ctx, user.Spec.Username); err != nil {
+						engine := cfg.Engine
+						if _, err := svc.Delete(ctx, user.Spec.Username); err != nil {
 							metrics.RecordUserOperation(metrics.OperationDelete, engine, user.Namespace, metrics.StatusFailure)
 							log.Error(err, "Failed to drop user", "username", user.Spec.Username)
 						} else {

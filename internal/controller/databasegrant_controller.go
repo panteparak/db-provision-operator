@@ -31,10 +31,9 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
-	"github.com/db-provision-operator/internal/adapter"
-	adapterpkg "github.com/db-provision-operator/internal/adapter/types"
 	"github.com/db-provision-operator/internal/metrics"
 	"github.com/db-provision-operator/internal/secret"
+	"github.com/db-provision-operator/internal/service"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -219,30 +218,30 @@ func (r *DatabaseGrantReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
-	// Build connection config
+	// Build service config
 	var tlsCA, tlsCert, tlsKey []byte
 	if tlsCreds != nil {
 		tlsCA = tlsCreds.CA
 		tlsCert = tlsCreds.Cert
 		tlsKey = tlsCreds.Key
 	}
-	connConfig := adapter.BuildConnectionConfig(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
+	cfg := service.ConfigFromInstance(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
 
-	// Create database adapter and connect with retry
-	dbAdapter, err := adapter.NewAdapter(instance.Spec.Engine, connConfig)
+	// Create grant service and connect with retry
+	svc, err := service.NewGrantService(cfg)
 	if err != nil {
 		grant.Status.Phase = dbopsv1alpha1.PhaseFailed
-		grant.Status.Message = fmt.Sprintf("Unsupported database engine: %s", instance.Spec.Engine)
-		util.SetReadyCondition(&grant.Status.Conditions, metav1.ConditionFalse, "UnsupportedEngine", grant.Status.Message)
+		grant.Status.Message = fmt.Sprintf("Failed to create grant service: %v", err)
+		util.SetReadyCondition(&grant.Status.Conditions, metav1.ConditionFalse, "ServiceCreationFailed", grant.Status.Message)
 		if statusErr := r.Status().Update(ctx, &grant); statusErr != nil {
 			log.Error(statusErr, "Failed to update status")
 		}
-		return ctrl.Result{}, nil
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
-	defer func() { _ = dbAdapter.Close() }()
+	defer svc.Close()
 
 	result = util.RetryWithBackoff(ctx, retryConfig, func() error {
-		return dbAdapter.Connect(ctx)
+		return svc.Connect(ctx)
 	})
 	if result.LastError != nil {
 		log.Error(result.LastError, "Failed to connect to database after retries",
@@ -274,182 +273,48 @@ func (r *DatabaseGrantReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		DefaultPrivileges: 0,
 	}
 
-	// Apply grants based on engine type
+	// Apply grants using service layer
 	defaultRetryConfig := util.DefaultRetryConfig()
-	engine := string(instance.Spec.Engine)
+	engine := cfg.Engine
 
-	switch instance.Spec.Engine {
-	case dbopsv1alpha1.EngineTypePostgres:
-		if grant.Spec.Postgres != nil {
-			// Apply role assignments
-			if len(grant.Spec.Postgres.Roles) > 0 {
-				attemptCount := 0
-				result := util.RetryWithBackoff(ctx, defaultRetryConfig, func() error {
-					attemptCount++
-					err := dbAdapter.GrantRole(ctx, username, grant.Spec.Postgres.Roles)
-					if err != nil && attemptCount > 1 {
-						// Update status to show retry in progress
-						grant.Status.Message = fmt.Sprintf("Retrying role grants (attempt %d): %v", attemptCount, err)
-						if statusErr := r.Status().Update(ctx, &grant); statusErr != nil {
-							log.Error(statusErr, "Failed to update retry status")
-						}
-					}
-					return err
-				})
-				if result.LastError != nil {
-					log.Error(result.LastError, "Failed to grant roles",
-						"attempts", result.Attempts,
-						"roles", grant.Spec.Postgres.Roles)
-					metrics.RecordGrantOperation(metrics.OperationCreate, engine, grant.Namespace, metrics.StatusFailure)
-					grant.Status.Phase = dbopsv1alpha1.PhaseFailed
-					grant.Status.Message = fmt.Sprintf("Failed to grant roles: %v", result.LastError)
-					util.SetSyncedCondition(&grant.Status.Conditions, metav1.ConditionFalse, "GrantRolesFailed", grant.Status.Message)
-					util.SetReadyCondition(&grant.Status.Conditions, metav1.ConditionFalse, "GrantRolesFailed", grant.Status.Message)
-					if err := r.Status().Update(ctx, &grant); err != nil {
-						log.Error(err, "Failed to update status")
-					}
-					return ctrl.Result{RequeueAfter: util.CalculateRequeueAfter(defaultRetryConfig, result)}, nil
-				}
-				appliedGrants.Roles = append(appliedGrants.Roles, grant.Spec.Postgres.Roles...)
-				log.Info("Granted roles", "username", username, "roles", grant.Spec.Postgres.Roles)
-			}
-
-			// Apply direct grants
-			if len(grant.Spec.Postgres.Grants) > 0 {
-				grantOpts := r.buildPostgresGrantOptions(grant.Spec.Postgres.Grants)
-				attemptCount := 0
-				result := util.RetryWithBackoff(ctx, defaultRetryConfig, func() error {
-					attemptCount++
-					err := dbAdapter.Grant(ctx, username, grantOpts)
-					if err != nil && attemptCount > 1 {
-						// Update status to show retry in progress
-						grant.Status.Message = fmt.Sprintf("Retrying direct grants (attempt %d): %v", attemptCount, err)
-						if statusErr := r.Status().Update(ctx, &grant); statusErr != nil {
-							log.Error(statusErr, "Failed to update retry status")
-						}
-					}
-					return err
-				})
-				if result.LastError != nil {
-					log.Error(result.LastError, "Failed to apply direct grants",
-						"attempts", result.Attempts)
-					metrics.RecordGrantOperation(metrics.OperationCreate, engine, grant.Namespace, metrics.StatusFailure)
-					grant.Status.Phase = dbopsv1alpha1.PhaseFailed
-					grant.Status.Message = fmt.Sprintf("Failed to apply direct grants: %v", result.LastError)
-					util.SetSyncedCondition(&grant.Status.Conditions, metav1.ConditionFalse, "DirectGrantsFailed", grant.Status.Message)
-					util.SetReadyCondition(&grant.Status.Conditions, metav1.ConditionFalse, "DirectGrantsFailed", grant.Status.Message)
-					if err := r.Status().Update(ctx, &grant); err != nil {
-						log.Error(err, "Failed to update status")
-					}
-					return ctrl.Result{RequeueAfter: util.CalculateRequeueAfter(defaultRetryConfig, result)}, nil
-				}
-				appliedGrants.DirectGrants = int32(len(grant.Spec.Postgres.Grants))
-				log.Info("Applied direct grants", "username", username, "count", len(grant.Spec.Postgres.Grants))
-			}
-
-			// Apply default privileges
-			if len(grant.Spec.Postgres.DefaultPrivileges) > 0 {
-				defPrivOpts := r.buildDefaultPrivilegeOptions(grant.Spec.Postgres.DefaultPrivileges)
-				attemptCount := 0
-				result := util.RetryWithBackoff(ctx, defaultRetryConfig, func() error {
-					attemptCount++
-					err := dbAdapter.SetDefaultPrivileges(ctx, username, defPrivOpts)
-					if err != nil && attemptCount > 1 {
-						// Update status to show retry in progress
-						grant.Status.Message = fmt.Sprintf("Retrying default privileges (attempt %d): %v", attemptCount, err)
-						if statusErr := r.Status().Update(ctx, &grant); statusErr != nil {
-							log.Error(statusErr, "Failed to update retry status")
-						}
-					}
-					return err
-				})
-				if result.LastError != nil {
-					log.Error(result.LastError, "Failed to set default privileges",
-						"attempts", result.Attempts)
-					metrics.RecordGrantOperation(metrics.OperationCreate, engine, grant.Namespace, metrics.StatusFailure)
-					grant.Status.Phase = dbopsv1alpha1.PhaseFailed
-					grant.Status.Message = fmt.Sprintf("Failed to set default privileges: %v", result.LastError)
-					util.SetSyncedCondition(&grant.Status.Conditions, metav1.ConditionFalse, "DefaultPrivilegesFailed", grant.Status.Message)
-					util.SetReadyCondition(&grant.Status.Conditions, metav1.ConditionFalse, "DefaultPrivilegesFailed", grant.Status.Message)
-					if err := r.Status().Update(ctx, &grant); err != nil {
-						log.Error(err, "Failed to update status")
-					}
-					return ctrl.Result{RequeueAfter: util.CalculateRequeueAfter(defaultRetryConfig, result)}, nil
-				}
-				appliedGrants.DefaultPrivileges = int32(len(grant.Spec.Postgres.DefaultPrivileges))
-				log.Info("Set default privileges", "username", username, "count", len(grant.Spec.Postgres.DefaultPrivileges))
+	attemptCount := 0
+	result = util.RetryWithBackoff(ctx, defaultRetryConfig, func() error {
+		attemptCount++
+		grantResult, err := svc.Apply(ctx, service.ApplyGrantServiceOptions{
+			Username: username,
+			Spec:     &grant.Spec,
+		})
+		if err != nil && attemptCount > 1 {
+			grant.Status.Message = fmt.Sprintf("Retrying grants (attempt %d): %v", attemptCount, err)
+			if statusErr := r.Status().Update(ctx, &grant); statusErr != nil {
+				log.Error(statusErr, "Failed to update retry status")
 			}
 		}
-
-	case dbopsv1alpha1.EngineTypeMySQL:
-		if grant.Spec.MySQL != nil {
-			// Apply role assignments (MySQL 8.0+)
-			if len(grant.Spec.MySQL.Roles) > 0 {
-				attemptCount := 0
-				result := util.RetryWithBackoff(ctx, defaultRetryConfig, func() error {
-					attemptCount++
-					err := dbAdapter.GrantRole(ctx, username, grant.Spec.MySQL.Roles)
-					if err != nil && attemptCount > 1 {
-						// Update status to show retry in progress
-						grant.Status.Message = fmt.Sprintf("Retrying role grants (attempt %d): %v", attemptCount, err)
-						if statusErr := r.Status().Update(ctx, &grant); statusErr != nil {
-							log.Error(statusErr, "Failed to update retry status")
-						}
-					}
-					return err
-				})
-				if result.LastError != nil {
-					log.Error(result.LastError, "Failed to grant roles",
-						"attempts", result.Attempts,
-						"roles", grant.Spec.MySQL.Roles)
-					metrics.RecordGrantOperation(metrics.OperationCreate, engine, grant.Namespace, metrics.StatusFailure)
-					grant.Status.Phase = dbopsv1alpha1.PhaseFailed
-					grant.Status.Message = fmt.Sprintf("Failed to grant roles: %v", result.LastError)
-					util.SetSyncedCondition(&grant.Status.Conditions, metav1.ConditionFalse, "GrantRolesFailed", grant.Status.Message)
-					util.SetReadyCondition(&grant.Status.Conditions, metav1.ConditionFalse, "GrantRolesFailed", grant.Status.Message)
-					if err := r.Status().Update(ctx, &grant); err != nil {
-						log.Error(err, "Failed to update status")
-					}
-					return ctrl.Result{RequeueAfter: util.CalculateRequeueAfter(defaultRetryConfig, result)}, nil
-				}
-				appliedGrants.Roles = append(appliedGrants.Roles, grant.Spec.MySQL.Roles...)
-				log.Info("Granted roles", "username", username, "roles", grant.Spec.MySQL.Roles)
-			}
-
-			// Apply direct grants
-			if len(grant.Spec.MySQL.Grants) > 0 {
-				grantOpts := r.buildMySQLGrantOptions(grant.Spec.MySQL.Grants)
-				attemptCount := 0
-				result := util.RetryWithBackoff(ctx, defaultRetryConfig, func() error {
-					attemptCount++
-					err := dbAdapter.Grant(ctx, username, grantOpts)
-					if err != nil && attemptCount > 1 {
-						// Update status to show retry in progress
-						grant.Status.Message = fmt.Sprintf("Retrying direct grants (attempt %d): %v", attemptCount, err)
-						if statusErr := r.Status().Update(ctx, &grant); statusErr != nil {
-							log.Error(statusErr, "Failed to update retry status")
-						}
-					}
-					return err
-				})
-				if result.LastError != nil {
-					log.Error(result.LastError, "Failed to apply direct grants",
-						"attempts", result.Attempts)
-					metrics.RecordGrantOperation(metrics.OperationCreate, engine, grant.Namespace, metrics.StatusFailure)
-					grant.Status.Phase = dbopsv1alpha1.PhaseFailed
-					grant.Status.Message = fmt.Sprintf("Failed to apply direct grants: %v", result.LastError)
-					util.SetSyncedCondition(&grant.Status.Conditions, metav1.ConditionFalse, "DirectGrantsFailed", grant.Status.Message)
-					util.SetReadyCondition(&grant.Status.Conditions, metav1.ConditionFalse, "DirectGrantsFailed", grant.Status.Message)
-					if err := r.Status().Update(ctx, &grant); err != nil {
-						log.Error(err, "Failed to update status")
-					}
-					return ctrl.Result{RequeueAfter: util.CalculateRequeueAfter(defaultRetryConfig, result)}, nil
-				}
-				appliedGrants.DirectGrants = int32(len(grant.Spec.MySQL.Grants))
-				log.Info("Applied direct grants", "username", username, "count", len(grant.Spec.MySQL.Grants))
-			}
+		if err == nil && grantResult != nil {
+			// Update applied grants info from result
+			appliedGrants.Roles = grantResult.AppliedRoles
+			appliedGrants.DirectGrants = int32(grantResult.AppliedDirectGrants)
+			appliedGrants.DefaultPrivileges = int32(grantResult.AppliedDefaultPrivileges)
 		}
+		return err
+	})
+	if result.LastError != nil {
+		log.Error(result.LastError, "Failed to apply grants", "attempts", result.Attempts)
+		metrics.RecordGrantOperation(metrics.OperationCreate, engine, grant.Namespace, metrics.StatusFailure)
+		grant.Status.Phase = dbopsv1alpha1.PhaseFailed
+		grant.Status.Message = fmt.Sprintf("Failed to apply grants: %v", result.LastError)
+		util.SetSyncedCondition(&grant.Status.Conditions, metav1.ConditionFalse, "GrantsFailed", grant.Status.Message)
+		util.SetReadyCondition(&grant.Status.Conditions, metav1.ConditionFalse, "GrantsFailed", grant.Status.Message)
+		if err := r.Status().Update(ctx, &grant); err != nil {
+			log.Error(err, "Failed to update status")
+		}
+		return ctrl.Result{RequeueAfter: util.CalculateRequeueAfter(defaultRetryConfig, result)}, nil
 	}
+
+	log.Info("Applied grants", "username", username,
+		"roles", appliedGrants.Roles,
+		"directGrants", appliedGrants.DirectGrants,
+		"defaultPrivileges", appliedGrants.DefaultPrivileges)
 
 	// Record successful grant operation
 	metrics.RecordGrantOperation(metrics.OperationCreate, engine, grant.Namespace, metrics.StatusSuccess)
@@ -540,146 +405,46 @@ func (r *DatabaseGrantReconciler) handleDeletion(ctx context.Context, grant *dbo
 	}
 
 	// Get TLS credentials if needed
-	var tlsCreds *secret.TLSCredentials
-	if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
-		tlsCreds, _ = r.SecretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
-	}
-
-	// Build connection config
 	var tlsCA, tlsCert, tlsKey []byte
-	if tlsCreds != nil {
-		tlsCA = tlsCreds.CA
-		tlsCert = tlsCreds.Cert
-		tlsKey = tlsCreds.Key
+	if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
+		tlsCreds, err := r.SecretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
+		if err == nil {
+			tlsCA = tlsCreds.CA
+			tlsCert = tlsCreds.Cert
+			tlsKey = tlsCreds.Key
+		}
 	}
-	connConfig := adapter.BuildConnectionConfig(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
 
-	// Create adapter and connect
-	dbAdapter, err := adapter.NewAdapter(instance.Spec.Engine, connConfig)
+	// Build service config and create service
+	cfg := service.ConfigFromInstance(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
+	svc, err := service.NewGrantService(cfg)
 	if err != nil {
-		log.Error(err, "Failed to create adapter for revocation")
+		log.Error(err, "Failed to create grant service for revocation")
 		return nil
 	}
-	defer func() { _ = dbAdapter.Close() }()
+	defer svc.Close()
 
-	if err := dbAdapter.Connect(ctx); err != nil {
+	if err := svc.Connect(ctx); err != nil {
 		log.Error(err, "Failed to connect for revocation")
 		return nil
 	}
 
-	// Revoke grants based on engine type
-	engine := string(instance.Spec.Engine)
-	revocationFailed := false
-
-	switch instance.Spec.Engine {
-	case dbopsv1alpha1.EngineTypePostgres:
-		if grant.Spec.Postgres != nil {
-			// Revoke role assignments
-			if len(grant.Spec.Postgres.Roles) > 0 {
-				if err := dbAdapter.RevokeRole(ctx, username, grant.Spec.Postgres.Roles); err != nil {
-					log.Error(err, "Failed to revoke roles", "roles", grant.Spec.Postgres.Roles)
-					revocationFailed = true
-				} else {
-					log.Info("Revoked roles", "username", username, "roles", grant.Spec.Postgres.Roles)
-				}
-			}
-
-			// Revoke direct grants
-			if len(grant.Spec.Postgres.Grants) > 0 {
-				grantOpts := r.buildPostgresGrantOptions(grant.Spec.Postgres.Grants)
-				if err := dbAdapter.Revoke(ctx, username, grantOpts); err != nil {
-					log.Error(err, "Failed to revoke direct grants")
-					revocationFailed = true
-				} else {
-					log.Info("Revoked direct grants", "username", username, "count", len(grant.Spec.Postgres.Grants))
-				}
-			}
-		}
-
-	case dbopsv1alpha1.EngineTypeMySQL:
-		if grant.Spec.MySQL != nil {
-			// Revoke role assignments
-			if len(grant.Spec.MySQL.Roles) > 0 {
-				if err := dbAdapter.RevokeRole(ctx, username, grant.Spec.MySQL.Roles); err != nil {
-					log.Error(err, "Failed to revoke roles", "roles", grant.Spec.MySQL.Roles)
-					revocationFailed = true
-				} else {
-					log.Info("Revoked roles", "username", username, "roles", grant.Spec.MySQL.Roles)
-				}
-			}
-
-			// Revoke direct grants
-			if len(grant.Spec.MySQL.Grants) > 0 {
-				grantOpts := r.buildMySQLGrantOptions(grant.Spec.MySQL.Grants)
-				if err := dbAdapter.Revoke(ctx, username, grantOpts); err != nil {
-					log.Error(err, "Failed to revoke direct grants")
-					revocationFailed = true
-				} else {
-					log.Info("Revoked direct grants", "username", username, "count", len(grant.Spec.MySQL.Grants))
-				}
-			}
-		}
-	}
-
-	// Record grant deletion metrics
-	if revocationFailed {
+	// Revoke grants using service layer
+	engine := cfg.Engine
+	_, err = svc.Revoke(ctx, service.ApplyGrantServiceOptions{
+		Username: username,
+		Spec:     &grant.Spec,
+	})
+	if err != nil {
+		log.Error(err, "Failed to revoke grants")
 		metrics.RecordGrantOperation(metrics.OperationDelete, engine, grant.Namespace, metrics.StatusFailure)
 	} else {
+		log.Info("Revoked grants", "username", username)
 		metrics.RecordGrantOperation(metrics.OperationDelete, engine, grant.Namespace, metrics.StatusSuccess)
 	}
 
 	log.Info("DatabaseGrant cleanup completed", "grant", grant.Name)
 	return nil
-}
-
-// buildPostgresGrantOptions converts PostgresGrant specs to adapter GrantOptions
-func (r *DatabaseGrantReconciler) buildPostgresGrantOptions(grants []dbopsv1alpha1.PostgresGrant) []adapterpkg.GrantOptions {
-	opts := make([]adapterpkg.GrantOptions, 0, len(grants))
-	for _, g := range grants {
-		opts = append(opts, adapterpkg.GrantOptions{
-			Database:        g.Database,
-			Schema:          g.Schema,
-			Tables:          g.Tables,
-			Sequences:       g.Sequences,
-			Functions:       g.Functions,
-			Privileges:      g.Privileges,
-			WithGrantOption: g.WithGrantOption,
-		})
-	}
-	return opts
-}
-
-// buildMySQLGrantOptions converts MySQLGrant specs to adapter GrantOptions
-func (r *DatabaseGrantReconciler) buildMySQLGrantOptions(grants []dbopsv1alpha1.MySQLGrant) []adapterpkg.GrantOptions {
-	opts := make([]adapterpkg.GrantOptions, 0, len(grants))
-	for _, g := range grants {
-		opts = append(opts, adapterpkg.GrantOptions{
-			Level:           string(g.Level),
-			Database:        g.Database,
-			Table:           g.Table,
-			Columns:         g.Columns,
-			Procedure:       g.Procedure,
-			Function:        g.Function,
-			Privileges:      g.Privileges,
-			WithGrantOption: g.WithGrantOption,
-		})
-	}
-	return opts
-}
-
-// buildDefaultPrivilegeOptions converts PostgresDefaultPrivilegeGrant specs to adapter DefaultPrivilegeGrantOptions
-func (r *DatabaseGrantReconciler) buildDefaultPrivilegeOptions(defPrivs []dbopsv1alpha1.PostgresDefaultPrivilegeGrant) []adapterpkg.DefaultPrivilegeGrantOptions {
-	opts := make([]adapterpkg.DefaultPrivilegeGrantOptions, 0, len(defPrivs))
-	for _, dp := range defPrivs {
-		opts = append(opts, adapterpkg.DefaultPrivilegeGrantOptions{
-			Database:   dp.Database,
-			Schema:     dp.Schema,
-			GrantedBy:  dp.GrantedBy,
-			ObjectType: dp.ObjectType,
-			Privileges: dp.Privileges,
-		})
-	}
-	return opts
 }
 
 // SetupWithManager sets up the controller with the Manager.

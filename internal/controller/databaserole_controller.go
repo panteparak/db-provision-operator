@@ -30,10 +30,9 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
-	"github.com/db-provision-operator/internal/adapter"
-	adaptypes "github.com/db-provision-operator/internal/adapter/types"
 	"github.com/db-provision-operator/internal/metrics"
 	"github.com/db-provision-operator/internal/secret"
+	"github.com/db-provision-operator/internal/service"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -150,32 +149,31 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *dbopsv
 	}
 
 	// Get TLS credentials if enabled
-	var tlsCreds *secret.TLSCredentials
-	if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
-		tlsCreds, _ = r.SecretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
-	}
-
-	// Build connection config
 	var tlsCA, tlsCert, tlsKey []byte
-	if tlsCreds != nil {
-		tlsCA = tlsCreds.CA
-		tlsCert = tlsCreds.Cert
-		tlsKey = tlsCreds.Key
+	if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
+		tlsCreds, err := r.SecretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
+		if err == nil {
+			tlsCA = tlsCreds.CA
+			tlsCert = tlsCreds.Cert
+			tlsKey = tlsCreds.Key
+		}
 	}
-	config := adapter.BuildConnectionConfig(&instance.Spec, adminCreds.Username, adminCreds.Password, tlsCA, tlsCert, tlsKey)
 
-	// Create adapter
-	dbAdapter, err := adapter.NewAdapter(instance.Spec.Engine, config)
+	// Build service config from instance and credentials
+	cfg := service.ConfigFromInstance(&instance.Spec, adminCreds.Username, adminCreds.Password, tlsCA, tlsCert, tlsKey)
+
+	// Create role service
+	svc, err := service.NewRoleService(cfg)
 	if err != nil {
 		role.Status.Phase = dbopsv1alpha1.PhaseFailed
-		role.Status.Message = fmt.Sprintf("Failed to create adapter: %v", err)
+		role.Status.Message = fmt.Sprintf("Failed to create service: %v", err)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
-	defer func() { _ = dbAdapter.Close() }()
+	defer svc.Close()
 
 	// Connect to database with retry
 	retryResult = util.RetryWithBackoff(ctx, retryConfig, func() error {
-		return dbAdapter.Connect(ctx)
+		return svc.Connect(ctx)
 	})
 	if retryResult.LastError != nil {
 		role.Status.Phase = dbopsv1alpha1.PhaseFailed
@@ -187,14 +185,14 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *dbopsv
 	}
 
 	roleName := role.Spec.RoleName
-	engine := string(instance.Spec.Engine)
+	engine := cfg.Engine
 
 	// Check if role exists with retry
 	var exists bool
 	defaultRetryConfig := util.DefaultRetryConfig()
 	retryResult = util.RetryWithBackoff(ctx, defaultRetryConfig, func() error {
 		var err error
-		exists, err = dbAdapter.RoleExists(ctx, roleName)
+		exists, err = svc.Exists(ctx, roleName)
 		return err
 	})
 	if retryResult.LastError != nil {
@@ -212,9 +210,9 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *dbopsv
 			log.Error(statusErr, "Failed to update status")
 		}
 
-		opts := r.buildCreateRoleOptions(role, instance.Spec.Engine)
 		retryResult = util.RetryWithBackoff(ctx, defaultRetryConfig, func() error {
-			return dbAdapter.CreateRole(ctx, opts)
+			_, err := svc.Create(ctx, &role.Spec)
+			return err
 		})
 		if retryResult.LastError != nil {
 			metrics.RecordRoleOperation(metrics.OperationCreate, engine, role.Namespace, metrics.StatusFailure)
@@ -232,9 +230,9 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *dbopsv
 		log.Info("Successfully created role", "roleName", roleName)
 	} else {
 		// Update role if needed
-		updateOpts := r.buildUpdateRoleOptions(role, instance.Spec.Engine)
 		retryResult = util.RetryWithBackoff(ctx, defaultRetryConfig, func() error {
-			return dbAdapter.UpdateRole(ctx, roleName, updateOpts)
+			_, err := svc.Update(ctx, roleName, &role.Spec)
+			return err
 		})
 		if retryResult.LastError != nil {
 			metrics.RecordRoleOperation(metrics.OperationUpdate, engine, role.Namespace, metrics.StatusFailure)
@@ -269,130 +267,6 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *dbopsv
 	return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
 }
 
-// buildCreateRoleOptions builds options for creating a role
-func (r *DatabaseRoleReconciler) buildCreateRoleOptions(role *dbopsv1alpha1.DatabaseRole, engine dbopsv1alpha1.EngineType) adaptypes.CreateRoleOptions {
-	opts := adaptypes.CreateRoleOptions{
-		RoleName: role.Spec.RoleName,
-		Inherit:  true,
-	}
-
-	switch engine {
-	case dbopsv1alpha1.EngineTypePostgres:
-		if role.Spec.Postgres != nil {
-			opts.Login = role.Spec.Postgres.Login
-			opts.Inherit = role.Spec.Postgres.Inherit
-			opts.CreateDB = role.Spec.Postgres.CreateDB
-			opts.CreateRole = role.Spec.Postgres.CreateRole
-			opts.Superuser = role.Spec.Postgres.Superuser
-			opts.Replication = role.Spec.Postgres.Replication
-			opts.BypassRLS = role.Spec.Postgres.BypassRLS
-			opts.InRoles = role.Spec.Postgres.InRoles
-
-			// Convert grants
-			if len(role.Spec.Postgres.Grants) > 0 {
-				opts.Grants = make([]adaptypes.GrantOptions, 0, len(role.Spec.Postgres.Grants))
-				for _, g := range role.Spec.Postgres.Grants {
-					opts.Grants = append(opts.Grants, adaptypes.GrantOptions{
-						Database:        g.Database,
-						Schema:          g.Schema,
-						Tables:          g.Tables,
-						Sequences:       g.Sequences,
-						Functions:       g.Functions,
-						Privileges:      g.Privileges,
-						WithGrantOption: g.WithGrantOption,
-					})
-				}
-			}
-		}
-	case dbopsv1alpha1.EngineTypeMySQL:
-		if role.Spec.MySQL != nil {
-			opts.UseNativeRoles = role.Spec.MySQL.UseNativeRoles
-
-			// Convert grants
-			if len(role.Spec.MySQL.Grants) > 0 {
-				opts.Grants = make([]adaptypes.GrantOptions, 0, len(role.Spec.MySQL.Grants))
-				for _, g := range role.Spec.MySQL.Grants {
-					opts.Grants = append(opts.Grants, adaptypes.GrantOptions{
-						Level:           string(g.Level),
-						Database:        g.Database,
-						Table:           g.Table,
-						Columns:         g.Columns,
-						Procedure:       g.Procedure,
-						Function:        g.Function,
-						Privileges:      g.Privileges,
-						WithGrantOption: g.WithGrantOption,
-					})
-				}
-			}
-		}
-	}
-
-	return opts
-}
-
-// buildUpdateRoleOptions builds options for updating a role
-func (r *DatabaseRoleReconciler) buildUpdateRoleOptions(role *dbopsv1alpha1.DatabaseRole, engine dbopsv1alpha1.EngineType) adaptypes.UpdateRoleOptions {
-	opts := adaptypes.UpdateRoleOptions{}
-
-	switch engine {
-	case dbopsv1alpha1.EngineTypePostgres:
-		if role.Spec.Postgres != nil {
-			login := role.Spec.Postgres.Login
-			opts.Login = &login
-			inherit := role.Spec.Postgres.Inherit
-			opts.Inherit = &inherit
-			createDB := role.Spec.Postgres.CreateDB
-			opts.CreateDB = &createDB
-			createRole := role.Spec.Postgres.CreateRole
-			opts.CreateRole = &createRole
-			superuser := role.Spec.Postgres.Superuser
-			opts.Superuser = &superuser
-			replication := role.Spec.Postgres.Replication
-			opts.Replication = &replication
-			bypassRLS := role.Spec.Postgres.BypassRLS
-			opts.BypassRLS = &bypassRLS
-			opts.InRoles = role.Spec.Postgres.InRoles
-
-			// Convert grants
-			if len(role.Spec.Postgres.Grants) > 0 {
-				opts.Grants = make([]adaptypes.GrantOptions, 0, len(role.Spec.Postgres.Grants))
-				for _, g := range role.Spec.Postgres.Grants {
-					opts.Grants = append(opts.Grants, adaptypes.GrantOptions{
-						Database:        g.Database,
-						Schema:          g.Schema,
-						Tables:          g.Tables,
-						Sequences:       g.Sequences,
-						Functions:       g.Functions,
-						Privileges:      g.Privileges,
-						WithGrantOption: g.WithGrantOption,
-					})
-				}
-			}
-		}
-	case dbopsv1alpha1.EngineTypeMySQL:
-		if role.Spec.MySQL != nil {
-			// Convert grants for add
-			if len(role.Spec.MySQL.Grants) > 0 {
-				opts.AddGrants = make([]adaptypes.GrantOptions, 0, len(role.Spec.MySQL.Grants))
-				for _, g := range role.Spec.MySQL.Grants {
-					opts.AddGrants = append(opts.AddGrants, adaptypes.GrantOptions{
-						Level:           string(g.Level),
-						Database:        g.Database,
-						Table:           g.Table,
-						Columns:         g.Columns,
-						Procedure:       g.Procedure,
-						Function:        g.Function,
-						Privileges:      g.Privileges,
-						WithGrantOption: g.WithGrantOption,
-					})
-				}
-			}
-		}
-	}
-
-	return opts
-}
-
 // handleDeletion handles the deletion of a DatabaseRole
 func (r *DatabaseRoleReconciler) handleDeletion(ctx context.Context, role *dbopsv1alpha1.DatabaseRole) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
@@ -417,29 +291,29 @@ func (r *DatabaseRoleReconciler) handleDeletion(ctx context.Context, role *dbops
 			Namespace: instanceNamespace,
 			Name:      instanceRef.Name,
 		}, instance); err == nil {
-			// Get credentials and connect
+			// Get credentials
 			adminCreds, err := r.SecretManager.GetCredentials(ctx, instance.Namespace, instance.Spec.Connection.SecretRef)
 			if err == nil {
-				var tlsCreds *secret.TLSCredentials
-				if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
-					tlsCreds, _ = r.SecretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
-				}
-
+				// Get TLS credentials if enabled
 				var tlsCA, tlsCert, tlsKey []byte
-				if tlsCreds != nil {
-					tlsCA = tlsCreds.CA
-					tlsCert = tlsCreds.Cert
-					tlsKey = tlsCreds.Key
+				if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
+					tlsCreds, err := r.SecretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
+					if err == nil {
+						tlsCA = tlsCreds.CA
+						tlsCert = tlsCreds.Cert
+						tlsKey = tlsCreds.Key
+					}
 				}
-				config := adapter.BuildConnectionConfig(&instance.Spec, adminCreds.Username, adminCreds.Password, tlsCA, tlsCert, tlsKey)
 
-				dbAdapter, err := adapter.NewAdapter(instance.Spec.Engine, config)
+				// Build service config and create service
+				cfg := service.ConfigFromInstance(&instance.Spec, adminCreds.Username, adminCreds.Password, tlsCA, tlsCert, tlsKey)
+				svc, err := service.NewRoleService(cfg)
 				if err == nil {
-					defer func() { _ = dbAdapter.Close() }()
-					if err := dbAdapter.Connect(ctx); err == nil {
+					defer svc.Close()
+					if err := svc.Connect(ctx); err == nil {
 						log.Info("Dropping role", "roleName", role.Spec.RoleName)
-						engine := string(instance.Spec.Engine)
-						if err := dbAdapter.DropRole(ctx, role.Spec.RoleName); err != nil {
+						engine := cfg.Engine
+						if _, err := svc.Delete(ctx, role.Spec.RoleName); err != nil {
 							log.Error(err, "Failed to drop role", "roleName", role.Spec.RoleName)
 							metrics.RecordRoleOperation(metrics.OperationDelete, engine, role.Namespace, metrics.StatusFailure)
 						} else {
