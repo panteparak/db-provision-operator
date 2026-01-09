@@ -1,34 +1,41 @@
+# syntax=docker/dockerfile:1
 # Build the manager binary
 FROM golang:1.24 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
 WORKDIR /workspace
+
 # Copy the Go Modules manifests
 COPY go.mod go.mod
 COPY go.sum go.sum
-# cache deps before building and copying source so that we don't need to re-download as much
-# and so that source changes don't invalidate our downloaded layer
-RUN go mod download
+
+# Download dependencies with BuildKit cache mount
+# This cache persists across builds and is much faster than layer caching
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
 # Copy the go source
 COPY cmd/main.go cmd/main.go
 COPY api/ api/
 COPY internal/ internal/
 
-# Build
-# the GOARCH has not a default value to allow the binary be built according to the host where the command
-# was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
-# the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
-# by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
+# Build with BuildKit cache mounts for both modules and build cache
+# - /go/pkg/mod: Go module cache (avoids re-downloading)
+# - /root/.cache/go-build: Go build cache (avoids recompiling unchanged packages)
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
+    go build -a -o manager cmd/main.go
 
 # Production image with database client tools for backup/restore operations
 # Using Alpine instead of distroless to include pg_dump, mysqldump, etc.
 FROM alpine:3.21
 
 # Install PostgreSQL and MySQL client tools required for backup/restore
-RUN apk add --no-cache \
+# Use BuildKit cache mount for APK packages to speed up rebuilds
+RUN --mount=type=cache,target=/var/cache/apk \
+    apk add --no-cache \
     postgresql16-client \
     mysql-client \
     ca-certificates \
