@@ -276,6 +276,14 @@ func (a *Adapter) createSchema(ctx context.Context, database string, schema type
 	return a.execWithNewConnection(ctx, database, sb.String())
 }
 
+// VerifyDatabaseAccess verifies that a database is accepting connections.
+// This is important for PostgreSQL where a newly created database may temporarily
+// not accept connections while being initialized from a template (SQLSTATE 55000).
+func (a *Adapter) VerifyDatabaseAccess(ctx context.Context, name string) error {
+	// Try to execute a simple query on the target database
+	return a.execWithNewConnection(ctx, name, "SELECT 1")
+}
+
 // setDefaultPrivileges sets default privileges in a database
 func (a *Adapter) setDefaultPrivileges(ctx context.Context, database string, dp types.DefaultPrivilegeOptions) error {
 	var sb strings.Builder

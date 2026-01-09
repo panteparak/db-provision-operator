@@ -66,6 +66,11 @@ type DatabaseManager interface {
 
 	// UpdateDatabase updates database settings (extensions, schemas, etc.)
 	UpdateDatabase(ctx context.Context, name string, opts UpdateDatabaseOptions) error
+
+	// VerifyDatabaseAccess verifies that the database is accepting connections.
+	// This is particularly important for PostgreSQL where a newly created database
+	// may temporarily not accept connections while being initialized from a template.
+	VerifyDatabaseAccess(ctx context.Context, name string) error
 }
 
 // CreateDatabaseOptions contains options for creating a database

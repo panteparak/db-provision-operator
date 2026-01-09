@@ -220,6 +220,22 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, database *db
 		log.Info("Successfully created database", "name", dbName)
 	}
 
+	// Verify the database is accepting connections before marking it as Ready.
+	// This is particularly important for PostgreSQL where a newly created database
+	// may temporarily not accept connections while being initialized from a template.
+	if err := dbAdapter.VerifyDatabaseAccess(ctx, dbName); err != nil {
+		log.Info("Database not yet accepting connections, will retry", "name", dbName, "error", err)
+		database.Status.Phase = dbopsv1alpha1.PhaseCreating
+		database.Status.Message = "Waiting for database to accept connections"
+		util.SetReadyCondition(&database.Status.Conditions, metav1.ConditionFalse,
+			util.ReasonCreating, "Database is initializing")
+		if statusErr := r.Status().Update(ctx, database); statusErr != nil {
+			log.Error(statusErr, "Failed to update status")
+		}
+		// Requeue quickly to check again
+		return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
+	}
+
 	// Update database settings if needed
 	updateOpts := r.buildUpdateDatabaseOptions(database, instance.Spec.Engine)
 	if err := dbAdapter.UpdateDatabase(ctx, dbName, updateOpts); err != nil {

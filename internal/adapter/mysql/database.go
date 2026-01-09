@@ -134,6 +134,33 @@ func (a *Adapter) GetDatabaseInfo(ctx context.Context, name string) (*types.Data
 	return &info, nil
 }
 
+// VerifyDatabaseAccess verifies that a database is accepting connections.
+// For MySQL, this simply verifies we can select from the database.
+// Unlike PostgreSQL, MySQL databases are immediately available after creation.
+func (a *Adapter) VerifyDatabaseAccess(ctx context.Context, name string) error {
+	db, err := a.getDB()
+	if err != nil {
+		return err
+	}
+
+	// Use the database and execute a simple query
+	_, err = db.ExecContext(ctx, fmt.Sprintf("USE %s", escapeIdentifier(name)))
+	if err != nil {
+		return fmt.Errorf("failed to access database %s: %w", name, err)
+	}
+
+	// Execute a simple query to verify the database is accessible
+	_, err = db.ExecContext(ctx, "SELECT 1")
+	if err != nil {
+		return fmt.Errorf("failed to query database %s: %w", name, err)
+	}
+
+	// Switch back to the admin database
+	_, _ = db.ExecContext(ctx, fmt.Sprintf("USE %s", escapeIdentifier(a.config.Database)))
+
+	return nil
+}
+
 // UpdateDatabase updates MySQL database settings
 func (a *Adapter) UpdateDatabase(ctx context.Context, name string, opts types.UpdateDatabaseOptions) error {
 	db, err := a.getDB()
