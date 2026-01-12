@@ -123,7 +123,7 @@ func createDatabase(ctx context.Context, cfg *service.Config, res internal.Resou
 	if err != nil {
 		return nil, err
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	if err := svc.Connect(ctx); err != nil {
 		return nil, err
@@ -149,7 +149,7 @@ func createUser(ctx context.Context, cfg *service.Config, res internal.Resource)
 	if err != nil {
 		return nil, err
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	if err := svc.Connect(ctx); err != nil {
 		return nil, err
@@ -171,7 +171,7 @@ func createRole(ctx context.Context, cfg *service.Config, res internal.Resource)
 	if err != nil {
 		return nil, err
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	if err := svc.Connect(ctx); err != nil {
 		return nil, err
@@ -181,36 +181,5 @@ func createRole(ctx context.Context, cfg *service.Config, res internal.Resource)
 }
 
 func createGrant(ctx context.Context, cfg *service.Config, res internal.Resource) (*service.Result, error) {
-	spec, ok := res.GetDatabaseGrantSpec()
-	if !ok {
-		return nil, fmt.Errorf("invalid grant spec")
-	}
-
-	// Username is required for grants
-	username := createForUser
-	if username == "" {
-		return nil, fmt.Errorf("--for-user flag is required for grant creation")
-	}
-
-	svc, err := service.NewGrantService(cfg)
-	if err != nil {
-		return nil, err
-	}
-	defer svc.Close()
-
-	if err := svc.Connect(ctx); err != nil {
-		return nil, err
-	}
-
-	grantResult, err := svc.Apply(ctx, service.ApplyGrantServiceOptions{
-		Username: username,
-		Spec:     spec,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert GrantResult to Result
-	totalGrants := len(grantResult.AppliedRoles) + grantResult.AppliedDirectGrants + grantResult.AppliedDefaultPrivileges
-	return service.NewSuccessResult(fmt.Sprintf("Applied %d grants to user '%s'", totalGrants, username)), nil
+	return executeGrant(ctx, cfg, res, createForUser, "creation")
 }

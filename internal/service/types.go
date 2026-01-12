@@ -238,10 +238,10 @@ func (c *Config) Validate() error {
 
 	// Validate SSL mode
 	validSSLModes := map[string]bool{
-		"":           true,
-		"disable":    true,
-		"require":    true,
-		"verify-ca":  true,
+		"":            true,
+		"disable":     true,
+		"require":     true,
+		"verify-ca":   true,
 		"verify-full": true,
 	}
 	if !validSSLModes[c.SSLMode] {

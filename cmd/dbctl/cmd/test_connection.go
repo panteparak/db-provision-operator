@@ -55,7 +55,7 @@ func runTestConnection(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	if err := svc.Connect(ctx); err != nil {
 		return err

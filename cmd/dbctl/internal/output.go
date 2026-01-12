@@ -63,7 +63,7 @@ func NewPrinter(format OutputFormat, writer io.Writer) *Printer {
 
 // PrintResult prints a result message
 func (p *Printer) PrintResult(message string) {
-	fmt.Fprintln(p.writer, message)
+	_, _ = fmt.Fprintln(p.writer, message)
 }
 
 // PrintTable prints data in table format
@@ -86,11 +86,11 @@ func (p *Printer) PrintTable(headers []string, rows [][]string) error {
 	w := tabwriter.NewWriter(p.writer, 0, 0, 2, ' ', 0)
 
 	// Print headers
-	fmt.Fprintln(w, strings.Join(headers, "\t"))
+	_, _ = fmt.Fprintln(w, strings.Join(headers, "\t"))
 
 	// Print rows
 	for _, row := range rows {
-		fmt.Fprintln(w, strings.Join(row, "\t"))
+		_, _ = fmt.Fprintln(w, strings.Join(row, "\t"))
 	}
 
 	return w.Flush()
@@ -115,7 +115,7 @@ func (p *Printer) printYAML(data interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal YAML: %w", err)
 	}
-	fmt.Fprint(p.writer, string(output))
+	_, _ = fmt.Fprint(p.writer, string(output))
 	return nil
 }
 
@@ -125,7 +125,7 @@ func (p *Printer) printJSON(data interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
-	fmt.Fprintln(p.writer, string(output))
+	_, _ = fmt.Fprintln(p.writer, string(output))
 	return nil
 }
 

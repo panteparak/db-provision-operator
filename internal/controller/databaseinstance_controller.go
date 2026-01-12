@@ -148,7 +148,7 @@ func (r *DatabaseInstanceReconciler) reconcileInstance(ctx context.Context, inst
 		}
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	// Connect to database with metrics
 	engine := cfg.Engine

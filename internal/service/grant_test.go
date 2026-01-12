@@ -31,15 +31,15 @@ import (
 
 func TestGrantService_Apply(t *testing.T) {
 	tests := []struct {
-		name                     string
-		opts                     ApplyGrantServiceOptions
-		engine                   string
-		setupMock                func(*testutil.MockAdapter)
-		wantErr                  bool
-		errContains              string
-		wantAppliedRoles         int
-		wantAppliedDirectGrants  int
-		wantAppliedDefaultPrivs  int
+		name                    string
+		opts                    ApplyGrantServiceOptions
+		engine                  string
+		setupMock               func(*testutil.MockAdapter)
+		wantErr                 bool
+		errContains             string
+		wantAppliedRoles        int
+		wantAppliedDirectGrants int
+		wantAppliedDefaultPrivs int
 	}{
 		{
 			name: "successful postgres apply with roles",

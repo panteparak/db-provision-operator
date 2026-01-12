@@ -115,7 +115,7 @@ func getDatabase(ctx context.Context, cfg *service.Config, name string, printer 
 	if err != nil {
 		return err
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	if err := svc.Connect(ctx); err != nil {
 		return err
@@ -154,7 +154,7 @@ func getUser(ctx context.Context, cfg *service.Config, name string, printer *int
 	if err != nil {
 		return err
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	if err := svc.Connect(ctx); err != nil {
 		return err
@@ -205,7 +205,7 @@ func getRole(ctx context.Context, cfg *service.Config, name string, printer *int
 	if err != nil {
 		return err
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	if err := svc.Connect(ctx); err != nil {
 		return err
@@ -255,7 +255,7 @@ func getGrant(ctx context.Context, cfg *service.Config, printer *internal.Printe
 	if err != nil {
 		return err
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	if err := svc.Connect(ctx); err != nil {
 		return err

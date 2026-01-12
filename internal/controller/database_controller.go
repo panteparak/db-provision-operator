@@ -170,7 +170,7 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, database *db
 		database.Status.Message = fmt.Sprintf("Failed to create service: %v", err)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	// Connect to database
 	if err := svc.Connect(ctx); err != nil {
@@ -339,7 +339,7 @@ func (r *DatabaseReconciler) handleDeletion(ctx context.Context, database *dbops
 				cfg := service.ConfigFromInstance(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
 				svc, err := service.NewDatabaseService(cfg)
 				if err == nil {
-					defer svc.Close()
+					defer func() { _ = svc.Close() }()
 					if err := svc.Connect(ctx); err == nil {
 						log.Info("Dropping database", "name", database.Spec.Name)
 						engine := cfg.Engine

@@ -236,7 +236,7 @@ func TestConfigBuilder(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "postgres", cfg.Engine)
 		assert.Equal(t, "localhost", cfg.Host)
-		assert.Equal(t, int32(5432), cfg.Port) // Default port
+		assert.Equal(t, int32(5432), cfg.Port)    // Default port
 		assert.Equal(t, "postgres", cfg.Database) // Default database
 		assert.Equal(t, "admin", cfg.Username)
 		assert.Equal(t, "secret", cfg.Password)
@@ -573,8 +573,8 @@ func TestConfigFromInstance(t *testing.T) {
 
 		cfg := ConfigFromInstance(spec, "root", "pass", nil, nil, nil)
 		assert.Equal(t, "mysql", cfg.Engine)
-		assert.Equal(t, int32(3306), cfg.Port)    // Default port
-		assert.Equal(t, "mysql", cfg.Database)    // Default database
+		assert.Equal(t, int32(3306), cfg.Port) // Default port
+		assert.Equal(t, "mysql", cfg.Database) // Default database
 	})
 
 	t.Run("with TLS credentials", func(t *testing.T) {

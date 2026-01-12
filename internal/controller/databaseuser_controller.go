@@ -163,7 +163,7 @@ func (r *DatabaseUserReconciler) reconcileUser(ctx context.Context, user *dbopsv
 		user.Status.Message = fmt.Sprintf("Failed to create service: %v", err)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	// Connect to database
 	if err := svc.Connect(ctx); err != nil {
@@ -369,7 +369,7 @@ func (r *DatabaseUserReconciler) handleDeletion(ctx context.Context, user *dbops
 				cfg := service.ConfigFromInstance(&instance.Spec, adminCreds.Username, adminCreds.Password, tlsCA, tlsCert, tlsKey)
 				svc, err := service.NewUserService(cfg)
 				if err == nil {
-					defer svc.Close()
+					defer func() { _ = svc.Close() }()
 					if err := svc.Connect(ctx); err == nil {
 						log.Info("Dropping user", "username", user.Spec.Username)
 						engine := cfg.Engine

@@ -154,7 +154,7 @@ func (s *BackupService) BackupToFile(ctx context.Context, database, filePath str
 	if err != nil {
 		return nil, fmt.Errorf("failed to create output file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Perform backup
 	result, err := s.Backup(ctx, BackupOptions{

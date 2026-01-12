@@ -152,7 +152,7 @@ func (s *RestoreService) RestoreFromFile(ctx context.Context, database, filePath
 	if err != nil {
 		return nil, fmt.Errorf("failed to open backup file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Perform restore
 	return s.Restore(ctx, RestoreOptions{

@@ -88,7 +88,13 @@ func init() {
 func getConfig() (*service.Config, error) {
 	cfg, err := service.ConfigFromEnv(os.Getenv)
 	if err != nil {
-		return nil, fmt.Errorf("configuration error: %w\n\nPlease ensure all required environment variables are set:\n  DBCTL_ENGINE, DBCTL_HOST, DBCTL_PORT, DBCTL_DATABASE, DBCTL_USERNAME, DBCTL_PASSWORD", err)
+		return nil, fmt.Errorf(
+			"configuration error: %w\n\n"+
+				"Please ensure all required environment variables are set:\n"+
+				"  DBCTL_ENGINE, DBCTL_HOST, DBCTL_PORT, DBCTL_DATABASE, "+
+				"DBCTL_USERNAME, DBCTL_PASSWORD",
+			err,
+		)
 	}
 	return cfg, nil
 }
@@ -98,9 +104,4 @@ func printVerbose(format string, args ...interface{}) {
 	if verbose {
 		fmt.Printf("[VERBOSE] "+format+"\n", args...)
 	}
-}
-
-// printError prints an error message to stderr
-func printError(format string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, "Error: "+format+"\n", args...)
 }

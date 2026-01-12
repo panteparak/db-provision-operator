@@ -114,7 +114,7 @@ func updateDatabase(ctx context.Context, cfg *service.Config, res internal.Resou
 	if err != nil {
 		return nil, err
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	if err := svc.Connect(ctx); err != nil {
 		return nil, err
@@ -133,7 +133,7 @@ func updateUser(ctx context.Context, cfg *service.Config, res internal.Resource)
 	if err != nil {
 		return nil, err
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	if err := svc.Connect(ctx); err != nil {
 		return nil, err
@@ -152,7 +152,7 @@ func updateRole(ctx context.Context, cfg *service.Config, res internal.Resource)
 	if err != nil {
 		return nil, err
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	if err := svc.Connect(ctx); err != nil {
 		return nil, err

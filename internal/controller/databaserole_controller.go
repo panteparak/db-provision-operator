@@ -169,7 +169,7 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *dbopsv
 		role.Status.Message = fmt.Sprintf("Failed to create service: %v", err)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	// Connect to database with retry
 	retryResult = util.RetryWithBackoff(ctx, retryConfig, func() error {
@@ -309,7 +309,7 @@ func (r *DatabaseRoleReconciler) handleDeletion(ctx context.Context, role *dbops
 				cfg := service.ConfigFromInstance(&instance.Spec, adminCreds.Username, adminCreds.Password, tlsCA, tlsCert, tlsKey)
 				svc, err := service.NewRoleService(cfg)
 				if err == nil {
-					defer svc.Close()
+					defer func() { _ = svc.Close() }()
 					if err := svc.Connect(ctx); err == nil {
 						log.Info("Dropping role", "roleName", role.Spec.RoleName)
 						engine := cfg.Engine

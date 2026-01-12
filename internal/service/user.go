@@ -318,8 +318,8 @@ func (s *UserService) buildCreateOptions(spec *dbopsv1alpha1.DatabaseUserSpec, p
 	opts := types.CreateUserOptions{
 		Username: spec.Username,
 		Password: password,
-		Login:    true,  // Default to allowing login
-		Inherit:  true,  // Default to inheriting privileges
+		Login:    true, // Default to allowing login
+		Inherit:  true, // Default to inheriting privileges
 	}
 
 	switch s.config.GetEngineType() {

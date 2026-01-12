@@ -116,7 +116,12 @@ func deleteFromFile(ctx context.Context, cfg *service.Config, printer *internal.
 	return nil
 }
 
-func deleteByName(ctx context.Context, cfg *service.Config, resourceType, name string, printer *internal.Printer) error {
+func deleteByName(
+	ctx context.Context,
+	cfg *service.Config,
+	resourceType, name string,
+	printer *internal.Printer,
+) error {
 	if dryRun {
 		fmt.Printf("[DRY-RUN] Would delete %s '%s'\n", resourceType, name)
 		return nil
@@ -173,7 +178,7 @@ func deleteDatabaseByName(ctx context.Context, cfg *service.Config, name string)
 	if err != nil {
 		return nil, err
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	if err := svc.Connect(ctx); err != nil {
 		return nil, err
@@ -196,7 +201,7 @@ func deleteUserByName(ctx context.Context, cfg *service.Config, name string) (*s
 	if err != nil {
 		return nil, err
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	if err := svc.Connect(ctx); err != nil {
 		return nil, err
@@ -219,7 +224,7 @@ func deleteRoleByName(ctx context.Context, cfg *service.Config, name string) (*s
 	if err != nil {
 		return nil, err
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	if err := svc.Connect(ctx); err != nil {
 		return nil, err
@@ -244,7 +249,7 @@ func deleteGrant(ctx context.Context, cfg *service.Config, res internal.Resource
 	if err != nil {
 		return nil, err
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	if err := svc.Connect(ctx); err != nil {
 		return nil, err

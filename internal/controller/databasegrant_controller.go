@@ -238,7 +238,7 @@ func (r *DatabaseGrantReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	result = util.RetryWithBackoff(ctx, retryConfig, func() error {
 		return svc.Connect(ctx)
@@ -422,7 +422,7 @@ func (r *DatabaseGrantReconciler) handleDeletion(ctx context.Context, grant *dbo
 		log.Error(err, "Failed to create grant service for revocation")
 		return nil
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	if err := svc.Connect(ctx); err != nil {
 		log.Error(err, "Failed to connect for revocation")
