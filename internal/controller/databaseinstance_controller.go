@@ -135,6 +135,7 @@ func (r *DatabaseInstanceReconciler) reconcileInstance(ctx context.Context, inst
 		tlsKey = tlsCreds.Key
 	}
 	cfg := service.ConfigFromInstance(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
+	cfg.Logger = log
 
 	// Create instance service
 	svc, err := service.NewInstanceService(cfg)

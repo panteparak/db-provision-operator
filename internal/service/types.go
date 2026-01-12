@@ -20,6 +20,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-logr/logr"
+
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/adapter"
 	"github.com/db-provision-operator/internal/util"
@@ -62,6 +64,18 @@ type Config struct {
 	Timeout      string
 	ReadTimeout  string
 	WriteTimeout string
+
+	// Logger is optional. If not provided, a no-op logger is used.
+	// Controllers should pass their context logger for structured logging.
+	Logger logr.Logger
+}
+
+// GetLogger returns the configured logger or a no-op logger if none set.
+func (c *Config) GetLogger() logr.Logger {
+	if c.Logger.GetSink() == nil {
+		return logr.Discard()
+	}
+	return c.Logger
 }
 
 // ConfigFromEnv creates a Config from environment variables.
@@ -397,6 +411,12 @@ func (b *ConfigBuilder) WithMySQLOptions(charset, collation string, parseTime bo
 	b.config.Charset = charset
 	b.config.Collation = collation
 	b.config.ParseTime = parseTime
+	return b
+}
+
+// WithLogger sets the logger for structured logging.
+func (b *ConfigBuilder) WithLogger(log logr.Logger) *ConfigBuilder {
+	b.config.Logger = log
 	return b
 }
 

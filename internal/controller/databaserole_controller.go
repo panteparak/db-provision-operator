@@ -161,6 +161,7 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *dbopsv
 
 	// Build service config from instance and credentials
 	cfg := service.ConfigFromInstance(&instance.Spec, adminCreds.Username, adminCreds.Password, tlsCA, tlsCert, tlsKey)
+	cfg.Logger = log
 
 	// Create role service
 	svc, err := service.NewRoleService(cfg)
@@ -307,6 +308,7 @@ func (r *DatabaseRoleReconciler) handleDeletion(ctx context.Context, role *dbops
 
 				// Build service config and create service
 				cfg := service.ConfigFromInstance(&instance.Spec, adminCreds.Username, adminCreds.Password, tlsCA, tlsCert, tlsKey)
+				cfg.Logger = log
 				svc, err := service.NewRoleService(cfg)
 				if err == nil {
 					defer func() { _ = svc.Close() }()

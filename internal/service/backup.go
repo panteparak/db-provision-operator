@@ -32,6 +32,7 @@ import (
 // It extracts business logic from controllers and can be used both by
 // Kubernetes controllers and the CLI tool.
 type BackupService struct {
+	baseService
 	adapter adapter.DatabaseAdapter
 	config  *Config
 }
@@ -49,24 +50,37 @@ func NewBackupService(cfg *Config) (*BackupService, error) {
 	}
 
 	return &BackupService{
-		adapter: dbAdapter,
-		config:  cfg,
+		baseService: newBaseService(cfg, "BackupService"),
+		adapter:     dbAdapter,
+		config:      cfg,
 	}, nil
 }
 
 // NewBackupServiceWithAdapter creates a BackupService with a pre-created adapter.
 func NewBackupServiceWithAdapter(adp adapter.DatabaseAdapter, cfg *Config) *BackupService {
 	return &BackupService{
-		adapter: adp,
-		config:  cfg,
+		baseService: newBaseService(cfg, "BackupService"),
+		adapter:     adp,
+		config:      cfg,
 	}
 }
 
 // Connect establishes a connection to the database server.
 func (s *BackupService) Connect(ctx context.Context) error {
+	op := s.startOp("Connect", s.config.Host)
+
+	ctx, cancel := s.config.Timeouts.WithConnectTimeout(ctx)
+	defer cancel()
+
 	if err := s.adapter.Connect(ctx); err != nil {
+		op.Error(err, "failed to connect")
+		if ctx.Err() == context.DeadlineExceeded {
+			return NewTimeoutError("connect", s.config.Host, s.config.Timeouts.ConnectTimeout.String(), err)
+		}
 		return NewConnectionError(s.config.Host, s.config.Port, err)
 	}
+
+	op.Success("connected successfully")
 	return nil
 }
 
@@ -121,19 +135,25 @@ func (s *BackupService) Backup(ctx context.Context, opts BackupOptions) (*Backup
 		return nil, &ValidationError{Field: "writer", Message: "writer is required for backup output"}
 	}
 
+	op := s.startOp("Backup", opts.Database)
+	op.Debug("starting backup", "backupID", opts.BackupID)
+
 	startTime := time.Now()
 
 	// Build adapter backup options
 	adapterOpts := s.buildBackupOptions(opts)
+	op.Debug("backup options built", "format", adapterOpts.Format, "method", adapterOpts.Method)
 
 	// Execute backup
 	result, err := s.adapter.Backup(ctx, adapterOpts)
 	if err != nil {
-		return nil, NewDatabaseError("backup", opts.Database, err)
+		op.Error(err, "backup failed")
+		return nil, s.wrapError(ctx, s.config, "backup", opts.Database, err)
 	}
 
 	duration := time.Since(startTime)
 
+	op.Success("backup completed successfully")
 	return &BackupResult{
 		Success:             true,
 		Message:             fmt.Sprintf("Backup of database '%s' completed successfully", opts.Database),
@@ -149,9 +169,13 @@ func (s *BackupService) Backup(ctx context.Context, opts BackupOptions) (*Backup
 // BackupToFile performs a backup and writes it to a file.
 // This is a convenience method for CLI usage.
 func (s *BackupService) BackupToFile(ctx context.Context, database, filePath string, spec *dbopsv1alpha1.DatabaseBackupSpec) (*BackupResult, error) {
+	op := s.startOp("BackupToFile", database)
+	op.Debug("backing up to file", "path", filePath)
+
 	// Create output file
 	file, err := os.Create(filePath)
 	if err != nil {
+		op.Error(err, "failed to create output file")
 		return nil, fmt.Errorf("failed to create output file: %w", err)
 	}
 	defer func() { _ = file.Close() }()
@@ -170,6 +194,7 @@ func (s *BackupService) BackupToFile(ctx context.Context, database, filePath str
 	// Update path to local file path
 	result.Path = filePath
 
+	op.Success("backup to file completed")
 	return result, nil
 }
 

@@ -29,6 +29,7 @@ import (
 // It extracts business logic from controllers and can be used both by
 // Kubernetes controllers and the CLI tool.
 type GrantService struct {
+	baseService
 	adapter adapter.DatabaseAdapter
 	config  *Config
 }
@@ -46,30 +47,37 @@ func NewGrantService(cfg *Config) (*GrantService, error) {
 	}
 
 	return &GrantService{
-		adapter: dbAdapter,
-		config:  cfg,
+		baseService: newBaseService(cfg, "GrantService"),
+		adapter:     dbAdapter,
+		config:      cfg,
 	}, nil
 }
 
 // NewGrantServiceWithAdapter creates a GrantService with a pre-created adapter.
 func NewGrantServiceWithAdapter(adp adapter.DatabaseAdapter, cfg *Config) *GrantService {
 	return &GrantService{
-		adapter: adp,
-		config:  cfg,
+		baseService: newBaseService(cfg, "GrantService"),
+		adapter:     adp,
+		config:      cfg,
 	}
 }
 
 // Connect establishes a connection to the database server.
 func (s *GrantService) Connect(ctx context.Context) error {
+	op := s.startOp("Connect", s.config.Host)
+
 	ctx, cancel := s.config.Timeouts.WithConnectTimeout(ctx)
 	defer cancel()
 
 	if err := s.adapter.Connect(ctx); err != nil {
+		op.Error(err, "failed to connect")
 		if ctx.Err() == context.DeadlineExceeded {
 			return NewTimeoutError("connect", s.config.Host, s.config.Timeouts.ConnectTimeout.String(), err)
 		}
 		return NewConnectionError(s.config.Host, s.config.Port, err)
 	}
+
+	op.Success("connected successfully")
 	return nil
 }
 
@@ -105,6 +113,8 @@ func (s *GrantService) Apply(ctx context.Context, opts ApplyGrantServiceOptions)
 		return nil, &ValidationError{Field: "spec", Message: "spec is required"}
 	}
 
+	op := s.startOp("Apply", opts.Username)
+
 	// Apply operation timeout
 	ctx, cancel := s.config.Timeouts.WithOperationTimeout(ctx)
 	defer cancel()
@@ -118,35 +128,32 @@ func (s *GrantService) Apply(ctx context.Context, opts ApplyGrantServiceOptions)
 		if opts.Spec.Postgres != nil {
 			// Grant roles
 			if len(opts.Spec.Postgres.Roles) > 0 {
+				op.Debug("granting roles", "roles", opts.Spec.Postgres.Roles)
 				if err := s.adapter.GrantRole(ctx, opts.Username, opts.Spec.Postgres.Roles); err != nil {
-					if ctx.Err() == context.DeadlineExceeded {
-						return nil, NewTimeoutError("grant roles", opts.Username, s.config.Timeouts.OperationTimeout.String(), err)
-					}
-					return nil, NewDatabaseError("grant roles", opts.Username, err)
+					op.Error(err, "failed to grant roles")
+					return nil, s.wrapError(ctx, s.config, "grant roles", opts.Username, err)
 				}
 				result.AppliedRoles = append(result.AppliedRoles, opts.Spec.Postgres.Roles...)
 			}
 
 			// Apply direct grants
 			if len(opts.Spec.Postgres.Grants) > 0 {
+				op.Debug("applying direct grants", "count", len(opts.Spec.Postgres.Grants))
 				grantOpts := s.buildPostgresGrantOptions(opts.Spec.Postgres.Grants)
 				if err := s.adapter.Grant(ctx, opts.Username, grantOpts); err != nil {
-					if ctx.Err() == context.DeadlineExceeded {
-						return nil, NewTimeoutError("apply grants", opts.Username, s.config.Timeouts.OperationTimeout.String(), err)
-					}
-					return nil, NewDatabaseError("apply grants", opts.Username, err)
+					op.Error(err, "failed to apply grants")
+					return nil, s.wrapError(ctx, s.config, "apply grants", opts.Username, err)
 				}
 				result.AppliedDirectGrants = len(opts.Spec.Postgres.Grants)
 			}
 
 			// Apply default privileges
 			if len(opts.Spec.Postgres.DefaultPrivileges) > 0 {
+				op.Debug("setting default privileges", "count", len(opts.Spec.Postgres.DefaultPrivileges))
 				defPrivOpts := s.buildDefaultPrivilegeOptions(opts.Spec.Postgres.DefaultPrivileges)
 				if err := s.adapter.SetDefaultPrivileges(ctx, opts.Username, defPrivOpts); err != nil {
-					if ctx.Err() == context.DeadlineExceeded {
-						return nil, NewTimeoutError("set default privileges", opts.Username, s.config.Timeouts.OperationTimeout.String(), err)
-					}
-					return nil, NewDatabaseError("set default privileges", opts.Username, err)
+					op.Error(err, "failed to set default privileges")
+					return nil, s.wrapError(ctx, s.config, "set default privileges", opts.Username, err)
 				}
 				result.AppliedDefaultPrivileges = len(opts.Spec.Postgres.DefaultPrivileges)
 			}
@@ -156,29 +163,28 @@ func (s *GrantService) Apply(ctx context.Context, opts ApplyGrantServiceOptions)
 		if opts.Spec.MySQL != nil {
 			// Grant roles
 			if len(opts.Spec.MySQL.Roles) > 0 {
+				op.Debug("granting roles", "roles", opts.Spec.MySQL.Roles)
 				if err := s.adapter.GrantRole(ctx, opts.Username, opts.Spec.MySQL.Roles); err != nil {
-					if ctx.Err() == context.DeadlineExceeded {
-						return nil, NewTimeoutError("grant roles", opts.Username, s.config.Timeouts.OperationTimeout.String(), err)
-					}
-					return nil, NewDatabaseError("grant roles", opts.Username, err)
+					op.Error(err, "failed to grant roles")
+					return nil, s.wrapError(ctx, s.config, "grant roles", opts.Username, err)
 				}
 				result.AppliedRoles = append(result.AppliedRoles, opts.Spec.MySQL.Roles...)
 			}
 
 			// Apply direct grants
 			if len(opts.Spec.MySQL.Grants) > 0 {
+				op.Debug("applying direct grants", "count", len(opts.Spec.MySQL.Grants))
 				grantOpts := s.buildMySQLGrantOptions(opts.Spec.MySQL.Grants)
 				if err := s.adapter.Grant(ctx, opts.Username, grantOpts); err != nil {
-					if ctx.Err() == context.DeadlineExceeded {
-						return nil, NewTimeoutError("apply grants", opts.Username, s.config.Timeouts.OperationTimeout.String(), err)
-					}
-					return nil, NewDatabaseError("apply grants", opts.Username, err)
+					op.Error(err, "failed to apply grants")
+					return nil, s.wrapError(ctx, s.config, "apply grants", opts.Username, err)
 				}
 				result.AppliedDirectGrants = len(opts.Spec.MySQL.Grants)
 			}
 		}
 	}
 
+	op.Success("grants applied successfully")
 	return result, nil
 }
 
@@ -192,6 +198,8 @@ func (s *GrantService) Revoke(ctx context.Context, opts ApplyGrantServiceOptions
 		return nil, &ValidationError{Field: "spec", Message: "spec is required"}
 	}
 
+	op := s.startOp("Revoke", opts.Username)
+
 	// Apply operation timeout
 	ctx, cancel := s.config.Timeouts.WithOperationTimeout(ctx)
 	defer cancel()
@@ -203,23 +211,21 @@ func (s *GrantService) Revoke(ctx context.Context, opts ApplyGrantServiceOptions
 		if opts.Spec.Postgres != nil {
 			// Revoke roles
 			if len(opts.Spec.Postgres.Roles) > 0 {
+				op.Debug("revoking roles", "roles", opts.Spec.Postgres.Roles)
 				if err := s.adapter.RevokeRole(ctx, opts.Username, opts.Spec.Postgres.Roles); err != nil {
-					if ctx.Err() == context.DeadlineExceeded {
-						return nil, NewTimeoutError("revoke roles", opts.Username, s.config.Timeouts.OperationTimeout.String(), err)
-					}
-					return nil, NewDatabaseError("revoke roles", opts.Username, err)
+					op.Error(err, "failed to revoke roles")
+					return nil, s.wrapError(ctx, s.config, "revoke roles", opts.Username, err)
 				}
 				revokedCount += len(opts.Spec.Postgres.Roles)
 			}
 
 			// Revoke direct grants
 			if len(opts.Spec.Postgres.Grants) > 0 {
+				op.Debug("revoking direct grants", "count", len(opts.Spec.Postgres.Grants))
 				grantOpts := s.buildPostgresGrantOptions(opts.Spec.Postgres.Grants)
 				if err := s.adapter.Revoke(ctx, opts.Username, grantOpts); err != nil {
-					if ctx.Err() == context.DeadlineExceeded {
-						return nil, NewTimeoutError("revoke grants", opts.Username, s.config.Timeouts.OperationTimeout.String(), err)
-					}
-					return nil, NewDatabaseError("revoke grants", opts.Username, err)
+					op.Error(err, "failed to revoke grants")
+					return nil, s.wrapError(ctx, s.config, "revoke grants", opts.Username, err)
 				}
 				revokedCount += len(opts.Spec.Postgres.Grants)
 			}
@@ -229,29 +235,28 @@ func (s *GrantService) Revoke(ctx context.Context, opts ApplyGrantServiceOptions
 		if opts.Spec.MySQL != nil {
 			// Revoke roles
 			if len(opts.Spec.MySQL.Roles) > 0 {
+				op.Debug("revoking roles", "roles", opts.Spec.MySQL.Roles)
 				if err := s.adapter.RevokeRole(ctx, opts.Username, opts.Spec.MySQL.Roles); err != nil {
-					if ctx.Err() == context.DeadlineExceeded {
-						return nil, NewTimeoutError("revoke roles", opts.Username, s.config.Timeouts.OperationTimeout.String(), err)
-					}
-					return nil, NewDatabaseError("revoke roles", opts.Username, err)
+					op.Error(err, "failed to revoke roles")
+					return nil, s.wrapError(ctx, s.config, "revoke roles", opts.Username, err)
 				}
 				revokedCount += len(opts.Spec.MySQL.Roles)
 			}
 
 			// Revoke direct grants
 			if len(opts.Spec.MySQL.Grants) > 0 {
+				op.Debug("revoking direct grants", "count", len(opts.Spec.MySQL.Grants))
 				grantOpts := s.buildMySQLGrantOptions(opts.Spec.MySQL.Grants)
 				if err := s.adapter.Revoke(ctx, opts.Username, grantOpts); err != nil {
-					if ctx.Err() == context.DeadlineExceeded {
-						return nil, NewTimeoutError("revoke grants", opts.Username, s.config.Timeouts.OperationTimeout.String(), err)
-					}
-					return nil, NewDatabaseError("revoke grants", opts.Username, err)
+					op.Error(err, "failed to revoke grants")
+					return nil, s.wrapError(ctx, s.config, "revoke grants", opts.Username, err)
 				}
 				revokedCount += len(opts.Spec.MySQL.Grants)
 			}
 		}
 	}
 
+	op.Success("grants revoked successfully")
 	return NewSuccessResult(fmt.Sprintf("Revoked %d grants from user '%s'", revokedCount, opts.Username)), nil
 }
 
@@ -264,17 +269,19 @@ func (s *GrantService) GrantRoles(ctx context.Context, username string, roles []
 		return nil, &ValidationError{Field: "roles", Message: "at least one role is required"}
 	}
 
+	op := s.startOp("GrantRoles", username)
+	op.Debug("granting roles", "roles", roles)
+
 	// Apply operation timeout
 	ctx, cancel := s.config.Timeouts.WithOperationTimeout(ctx)
 	defer cancel()
 
 	if err := s.adapter.GrantRole(ctx, username, roles); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("grant roles", username, s.config.Timeouts.OperationTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("grant roles", username, err)
+		op.Error(err, "failed to grant roles")
+		return nil, s.wrapError(ctx, s.config, "grant roles", username, err)
 	}
 
+	op.Success("roles granted successfully")
 	return NewSuccessResult(fmt.Sprintf("Granted %d roles to user '%s'", len(roles), username)), nil
 }
 
@@ -287,17 +294,19 @@ func (s *GrantService) RevokeRoles(ctx context.Context, username string, roles [
 		return nil, &ValidationError{Field: "roles", Message: "at least one role is required"}
 	}
 
+	op := s.startOp("RevokeRoles", username)
+	op.Debug("revoking roles", "roles", roles)
+
 	// Apply operation timeout
 	ctx, cancel := s.config.Timeouts.WithOperationTimeout(ctx)
 	defer cancel()
 
 	if err := s.adapter.RevokeRole(ctx, username, roles); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("revoke roles", username, s.config.Timeouts.OperationTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("revoke roles", username, err)
+		op.Error(err, "failed to revoke roles")
+		return nil, s.wrapError(ctx, s.config, "revoke roles", username, err)
 	}
 
+	op.Success("roles revoked successfully")
 	return NewSuccessResult(fmt.Sprintf("Revoked %d roles from user '%s'", len(roles), username)), nil
 }
 
@@ -307,18 +316,19 @@ func (s *GrantService) GetGrants(ctx context.Context, grantee string) ([]types.G
 		return nil, &ValidationError{Field: "grantee", Message: "grantee is required"}
 	}
 
+	op := s.startOp("GetGrants", grantee)
+
 	// Apply query timeout
 	ctx, cancel := s.config.Timeouts.WithQueryTimeout(ctx)
 	defer cancel()
 
 	grants, err := s.adapter.GetGrants(ctx, grantee)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("get grants", grantee, s.config.Timeouts.QueryTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("get grants", grantee, err)
+		op.Error(err, "failed to get grants")
+		return nil, s.wrapError(ctx, s.config, "get grants", grantee, err)
 	}
 
+	op.Success("retrieved grants")
 	return grants, nil
 }
 

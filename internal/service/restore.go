@@ -32,6 +32,7 @@ import (
 // It extracts business logic from controllers and can be used both by
 // Kubernetes controllers and the CLI tool.
 type RestoreService struct {
+	baseService
 	adapter adapter.DatabaseAdapter
 	config  *Config
 }
@@ -49,24 +50,37 @@ func NewRestoreService(cfg *Config) (*RestoreService, error) {
 	}
 
 	return &RestoreService{
-		adapter: dbAdapter,
-		config:  cfg,
+		baseService: newBaseService(cfg, "RestoreService"),
+		adapter:     dbAdapter,
+		config:      cfg,
 	}, nil
 }
 
 // NewRestoreServiceWithAdapter creates a RestoreService with a pre-created adapter.
 func NewRestoreServiceWithAdapter(adp adapter.DatabaseAdapter, cfg *Config) *RestoreService {
 	return &RestoreService{
-		adapter: adp,
-		config:  cfg,
+		baseService: newBaseService(cfg, "RestoreService"),
+		adapter:     adp,
+		config:      cfg,
 	}
 }
 
 // Connect establishes a connection to the database server.
 func (s *RestoreService) Connect(ctx context.Context) error {
+	op := s.startOp("Connect", s.config.Host)
+
+	ctx, cancel := s.config.Timeouts.WithConnectTimeout(ctx)
+	defer cancel()
+
 	if err := s.adapter.Connect(ctx); err != nil {
+		op.Error(err, "failed to connect")
+		if ctx.Err() == context.DeadlineExceeded {
+			return NewTimeoutError("connect", s.config.Host, s.config.Timeouts.ConnectTimeout.String(), err)
+		}
 		return NewConnectionError(s.config.Host, s.config.Port, err)
 	}
+
+	op.Success("connected successfully")
 	return nil
 }
 
@@ -121,6 +135,9 @@ func (s *RestoreService) Restore(ctx context.Context, opts RestoreOptions) (*Res
 		return nil, &ValidationError{Field: "reader", Message: "reader is required for backup input"}
 	}
 
+	op := s.startOp("Restore", opts.Database)
+	op.Debug("starting restore", "restoreID", opts.RestoreID, "dropExisting", opts.DropExisting, "createDatabase", opts.CreateDatabase)
+
 	startTime := time.Now()
 
 	// Build adapter restore options
@@ -129,11 +146,13 @@ func (s *RestoreService) Restore(ctx context.Context, opts RestoreOptions) (*Res
 	// Execute restore
 	result, err := s.adapter.Restore(ctx, adapterOpts)
 	if err != nil {
-		return nil, NewDatabaseError("restore", opts.Database, err)
+		op.Error(err, "restore failed")
+		return nil, s.wrapError(ctx, s.config, "restore", opts.Database, err)
 	}
 
 	duration := time.Since(startTime)
 
+	op.Success("restore completed successfully")
 	return &RestoreResult{
 		Success:        true,
 		Message:        fmt.Sprintf("Restore to database '%s' completed successfully", opts.Database),
@@ -147,15 +166,19 @@ func (s *RestoreService) Restore(ctx context.Context, opts RestoreOptions) (*Res
 // RestoreFromFile performs a restore from a local file.
 // This is a convenience method for CLI usage.
 func (s *RestoreService) RestoreFromFile(ctx context.Context, database, filePath string, dropExisting bool, spec *dbopsv1alpha1.DatabaseRestoreSpec) (*RestoreResult, error) {
+	op := s.startOp("RestoreFromFile", database)
+	op.Debug("restoring from file", "path", filePath, "dropExisting", dropExisting)
+
 	// Open input file
 	file, err := os.Open(filePath)
 	if err != nil {
+		op.Error(err, "failed to open backup file")
 		return nil, fmt.Errorf("failed to open backup file: %w", err)
 	}
 	defer func() { _ = file.Close() }()
 
 	// Perform restore
-	return s.Restore(ctx, RestoreOptions{
+	result, err := s.Restore(ctx, RestoreOptions{
 		Database:       database,
 		RestoreID:      fmt.Sprintf("cli-%d", time.Now().Unix()),
 		Reader:         file,
@@ -163,6 +186,12 @@ func (s *RestoreService) RestoreFromFile(ctx context.Context, database, filePath
 		CreateDatabase: true,
 		Spec:           spec,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	op.Success("restore from file completed")
+	return result, nil
 }
 
 // buildRestoreOptions builds adapter.RestoreOptions from the service options.

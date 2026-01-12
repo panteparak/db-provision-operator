@@ -226,6 +226,7 @@ func (r *DatabaseGrantReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		tlsKey = tlsCreds.Key
 	}
 	cfg := service.ConfigFromInstance(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
+	cfg.Logger = log
 
 	// Create grant service and connect with retry
 	svc, err := service.NewGrantService(cfg)
@@ -417,6 +418,7 @@ func (r *DatabaseGrantReconciler) handleDeletion(ctx context.Context, grant *dbo
 
 	// Build service config and create service
 	cfg := service.ConfigFromInstance(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
+	cfg.Logger = log
 	svc, err := service.NewGrantService(cfg)
 	if err != nil {
 		log.Error(err, "Failed to create grant service for revocation")

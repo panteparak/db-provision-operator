@@ -28,6 +28,7 @@ import (
 // It extracts business logic from controllers and can be used both by
 // Kubernetes controllers and the CLI tool.
 type InstanceService struct {
+	baseService
 	adapter adapter.DatabaseAdapter
 	config  *Config
 }
@@ -45,24 +46,37 @@ func NewInstanceService(cfg *Config) (*InstanceService, error) {
 	}
 
 	return &InstanceService{
-		adapter: dbAdapter,
-		config:  cfg,
+		baseService: newBaseService(cfg, "InstanceService"),
+		adapter:     dbAdapter,
+		config:      cfg,
 	}, nil
 }
 
 // NewInstanceServiceWithAdapter creates an InstanceService with a pre-created adapter.
 func NewInstanceServiceWithAdapter(adp adapter.DatabaseAdapter, cfg *Config) *InstanceService {
 	return &InstanceService{
-		adapter: adp,
-		config:  cfg,
+		baseService: newBaseService(cfg, "InstanceService"),
+		adapter:     adp,
+		config:      cfg,
 	}
 }
 
 // Connect establishes a connection to the database server.
 func (s *InstanceService) Connect(ctx context.Context) error {
+	op := s.startOp("Connect", s.config.Host)
+
+	ctx, cancel := s.config.Timeouts.WithConnectTimeout(ctx)
+	defer cancel()
+
 	if err := s.adapter.Connect(ctx); err != nil {
+		op.Error(err, "failed to connect")
+		if ctx.Err() == context.DeadlineExceeded {
+			return NewTimeoutError("connect", s.config.Host, s.config.Timeouts.ConnectTimeout.String(), err)
+		}
 		return NewConnectionError(s.config.Host, s.config.Port, err)
 	}
+
+	op.Success("connected successfully")
 	return nil
 }
 
@@ -86,18 +100,25 @@ type HealthCheckResult struct {
 // HealthCheck performs a health check on the database connection.
 // This is the main method for the CLI to test connectivity.
 func (s *InstanceService) HealthCheck(ctx context.Context) (*HealthCheckResult, error) {
+	op := s.startOp("HealthCheck", s.config.Host)
+
 	result := &HealthCheckResult{
 		Healthy: false,
 	}
+
+	// Apply query timeout
+	ctx, cancel := s.config.Timeouts.WithQueryTimeout(ctx)
+	defer cancel()
 
 	// Measure connection and ping time
 	start := time.Now()
 
 	// Try to ping
 	if err := s.adapter.Ping(ctx); err != nil {
+		op.Error(err, "health check failed - ping error")
 		result.ErrorMessage = fmt.Sprintf("Ping failed: %v", err)
 		result.Message = "Database is not healthy"
-		return result, NewDatabaseError("ping", s.config.Host, err)
+		return result, s.wrapError(ctx, s.config, "ping", s.config.Host, err)
 	}
 
 	result.Latency = time.Since(start)
@@ -106,6 +127,7 @@ func (s *InstanceService) HealthCheck(ctx context.Context) (*HealthCheckResult, 
 	version, err := s.adapter.GetVersion(ctx)
 	if err != nil {
 		// Version retrieval failure is not critical
+		op.Debug("version retrieval failed", "error", err)
 		result.Version = "unknown"
 	} else {
 		result.Version = version
@@ -114,24 +136,30 @@ func (s *InstanceService) HealthCheck(ctx context.Context) (*HealthCheckResult, 
 	result.Healthy = true
 	result.Message = fmt.Sprintf("Connected to %s %s", s.config.Engine, result.Version)
 
+	op.Success("health check passed")
 	return result, nil
 }
 
 // TestConnection tests the database connection.
 // Returns a Result with success/failure information.
 func (s *InstanceService) TestConnection(ctx context.Context) (*Result, error) {
+	op := s.startOp("TestConnection", s.config.Host)
+
 	healthResult, err := s.HealthCheck(ctx)
 	if err != nil {
+		op.Error(err, "connection test failed")
 		return nil, err
 	}
 
 	if !healthResult.Healthy {
+		op.Debug("connection test unhealthy", "error", healthResult.ErrorMessage)
 		return &Result{
 			Success: false,
 			Message: healthResult.ErrorMessage,
 		}, nil
 	}
 
+	op.Success("connection test passed")
 	return &Result{
 		Success: true,
 		Message: healthResult.Message,
@@ -144,17 +172,33 @@ func (s *InstanceService) TestConnection(ctx context.Context) (*Result, error) {
 
 // GetVersion returns the database version.
 func (s *InstanceService) GetVersion(ctx context.Context) (string, error) {
+	op := s.startOp("GetVersion", s.config.Host)
+
+	ctx, cancel := s.config.Timeouts.WithQueryTimeout(ctx)
+	defer cancel()
+
 	version, err := s.adapter.GetVersion(ctx)
 	if err != nil {
-		return "", NewDatabaseError("get version", s.config.Host, err)
+		op.Error(err, "failed to get version")
+		return "", s.wrapError(ctx, s.config, "get version", s.config.Host, err)
 	}
+
+	op.Success("retrieved version")
 	return version, nil
 }
 
 // Ping verifies the database connection is alive.
 func (s *InstanceService) Ping(ctx context.Context) error {
+	op := s.startOp("Ping", s.config.Host)
+
+	ctx, cancel := s.config.Timeouts.WithQueryTimeout(ctx)
+	defer cancel()
+
 	if err := s.adapter.Ping(ctx); err != nil {
-		return NewDatabaseError("ping", s.config.Host, err)
+		op.Error(err, "ping failed")
+		return s.wrapError(ctx, s.config, "ping", s.config.Host, err)
 	}
+
+	op.Success("ping successful")
 	return nil
 }

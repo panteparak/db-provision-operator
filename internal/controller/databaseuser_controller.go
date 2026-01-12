@@ -155,6 +155,7 @@ func (r *DatabaseUserReconciler) reconcileUser(ctx context.Context, user *dbopsv
 
 	// Build service config from instance and credentials
 	cfg := service.ConfigFromInstance(&instance.Spec, adminCreds.Username, adminCreds.Password, tlsCA, tlsCert, tlsKey)
+	cfg.Logger = log
 
 	// Create user service
 	svc, err := service.NewUserService(cfg)
@@ -367,6 +368,7 @@ func (r *DatabaseUserReconciler) handleDeletion(ctx context.Context, user *dbops
 
 				// Build service config and create service
 				cfg := service.ConfigFromInstance(&instance.Spec, adminCreds.Username, adminCreds.Password, tlsCA, tlsCert, tlsKey)
+				cfg.Logger = log
 				svc, err := service.NewUserService(cfg)
 				if err == nil {
 					defer func() { _ = svc.Close() }()

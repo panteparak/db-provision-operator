@@ -29,8 +29,10 @@ import (
 // It extracts business logic from controllers and can be used both by
 // Kubernetes controllers and the CLI tool.
 type DatabaseService struct {
-	adapter adapter.DatabaseAdapter
-	config  *Config
+	baseService
+	adapter     adapter.DatabaseAdapter
+	config      *Config
+	specBuilder SpecBuilder
 }
 
 // NewDatabaseService creates a new DatabaseService with the given configuration.
@@ -47,8 +49,10 @@ func NewDatabaseService(cfg *Config) (*DatabaseService, error) {
 	}
 
 	return &DatabaseService{
-		adapter: dbAdapter,
-		config:  cfg,
+		baseService: newBaseService(cfg, "DatabaseService"),
+		adapter:     dbAdapter,
+		config:      cfg,
+		specBuilder: GetSpecBuilder(cfg.GetEngineType()),
 	}, nil
 }
 
@@ -56,23 +60,29 @@ func NewDatabaseService(cfg *Config) (*DatabaseService, error) {
 // This is useful for testing or when the adapter is already available.
 func NewDatabaseServiceWithAdapter(adp adapter.DatabaseAdapter, cfg *Config) *DatabaseService {
 	return &DatabaseService{
-		adapter: adp,
-		config:  cfg,
+		baseService: newBaseService(cfg, "DatabaseService"),
+		adapter:     adp,
+		config:      cfg,
+		specBuilder: GetSpecBuilder(cfg.GetEngineType()),
 	}
 }
 
 // Connect establishes a connection to the database server.
 func (s *DatabaseService) Connect(ctx context.Context) error {
+	op := s.startOp("Connect", s.config.Host)
+
 	ctx, cancel := s.config.Timeouts.WithConnectTimeout(ctx)
 	defer cancel()
 
 	if err := s.adapter.Connect(ctx); err != nil {
-		// Wrap timeout errors with more context
+		op.Error(err, "failed to connect")
 		if ctx.Err() == context.DeadlineExceeded {
 			return NewTimeoutError("connect", s.config.Host, s.config.Timeouts.ConnectTimeout.String(), err)
 		}
 		return NewConnectionError(s.config.Host, s.config.Port, err)
 	}
+
+	op.Success("connected successfully")
 	return nil
 }
 
@@ -96,6 +106,8 @@ func (s *DatabaseService) Create(ctx context.Context, spec *dbopsv1alpha1.Databa
 		return nil, &ValidationError{Field: "name", Message: "database name is required"}
 	}
 
+	op := s.startOp("Create", spec.Name)
+
 	// Apply operation timeout
 	ctx, cancel := s.config.Timeouts.WithOperationTimeout(ctx)
 	defer cancel()
@@ -103,32 +115,30 @@ func (s *DatabaseService) Create(ctx context.Context, spec *dbopsv1alpha1.Databa
 	// Check if database already exists
 	exists, err := s.adapter.DatabaseExists(ctx, spec.Name)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("check existence", spec.Name, s.config.Timeouts.OperationTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("check existence", spec.Name, err)
+		op.Error(err, "failed to check existence")
+		return nil, s.wrapError(ctx, s.config, "check existence", spec.Name, err)
 	}
 	if exists {
+		op.Success("database already exists")
 		return NewExistsResult(fmt.Sprintf("Database '%s' already exists", spec.Name)), nil
 	}
 
-	// Build create options based on engine type
-	opts := s.buildCreateOptions(spec)
+	// Build create options using SpecBuilder
+	opts := s.specBuilder.BuildDatabaseCreateOptions(spec)
+	op.Debug("creating database", "encoding", opts.Encoding, "owner", opts.Owner)
 
 	// Create the database
 	if err := s.adapter.CreateDatabase(ctx, opts); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("create", spec.Name, s.config.Timeouts.OperationTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("create", spec.Name, err)
+		op.Error(err, "failed to create database")
+		return nil, s.wrapError(ctx, s.config, "create", spec.Name, err)
 	}
 
 	// Verify database is accepting connections
 	if err := s.adapter.VerifyDatabaseAccess(ctx, spec.Name); err != nil {
+		op.Error(err, "database not accepting connections")
 		if ctx.Err() == context.DeadlineExceeded {
 			return nil, NewTimeoutError("verify access", spec.Name, s.config.Timeouts.OperationTimeout.String(), err)
 		}
-		// Database was created but not yet ready - this is a transient state
 		return nil, &DatabaseError{
 			Operation: "verify access",
 			Resource:  spec.Name,
@@ -136,6 +146,7 @@ func (s *DatabaseService) Create(ctx context.Context, spec *dbopsv1alpha1.Databa
 		}
 	}
 
+	op.Success("database created successfully")
 	return NewCreatedResult(fmt.Sprintf("Database '%s' created successfully", spec.Name)), nil
 }
 
@@ -151,6 +162,8 @@ func (s *DatabaseService) CreateOnly(ctx context.Context, spec *dbopsv1alpha1.Da
 		return nil, &ValidationError{Field: "name", Message: "database name is required"}
 	}
 
+	op := s.startOp("CreateOnly", spec.Name)
+
 	// Apply operation timeout
 	ctx, cancel := s.config.Timeouts.WithOperationTimeout(ctx)
 	defer cancel()
@@ -158,26 +171,25 @@ func (s *DatabaseService) CreateOnly(ctx context.Context, spec *dbopsv1alpha1.Da
 	// Check if database already exists
 	exists, err := s.adapter.DatabaseExists(ctx, spec.Name)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("check existence", spec.Name, s.config.Timeouts.OperationTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("check existence", spec.Name, err)
+		op.Error(err, "failed to check existence")
+		return nil, s.wrapError(ctx, s.config, "check existence", spec.Name, err)
 	}
 	if exists {
+		op.Success("database already exists")
 		return NewExistsResult(fmt.Sprintf("Database '%s' already exists", spec.Name)), nil
 	}
 
-	// Build create options based on engine type
-	opts := s.buildCreateOptions(spec)
+	// Build create options using SpecBuilder
+	opts := s.specBuilder.BuildDatabaseCreateOptions(spec)
+	op.Debug("creating database (no verify)", "encoding", opts.Encoding)
 
 	// Create the database
 	if err := s.adapter.CreateDatabase(ctx, opts); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("create", spec.Name, s.config.Timeouts.OperationTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("create", spec.Name, err)
+		op.Error(err, "failed to create database")
+		return nil, s.wrapError(ctx, s.config, "create", spec.Name, err)
 	}
 
+	op.Success("database created (verification pending)")
 	return NewCreatedResult(fmt.Sprintf("Database '%s' created successfully", spec.Name)), nil
 }
 
@@ -187,6 +199,8 @@ func (s *DatabaseService) Get(ctx context.Context, name string) (*types.Database
 		return nil, &ValidationError{Field: "name", Message: "database name is required"}
 	}
 
+	op := s.startOp("Get", name)
+
 	// Apply query timeout for read operations
 	ctx, cancel := s.config.Timeouts.WithQueryTimeout(ctx)
 	defer cancel()
@@ -194,24 +208,22 @@ func (s *DatabaseService) Get(ctx context.Context, name string) (*types.Database
 	// Check if database exists
 	exists, err := s.adapter.DatabaseExists(ctx, name)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("check existence", name, s.config.Timeouts.QueryTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("check existence", name, err)
+		op.Error(err, "failed to check existence")
+		return nil, s.wrapError(ctx, s.config, "check existence", name, err)
 	}
 	if !exists {
+		op.Debug("database not found")
 		return nil, ErrNotFound
 	}
 
 	// Get database info
 	info, err := s.adapter.GetDatabaseInfo(ctx, name)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("get info", name, s.config.Timeouts.QueryTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("get info", name, err)
+		op.Error(err, "failed to get info")
+		return nil, s.wrapError(ctx, s.config, "get info", name, err)
 	}
 
+	op.Success("retrieved database info")
 	return info, nil
 }
 
@@ -224,6 +236,8 @@ func (s *DatabaseService) Update(ctx context.Context, name string, spec *dbopsv1
 		return nil, &ValidationError{Field: "spec", Message: "spec is required"}
 	}
 
+	op := s.startOp("Update", name)
+
 	// Apply operation timeout
 	ctx, cancel := s.config.Timeouts.WithOperationTimeout(ctx)
 	defer cancel()
@@ -231,26 +245,25 @@ func (s *DatabaseService) Update(ctx context.Context, name string, spec *dbopsv1
 	// Check if database exists
 	exists, err := s.adapter.DatabaseExists(ctx, name)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("check existence", name, s.config.Timeouts.OperationTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("check existence", name, err)
+		op.Error(err, "failed to check existence")
+		return nil, s.wrapError(ctx, s.config, "check existence", name, err)
 	}
 	if !exists {
+		op.Debug("database not found")
 		return nil, ErrNotFound
 	}
 
-	// Build update options
-	opts := s.buildUpdateOptions(spec)
+	// Build update options using SpecBuilder
+	opts := s.specBuilder.BuildDatabaseUpdateOptions(spec)
+	op.Debug("updating database", "extensions", len(opts.Extensions), "schemas", len(opts.Schemas))
 
 	// Update the database
 	if err := s.adapter.UpdateDatabase(ctx, name, opts); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("update", name, s.config.Timeouts.OperationTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("update", name, err)
+		op.Error(err, "failed to update database")
+		return nil, s.wrapError(ctx, s.config, "update", name, err)
 	}
 
+	op.Success("database updated successfully")
 	return NewUpdatedResult(fmt.Sprintf("Database '%s' updated successfully", name)), nil
 }
 
@@ -260,6 +273,9 @@ func (s *DatabaseService) Delete(ctx context.Context, name string, force bool) (
 		return nil, &ValidationError{Field: "name", Message: "database name is required"}
 	}
 
+	op := s.startOp("Delete", name)
+	op.Debug("delete requested", "force", force)
+
 	// Apply operation timeout
 	ctx, cancel := s.config.Timeouts.WithOperationTimeout(ctx)
 	defer cancel()
@@ -267,12 +283,11 @@ func (s *DatabaseService) Delete(ctx context.Context, name string, force bool) (
 	// Check if database exists
 	exists, err := s.adapter.DatabaseExists(ctx, name)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("check existence", name, s.config.Timeouts.OperationTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("check existence", name, err)
+		op.Error(err, "failed to check existence")
+		return nil, s.wrapError(ctx, s.config, "check existence", name, err)
 	}
 	if !exists {
+		op.Success("database does not exist (no-op)")
 		return NewSuccessResult(fmt.Sprintf("Database '%s' does not exist", name)), nil
 	}
 
@@ -281,12 +296,11 @@ func (s *DatabaseService) Delete(ctx context.Context, name string, force bool) (
 		Force: force,
 	}
 	if err := s.adapter.DropDatabase(ctx, name, opts); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("delete", name, s.config.Timeouts.OperationTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("delete", name, err)
+		op.Error(err, "failed to drop database")
+		return nil, s.wrapError(ctx, s.config, "delete", name, err)
 	}
 
+	op.Success("database deleted successfully")
 	return NewSuccessResult(fmt.Sprintf("Database '%s' deleted successfully", name)), nil
 }
 
@@ -296,18 +310,19 @@ func (s *DatabaseService) Exists(ctx context.Context, name string) (bool, error)
 		return false, &ValidationError{Field: "name", Message: "database name is required"}
 	}
 
+	op := s.startOp("Exists", name)
+
 	// Apply query timeout for read operations
 	ctx, cancel := s.config.Timeouts.WithQueryTimeout(ctx)
 	defer cancel()
 
 	exists, err := s.adapter.DatabaseExists(ctx, name)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return false, NewTimeoutError("check existence", name, s.config.Timeouts.QueryTimeout.String(), err)
-		}
-		return false, NewDatabaseError("check existence", name, err)
+		op.Error(err, "failed to check existence")
+		return false, s.wrapError(ctx, s.config, "check existence", name, err)
 	}
 
+	op.Debug("existence check complete", "exists", exists)
 	return exists, nil
 }
 
@@ -317,88 +332,17 @@ func (s *DatabaseService) VerifyAccess(ctx context.Context, name string) error {
 		return &ValidationError{Field: "name", Message: "database name is required"}
 	}
 
+	op := s.startOp("VerifyAccess", name)
+
 	// Apply query timeout
 	ctx, cancel := s.config.Timeouts.WithQueryTimeout(ctx)
 	defer cancel()
 
 	if err := s.adapter.VerifyDatabaseAccess(ctx, name); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return NewTimeoutError("verify access", name, s.config.Timeouts.QueryTimeout.String(), err)
-		}
-		return NewDatabaseError("verify access", name, err)
+		op.Error(err, "database not accepting connections")
+		return s.wrapError(ctx, s.config, "verify access", name, err)
 	}
 
+	op.Success("database is accepting connections")
 	return nil
-}
-
-// buildCreateOptions builds adapter.CreateDatabaseOptions from the spec.
-// This logic was extracted from database_controller.go
-func (s *DatabaseService) buildCreateOptions(spec *dbopsv1alpha1.DatabaseSpec) types.CreateDatabaseOptions {
-	opts := types.CreateDatabaseOptions{
-		Name: spec.Name,
-	}
-
-	switch s.config.GetEngineType() {
-	case dbopsv1alpha1.EngineTypePostgres:
-		if spec.Postgres != nil {
-			opts.Encoding = spec.Postgres.Encoding
-			opts.LCCollate = spec.Postgres.LCCollate
-			opts.LCCtype = spec.Postgres.LCCtype
-			opts.Tablespace = spec.Postgres.Tablespace
-			opts.Template = spec.Postgres.Template
-			opts.ConnectionLimit = spec.Postgres.ConnectionLimit
-			opts.IsTemplate = spec.Postgres.IsTemplate
-			opts.AllowConnections = spec.Postgres.AllowConnections
-		}
-	case dbopsv1alpha1.EngineTypeMySQL:
-		if spec.MySQL != nil {
-			opts.Charset = spec.MySQL.Charset
-			opts.Collation = spec.MySQL.Collation
-		}
-	}
-
-	return opts
-}
-
-// buildUpdateOptions builds adapter.UpdateDatabaseOptions from the spec.
-// This logic was extracted from database_controller.go
-func (s *DatabaseService) buildUpdateOptions(spec *dbopsv1alpha1.DatabaseSpec) types.UpdateDatabaseOptions {
-	opts := types.UpdateDatabaseOptions{}
-
-	switch s.config.GetEngineType() {
-	case dbopsv1alpha1.EngineTypePostgres:
-		if spec.Postgres != nil {
-			// Extensions
-			for _, ext := range spec.Postgres.Extensions {
-				opts.Extensions = append(opts.Extensions, types.ExtensionOptions{
-					Name:    ext.Name,
-					Schema:  ext.Schema,
-					Version: ext.Version,
-				})
-			}
-			// Schemas
-			for _, schema := range spec.Postgres.Schemas {
-				opts.Schemas = append(opts.Schemas, types.SchemaOptions{
-					Name:  schema.Name,
-					Owner: schema.Owner,
-				})
-			}
-			// Default privileges
-			for _, dp := range spec.Postgres.DefaultPrivileges {
-				opts.DefaultPrivileges = append(opts.DefaultPrivileges, types.DefaultPrivilegeOptions{
-					Role:       dp.Role,
-					Schema:     dp.Schema,
-					ObjectType: dp.ObjectType,
-					Privileges: dp.Privileges,
-				})
-			}
-		}
-	case dbopsv1alpha1.EngineTypeMySQL:
-		if spec.MySQL != nil {
-			opts.Charset = spec.MySQL.Charset
-			opts.Collation = spec.MySQL.Collation
-		}
-	}
-
-	return opts
 }

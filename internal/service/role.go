@@ -29,8 +29,10 @@ import (
 // It extracts business logic from controllers and can be used both by
 // Kubernetes controllers and the CLI tool.
 type RoleService struct {
-	adapter adapter.DatabaseAdapter
-	config  *Config
+	baseService
+	adapter     adapter.DatabaseAdapter
+	config      *Config
+	specBuilder SpecBuilder
 }
 
 // NewRoleService creates a new RoleService with the given configuration.
@@ -46,30 +48,39 @@ func NewRoleService(cfg *Config) (*RoleService, error) {
 	}
 
 	return &RoleService{
-		adapter: dbAdapter,
-		config:  cfg,
+		baseService: newBaseService(cfg, "RoleService"),
+		adapter:     dbAdapter,
+		config:      cfg,
+		specBuilder: GetSpecBuilder(cfg.GetEngineType()),
 	}, nil
 }
 
 // NewRoleServiceWithAdapter creates a RoleService with a pre-created adapter.
 func NewRoleServiceWithAdapter(adp adapter.DatabaseAdapter, cfg *Config) *RoleService {
 	return &RoleService{
-		adapter: adp,
-		config:  cfg,
+		baseService: newBaseService(cfg, "RoleService"),
+		adapter:     adp,
+		config:      cfg,
+		specBuilder: GetSpecBuilder(cfg.GetEngineType()),
 	}
 }
 
 // Connect establishes a connection to the database server.
 func (s *RoleService) Connect(ctx context.Context) error {
+	op := s.startOp("Connect", s.config.Host)
+
 	ctx, cancel := s.config.Timeouts.WithConnectTimeout(ctx)
 	defer cancel()
 
 	if err := s.adapter.Connect(ctx); err != nil {
+		op.Error(err, "failed to connect")
 		if ctx.Err() == context.DeadlineExceeded {
 			return NewTimeoutError("connect", s.config.Host, s.config.Timeouts.ConnectTimeout.String(), err)
 		}
 		return NewConnectionError(s.config.Host, s.config.Port, err)
 	}
+
+	op.Success("connected successfully")
 	return nil
 }
 
@@ -91,6 +102,8 @@ func (s *RoleService) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseRo
 		return nil, &ValidationError{Field: "roleName", Message: "role name is required"}
 	}
 
+	op := s.startOp("Create", spec.RoleName)
+
 	// Apply operation timeout
 	ctx, cancel := s.config.Timeouts.WithOperationTimeout(ctx)
 	defer cancel()
@@ -98,35 +111,33 @@ func (s *RoleService) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseRo
 	// Check if role already exists
 	exists, err := s.adapter.RoleExists(ctx, spec.RoleName)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("check existence", spec.RoleName, s.config.Timeouts.OperationTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("check existence", spec.RoleName, err)
+		op.Error(err, "failed to check existence")
+		return nil, s.wrapError(ctx, s.config, "check existence", spec.RoleName, err)
 	}
 
 	if exists {
-		// Update existing role
-		updateOpts := s.buildUpdateOptions(spec)
+		op.Debug("role exists, updating instead")
+		// Update existing role using SpecBuilder
+		updateOpts := s.specBuilder.BuildRoleUpdateOptions(spec)
 		if err := s.adapter.UpdateRole(ctx, spec.RoleName, updateOpts); err != nil {
-			if ctx.Err() == context.DeadlineExceeded {
-				return nil, NewTimeoutError("update", spec.RoleName, s.config.Timeouts.OperationTimeout.String(), err)
-			}
-			return nil, NewDatabaseError("update", spec.RoleName, err)
+			op.Error(err, "failed to update role")
+			return nil, s.wrapError(ctx, s.config, "update", spec.RoleName, err)
 		}
+		op.Success("role updated successfully")
 		return NewUpdatedResult(fmt.Sprintf("Role '%s' updated successfully", spec.RoleName)), nil
 	}
 
-	// Build create options
-	createOpts := s.buildCreateOptions(spec)
+	// Build create options using SpecBuilder
+	createOpts := s.specBuilder.BuildRoleCreateOptions(spec)
+	op.Debug("creating role", "inherit", createOpts.Inherit, "grants", len(createOpts.Grants))
 
 	// Create the role
 	if err := s.adapter.CreateRole(ctx, createOpts); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("create", spec.RoleName, s.config.Timeouts.OperationTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("create", spec.RoleName, err)
+		op.Error(err, "failed to create role")
+		return nil, s.wrapError(ctx, s.config, "create", spec.RoleName, err)
 	}
 
+	op.Success("role created successfully")
 	return NewCreatedResult(fmt.Sprintf("Role '%s' created successfully", spec.RoleName)), nil
 }
 
@@ -136,6 +147,8 @@ func (s *RoleService) Get(ctx context.Context, roleName string) (*types.RoleInfo
 		return nil, &ValidationError{Field: "roleName", Message: "role name is required"}
 	}
 
+	op := s.startOp("Get", roleName)
+
 	// Apply query timeout
 	ctx, cancel := s.config.Timeouts.WithQueryTimeout(ctx)
 	defer cancel()
@@ -143,24 +156,22 @@ func (s *RoleService) Get(ctx context.Context, roleName string) (*types.RoleInfo
 	// Check if role exists
 	exists, err := s.adapter.RoleExists(ctx, roleName)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("check existence", roleName, s.config.Timeouts.QueryTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("check existence", roleName, err)
+		op.Error(err, "failed to check existence")
+		return nil, s.wrapError(ctx, s.config, "check existence", roleName, err)
 	}
 	if !exists {
+		op.Debug("role not found")
 		return nil, ErrNotFound
 	}
 
 	// Get role info
 	info, err := s.adapter.GetRoleInfo(ctx, roleName)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("get info", roleName, s.config.Timeouts.QueryTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("get info", roleName, err)
+		op.Error(err, "failed to get info")
+		return nil, s.wrapError(ctx, s.config, "get info", roleName, err)
 	}
 
+	op.Success("retrieved role info")
 	return info, nil
 }
 
@@ -173,6 +184,8 @@ func (s *RoleService) Update(ctx context.Context, roleName string, spec *dbopsv1
 		return nil, &ValidationError{Field: "spec", Message: "spec is required"}
 	}
 
+	op := s.startOp("Update", roleName)
+
 	// Apply operation timeout
 	ctx, cancel := s.config.Timeouts.WithOperationTimeout(ctx)
 	defer cancel()
@@ -180,26 +193,25 @@ func (s *RoleService) Update(ctx context.Context, roleName string, spec *dbopsv1
 	// Check if role exists
 	exists, err := s.adapter.RoleExists(ctx, roleName)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("check existence", roleName, s.config.Timeouts.OperationTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("check existence", roleName, err)
+		op.Error(err, "failed to check existence")
+		return nil, s.wrapError(ctx, s.config, "check existence", roleName, err)
 	}
 	if !exists {
+		op.Debug("role not found")
 		return nil, ErrNotFound
 	}
 
-	// Build update options
-	opts := s.buildUpdateOptions(spec)
+	// Build update options using SpecBuilder
+	opts := s.specBuilder.BuildRoleUpdateOptions(spec)
+	op.Debug("updating role settings")
 
 	// Update the role
 	if err := s.adapter.UpdateRole(ctx, roleName, opts); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("update", roleName, s.config.Timeouts.OperationTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("update", roleName, err)
+		op.Error(err, "failed to update role")
+		return nil, s.wrapError(ctx, s.config, "update", roleName, err)
 	}
 
+	op.Success("role updated successfully")
 	return NewUpdatedResult(fmt.Sprintf("Role '%s' updated successfully", roleName)), nil
 }
 
@@ -209,6 +221,8 @@ func (s *RoleService) Delete(ctx context.Context, roleName string) (*Result, err
 		return nil, &ValidationError{Field: "roleName", Message: "role name is required"}
 	}
 
+	op := s.startOp("Delete", roleName)
+
 	// Apply operation timeout
 	ctx, cancel := s.config.Timeouts.WithOperationTimeout(ctx)
 	defer cancel()
@@ -216,23 +230,21 @@ func (s *RoleService) Delete(ctx context.Context, roleName string) (*Result, err
 	// Check if role exists
 	exists, err := s.adapter.RoleExists(ctx, roleName)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("check existence", roleName, s.config.Timeouts.OperationTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("check existence", roleName, err)
+		op.Error(err, "failed to check existence")
+		return nil, s.wrapError(ctx, s.config, "check existence", roleName, err)
 	}
 	if !exists {
+		op.Success("role does not exist (no-op)")
 		return NewSuccessResult(fmt.Sprintf("Role '%s' does not exist", roleName)), nil
 	}
 
 	// Drop the role
 	if err := s.adapter.DropRole(ctx, roleName); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, NewTimeoutError("delete", roleName, s.config.Timeouts.OperationTimeout.String(), err)
-		}
-		return nil, NewDatabaseError("delete", roleName, err)
+		op.Error(err, "failed to drop role")
+		return nil, s.wrapError(ctx, s.config, "delete", roleName, err)
 	}
 
+	op.Success("role deleted successfully")
 	return NewSuccessResult(fmt.Sprintf("Role '%s' deleted successfully", roleName)), nil
 }
 
@@ -242,143 +254,18 @@ func (s *RoleService) Exists(ctx context.Context, roleName string) (bool, error)
 		return false, &ValidationError{Field: "roleName", Message: "role name is required"}
 	}
 
+	op := s.startOp("Exists", roleName)
+
 	// Apply query timeout
 	ctx, cancel := s.config.Timeouts.WithQueryTimeout(ctx)
 	defer cancel()
 
 	exists, err := s.adapter.RoleExists(ctx, roleName)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return false, NewTimeoutError("check existence", roleName, s.config.Timeouts.QueryTimeout.String(), err)
-		}
-		return false, NewDatabaseError("check existence", roleName, err)
+		op.Error(err, "failed to check existence")
+		return false, s.wrapError(ctx, s.config, "check existence", roleName, err)
 	}
 
+	op.Debug("existence check complete", "exists", exists)
 	return exists, nil
-}
-
-// buildCreateOptions builds adapter.CreateRoleOptions from the spec.
-// This logic was extracted from databaserole_controller.go
-func (s *RoleService) buildCreateOptions(spec *dbopsv1alpha1.DatabaseRoleSpec) types.CreateRoleOptions {
-	opts := types.CreateRoleOptions{
-		RoleName: spec.RoleName,
-		Inherit:  true, // Default to inheriting privileges
-	}
-
-	switch s.config.GetEngineType() {
-	case dbopsv1alpha1.EngineTypePostgres:
-		if spec.Postgres != nil {
-			opts.Login = spec.Postgres.Login
-			opts.Inherit = spec.Postgres.Inherit
-			opts.CreateDB = spec.Postgres.CreateDB
-			opts.CreateRole = spec.Postgres.CreateRole
-			opts.Superuser = spec.Postgres.Superuser
-			opts.Replication = spec.Postgres.Replication
-			opts.BypassRLS = spec.Postgres.BypassRLS
-			opts.InRoles = spec.Postgres.InRoles
-
-			// Convert grants
-			if len(spec.Postgres.Grants) > 0 {
-				opts.Grants = make([]types.GrantOptions, 0, len(spec.Postgres.Grants))
-				for _, g := range spec.Postgres.Grants {
-					opts.Grants = append(opts.Grants, types.GrantOptions{
-						Database:        g.Database,
-						Schema:          g.Schema,
-						Tables:          g.Tables,
-						Sequences:       g.Sequences,
-						Functions:       g.Functions,
-						Privileges:      g.Privileges,
-						WithGrantOption: g.WithGrantOption,
-					})
-				}
-			}
-		}
-	case dbopsv1alpha1.EngineTypeMySQL:
-		if spec.MySQL != nil {
-			opts.UseNativeRoles = spec.MySQL.UseNativeRoles
-
-			// Convert grants
-			if len(spec.MySQL.Grants) > 0 {
-				opts.Grants = make([]types.GrantOptions, 0, len(spec.MySQL.Grants))
-				for _, g := range spec.MySQL.Grants {
-					opts.Grants = append(opts.Grants, types.GrantOptions{
-						Level:           string(g.Level),
-						Database:        g.Database,
-						Table:           g.Table,
-						Columns:         g.Columns,
-						Procedure:       g.Procedure,
-						Function:        g.Function,
-						Privileges:      g.Privileges,
-						WithGrantOption: g.WithGrantOption,
-					})
-				}
-			}
-		}
-	}
-
-	return opts
-}
-
-// buildUpdateOptions builds adapter.UpdateRoleOptions from the spec.
-// This logic was extracted from databaserole_controller.go
-func (s *RoleService) buildUpdateOptions(spec *dbopsv1alpha1.DatabaseRoleSpec) types.UpdateRoleOptions {
-	opts := types.UpdateRoleOptions{}
-
-	switch s.config.GetEngineType() {
-	case dbopsv1alpha1.EngineTypePostgres:
-		if spec.Postgres != nil {
-			login := spec.Postgres.Login
-			opts.Login = &login
-			inherit := spec.Postgres.Inherit
-			opts.Inherit = &inherit
-			createDB := spec.Postgres.CreateDB
-			opts.CreateDB = &createDB
-			createRole := spec.Postgres.CreateRole
-			opts.CreateRole = &createRole
-			superuser := spec.Postgres.Superuser
-			opts.Superuser = &superuser
-			replication := spec.Postgres.Replication
-			opts.Replication = &replication
-			bypassRLS := spec.Postgres.BypassRLS
-			opts.BypassRLS = &bypassRLS
-			opts.InRoles = spec.Postgres.InRoles
-
-			// Convert grants
-			if len(spec.Postgres.Grants) > 0 {
-				opts.Grants = make([]types.GrantOptions, 0, len(spec.Postgres.Grants))
-				for _, g := range spec.Postgres.Grants {
-					opts.Grants = append(opts.Grants, types.GrantOptions{
-						Database:        g.Database,
-						Schema:          g.Schema,
-						Tables:          g.Tables,
-						Sequences:       g.Sequences,
-						Functions:       g.Functions,
-						Privileges:      g.Privileges,
-						WithGrantOption: g.WithGrantOption,
-					})
-				}
-			}
-		}
-	case dbopsv1alpha1.EngineTypeMySQL:
-		if spec.MySQL != nil {
-			// Convert grants for add
-			if len(spec.MySQL.Grants) > 0 {
-				opts.AddGrants = make([]types.GrantOptions, 0, len(spec.MySQL.Grants))
-				for _, g := range spec.MySQL.Grants {
-					opts.AddGrants = append(opts.AddGrants, types.GrantOptions{
-						Level:           string(g.Level),
-						Database:        g.Database,
-						Table:           g.Table,
-						Columns:         g.Columns,
-						Procedure:       g.Procedure,
-						Function:        g.Function,
-						Privileges:      g.Privileges,
-						WithGrantOption: g.WithGrantOption,
-					})
-				}
-			}
-		}
-	}
-
-	return opts
 }

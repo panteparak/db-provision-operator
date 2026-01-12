@@ -63,9 +63,11 @@ func (a *Adapter) CreateDatabase(ctx context.Context, opts types.CreateDatabaseO
 	if opts.IsTemplate {
 		options = append(options, "IS_TEMPLATE = TRUE")
 	}
-	if !opts.AllowConnections {
-		options = append(options, "ALLOW_CONNECTIONS = FALSE")
-	}
+	// Note: ALLOW_CONNECTIONS defaults to TRUE in PostgreSQL.
+	// We intentionally do NOT add ALLOW_CONNECTIONS = FALSE here because:
+	// - The AllowConnections field is a bool (defaults to false)
+	// - Adding this option would prevent ALL newly created databases from accepting connections
+	// - If this feature is needed in the future, use a pointer type (*bool) or inverted field name
 
 	if len(options) > 0 {
 		sb.WriteString(" WITH ")

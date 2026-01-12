@@ -162,6 +162,7 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, database *db
 
 	// Build service config from instance and credentials
 	cfg := service.ConfigFromInstance(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
+	cfg.Logger = log
 
 	// Create database service
 	svc, err := service.NewDatabaseService(cfg)
@@ -337,6 +338,7 @@ func (r *DatabaseReconciler) handleDeletion(ctx context.Context, database *dbops
 
 				// Build service config and create service
 				cfg := service.ConfigFromInstance(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
+				cfg.Logger = log
 				svc, err := service.NewDatabaseService(cfg)
 				if err == nil {
 					defer func() { _ = svc.Close() }()
