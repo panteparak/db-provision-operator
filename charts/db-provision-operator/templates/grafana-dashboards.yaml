@@ -1,0 +1,160 @@
+{{- if .Values.grafanaDashboards.enabled }}
+{{- $fullname := include "db-provision-operator.fullname" . -}}
+{{- $labels := include "db-provision-operator.labels" . -}}
+{{- $folder := .Values.grafanaDashboards.folder -}}
+{{- $instanceSelector := .Values.grafanaDashboards.instanceSelector -}}
+
+{{- if .Values.grafanaDashboards.dashboards.overview.enabled }}
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: {{ $fullname }}-overview
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  folder: {{ $folder }}
+  instanceSelector:
+    {{- toYaml $instanceSelector | nindent 4 }}
+  configMapRef:
+    name: {{ $fullname }}-dashboards
+    key: overview.json
+{{- end }}
+
+{{- if .Values.grafanaDashboards.dashboards.instances.enabled }}
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: {{ $fullname }}-instances
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  folder: {{ $folder }}
+  instanceSelector:
+    {{- toYaml $instanceSelector | nindent 4 }}
+  configMapRef:
+    name: {{ $fullname }}-dashboards
+    key: instances.json
+{{- end }}
+
+{{- if .Values.grafanaDashboards.dashboards.databases.enabled }}
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: {{ $fullname }}-databases
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  folder: {{ $folder }}
+  instanceSelector:
+    {{- toYaml $instanceSelector | nindent 4 }}
+  configMapRef:
+    name: {{ $fullname }}-dashboards
+    key: databases.json
+{{- end }}
+
+{{- if .Values.grafanaDashboards.dashboards.users.enabled }}
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: {{ $fullname }}-users
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  folder: {{ $folder }}
+  instanceSelector:
+    {{- toYaml $instanceSelector | nindent 4 }}
+  configMapRef:
+    name: {{ $fullname }}-dashboards
+    key: users.json
+{{- end }}
+
+{{- if .Values.grafanaDashboards.dashboards.roles.enabled }}
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: {{ $fullname }}-roles
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  folder: {{ $folder }}
+  instanceSelector:
+    {{- toYaml $instanceSelector | nindent 4 }}
+  configMapRef:
+    name: {{ $fullname }}-dashboards
+    key: roles.json
+{{- end }}
+
+{{- if .Values.grafanaDashboards.dashboards.grants.enabled }}
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: {{ $fullname }}-grants
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  folder: {{ $folder }}
+  instanceSelector:
+    {{- toYaml $instanceSelector | nindent 4 }}
+  configMapRef:
+    name: {{ $fullname }}-dashboards
+    key: grants.json
+{{- end }}
+
+{{- if .Values.grafanaDashboards.dashboards.backups.enabled }}
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: {{ $fullname }}-backups
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  folder: {{ $folder }}
+  instanceSelector:
+    {{- toYaml $instanceSelector | nindent 4 }}
+  configMapRef:
+    name: {{ $fullname }}-dashboards
+    key: backups.json
+{{- end }}
+
+{{- if .Values.grafanaDashboards.dashboards.schedules.enabled }}
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: {{ $fullname }}-schedules
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  folder: {{ $folder }}
+  instanceSelector:
+    {{- toYaml $instanceSelector | nindent 4 }}
+  configMapRef:
+    name: {{ $fullname }}-dashboards
+    key: schedules.json
+{{- end }}
+
+{{- if .Values.grafanaDashboards.dashboards.restores.enabled }}
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: {{ $fullname }}-restores
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  folder: {{ $folder }}
+  instanceSelector:
+    {{- toYaml $instanceSelector | nindent 4 }}
+  configMapRef:
+    name: {{ $fullname }}-dashboards
+    key: restores.json
+{{- end }}
+
+{{- end }}

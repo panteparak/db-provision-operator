@@ -46,4 +46,3 @@ resources:
 - databaseinstance_admin_role.yaml
 - databaseinstance_editor_role.yaml
 - databaseinstance_viewer_role.yaml
-

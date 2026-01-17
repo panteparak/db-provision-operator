@@ -38,6 +38,10 @@ spec:
             - --leader-elect
             {{- end }}
             - --health-probe-bind-address={{ .Values.healthProbeBindAddress }}
+          ports:
+            - containerPort: 8081
+              name: health
+              protocol: TCP
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           livenessProbe:

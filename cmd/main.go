@@ -38,7 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
-	"github.com/db-provision-operator/internal/controller"
+	"github.com/db-provision-operator/internal/app"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -202,60 +202,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := (&controller.DatabaseInstanceReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DatabaseInstance")
+	// Create and setup the application with feature modules
+	// This includes all controllers: Instance, Database, User, Role, Grant, Backup, BackupSchedule, Restore
+	application, err := app.NewApplication(mgr)
+	if err != nil {
+		setupLog.Error(err, "unable to create application")
 		os.Exit(1)
 	}
-	if err := (&controller.DatabaseReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Database")
-		os.Exit(1)
-	}
-	if err := (&controller.DatabaseUserReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DatabaseUser")
-		os.Exit(1)
-	}
-	if err := (&controller.DatabaseRoleReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DatabaseRole")
-		os.Exit(1)
-	}
-	if err := (&controller.DatabaseGrantReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DatabaseGrant")
-		os.Exit(1)
-	}
-	if err := (&controller.DatabaseBackupReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DatabaseBackup")
-		os.Exit(1)
-	}
-	if err := (&controller.DatabaseBackupScheduleReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DatabaseBackupSchedule")
-		os.Exit(1)
-	}
-	if err := (&controller.DatabaseRestoreReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DatabaseRestore")
+	if err := application.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to setup application with manager")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

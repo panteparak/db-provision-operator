@@ -41,9 +41,33 @@ Namespace: {{ .Release.Namespace }}
 
    kubectl get databaseinstance my-postgres -o yaml
 
+{{- if .Values.grafanaDashboards.enabled }}
+
+6. Grafana Dashboards:
+
+   Grafana dashboards have been deployed to monitor your database resources.
+
+   Prerequisites:
+   - Grafana Operator must be installed
+   - A Grafana instance with matching labels must exist:
+     {{- toYaml .Values.grafanaDashboards.instanceSelector | nindent 6 }}
+
+   Dashboards are available in the "{{ .Values.grafanaDashboards.folder }}" folder:
+   - Overview - Resource counts and health status
+   - Instances - Database instance monitoring
+   - Databases - Database operations
+   - Users - User management
+   - Roles - Role management
+   - Grants - Permission grants
+   - Backups - Backup operations
+   - Schedules - Backup schedules
+   - Restores - Restore operations
+
+{{- end }}
+
 {{- if .Values.metrics.enabled }}
 
-6. Access metrics:
+{{ if .Values.grafanaDashboards.enabled }}7{{ else }}6{{ end }}. Access metrics:
 
    The metrics service is available at:
    {{ include "db-provision-operator.fullname" . }}-metrics-service.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.metrics.service.port }}

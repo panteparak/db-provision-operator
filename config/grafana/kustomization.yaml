@@ -1,0 +1,28 @@
+# Resources for deploying Grafana dashboards via the Grafana Operator
+# Requires the Grafana Operator CRDs to be installed first:
+#   https://grafana.github.io/grafana-operator/
+#
+# To enable, uncomment the grafana reference in config/default/kustomization.yaml
+resources:
+- grafana-dashboards.yaml
+
+# Generate ConfigMap from dashboard JSON files
+# Note: Dashboard JSON files are copied from /dashboards/ to keep Kustomize resources self-contained
+configMapGenerator:
+- name: db-provision-operator-dashboards
+  files:
+  - overview.json=dashboards/overview.json
+  - instances.json=dashboards/instances.json
+  - databases.json=dashboards/databases.json
+  - users.json=dashboards/users.json
+  - roles.json=dashboards/roles.json
+  - grants.json=dashboards/grants.json
+  - backups.json=dashboards/backups.json
+  - schedules.json=dashboards/schedules.json
+  - restores.json=dashboards/restores.json
+  options:
+    labels:
+      grafana_dashboard: "1"
+
+generatorOptions:
+  disableNameSuffixHash: true

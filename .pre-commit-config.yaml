@@ -1,7 +1,17 @@
 # Pre-commit hooks configuration
 # See https://pre-commit.com for more information
-# Install: pip install pre-commit && pre-commit install
-# Run manually: pre-commit run --all-files
+#
+# Quick start:
+#   make setup-precommit   # Install pre-commit and dependencies
+#   pre-commit install     # Enable hooks
+#   pre-commit run --all-files  # Run manually
+#
+# Dependencies (installed by setup-precommit):
+#   - pre-commit: pip install pre-commit
+#   - golangci-lint: https://golangci-lint.run/usage/install/
+#   - shellcheck: https://github.com/koalaman/shellcheck#installing
+#   - helm: https://helm.sh/docs/intro/install/
+#   - docker: Required for hadolint-docker hook
 
 default_install_hook_types: [pre-commit, commit-msg]
 fail_fast: false
@@ -16,10 +26,12 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
         args: [--unsafe]  # Allow custom tags in Kubernetes YAML
+        exclude: ^charts/.*/templates/  # Helm templates contain Go template syntax
       - id: check-added-large-files
         args: [--maxkb=1000]
       - id: check-merge-conflict
       - id: detect-private-key
+        exclude: (testutil/|_test\.go$)  # Test fixtures contain fake keys
       - id: mixed-line-ending
         args: [--fix=lf]
 
@@ -36,6 +48,16 @@ repos:
       - id: golangci-lint
         args: [--fix]
 
+  # Unit tests (excludes E2E, uses -short for speed)
+  - repo: local
+    hooks:
+      - id: go-test
+        name: go test
+        entry: bash -c 'go test $(go list ./... | grep -v /e2e) -short'
+        language: system
+        files: \.go$
+        pass_filenames: false
+
   # Shell script linting (for scripts in Makefile, CI, etc.)
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.10.0.1
@@ -47,7 +69,7 @@ repos:
   - repo: https://github.com/hadolint/hadolint
     rev: v2.12.0
     hooks:
-      - id: hadolint
+      - id: hadolint-docker
         args: [--ignore, DL3018]  # Allow apk add without pinning versions
 
   # Helm chart linting

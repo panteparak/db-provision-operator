@@ -130,3 +130,35 @@ crds:
   install: true
   # -- Keep CRDs on chart uninstall
   keep: true
+
+# Grafana dashboards configuration
+grafanaDashboards:
+  # -- Enable Grafana dashboards deployment via Grafana Operator CRD
+  enabled: false
+  # -- Instance selector for GrafanaDashboard CRD
+  # Must match labels on your Grafana instance
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"
+  # -- Folder to place dashboards in Grafana
+  folder: "Database Provisioning"
+  # -- Dashboard-specific configuration
+  dashboards:
+    overview:
+      enabled: true
+    instances:
+      enabled: true
+    databases:
+      enabled: true
+    users:
+      enabled: true
+    roles:
+      enabled: true
+    grants:
+      enabled: true
+    backups:
+      enabled: true
+    schedules:
+      enabled: true
+    restores:
+      enabled: true

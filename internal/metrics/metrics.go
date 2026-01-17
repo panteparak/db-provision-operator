@@ -265,6 +265,89 @@ var (
 		},
 		[]string{"resource_type", labelPhase, labelNamespace},
 	)
+
+	// Info metrics - expose resource details as labels for Grafana table views
+	// Following the kube-state-metrics pattern, value is always 1
+
+	// InstanceInfo exposes database instance details
+	InstanceInfo = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "instance_info",
+			Help:      "Information about database instances (value is always 1)",
+		},
+		[]string{labelInstance, labelNamespace, labelEngine, "version", "host", "port", labelPhase},
+	)
+
+	// DatabaseInfo exposes database details
+	DatabaseInfo = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "database_info",
+			Help:      "Information about databases (value is always 1)",
+		},
+		[]string{labelDatabase, labelNamespace, "instance_ref", "db_name", labelPhase},
+	)
+
+	// UserInfo exposes database user details
+	UserInfo = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "user_info",
+			Help:      "Information about database users (value is always 1)",
+		},
+		[]string{"user", labelNamespace, "instance_ref", "username", labelPhase},
+	)
+
+	// RoleInfo exposes database role details
+	RoleInfo = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "role_info",
+			Help:      "Information about database roles (value is always 1)",
+		},
+		[]string{"role", labelNamespace, "instance_ref", "role_name", labelPhase},
+	)
+
+	// GrantInfo exposes database grant details
+	GrantInfo = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "grant_info",
+			Help:      "Information about database grants (value is always 1)",
+		},
+		[]string{"grant", labelNamespace, "user_ref", "database_ref", "privileges", labelPhase},
+	)
+
+	// BackupInfo exposes database backup details
+	BackupInfo = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "backup_info",
+			Help:      "Information about database backups (value is always 1)",
+		},
+		[]string{"backup", labelNamespace, "database_ref", "storage_type", labelPhase},
+	)
+
+	// ScheduleInfo exposes backup schedule details
+	ScheduleInfo = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "schedule_info",
+			Help:      "Information about backup schedules (value is always 1)",
+		},
+		[]string{"schedule", labelNamespace, "database_ref", "cron", "paused"},
+	)
+
+	// RestoreInfo exposes database restore details
+	RestoreInfo = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "restore_info",
+			Help:      "Information about database restores (value is always 1)",
+		},
+		[]string{"restore", labelNamespace, "backup_ref", "target_instance", labelPhase},
+	)
 )
 
 func init() {
@@ -308,6 +391,16 @@ func init() {
 
 		// Resource counts
 		ResourceCount,
+
+		// Info metrics for Grafana table views
+		InstanceInfo,
+		DatabaseInfo,
+		UserInfo,
+		RoleInfo,
+		GrantInfo,
+		BackupInfo,
+		ScheduleInfo,
+		RestoreInfo,
 	)
 }
 
@@ -431,4 +524,145 @@ func DeleteBackupMetrics(database, engine, namespace string) {
 // DeleteScheduleMetrics removes all metrics for a deleted schedule
 func DeleteScheduleMetrics(database, namespace string) {
 	ScheduleNextBackupTimestamp.DeleteLabelValues(database, namespace)
+}
+
+// Info metric helper functions
+// These use DeletePartialMatch to handle changing labels (e.g., phase changes)
+
+// SetInstanceInfo sets info metric for an instance (value is always 1)
+// It first clears any existing info metric for this instance to handle phase changes
+func SetInstanceInfo(instance, namespace, engine, version, host, port, phase string) {
+	// Clear any existing info metric for this instance (handles phase changes)
+	InstanceInfo.DeletePartialMatch(prometheus.Labels{
+		labelInstance:  instance,
+		labelNamespace: namespace,
+	})
+	InstanceInfo.WithLabelValues(instance, namespace, engine, version, host, port, phase).Set(1)
+}
+
+// DeleteInstanceInfo removes all info metrics for a deleted instance
+func DeleteInstanceInfo(instance, namespace string) {
+	InstanceInfo.DeletePartialMatch(prometheus.Labels{
+		labelInstance:  instance,
+		labelNamespace: namespace,
+	})
+}
+
+// SetDatabaseInfo sets info metric for a database (value is always 1)
+func SetDatabaseInfo(database, namespace, instanceRef, dbName, phase string) {
+	DatabaseInfo.DeletePartialMatch(prometheus.Labels{
+		labelDatabase:  database,
+		labelNamespace: namespace,
+	})
+	DatabaseInfo.WithLabelValues(database, namespace, instanceRef, dbName, phase).Set(1)
+}
+
+// DeleteDatabaseInfo removes all info metrics for a deleted database
+func DeleteDatabaseInfo(database, namespace string) {
+	DatabaseInfo.DeletePartialMatch(prometheus.Labels{
+		labelDatabase:  database,
+		labelNamespace: namespace,
+	})
+}
+
+// SetUserInfo sets info metric for a user (value is always 1)
+func SetUserInfo(user, namespace, instanceRef, username, phase string) {
+	UserInfo.DeletePartialMatch(prometheus.Labels{
+		"user":         user,
+		labelNamespace: namespace,
+	})
+	UserInfo.WithLabelValues(user, namespace, instanceRef, username, phase).Set(1)
+}
+
+// DeleteUserInfo removes all info metrics for a deleted user
+func DeleteUserInfo(user, namespace string) {
+	UserInfo.DeletePartialMatch(prometheus.Labels{
+		"user":         user,
+		labelNamespace: namespace,
+	})
+}
+
+// SetRoleInfo sets info metric for a role (value is always 1)
+func SetRoleInfo(role, namespace, instanceRef, roleName, phase string) {
+	RoleInfo.DeletePartialMatch(prometheus.Labels{
+		"role":         role,
+		labelNamespace: namespace,
+	})
+	RoleInfo.WithLabelValues(role, namespace, instanceRef, roleName, phase).Set(1)
+}
+
+// DeleteRoleInfo removes all info metrics for a deleted role
+func DeleteRoleInfo(role, namespace string) {
+	RoleInfo.DeletePartialMatch(prometheus.Labels{
+		"role":         role,
+		labelNamespace: namespace,
+	})
+}
+
+// SetGrantInfo sets info metric for a grant (value is always 1)
+func SetGrantInfo(grant, namespace, userRef, databaseRef, privileges, phase string) {
+	GrantInfo.DeletePartialMatch(prometheus.Labels{
+		"grant":        grant,
+		labelNamespace: namespace,
+	})
+	GrantInfo.WithLabelValues(grant, namespace, userRef, databaseRef, privileges, phase).Set(1)
+}
+
+// DeleteGrantInfo removes all info metrics for a deleted grant
+func DeleteGrantInfo(grant, namespace string) {
+	GrantInfo.DeletePartialMatch(prometheus.Labels{
+		"grant":        grant,
+		labelNamespace: namespace,
+	})
+}
+
+// SetBackupInfo sets info metric for a backup (value is always 1)
+func SetBackupInfo(backup, namespace, databaseRef, storageType, phase string) {
+	BackupInfo.DeletePartialMatch(prometheus.Labels{
+		"backup":       backup,
+		labelNamespace: namespace,
+	})
+	BackupInfo.WithLabelValues(backup, namespace, databaseRef, storageType, phase).Set(1)
+}
+
+// DeleteBackupInfo removes all info metrics for a deleted backup
+func DeleteBackupInfo(backup, namespace string) {
+	BackupInfo.DeletePartialMatch(prometheus.Labels{
+		"backup":       backup,
+		labelNamespace: namespace,
+	})
+}
+
+// SetScheduleInfo sets info metric for a backup schedule (value is always 1)
+func SetScheduleInfo(schedule, namespace, databaseRef, cron, paused string) {
+	ScheduleInfo.DeletePartialMatch(prometheus.Labels{
+		"schedule":     schedule,
+		labelNamespace: namespace,
+	})
+	ScheduleInfo.WithLabelValues(schedule, namespace, databaseRef, cron, paused).Set(1)
+}
+
+// DeleteScheduleInfo removes all info metrics for a deleted schedule
+func DeleteScheduleInfo(schedule, namespace string) {
+	ScheduleInfo.DeletePartialMatch(prometheus.Labels{
+		"schedule":     schedule,
+		labelNamespace: namespace,
+	})
+}
+
+// SetRestoreInfo sets info metric for a restore (value is always 1)
+func SetRestoreInfo(restore, namespace, backupRef, targetInstance, phase string) {
+	RestoreInfo.DeletePartialMatch(prometheus.Labels{
+		"restore":      restore,
+		labelNamespace: namespace,
+	})
+	RestoreInfo.WithLabelValues(restore, namespace, backupRef, targetInstance, phase).Set(1)
+}
+
+// DeleteRestoreInfo removes all info metrics for a deleted restore
+func DeleteRestoreInfo(restore, namespace string) {
+	RestoreInfo.DeletePartialMatch(prometheus.Labels{
+		"restore":      restore,
+		labelNamespace: namespace,
+	})
 }

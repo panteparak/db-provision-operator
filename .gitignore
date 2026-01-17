@@ -25,3 +25,8 @@ go.work
 *.swp
 *.swo
 *~
+
+# Dashboard assets - copied from dashboards/ during CI release
+# These directories are populated by `make copy-dashboards` or CI
+charts/db-provision-operator/dashboards/
+config/grafana/dashboards/

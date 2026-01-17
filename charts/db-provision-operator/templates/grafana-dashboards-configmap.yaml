@@ -1,0 +1,46 @@
+{{- if .Values.grafanaDashboards.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "db-provision-operator.fullname" . }}-dashboards
+  labels:
+    {{- include "db-provision-operator.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  {{- if .Values.grafanaDashboards.dashboards.overview.enabled }}
+  overview.json: |-
+{{ .Files.Get "dashboards/overview.json" | indent 4 }}
+  {{- end }}
+  {{- if .Values.grafanaDashboards.dashboards.instances.enabled }}
+  instances.json: |-
+{{ .Files.Get "dashboards/instances.json" | indent 4 }}
+  {{- end }}
+  {{- if .Values.grafanaDashboards.dashboards.databases.enabled }}
+  databases.json: |-
+{{ .Files.Get "dashboards/databases.json" | indent 4 }}
+  {{- end }}
+  {{- if .Values.grafanaDashboards.dashboards.users.enabled }}
+  users.json: |-
+{{ .Files.Get "dashboards/users.json" | indent 4 }}
+  {{- end }}
+  {{- if .Values.grafanaDashboards.dashboards.roles.enabled }}
+  roles.json: |-
+{{ .Files.Get "dashboards/roles.json" | indent 4 }}
+  {{- end }}
+  {{- if .Values.grafanaDashboards.dashboards.grants.enabled }}
+  grants.json: |-
+{{ .Files.Get "dashboards/grants.json" | indent 4 }}
+  {{- end }}
+  {{- if .Values.grafanaDashboards.dashboards.backups.enabled }}
+  backups.json: |-
+{{ .Files.Get "dashboards/backups.json" | indent 4 }}
+  {{- end }}
+  {{- if .Values.grafanaDashboards.dashboards.schedules.enabled }}
+  schedules.json: |-
+{{ .Files.Get "dashboards/schedules.json" | indent 4 }}
+  {{- end }}
+  {{- if .Values.grafanaDashboards.dashboards.restores.enabled }}
+  restores.json: |-
+{{ .Files.Get "dashboards/restores.json" | indent 4 }}
+  {{- end }}
+{{- end }}

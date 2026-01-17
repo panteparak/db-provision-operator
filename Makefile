@@ -112,6 +112,18 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet setup-envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
+.PHONY: setup-precommit
+setup-precommit: ## Install pre-commit and its dependencies
+	@echo "Installing pre-commit dependencies..."
+	@command -v pre-commit >/dev/null || { echo "Installing pre-commit..."; pip install pre-commit; }
+	@command -v golangci-lint >/dev/null || { echo "Installing golangci-lint..."; go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; }
+	@command -v shellcheck >/dev/null || { echo "shellcheck not found. Install from: https://github.com/koalaman/shellcheck#installing"; }
+	@command -v helm >/dev/null || { echo "helm not found. Install from: https://helm.sh/docs/intro/install/"; }
+	@command -v docker >/dev/null || { echo "docker not found. Required for hadolint-docker hook."; }
+	@echo "Setting up pre-commit hooks..."
+	pre-commit install --install-hooks
+	@echo "Done! Run 'pre-commit run --all-files' to verify."
+
 ##@ E2E Testing (k3d)
 
 # E2E Testing with k3d
@@ -183,6 +195,22 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 .PHONY: lint-config
 lint-config: golangci-lint ## Verify golangci-lint linter configuration
 	$(GOLANGCI_LINT) config verify
+
+##@ Assets
+
+.PHONY: copy-dashboards
+copy-dashboards: ## Copy dashboards to Helm and Kustomize directories (for local development)
+	@mkdir -p charts/db-provision-operator/dashboards
+	@mkdir -p config/grafana/dashboards
+	@cp dashboards/*.json charts/db-provision-operator/dashboards/
+	@cp dashboards/*.json config/grafana/dashboards/
+	@echo "Dashboards copied successfully"
+
+.PHONY: clean-dashboards
+clean-dashboards: ## Remove copied dashboard files
+	@rm -rf charts/db-provision-operator/dashboards
+	@rm -rf config/grafana/dashboards
+	@echo "Dashboard copies removed"
 
 ##@ Build
 
