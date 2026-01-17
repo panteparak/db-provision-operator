@@ -1,15 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# Stage 1: Build the web UI
-FROM node:20-alpine AS web-builder
-WORKDIR /web
-COPY web/package*.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci
-COPY web/ ./
-RUN npm run build
-
-# Stage 2: Build the manager binary
+# Build the manager binary
 FROM golang:1.24 AS builder
 ARG TARGETOS
 ARG TARGETARCH
@@ -29,9 +20,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 COPY cmd/main.go cmd/main.go
 COPY api/ api/
 COPY internal/ internal/
-
-# Copy the built web UI from the web-builder stage
-COPY --from=web-builder /web/dist ./internal/webui/static/dist/
 
 # Build with BuildKit cache mounts for both modules and build cache
 # - /go/pkg/mod: Go module cache (avoids re-downloading)
