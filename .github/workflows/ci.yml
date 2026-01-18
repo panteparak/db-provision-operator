@@ -328,14 +328,13 @@ jobs:
           format: 'json'
           output: 'trivy-results-${{ steps.platform.outputs.pair }}.json'
 
-      # Scan for vulnerabilities - HTML report (MEDIUM+, ignore unfixed)
-      - name: Scan for vulnerabilities (HTML Report)
+      # Scan for vulnerabilities - Table output (MEDIUM+, ignore unfixed)
+      - name: Scan for vulnerabilities (Table)
         uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.digest.outputs.digest }}
-          format: 'template'
-          template: '@/contrib/html.tpl'
-          output: 'trivy-report-${{ steps.platform.outputs.pair }}.html'
+          format: 'table'
+          output: 'trivy-report-${{ steps.platform.outputs.pair }}.txt'
           severity: 'MEDIUM,HIGH,CRITICAL'
           ignore-unfixed: true
 
@@ -361,7 +360,7 @@ jobs:
           path: |
             sbom-${{ steps.platform.outputs.pair }}.cyclonedx.json
             trivy-results-${{ steps.platform.outputs.pair }}.json
-            trivy-report-${{ steps.platform.outputs.pair }}.html
+            trivy-report-${{ steps.platform.outputs.pair }}.txt
             trivy-results-${{ steps.platform.outputs.pair }}.sarif
           retention-days: 30
 
