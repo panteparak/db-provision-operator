@@ -312,37 +312,41 @@ jobs:
           echo "digest=sha256:$DIGEST" >> $GITHUB_OUTPUT
           echo "Image digest for ${{ matrix.config.platform }}: sha256:$DIGEST"
 
-      # Generate SBOM using Trivy (CycloneDX format)
+      # Generate SBOM from image (scans the image once)
       - name: Generate SBOM
         uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.digest.outputs.digest }}
+          scan-type: 'image'
           format: 'cyclonedx'
           output: 'sbom-${{ steps.platform.outputs.pair }}.cyclonedx.json'
 
-      # Scan for vulnerabilities - JSON output (all severities)
-      - name: Scan for vulnerabilities (JSON)
+      # Scan SBOM for vulnerabilities - JSON output (all severities)
+      - name: Scan SBOM for vulnerabilities (JSON)
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.digest.outputs.digest }}
+          scan-type: 'sbom'
+          scan-ref: 'sbom-${{ steps.platform.outputs.pair }}.cyclonedx.json'
           format: 'json'
           output: 'trivy-results-${{ steps.platform.outputs.pair }}.json'
 
-      # Scan for vulnerabilities - Table output (MEDIUM+, ignore unfixed)
-      - name: Scan for vulnerabilities (Table)
+      # Scan SBOM for vulnerabilities - Table output (MEDIUM+, ignore unfixed)
+      - name: Scan SBOM for vulnerabilities (Table)
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.digest.outputs.digest }}
+          scan-type: 'sbom'
+          scan-ref: 'sbom-${{ steps.platform.outputs.pair }}.cyclonedx.json'
           format: 'table'
           output: 'trivy-report-${{ steps.platform.outputs.pair }}.txt'
           severity: 'MEDIUM,HIGH,CRITICAL'
           ignore-unfixed: true
 
-      # Upload SARIF to GitHub Security tab
-      - name: Generate SARIF report
+      # Scan SBOM for SARIF output (GitHub Security tab)
+      - name: Scan SBOM for SARIF report
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.digest.outputs.digest }}
+          scan-type: 'sbom'
+          scan-ref: 'sbom-${{ steps.platform.outputs.pair }}.cyclonedx.json'
           format: 'sarif'
           output: 'trivy-results-${{ steps.platform.outputs.pair }}.sarif'
 
