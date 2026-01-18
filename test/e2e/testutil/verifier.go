@@ -52,6 +52,49 @@ type DatabaseVerifier interface {
 	// HasPrivilegeOnDatabase checks if a grantee has a privilege on a specific database
 	// This is needed because PostgreSQL schema privileges are per-database
 	HasPrivilegeOnDatabase(ctx context.Context, grantee, privilege, objectType, objectName, database string) (bool, error)
+
+	// ===== Functionality Testing Methods =====
+
+	// ConnectAsUser establishes a new connection as a specific user
+	// Returns a UserConnection that can be used for testing operations
+	ConnectAsUser(ctx context.Context, username, password, database string) (UserConnection, error)
+
+	// GetDatabaseOwner returns the owner of a database
+	GetDatabaseOwner(ctx context.Context, database string) (string, error)
+
+	// HasRoleMembership checks if a user is a member of a role
+	HasRoleMembership(ctx context.Context, username, roleName string) (bool, error)
+}
+
+// UserConnection represents a database connection as a specific user
+// Used for testing that user credentials and permissions work correctly
+type UserConnection interface {
+	// Close closes the user connection
+	Close() error
+
+	// Ping verifies the connection is alive
+	Ping(ctx context.Context) error
+
+	// Exec executes a statement and returns error if it fails
+	Exec(ctx context.Context, query string, args ...interface{}) error
+
+	// Query executes a query and returns whether it succeeded
+	Query(ctx context.Context, query string, args ...interface{}) error
+
+	// CanCreateTable attempts to create a test table and returns success
+	CanCreateTable(ctx context.Context, tableName string) error
+
+	// CanInsertData attempts to insert into a table
+	CanInsertData(ctx context.Context, tableName string) error
+
+	// CanSelectData attempts to select from a table
+	CanSelectData(ctx context.Context, tableName string) error
+
+	// CanDeleteData attempts to delete from a table
+	CanDeleteData(ctx context.Context, tableName string) error
+
+	// CanDropTable attempts to drop a table
+	CanDropTable(ctx context.Context, tableName string) error
 }
 
 // EngineConfig provides engine-specific configuration for database verification

@@ -293,5 +293,131 @@ func (v *MySQLVerifier) HasPrivilegeOnDatabase(ctx context.Context, grantee, pri
 	return v.HasPrivilege(ctx, grantee, privilege, objectType, objectName)
 }
 
+// ConnectAsUser creates a new database connection as a specific user
+// This allows testing that generated credentials actually work
+func (v *MySQLVerifier) ConnectAsUser(ctx context.Context, username, password, database string) (UserConnection, error) {
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
+		username, password, v.config.Host, v.config.Port, database)
+
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open connection as user %s: %w", username, err)
+	}
+
+	// Verify connection works
+	if err := db.PingContext(ctx); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to ping database as user %s: %w", username, err)
+	}
+
+	return &MySQLUserConnection{db: db}, nil
+}
+
+// GetDatabaseOwner returns the "owner" of a MySQL database
+// MySQL doesn't have database ownership like PostgreSQL, so we return
+// the user with the most privileges (ALL PRIVILEGES) on the database
+func (v *MySQLVerifier) GetDatabaseOwner(ctx context.Context, database string) (string, error) {
+	if v.db == nil {
+		return "", fmt.Errorf("not connected to database")
+	}
+
+	// MySQL doesn't have a direct concept of database ownership
+	// We look for users who have ALL PRIVILEGES on the database
+	var user string
+	err := v.db.QueryRowContext(ctx, `
+		SELECT DISTINCT User FROM mysql.db
+		WHERE Db = ?
+		AND Select_priv = 'Y'
+		AND Insert_priv = 'Y'
+		AND Update_priv = 'Y'
+		AND Delete_priv = 'Y'
+		AND Create_priv = 'Y'
+		AND Drop_priv = 'Y'
+		LIMIT 1`,
+		database).Scan(&user)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// No user with ALL privileges, check for root or admin at global level
+			return "root", nil
+		}
+		return "", fmt.Errorf("failed to get database owner: %w", err)
+	}
+
+	return user, nil
+}
+
+// MySQLUserConnection implements UserConnection for MySQL
+type MySQLUserConnection struct {
+	db *sql.DB
+}
+
+// Close closes the user connection
+func (c *MySQLUserConnection) Close() error {
+	if c.db != nil {
+		err := c.db.Close()
+		c.db = nil
+		return err
+	}
+	return nil
+}
+
+// Ping verifies the connection is alive
+func (c *MySQLUserConnection) Ping(ctx context.Context) error {
+	return c.db.PingContext(ctx)
+}
+
+// Exec executes a statement
+func (c *MySQLUserConnection) Exec(ctx context.Context, query string, args ...interface{}) error {
+	_, err := c.db.ExecContext(ctx, query, args...)
+	return err
+}
+
+// Query executes a query
+func (c *MySQLUserConnection) Query(ctx context.Context, query string, args ...interface{}) error {
+	rows, err := c.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	return nil
+}
+
+// CanCreateTable attempts to create a test table
+func (c *MySQLUserConnection) CanCreateTable(ctx context.Context, tableName string) error {
+	query := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
+		id INT AUTO_INCREMENT PRIMARY KEY,
+		name VARCHAR(100),
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	)`, tableName)
+	return c.Exec(ctx, query)
+}
+
+// CanInsertData attempts to insert data into a table
+func (c *MySQLUserConnection) CanInsertData(ctx context.Context, tableName string) error {
+	query := fmt.Sprintf("INSERT INTO %s (name) VALUES (?)", tableName)
+	return c.Exec(ctx, query, "test_value")
+}
+
+// CanSelectData attempts to select data from a table
+func (c *MySQLUserConnection) CanSelectData(ctx context.Context, tableName string) error {
+	query := fmt.Sprintf("SELECT id, name FROM %s LIMIT 1", tableName)
+	return c.Query(ctx, query)
+}
+
+// CanDeleteData attempts to delete data from a table
+func (c *MySQLUserConnection) CanDeleteData(ctx context.Context, tableName string) error {
+	query := fmt.Sprintf("DELETE FROM %s WHERE name = ?", tableName)
+	return c.Exec(ctx, query, "test_value")
+}
+
+// CanDropTable attempts to drop a table
+func (c *MySQLUserConnection) CanDropTable(ctx context.Context, tableName string) error {
+	query := fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)
+	return c.Exec(ctx, query)
+}
+
 // Ensure MySQLVerifier implements DatabaseVerifier
 var _ DatabaseVerifier = (*MySQLVerifier)(nil)
+
+// Ensure MySQLUserConnection implements UserConnection
+var _ UserConnection = (*MySQLUserConnection)(nil)

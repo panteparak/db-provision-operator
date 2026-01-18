@@ -236,5 +236,114 @@ func (v *PostgresVerifier) HasRoleMembership(ctx context.Context, username, role
 	return exists, nil
 }
 
+// ConnectAsUser creates a new database connection as a specific user
+// This allows testing that generated credentials actually work
+func (v *PostgresVerifier) ConnectAsUser(ctx context.Context, username, password, database string) (UserConnection, error) {
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
+		username, password, v.config.Host, v.config.Port, database)
+
+	pool, err := pgxpool.New(ctx, connStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect as user %s: %w", username, err)
+	}
+
+	// Verify connection works
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("failed to ping database as user %s: %w", username, err)
+	}
+
+	return &PostgresUserConnection{pool: pool}, nil
+}
+
+// GetDatabaseOwner returns the owner of a PostgreSQL database
+func (v *PostgresVerifier) GetDatabaseOwner(ctx context.Context, database string) (string, error) {
+	if v.pool == nil {
+		return "", fmt.Errorf("not connected to database")
+	}
+
+	var owner string
+	err := v.pool.QueryRow(ctx,
+		"SELECT pg_catalog.pg_get_userbyid(d.datdba) FROM pg_catalog.pg_database d WHERE d.datname = $1",
+		database).Scan(&owner)
+	if err != nil {
+		return "", fmt.Errorf("failed to get database owner: %w", err)
+	}
+
+	return owner, nil
+}
+
+// PostgresUserConnection implements UserConnection for PostgreSQL
+type PostgresUserConnection struct {
+	pool *pgxpool.Pool
+}
+
+// Close closes the user connection
+func (c *PostgresUserConnection) Close() error {
+	if c.pool != nil {
+		c.pool.Close()
+		c.pool = nil
+	}
+	return nil
+}
+
+// Ping verifies the connection is alive
+func (c *PostgresUserConnection) Ping(ctx context.Context) error {
+	return c.pool.Ping(ctx)
+}
+
+// Exec executes a statement
+func (c *PostgresUserConnection) Exec(ctx context.Context, query string, args ...interface{}) error {
+	_, err := c.pool.Exec(ctx, query, args...)
+	return err
+}
+
+// Query executes a query
+func (c *PostgresUserConnection) Query(ctx context.Context, query string, args ...interface{}) error {
+	rows, err := c.pool.Query(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	rows.Close()
+	return nil
+}
+
+// CanCreateTable attempts to create a test table
+func (c *PostgresUserConnection) CanCreateTable(ctx context.Context, tableName string) error {
+	query := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
+		id SERIAL PRIMARY KEY,
+		name VARCHAR(100),
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	)`, tableName)
+	return c.Exec(ctx, query)
+}
+
+// CanInsertData attempts to insert data into a table
+func (c *PostgresUserConnection) CanInsertData(ctx context.Context, tableName string) error {
+	query := fmt.Sprintf("INSERT INTO %s (name) VALUES ($1)", tableName)
+	return c.Exec(ctx, query, "test_value")
+}
+
+// CanSelectData attempts to select data from a table
+func (c *PostgresUserConnection) CanSelectData(ctx context.Context, tableName string) error {
+	query := fmt.Sprintf("SELECT id, name FROM %s LIMIT 1", tableName)
+	return c.Query(ctx, query)
+}
+
+// CanDeleteData attempts to delete data from a table
+func (c *PostgresUserConnection) CanDeleteData(ctx context.Context, tableName string) error {
+	query := fmt.Sprintf("DELETE FROM %s WHERE name = $1", tableName)
+	return c.Exec(ctx, query, "test_value")
+}
+
+// CanDropTable attempts to drop a table
+func (c *PostgresUserConnection) CanDropTable(ctx context.Context, tableName string) error {
+	query := fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)
+	return c.Exec(ctx, query)
+}
+
 // Ensure PostgresVerifier implements DatabaseVerifier
 var _ DatabaseVerifier = (*PostgresVerifier)(nil)
+
+// Ensure PostgresUserConnection implements UserConnection
+var _ UserConnection = (*PostgresUserConnection)(nil)

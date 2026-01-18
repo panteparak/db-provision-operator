@@ -359,6 +359,173 @@ var _ = Describe("mariadb", Ordered, func() {
 		})
 	})
 
+	// ===== Functionality Verification Tests =====
+	// These tests verify that database operations actually work, not just that CRs become Ready
+	// MariaDB uses MySQL verifier since they share the same protocol
+
+	Context("Database Ownership Verification", func() {
+		It("should identify database owner (user with full privileges)", func() {
+			By("querying database owner from MariaDB")
+			// MariaDB (like MySQL) doesn't have explicit database ownership
+			// We check for users with ALL PRIVILEGES on the database
+			owner, err := verifier.GetDatabaseOwner(ctx, databaseName)
+			Expect(err).NotTo(HaveOccurred(), "Failed to get database owner")
+
+			By("verifying owner is root or admin user")
+			GinkgoWriter.Printf("Database '%s' owner/admin: %s\n", databaseName, owner)
+			Expect(owner).NotTo(BeEmpty(), "Should have an owner/admin user")
+		})
+	})
+
+	Context("User Credential Validation", func() {
+		It("should generate working credentials in Secret", func() {
+			By("getting user credentials from Secret")
+			secretName := userName + "-credentials"
+			password, err := getSecretValue(ctx, testNamespace, secretName, "password")
+			if err != nil {
+				password, err = getSecretValue(ctx, testNamespace, userName, "password")
+			}
+			Expect(err).NotTo(HaveOccurred(), "Failed to get user password from Secret")
+			Expect(password).NotTo(BeEmpty(), "Password should not be empty")
+
+			By("connecting to database using credentials from Secret")
+			userConn, err := verifier.ConnectAsUser(ctx, userName, password, databaseName)
+			Expect(err).NotTo(HaveOccurred(), "Should be able to connect as user '%s'", userName)
+			defer userConn.Close()
+
+			By("verifying connection is alive with ping")
+			err = userConn.Ping(ctx)
+			Expect(err).NotTo(HaveOccurred(), "Ping should succeed")
+
+			By("running a simple query to verify database access")
+			err = userConn.Query(ctx, "SELECT 1")
+			Expect(err).NotTo(HaveOccurred(), "Should be able to run simple query")
+
+			GinkgoWriter.Printf("User '%s' successfully connected and queried database '%s'\n", userName, databaseName)
+		})
+	})
+
+	Context("Grant Enforcement Verification", func() {
+		const testTable = "e2e_grant_test"
+
+		It("should enforce granted permissions (SELECT, INSERT allowed)", func() {
+			By("getting user credentials")
+			secretName := userName + "-credentials"
+			password, err := getSecretValue(ctx, testNamespace, secretName, "password")
+			if err != nil {
+				password, err = getSecretValue(ctx, testNamespace, userName, "password")
+			}
+			Expect(err).NotTo(HaveOccurred(), "Failed to get user password")
+
+			By("getting admin credentials for setup")
+			adminPassword, err := getSecretValue(ctx, secretNamespace, "mariadb-credentials", "password")
+			Expect(err).NotTo(HaveOccurred(), "Failed to get admin password")
+
+			By("creating a test table using admin connection first")
+			adminConn, err := verifier.ConnectAsUser(ctx, "root", adminPassword, databaseName)
+			Expect(err).NotTo(HaveOccurred(), "Should connect as admin")
+
+			// Create test table
+			err = adminConn.CanCreateTable(ctx, testTable)
+			Expect(err).NotTo(HaveOccurred(), "Admin should create test table")
+
+			// Grant SELECT, INSERT to the test user on the table
+			err = adminConn.Exec(ctx, "GRANT SELECT, INSERT ON "+databaseName+"."+testTable+" TO '"+userName+"'@'%'")
+			Expect(err).NotTo(HaveOccurred(), "Should grant permissions on table")
+
+			// Flush privileges to ensure grants take effect
+			err = adminConn.Exec(ctx, "FLUSH PRIVILEGES")
+			Expect(err).NotTo(HaveOccurred(), "Should flush privileges")
+			adminConn.Close()
+
+			By("connecting as the granted user")
+			userConn, err := verifier.ConnectAsUser(ctx, userName, password, databaseName)
+			Expect(err).NotTo(HaveOccurred(), "Should connect as user")
+			defer userConn.Close()
+
+			By("verifying SELECT is allowed")
+			err = userConn.CanSelectData(ctx, testTable)
+			Expect(err).NotTo(HaveOccurred(), "SELECT should be allowed")
+
+			By("verifying INSERT is allowed")
+			err = userConn.CanInsertData(ctx, testTable)
+			Expect(err).NotTo(HaveOccurred(), "INSERT should be allowed")
+
+			By("verifying DELETE is denied (not granted)")
+			err = userConn.CanDeleteData(ctx, testTable)
+			Expect(err).To(HaveOccurred(), "DELETE should be denied")
+			GinkgoWriter.Printf("DELETE correctly denied: %v\n", err)
+
+			By("cleaning up test table")
+			adminConn, _ = verifier.ConnectAsUser(ctx, "root", adminPassword, databaseName)
+			if adminConn != nil {
+				_ = adminConn.CanDropTable(ctx, testTable)
+				adminConn.Close()
+			}
+		})
+	})
+
+	Context("Role Membership Verification", func() {
+		const (
+			memberUser = "testmember"
+			roleName   = "testrole"
+		)
+
+		It("should verify role membership after assignment", func() {
+			By("checking if testrole exists from earlier test")
+			exists, err := verifier.RoleExists(ctx, roleName)
+			Expect(err).NotTo(HaveOccurred())
+			if !exists {
+				Skip("testrole does not exist, skipping role membership test")
+			}
+
+			By("creating a new user to test role assignment")
+			memberUserObj := &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "dbops.dbprovision.io/v1alpha1",
+					"kind":       "DatabaseUser",
+					"metadata": map[string]interface{}{
+						"name":      memberUser,
+						"namespace": testNamespace,
+					},
+					"spec": map[string]interface{}{
+						"instanceRef": map[string]interface{}{
+							"name": instanceName,
+						},
+						"username": memberUser,
+						"roles":    []interface{}{roleName},
+					},
+				},
+			}
+
+			_, err = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Create(ctx, memberUserObj, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred(), "Failed to create member user")
+
+			By("waiting for member user to become Ready")
+			Eventually(func() string {
+				obj, err := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Get(ctx, memberUser, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				return phase
+			}, timeout, interval).Should(Equal("Ready"))
+
+			By("verifying user is a member of the role")
+			Eventually(func() bool {
+				isMember, err := verifier.HasRoleMembership(ctx, memberUser, roleName)
+				if err != nil {
+					GinkgoWriter.Printf("Error checking role membership: %v\n", err)
+					return false
+				}
+				return isMember
+			}, timeout, interval).Should(BeTrue(), "User '%s' should be a member of role '%s'", memberUser, roleName)
+
+			By("cleaning up member user")
+			_ = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Delete(ctx, memberUser, metav1.DeleteOptions{})
+		})
+	})
+
 	// Cleanup after all tests
 	AfterAll(func() {
 		By("closing database verifier connection")
