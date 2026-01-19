@@ -134,7 +134,7 @@ func (c *Controller) reconcile(ctx context.Context, user *dbopsv1alpha1.Database
 		log.Info("Creating user", "username", user.Spec.Username)
 		c.updatePhase(ctx, user, dbopsv1alpha1.PhaseCreating, "Creating user")
 
-		_, err := c.handler.Create(ctx, &user.Spec, user.Namespace)
+		_, err := c.handler.Create(ctx, &user.Spec, user.Namespace, password)
 		if err != nil {
 			return c.handleError(ctx, user, err, "create user")
 		}

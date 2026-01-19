@@ -25,8 +25,8 @@ import (
 
 // API defines the public interface for the user module.
 type API interface {
-	// Create creates a new database user.
-	Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error)
+	// Create creates a new database user with the provided password.
+	Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, password string) (*Result, error)
 
 	// Update updates an existing database user.
 	Update(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error)

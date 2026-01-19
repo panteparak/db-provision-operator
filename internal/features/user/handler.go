@@ -54,12 +54,16 @@ func NewHandler(cfg HandlerConfig) *Handler {
 	}
 }
 
-// Create creates a new database user.
-func (h *Handler) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+// Create creates a new database user with the provided password.
+func (h *Handler) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, password string) (*Result, error) {
 	log := h.logger.WithValues("user", spec.Username, "namespace", namespace)
 
 	if spec.Username == "" {
 		return nil, fmt.Errorf("username is required")
+	}
+
+	if password == "" {
+		return nil, fmt.Errorf("password is required")
 	}
 
 	// Get engine for metrics
@@ -79,17 +83,7 @@ func (h *Handler) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSp
 		return &Result{Created: false, Message: "user already exists"}, nil
 	}
 
-	// Generate password using PasswordConfig from spec if available
-	var passwordConfig *dbopsv1alpha1.PasswordConfig
-	if spec.PasswordSecret != nil {
-		passwordConfig = spec.PasswordSecret
-	}
-	password, err := secret.GeneratePassword(passwordConfig)
-	if err != nil {
-		return nil, fmt.Errorf("generate password: %w", err)
-	}
-
-	// Create the user
+	// Create the user with the provided password
 	log.Info("Creating user")
 
 	result, err := h.repo.Create(ctx, spec, namespace, password)
