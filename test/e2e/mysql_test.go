@@ -492,7 +492,6 @@ var _ = Describe("mysql", Ordered, func() {
 							"name": instanceName,
 						},
 						"username": memberUser,
-						"roles":    []interface{}{roleName}, // Assign role during creation
 					},
 				},
 			}
@@ -510,6 +509,40 @@ var _ = Describe("mysql", Ordered, func() {
 				return phase
 			}, timeout, interval).Should(Equal("Ready"))
 
+			By("creating a DatabaseGrant to assign role to user")
+			roleGrantName := memberUser + "-role-grant"
+			roleGrantObj := &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "dbops.dbprovision.io/v1alpha1",
+					"kind":       "DatabaseGrant",
+					"metadata": map[string]interface{}{
+						"name":      roleGrantName,
+						"namespace": testNamespace,
+					},
+					"spec": map[string]interface{}{
+						"userRef": map[string]interface{}{
+							"name": memberUser,
+						},
+						"mysql": map[string]interface{}{
+							"roles": []interface{}{roleName},
+						},
+					},
+				},
+			}
+
+			_, err = dynamicClient.Resource(databaseGrantGVR).Namespace(testNamespace).Create(ctx, roleGrantObj, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred(), "Failed to create role grant")
+
+			By("waiting for grant to become Ready")
+			Eventually(func() string {
+				obj, err := dynamicClient.Resource(databaseGrantGVR).Namespace(testNamespace).Get(ctx, roleGrantName, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				return phase
+			}, timeout, interval).Should(Equal("Ready"))
+
 			By("verifying user is a member of the role")
 			Eventually(func() bool {
 				isMember, err := verifier.HasRoleMembership(ctx, memberUser, roleName)
@@ -519,6 +552,9 @@ var _ = Describe("mysql", Ordered, func() {
 				}
 				return isMember
 			}, timeout, interval).Should(BeTrue(), "User '%s' should be a member of role '%s'", memberUser, roleName)
+
+			By("cleaning up role grant")
+			_ = dynamicClient.Resource(databaseGrantGVR).Namespace(testNamespace).Delete(ctx, roleGrantName, metav1.DeleteOptions{})
 
 			By("cleaning up member user")
 			_ = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Delete(ctx, memberUser, metav1.DeleteOptions{})

@@ -493,7 +493,9 @@ var _ = Describe("postgresql", Ordered, func() {
 							"name": instanceName,
 						},
 						"username": memberUser,
-						"roles":    []interface{}{roleName}, // Assign role during creation
+						"postgres": map[string]interface{}{
+							"inRoles": []interface{}{roleName}, // Assign role via postgres.inRoles
+						},
 					},
 				},
 			}

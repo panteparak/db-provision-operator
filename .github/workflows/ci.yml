@@ -651,6 +651,7 @@ jobs:
           go test ./test/e2e/... -v -tags=e2e \
             -ginkgo.focus="${{ matrix.database }}" \
             -ginkgo.v \
+            -ginkgo.fail-fast=false \
             -timeout=10m
 
       - name: Collect logs on failure
