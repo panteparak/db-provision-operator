@@ -21,6 +21,7 @@ package testutil
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -42,7 +43,7 @@ func NewPostgresVerifier(cfg EngineConfig) *PostgresVerifier {
 // Connect establishes a connection to the PostgreSQL database
 func (v *PostgresVerifier) Connect(ctx context.Context) error {
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
-		v.config.Username, v.config.Password, v.config.Host, v.config.Port, v.config.AdminDatabase)
+		url.QueryEscape(v.config.Username), url.QueryEscape(v.config.Password), v.config.Host, v.config.Port, v.config.AdminDatabase)
 
 	pool, err := pgxpool.New(ctx, connStr)
 	if err != nil {
@@ -173,7 +174,7 @@ func (v *PostgresVerifier) HasSchemaPrivilege(ctx context.Context, grantee, sche
 func (v *PostgresVerifier) HasPrivilegeOnDatabase(ctx context.Context, grantee, privilege, objectType, objectName, database string) (bool, error) {
 	// Create a new connection to the specific database
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
-		v.config.Username, v.config.Password, v.config.Host, v.config.Port, database)
+		url.QueryEscape(v.config.Username), url.QueryEscape(v.config.Password), v.config.Host, v.config.Port, database)
 
 	pool, err := pgxpool.New(ctx, connStr)
 	if err != nil {
@@ -240,7 +241,7 @@ func (v *PostgresVerifier) HasRoleMembership(ctx context.Context, username, role
 // This allows testing that generated credentials actually work
 func (v *PostgresVerifier) ConnectAsUser(ctx context.Context, username, password, database string) (UserConnection, error) {
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
-		username, password, v.config.Host, v.config.Port, database)
+		url.QueryEscape(username), url.QueryEscape(password), v.config.Host, v.config.Port, database)
 
 	pool, err := pgxpool.New(ctx, connStr)
 	if err != nil {

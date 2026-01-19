@@ -24,8 +24,13 @@ import (
 	"fmt"
 	"strings"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 )
+
+// init registers the MySQL driver - the blank import is handled by the driver itself
+func init() {
+	// Driver registered via mysql.init()
+}
 
 // MySQLVerifier implements DatabaseVerifier for MySQL
 type MySQLVerifier struct {
@@ -42,10 +47,16 @@ func NewMySQLVerifier(cfg EngineConfig) *MySQLVerifier {
 
 // Connect establishes a connection to the MySQL database
 func (v *MySQLVerifier) Connect(ctx context.Context) error {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
-		v.config.Username, v.config.Password, v.config.Host, v.config.Port, v.config.AdminDatabase)
+	cfg := mysql.Config{
+		User:                 v.config.Username,
+		Passwd:               v.config.Password,
+		Net:                  "tcp",
+		Addr:                 fmt.Sprintf("%s:%d", v.config.Host, v.config.Port),
+		DBName:               v.config.AdminDatabase,
+		AllowNativePasswords: true,
+	}
 
-	db, err := sql.Open("mysql", dsn)
+	db, err := sql.Open("mysql", cfg.FormatDSN())
 	if err != nil {
 		return fmt.Errorf("failed to open database connection: %w", err)
 	}
@@ -296,10 +307,16 @@ func (v *MySQLVerifier) HasPrivilegeOnDatabase(ctx context.Context, grantee, pri
 // ConnectAsUser creates a new database connection as a specific user
 // This allows testing that generated credentials actually work
 func (v *MySQLVerifier) ConnectAsUser(ctx context.Context, username, password, database string) (UserConnection, error) {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
-		username, password, v.config.Host, v.config.Port, database)
+	cfg := mysql.Config{
+		User:                 username,
+		Passwd:               password,
+		Net:                  "tcp",
+		Addr:                 fmt.Sprintf("%s:%d", v.config.Host, v.config.Port),
+		DBName:               database,
+		AllowNativePasswords: true,
+	}
 
-	db, err := sql.Open("mysql", dsn)
+	db, err := sql.Open("mysql", cfg.FormatDSN())
 	if err != nil {
 		return nil, fmt.Errorf("failed to open connection as user %s: %w", username, err)
 	}
