@@ -1,0 +1,15 @@
+# Grant with limited privileges (SELECT, INSERT only)
+# Used by: PG-SEC-01, MY-SEC-01, MDB-SEC-01 (Grant Enforcement tests)
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseGrant
+metadata:
+  name: "{{ .Name }}"
+  namespace: "{{ .Namespace }}"
+spec:
+  userRef:
+    name: "{{ .UserName }}"
+  databaseRef:
+    name: "{{ .DatabaseName }}"
+  privileges:
+    - SELECT
+    - INSERT

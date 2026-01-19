@@ -1,0 +1,11 @@
+# Basic DatabaseUser fixture
+# Used by: PG-LIF-03, MY-LIF-03, MDB-LIF-03 (User lifecycle tests)
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseUser
+metadata:
+  name: "{{ .Name }}"
+  namespace: "{{ .Namespace }}"
+spec:
+  instanceRef:
+    name: "{{ .InstanceName }}"
+  username: "{{ .Username }}"

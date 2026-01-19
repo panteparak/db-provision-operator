@@ -1,0 +1,14 @@
+# DatabaseUser with PostgreSQL role membership
+# Used by: PG-SEC-02 (PostgreSQL Role Membership test)
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseUser
+metadata:
+  name: "{{ .Name }}"
+  namespace: "{{ .Namespace }}"
+spec:
+  instanceRef:
+    name: "{{ .InstanceName }}"
+  username: "{{ .Username }}"
+  postgres:
+    inRoles:
+      - "{{ .RoleName }}"

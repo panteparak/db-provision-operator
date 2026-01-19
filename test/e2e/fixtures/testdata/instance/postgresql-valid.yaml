@@ -1,0 +1,19 @@
+# PostgreSQL DatabaseInstance fixture
+# Used by: PG-LIF-01 (DatabaseInstance lifecycle test)
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseInstance
+metadata:
+  name: "{{ .Name }}"
+  namespace: "{{ .Namespace }}"
+spec:
+  engine: postgres
+  connection:
+    host: "{{ .Host }}"
+    port: {{ .Port | default 5432 }}
+    database: postgres
+    secretRef:
+      name: "{{ .SecretName }}"
+      namespace: "{{ .SecretNamespace }}"
+  healthCheck:
+    enabled: true
+    intervalSeconds: 30

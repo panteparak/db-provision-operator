@@ -19,7 +19,15 @@ limitations under the License.
 package testutil
 
 import (
+	"bytes"
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"text/template"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -255,4 +263,95 @@ func getDefaultDatabase(engine string) string {
 	default:
 		return "default"
 	}
+}
+
+// ===== Fixture Loader Functions =====
+
+// FixtureData holds template values for fixture rendering
+type FixtureData struct {
+	// Common fields
+	Name            string
+	Namespace       string
+	InstanceName    string
+	DatabaseName    string
+	Username        string
+	UserName        string // alias for Username
+	RoleName        string
+	Engine          string
+	AdminDatabase   string
+	Host            string
+	Port            int
+	SecretName      string
+	SecretNamespace string
+}
+
+// getTestDataPath returns the path to the fixtures/testdata directory
+func getTestDataPath() string {
+	// Get the directory of this source file
+	_, filename, _, _ := runtime.Caller(0)
+	return filepath.Join(filepath.Dir(filename), "..", "fixtures", "testdata")
+}
+
+// LoadFixture loads a YAML fixture file, renders it with template data, and returns an unstructured object
+func LoadFixture(fixtureType, fixtureName string, data FixtureData) (*unstructured.Unstructured, error) {
+	// Construct the fixture path
+	fixturePath := filepath.Join(getTestDataPath(), fixtureType, fixtureName+".yaml")
+
+	// Read the fixture file
+	content, err := os.ReadFile(fixturePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read fixture %s/%s: %w", fixtureType, fixtureName, err)
+	}
+
+	// Parse as template
+	tmpl, err := template.New(fixtureName).Funcs(template.FuncMap{
+		"default": func(defaultVal, val interface{}) interface{} {
+			if val == nil || val == "" || val == 0 {
+				return defaultVal
+			}
+			return val
+		},
+	}).Parse(string(content))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse fixture template %s/%s: %w", fixtureType, fixtureName, err)
+	}
+
+	// Render template
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return nil, fmt.Errorf("failed to render fixture template %s/%s: %w", fixtureType, fixtureName, err)
+	}
+
+	// Parse YAML to unstructured
+	obj := &unstructured.Unstructured{}
+	if err := yaml.Unmarshal(buf.Bytes(), &obj.Object); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal fixture %s/%s: %w", fixtureType, fixtureName, err)
+	}
+
+	return obj, nil
+}
+
+// LoadInstanceFixture is a convenience function for loading DatabaseInstance fixtures
+func LoadInstanceFixture(fixtureName string, data FixtureData) (*unstructured.Unstructured, error) {
+	return LoadFixture("instance", fixtureName, data)
+}
+
+// LoadDatabaseFixture is a convenience function for loading Database fixtures
+func LoadDatabaseFixture(fixtureName string, data FixtureData) (*unstructured.Unstructured, error) {
+	return LoadFixture("database", fixtureName, data)
+}
+
+// LoadUserFixture is a convenience function for loading DatabaseUser fixtures
+func LoadUserFixture(fixtureName string, data FixtureData) (*unstructured.Unstructured, error) {
+	return LoadFixture("user", fixtureName, data)
+}
+
+// LoadRoleFixture is a convenience function for loading DatabaseRole fixtures
+func LoadRoleFixture(fixtureName string, data FixtureData) (*unstructured.Unstructured, error) {
+	return LoadFixture("role", fixtureName, data)
+}
+
+// LoadGrantFixture is a convenience function for loading DatabaseGrant fixtures
+func LoadGrantFixture(fixtureName string, data FixtureData) (*unstructured.Unstructured, error) {
+	return LoadFixture("grant", fixtureName, data)
 }

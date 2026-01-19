@@ -1,0 +1,11 @@
+# Database with invalid instance reference
+# Used by: ALL-NEG-02 (Non-existent instance reference test)
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: Database
+metadata:
+  name: "{{ .Name }}-invalid-ref"
+  namespace: "{{ .Namespace }}"
+spec:
+  instanceRef:
+    name: "non-existent-instance"
+  name: "{{ .DatabaseName }}"

@@ -1,0 +1,14 @@
+# Basic DatabaseGrant fixture
+# Used by: PG-LIF-05, MY-LIF-05, MDB-LIF-05 (Grant lifecycle tests)
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseGrant
+metadata:
+  name: "{{ .Name }}"
+  namespace: "{{ .Namespace }}"
+spec:
+  userRef:
+    name: "{{ .UserName }}"
+  databaseRef:
+    name: "{{ .DatabaseName }}"
+  privileges:
+    - ALL

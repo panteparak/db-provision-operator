@@ -1,0 +1,13 @@
+# MySQL/MariaDB role membership grant
+# Used by: MY-SEC-02, MDB-SEC-02 (MySQL/MariaDB Role Membership tests)
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseGrant
+metadata:
+  name: "{{ .Name }}"
+  namespace: "{{ .Namespace }}"
+spec:
+  userRef:
+    name: "{{ .UserName }}"
+  mysql:
+    roles:
+      - "{{ .RoleName }}"

@@ -1,0 +1,11 @@
+# Basic DatabaseRole fixture
+# Used by: PG-LIF-04, MY-LIF-04, MDB-LIF-04 (Role lifecycle tests)
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseRole
+metadata:
+  name: "{{ .Name }}"
+  namespace: "{{ .Namespace }}"
+spec:
+  instanceRef:
+    name: "{{ .InstanceName }}"
+  roleName: "{{ .RoleName }}"

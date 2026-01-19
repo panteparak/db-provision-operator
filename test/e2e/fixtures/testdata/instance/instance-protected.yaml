@@ -1,0 +1,21 @@
+# DatabaseInstance with deletion protection
+# Used by: ALL-NEG-03 (Deletion protection enforcement test)
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseInstance
+metadata:
+  name: "{{ .Name }}"
+  namespace: "{{ .Namespace }}"
+  annotations:
+    dbops.dbprovision.io/deletion-protection: "true"
+spec:
+  engine: "{{ .Engine }}"
+  connection:
+    host: "{{ .Host }}"
+    port: {{ .Port }}
+    database: "{{ .AdminDatabase }}"
+    secretRef:
+      name: "{{ .SecretName }}"
+      namespace: "{{ .SecretNamespace }}"
+  healthCheck:
+    enabled: true
+    intervalSeconds: 30

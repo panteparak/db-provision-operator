@@ -1,0 +1,19 @@
+# MySQL/MariaDB DatabaseInstance fixture
+# Used by: MY-LIF-01, MDB-LIF-01 (DatabaseInstance lifecycle tests)
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseInstance
+metadata:
+  name: "{{ .Name }}"
+  namespace: "{{ .Namespace }}"
+spec:
+  engine: mysql
+  connection:
+    host: "{{ .Host }}"
+    port: {{ .Port | default 3306 }}
+    database: mysql
+    secretRef:
+      name: "{{ .SecretName }}"
+      namespace: "{{ .SecretNamespace }}"
+  healthCheck:
+    enabled: true
+    intervalSeconds: 30

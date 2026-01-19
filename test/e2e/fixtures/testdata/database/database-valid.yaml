@@ -1,0 +1,11 @@
+# Database fixture
+# Used by: PG-LIF-02, MY-LIF-02, MDB-LIF-02 (Database lifecycle tests)
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: Database
+metadata:
+  name: "{{ .Name }}"
+  namespace: "{{ .Namespace }}"
+spec:
+  instanceRef:
+    name: "{{ .InstanceName }}"
+  name: "{{ .DatabaseName }}"
