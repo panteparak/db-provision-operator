@@ -436,6 +436,11 @@ var _ = Describe("postgresql", Ordered, func() {
 			// Grant SELECT, INSERT to the test user on the table
 			err = adminConn.Exec(ctx, "GRANT SELECT, INSERT ON "+testTable+" TO "+userName)
 			Expect(err).NotTo(HaveOccurred(), "Should grant permissions on table")
+
+			// Grant USAGE on the sequence (required for SERIAL/auto-increment columns)
+			seqName := testTable + "_id_seq"
+			err = adminConn.Exec(ctx, "GRANT USAGE ON SEQUENCE "+seqName+" TO "+userName)
+			Expect(err).NotTo(HaveOccurred(), "Should grant USAGE on sequence")
 			adminConn.Close()
 
 			By("verifying SELECT is allowed")
