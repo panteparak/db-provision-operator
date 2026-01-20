@@ -313,9 +313,16 @@ var _ = Describe("Grant Operations", func() {
 		})
 
 		It("grants role to user", func() {
-			mock.ExpectExec(`GRANT 'admin' TO 'testuser'`).
+			// First, expect query for user hosts (only once)
+			rows := sqlmock.NewRows([]string{"Host"}).AddRow("%")
+			mock.ExpectQuery(`SELECT Host FROM mysql.user WHERE User = \?`).
+				WithArgs("testuser").
+				WillReturnRows(rows)
+
+			// Then expect grants for each role to each host
+			mock.ExpectExec(`GRANT 'admin' TO 'testuser'@'%'`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
-			mock.ExpectExec(`GRANT 'readonly' TO 'testuser'`).
+			mock.ExpectExec(`GRANT 'readonly' TO 'testuser'@'%'`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
 
 			err := adapter.GrantRole(ctx, "testuser", []string{"admin", "readonly"})
@@ -352,7 +359,13 @@ var _ = Describe("Grant Operations", func() {
 		})
 
 		It("revokes role from user", func() {
-			mock.ExpectExec(`REVOKE 'admin' FROM 'testuser'`).
+			// First, expect query for user hosts
+			rows := sqlmock.NewRows([]string{"Host"}).AddRow("%")
+			mock.ExpectQuery(`SELECT Host FROM mysql.user WHERE User = \?`).
+				WithArgs("testuser").
+				WillReturnRows(rows)
+
+			mock.ExpectExec(`REVOKE 'admin' FROM 'testuser'@'%'`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
 
 			err := adapter.RevokeRole(ctx, "testuser", []string{"admin"})
@@ -797,7 +810,13 @@ var _ = Describe("Grant Operations", func() {
 		})
 
 		It("returns error on grant role failure", func() {
-			mock.ExpectExec(`GRANT 'admin' TO 'testuser'`).
+			// First, expect query for user hosts
+			rows := sqlmock.NewRows([]string{"Host"}).AddRow("%")
+			mock.ExpectQuery(`SELECT Host FROM mysql.user WHERE User = \?`).
+				WithArgs("testuser").
+				WillReturnRows(rows)
+
+			mock.ExpectExec(`GRANT 'admin' TO 'testuser'@'%'`).
 				WillReturnError(errors.New("role does not exist"))
 
 			err := adapter.GrantRole(ctx, "testuser", []string{"admin"})
@@ -819,7 +838,13 @@ var _ = Describe("Grant Operations", func() {
 		})
 
 		It("returns error on revoke role failure", func() {
-			mock.ExpectExec(`REVOKE 'admin' FROM 'testuser'`).
+			// First, expect query for user hosts
+			rows := sqlmock.NewRows([]string{"Host"}).AddRow("%")
+			mock.ExpectQuery(`SELECT Host FROM mysql.user WHERE User = \?`).
+				WithArgs("testuser").
+				WillReturnRows(rows)
+
+			mock.ExpectExec(`REVOKE 'admin' FROM 'testuser'@'%'`).
 				WillReturnError(errors.New("role not granted"))
 
 			err := adapter.RevokeRole(ctx, "testuser", []string{"admin"})

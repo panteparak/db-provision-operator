@@ -79,13 +79,25 @@ func (a *Adapter) GrantRole(ctx context.Context, grantee string, roles []string)
 		return err
 	}
 
+	// Get all hosts for this user - MySQL/MariaDB requires user@host format
+	hosts, err := a.getUserHosts(ctx, grantee)
+	if err != nil {
+		return fmt.Errorf("failed to get hosts for user %s: %w", grantee, err)
+	}
+	if len(hosts) == 0 {
+		return fmt.Errorf("user %s not found", grantee)
+	}
+
 	for _, role := range roles {
-		query := fmt.Sprintf("GRANT %s TO %s",
-			escapeLiteral(role),
-			escapeLiteral(grantee))
-		_, err = db.ExecContext(ctx, query)
-		if err != nil {
-			return fmt.Errorf("failed to grant role %s to %s: %w", role, grantee, err)
+		for _, host := range hosts {
+			query := fmt.Sprintf("GRANT %s TO %s@%s",
+				escapeLiteral(role),
+				escapeLiteral(grantee),
+				escapeLiteral(host))
+			_, err = db.ExecContext(ctx, query)
+			if err != nil {
+				return fmt.Errorf("failed to grant role %s to %s@%s: %w", role, grantee, host, err)
+			}
 		}
 	}
 
@@ -99,13 +111,25 @@ func (a *Adapter) RevokeRole(ctx context.Context, grantee string, roles []string
 		return err
 	}
 
+	// Get all hosts for this user - MySQL/MariaDB requires user@host format
+	hosts, err := a.getUserHosts(ctx, grantee)
+	if err != nil {
+		return fmt.Errorf("failed to get hosts for user %s: %w", grantee, err)
+	}
+	if len(hosts) == 0 {
+		return fmt.Errorf("user %s not found", grantee)
+	}
+
 	for _, role := range roles {
-		query := fmt.Sprintf("REVOKE %s FROM %s",
-			escapeLiteral(role),
-			escapeLiteral(grantee))
-		_, err = db.ExecContext(ctx, query)
-		if err != nil {
-			return fmt.Errorf("failed to revoke role %s from %s: %w", role, grantee, err)
+		for _, host := range hosts {
+			query := fmt.Sprintf("REVOKE %s FROM %s@%s",
+				escapeLiteral(role),
+				escapeLiteral(grantee),
+				escapeLiteral(host))
+			_, err = db.ExecContext(ctx, query)
+			if err != nil {
+				return fmt.Errorf("failed to revoke role %s from %s@%s: %w", role, grantee, host, err)
+			}
 		}
 	}
 
@@ -297,4 +321,31 @@ func (a *Adapter) parseGrantString(grantStr, grantee string) *types.GrantInfo {
 	}
 
 	return grant
+}
+
+// getUserHosts retrieves all hosts associated with a MySQL/MariaDB user
+func (a *Adapter) getUserHosts(ctx context.Context, username string) ([]string, error) {
+	db, err := a.getDB()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := db.QueryContext(ctx,
+		"SELECT Host FROM mysql.user WHERE User = ?",
+		username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query user hosts: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var hosts []string
+	for rows.Next() {
+		var host string
+		if err := rows.Scan(&host); err != nil {
+			return nil, err
+		}
+		hosts = append(hosts, host)
+	}
+
+	return hosts, nil
 }
