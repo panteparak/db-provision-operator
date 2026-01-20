@@ -90,8 +90,9 @@ func (a *Adapter) GrantRole(ctx context.Context, grantee string, roles []string)
 
 	for _, role := range roles {
 		for _, host := range hosts {
+			// Role names are identifiers (use backticks), user@host uses string literals (quotes)
 			query := fmt.Sprintf("GRANT %s TO %s@%s",
-				escapeLiteral(role),
+				escapeIdentifier(role),
 				escapeLiteral(grantee),
 				escapeLiteral(host))
 			_, err = db.ExecContext(ctx, query)
@@ -122,8 +123,9 @@ func (a *Adapter) RevokeRole(ctx context.Context, grantee string, roles []string
 
 	for _, role := range roles {
 		for _, host := range hosts {
+			// Role names are identifiers (use backticks), user@host uses string literals (quotes)
 			query := fmt.Sprintf("REVOKE %s FROM %s@%s",
-				escapeLiteral(role),
+				escapeIdentifier(role),
 				escapeLiteral(grantee),
 				escapeLiteral(host))
 			_, err = db.ExecContext(ctx, query)

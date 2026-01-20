@@ -146,7 +146,14 @@ test-e2e-mysql: ## Run E2E tests with MySQL
 e2e-setup-cluster: ## Set up k3d cluster with database for E2E tests
 	@command -v k3d >/dev/null 2>&1 || { echo "Error: k3d not installed. Install with: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash"; exit 1; }
 	@echo "Creating k3d cluster $(E2E_K3D_CLUSTER)-$(E2E_DATABASE)..."
-	k3d cluster create $(E2E_K3D_CLUSTER)-$(E2E_DATABASE) --agents 1 --wait --timeout 120s || true
+	k3d cluster create $(E2E_K3D_CLUSTER)-$(E2E_DATABASE) \
+		--agents 0 \
+		--wait --timeout 120s \
+		--no-lb \
+		--no-rollback \
+		--k3s-arg "--disable=traefik@server:*" \
+		--k3s-arg "--disable=servicelb@server:*" \
+		--k3s-arg "--disable=metrics-server@server:*" || true
 	kubectl wait --for=condition=Ready nodes --all --timeout=60s
 	@echo "Deploying $(E2E_DATABASE)..."
 	kubectl apply -f test/e2e/fixtures/$(E2E_DATABASE).yaml

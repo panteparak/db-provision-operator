@@ -320,9 +320,10 @@ var _ = Describe("Grant Operations", func() {
 				WillReturnRows(rows)
 
 			// Then expect grants for each role to each host
-			mock.ExpectExec(`GRANT 'admin' TO 'testuser'@'%'`).
+			// Note: role names use backticks (identifier), user@host uses single quotes (literal)
+			mock.ExpectExec("GRANT `admin` TO 'testuser'@'%'").
 				WillReturnResult(sqlmock.NewResult(0, 0))
-			mock.ExpectExec(`GRANT 'readonly' TO 'testuser'@'%'`).
+			mock.ExpectExec("GRANT `readonly` TO 'testuser'@'%'").
 				WillReturnResult(sqlmock.NewResult(0, 0))
 
 			err := adapter.GrantRole(ctx, "testuser", []string{"admin", "readonly"})
@@ -365,7 +366,8 @@ var _ = Describe("Grant Operations", func() {
 				WithArgs("testuser").
 				WillReturnRows(rows)
 
-			mock.ExpectExec(`REVOKE 'admin' FROM 'testuser'@'%'`).
+			// Note: role names use backticks (identifier), user@host uses single quotes (literal)
+			mock.ExpectExec("REVOKE `admin` FROM 'testuser'@'%'").
 				WillReturnResult(sqlmock.NewResult(0, 0))
 
 			err := adapter.RevokeRole(ctx, "testuser", []string{"admin"})
@@ -816,7 +818,8 @@ var _ = Describe("Grant Operations", func() {
 				WithArgs("testuser").
 				WillReturnRows(rows)
 
-			mock.ExpectExec(`GRANT 'admin' TO 'testuser'@'%'`).
+			// Note: role names use backticks (identifier)
+			mock.ExpectExec("GRANT `admin` TO 'testuser'@'%'").
 				WillReturnError(errors.New("role does not exist"))
 
 			err := adapter.GrantRole(ctx, "testuser", []string{"admin"})
@@ -844,7 +847,8 @@ var _ = Describe("Grant Operations", func() {
 				WithArgs("testuser").
 				WillReturnRows(rows)
 
-			mock.ExpectExec(`REVOKE 'admin' FROM 'testuser'@'%'`).
+			// Note: role names use backticks (identifier)
+			mock.ExpectExec("REVOKE `admin` FROM 'testuser'@'%'").
 				WillReturnError(errors.New("role not granted"))
 
 			err := adapter.RevokeRole(ctx, "testuser", []string{"admin"})
