@@ -272,6 +272,10 @@ var _ = Describe("mariadb", Ordered, func() {
 							"name": instanceName,
 						},
 						"roleName": roleName,
+						// MariaDB 10.0.5+ supports native roles
+						"mysql": map[string]interface{}{
+							"useNativeRoles": true,
+						},
 					},
 				},
 			}

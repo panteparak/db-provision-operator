@@ -267,6 +267,10 @@ var _ = Describe("mysql", Ordered, func() {
 							"name": instanceName,
 						},
 						"roleName": roleName,
+						// MySQL 8.0+ supports native roles
+						"mysql": map[string]interface{}{
+							"useNativeRoles": true,
+						},
 					},
 				},
 			}
