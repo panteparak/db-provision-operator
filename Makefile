@@ -191,6 +191,50 @@ e2e-cleanup: ## Clean up k3d cluster
 e2e-logs: ## Show operator logs from E2E cluster
 	kubectl logs -n db-provision-operator-system -l control-plane=controller-manager -f
 
+E2E_DEBUG_LOG ?= e2e-debug-$(E2E_DATABASE).log
+
+.PHONY: e2e-debug
+e2e-debug: ## Show debug information for E2E cluster (pods, pvcs, events) - also saves to $(E2E_DEBUG_LOG)
+	@{ \
+		echo "=== E2E Debug Log for $(E2E_DATABASE) ===" ; \
+		echo "=== Generated at $$(date -u '+%Y-%m-%d %H:%M:%S UTC') ===" ; \
+		echo "" ; \
+		echo "=== Nodes ===" ; \
+		kubectl get nodes -o wide ; \
+		echo "" ; \
+		echo "=== Pods (all namespaces) ===" ; \
+		kubectl get pods -A -o wide ; \
+		echo "" ; \
+		echo "=== PVCs (all namespaces) ===" ; \
+		kubectl get pvc -A ; \
+		echo "" ; \
+		echo "=== PVC Details ===" ; \
+		kubectl describe pvc -A ; \
+		echo "" ; \
+		echo "=== PVs ===" ; \
+		kubectl get pv ; \
+		echo "" ; \
+		echo "=== StorageClasses ===" ; \
+		kubectl get storageclass ; \
+		echo "" ; \
+		echo "=== Events (last 50) ===" ; \
+		kubectl get events -A --sort-by='.lastTimestamp' | tail -50 ; \
+		echo "" ; \
+		echo "=== Operator Logs (last 100 lines) ===" ; \
+		kubectl logs -n db-provision-operator-system -l control-plane=controller-manager --tail=100 2>&1 || true ; \
+		echo "" ; \
+		echo "=== Database Pod Logs ($(E2E_DATABASE)) ===" ; \
+		if [ "$(E2E_DATABASE)" = "postgresql" ]; then \
+			kubectl logs -n postgres postgres-0 --tail=50 2>&1 || true ; \
+		elif [ "$(E2E_DATABASE)" = "mysql" ]; then \
+			kubectl logs -n mysql mysql-0 --tail=50 2>&1 || true ; \
+		elif [ "$(E2E_DATABASE)" = "mariadb" ]; then \
+			kubectl logs -n mariadb mariadb-0 --tail=50 2>&1 || true ; \
+		fi ; \
+	} 2>&1 | tee $(E2E_DEBUG_LOG)
+	@echo ""
+	@echo "Debug log saved to: $(E2E_DEBUG_LOG)"
+
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
 	$(GOLANGCI_LINT) run

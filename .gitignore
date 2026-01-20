@@ -30,3 +30,6 @@ go.work
 # These directories are populated by `make copy-dashboards` or CI
 charts/db-provision-operator/dashboards/
 config/grafana/dashboards/
+
+# E2E debug logs
+e2e-debug-*.log
