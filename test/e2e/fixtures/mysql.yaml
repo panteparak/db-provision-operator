@@ -78,13 +78,13 @@ spec:
               cpu: 500m
               memory: 1Gi
           # startupProbe waits for MySQL to be fully ready
-          # Uses explicit socket path and mysql client (more reliable than mysqladmin)
+          # Uses TCP connection (-h 127.0.0.1) instead of socket for reliability
           startupProbe:
             exec:
               command:
                 - /bin/sh
                 - -c
-                - mysql --socket=/var/lib/mysql/mysql.sock -uroot -p${MYSQL_ROOT_PASSWORD} -e "SELECT 1" >/dev/null 2>&1
+                - mysql -h 127.0.0.1 -uroot -p${MYSQL_ROOT_PASSWORD} -e "SELECT 1" >/dev/null 2>&1
             initialDelaySeconds: 90
             periodSeconds: 10
             timeoutSeconds: 10
@@ -95,7 +95,7 @@ spec:
               command:
                 - /bin/sh
                 - -c
-                - mysql --socket=/var/lib/mysql/mysql.sock -uroot -p${MYSQL_ROOT_PASSWORD} -e "SELECT 1" >/dev/null 2>&1
+                - mysql -h 127.0.0.1 -uroot -p${MYSQL_ROOT_PASSWORD} -e "SELECT 1" >/dev/null 2>&1
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3

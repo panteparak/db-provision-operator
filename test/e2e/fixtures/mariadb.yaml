@@ -79,13 +79,14 @@ spec:
               cpu: 500m
               memory: 1Gi
           # startupProbe waits for MariaDB to be fully ready
-          # Uses mariadb client command (more reliable than mariadb-admin)
+          # Uses TCP connection (-h 127.0.0.1) instead of socket for reliability
+          # MariaDB 11 uses /run/mysqld/mysqld.sock, not /var/lib/mysql/mysql.sock
           startupProbe:
             exec:
               command:
                 - /bin/sh
                 - -c
-                - mariadb --socket=/var/lib/mysql/mysql.sock -uroot -p${MARIADB_ROOT_PASSWORD} -e "SELECT 1" >/dev/null 2>&1
+                - mariadb -h 127.0.0.1 -uroot -p${MARIADB_ROOT_PASSWORD} -e "SELECT 1" >/dev/null 2>&1
             initialDelaySeconds: 60
             periodSeconds: 10
             timeoutSeconds: 10
@@ -96,7 +97,7 @@ spec:
               command:
                 - /bin/sh
                 - -c
-                - mariadb --socket=/var/lib/mysql/mysql.sock -uroot -p${MARIADB_ROOT_PASSWORD} -e "SELECT 1" >/dev/null 2>&1
+                - mariadb -h 127.0.0.1 -uroot -p${MARIADB_ROOT_PASSWORD} -e "SELECT 1" >/dev/null 2>&1
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
