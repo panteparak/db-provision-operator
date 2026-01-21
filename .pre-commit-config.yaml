@@ -14,26 +14,51 @@
 #   - docker: Required for hadolint-docker hook
 
 default_install_hook_types: [pre-commit, commit-msg]
+default_stages: [pre-commit]
 fail_fast: false
 
 repos:
-  # Standard pre-commit hooks
+  # Standard pre-commit hooks - comprehensive set
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
+      # Whitespace and formatting
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
       - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: fix-byte-order-marker
+
+      # File validation
       - id: check-yaml
         args: [--unsafe]  # Allow custom tags in Kubernetes YAML
         exclude: ^charts/.*/templates/  # Helm templates contain Go template syntax
+      - id: check-json
+      - id: check-toml
+      - id: check-xml
       - id: check-added-large-files
         args: [--maxkb=1000]
+
+      # Git and merge conflict checks
       - id: check-merge-conflict
+      - id: check-vcs-permalinks
+      # Uncomment to prevent direct commits to main/master
+      # - id: no-commit-to-branch
+      #   args: [--branch, main, --branch, master]
+
+      # Security
       - id: detect-private-key
         exclude: (testutil/|_test\.go$)  # Test fixtures contain fake keys
-      - id: mixed-line-ending
-        args: [--fix=lf]
+
+      # Filesystem safety
+      - id: check-case-conflict
+      - id: check-symlinks
+      - id: destroyed-symlinks
+
+      # Script validation
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
 
   # Go-specific hooks
   - repo: https://github.com/dnephin/pre-commit-golang
@@ -90,11 +115,13 @@ repos:
         stages: [commit-msg]
         args: [feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert]
 
-# CI configuration
+# CI configuration (for pre-commit.ci service)
 ci:
   autofix_commit_msg: "chore: auto-fix pre-commit issues"
   autoupdate_branch: ""
   autoupdate_commit_msg: "chore: update pre-commit hooks"
   autoupdate_schedule: weekly
-  skip: []
+  # Skip hooks that don't work well in CI:
+  # - hadolint-docker: requires Docker daemon
+  skip: [hadolint-docker]
   submodules: false
