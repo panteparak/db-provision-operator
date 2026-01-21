@@ -72,7 +72,7 @@ var _ = Describe("mariadb", Ordered, func() {
 		verifierHost := getVerifierHost()
 		GinkgoWriter.Printf("Using verifier host: %s\n", verifierHost)
 
-		cfg := testutil.MySQLEngineConfig(verifierHost, 3306, "root", password)
+		cfg := testutil.MariaDBEngineConfig(verifierHost, 3306, "root", password)
 		verifier = testutil.NewMySQLVerifier(cfg)
 
 		// Connect with retry since database may still be starting

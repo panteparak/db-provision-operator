@@ -130,3 +130,16 @@ func MySQLEngineConfig(host string, port int32, username, password string) Engin
 		Password:      password,
 	}
 }
+
+// MariaDBEngineConfig creates configuration for MariaDB verification
+// MariaDB is MySQL-compatible but uses different system tables for role management
+func MariaDBEngineConfig(host string, port int32, username, password string) EngineConfig {
+	return EngineConfig{
+		Name:          "mariadb",
+		Host:          host,
+		Port:          port,
+		AdminDatabase: "mysql",
+		Username:      username,
+		Password:      password,
+	}
+}

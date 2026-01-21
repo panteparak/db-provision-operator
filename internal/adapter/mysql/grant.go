@@ -21,72 +21,102 @@ import (
 	"fmt"
 	"strings"
 
+	ctrl "sigs.k8s.io/controller-runtime"
+
 	"github.com/db-provision-operator/internal/adapter/types"
 )
 
+// grantLog is the logger for grant operations
+var grantLog = ctrl.Log.WithName("mysql-adapter").WithName("grant")
+
 // Grant grants privileges to a MySQL user
 func (a *Adapter) Grant(ctx context.Context, grantee string, opts []types.GrantOptions) error {
+	log := grantLog.WithValues("grantee", grantee, "optCount", len(opts))
+	log.V(1).Info("Granting privileges")
+
 	db, err := a.getDB()
 	if err != nil {
+		log.Error(err, "Failed to get database connection")
 		return err
 	}
 
-	for _, opt := range opts {
+	for i, opt := range opts {
 		query := a.buildGrantQuery(grantee, opt)
+		log.V(2).Info("Executing grant query", "index", i, "query", query, "level", opt.Level, "database", opt.Database)
 		_, err = db.ExecContext(ctx, query)
 		if err != nil {
+			log.Error(err, "Failed to execute grant query", "query", query)
 			return fmt.Errorf("failed to grant privileges to %s: %w", grantee, err)
 		}
 	}
 
 	// Flush privileges to ensure changes take effect
+	log.V(2).Info("Flushing privileges")
 	_, err = db.ExecContext(ctx, "FLUSH PRIVILEGES")
 	if err != nil {
+		log.Error(err, "Failed to flush privileges")
 		return fmt.Errorf("failed to flush privileges: %w", err)
 	}
 
+	log.V(1).Info("Successfully granted privileges")
 	return nil
 }
 
 // Revoke revokes privileges from a MySQL user
 func (a *Adapter) Revoke(ctx context.Context, grantee string, opts []types.GrantOptions) error {
+	log := grantLog.WithValues("grantee", grantee, "optCount", len(opts))
+	log.V(1).Info("Revoking privileges")
+
 	db, err := a.getDB()
 	if err != nil {
+		log.Error(err, "Failed to get database connection")
 		return err
 	}
 
-	for _, opt := range opts {
+	for i, opt := range opts {
 		query := a.buildRevokeQuery(grantee, opt)
+		log.V(2).Info("Executing revoke query", "index", i, "query", query, "level", opt.Level, "database", opt.Database)
 		_, err = db.ExecContext(ctx, query)
 		if err != nil {
+			log.Error(err, "Failed to execute revoke query", "query", query)
 			return fmt.Errorf("failed to revoke privileges from %s: %w", grantee, err)
 		}
 	}
 
 	// Flush privileges
+	log.V(2).Info("Flushing privileges")
 	_, err = db.ExecContext(ctx, "FLUSH PRIVILEGES")
 	if err != nil {
+		log.Error(err, "Failed to flush privileges")
 		return fmt.Errorf("failed to flush privileges: %w", err)
 	}
 
+	log.V(1).Info("Successfully revoked privileges")
 	return nil
 }
 
 // GrantRole grants role membership to a user
 func (a *Adapter) GrantRole(ctx context.Context, grantee string, roles []string) error {
+	log := grantLog.WithValues("grantee", grantee, "roles", roles)
+	log.Info("Granting role membership")
+
 	db, err := a.getDB()
 	if err != nil {
+		log.Error(err, "Failed to get database connection")
 		return err
 	}
 
 	// Get all hosts for this user - MySQL/MariaDB requires user@host format
 	hosts, err := a.getUserHosts(ctx, grantee)
 	if err != nil {
+		log.Error(err, "Failed to get hosts for user")
 		return fmt.Errorf("failed to get hosts for user %s: %w", grantee, err)
 	}
 	if len(hosts) == 0 {
+		log.Error(nil, "User not found - no hosts returned")
 		return fmt.Errorf("user %s not found", grantee)
 	}
+	log.V(1).Info("Found user hosts", "hosts", hosts)
 
 	for _, role := range roles {
 		for _, host := range hosts {
@@ -95,31 +125,42 @@ func (a *Adapter) GrantRole(ctx context.Context, grantee string, roles []string)
 				escapeIdentifier(role),
 				escapeLiteral(grantee),
 				escapeLiteral(host))
+			log.Info("Executing role grant", "role", role, "host", host, "query", query)
 			_, err = db.ExecContext(ctx, query)
 			if err != nil {
+				log.Error(err, "Failed to grant role", "role", role, "host", host, "query", query)
 				return fmt.Errorf("failed to grant role %s to %s@%s: %w", role, grantee, host, err)
 			}
+			log.Info("Successfully granted role", "role", role, "host", host)
 		}
 	}
 
+	log.Info("Successfully granted all role memberships")
 	return nil
 }
 
 // RevokeRole revokes role membership from a user
 func (a *Adapter) RevokeRole(ctx context.Context, grantee string, roles []string) error {
+	log := grantLog.WithValues("grantee", grantee, "roles", roles)
+	log.Info("Revoking role membership")
+
 	db, err := a.getDB()
 	if err != nil {
+		log.Error(err, "Failed to get database connection")
 		return err
 	}
 
 	// Get all hosts for this user - MySQL/MariaDB requires user@host format
 	hosts, err := a.getUserHosts(ctx, grantee)
 	if err != nil {
+		log.Error(err, "Failed to get hosts for user")
 		return fmt.Errorf("failed to get hosts for user %s: %w", grantee, err)
 	}
 	if len(hosts) == 0 {
+		log.Error(nil, "User not found - no hosts returned")
 		return fmt.Errorf("user %s not found", grantee)
 	}
+	log.V(1).Info("Found user hosts", "hosts", hosts)
 
 	for _, role := range roles {
 		for _, host := range hosts {
@@ -128,13 +169,17 @@ func (a *Adapter) RevokeRole(ctx context.Context, grantee string, roles []string
 				escapeIdentifier(role),
 				escapeLiteral(grantee),
 				escapeLiteral(host))
+			log.Info("Executing role revoke", "role", role, "host", host, "query", query)
 			_, err = db.ExecContext(ctx, query)
 			if err != nil {
+				log.Error(err, "Failed to revoke role", "role", role, "host", host, "query", query)
 				return fmt.Errorf("failed to revoke role %s from %s@%s: %w", role, grantee, host, err)
 			}
+			log.Info("Successfully revoked role", "role", role, "host", host)
 		}
 	}
 
+	log.Info("Successfully revoked all role memberships")
 	return nil
 }
 

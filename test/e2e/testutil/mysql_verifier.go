@@ -267,7 +267,8 @@ func (v *MySQLVerifier) HasSchemaPrivilege(ctx context.Context, grantee, schema 
 	return true, nil
 }
 
-// HasRoleMembership checks if a user has been granted a role (MySQL 8.0+)
+// HasRoleMembership checks if a user has been granted a role
+// MySQL 8.0+ uses mysql.role_edges, MariaDB uses mysql.roles_mapping
 func (v *MySQLVerifier) HasRoleMembership(ctx context.Context, username, roleName string) (bool, error) {
 	if v.db == nil {
 		return false, fmt.Errorf("not connected to database")
@@ -284,11 +285,27 @@ func (v *MySQLVerifier) HasRoleMembership(ctx context.Context, username, roleNam
 	}
 
 	var exists bool
-	err := v.db.QueryRowContext(ctx, `
-		SELECT EXISTS(
-			SELECT 1 FROM mysql.role_edges
-			WHERE TO_USER = ? AND FROM_USER = ?
-		)`, user, role).Scan(&exists)
+	var err error
+
+	if v.config.Name == "mariadb" {
+		// MariaDB uses mysql.roles_mapping table
+		// Structure: User, Host, Role, Admin_option
+		err = v.db.QueryRowContext(ctx, `
+			SELECT EXISTS(
+				SELECT 1 FROM mysql.roles_mapping
+				WHERE User = ? AND Role = ?
+			)`, user, role).Scan(&exists)
+	} else {
+		// MySQL 8.0+ uses mysql.role_edges table
+		// Structure: FROM_USER, FROM_HOST, TO_USER, TO_HOST
+		// FROM_USER is the role, TO_USER is the grantee
+		err = v.db.QueryRowContext(ctx, `
+			SELECT EXISTS(
+				SELECT 1 FROM mysql.role_edges
+				WHERE TO_USER = ? AND FROM_USER = ?
+			)`, user, role).Scan(&exists)
+	}
+
 	if err != nil {
 		return false, fmt.Errorf("failed to check role membership: %w", err)
 	}
