@@ -112,6 +112,14 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet setup-envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
+.PHONY: test-integration
+test-integration: manifests generate setup-envtest ## Run integration tests (controllers with manager).
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./internal/controller/... -v -tags=integration -timeout=10m -coverprofile cover-integration.out
+
+.PHONY: test-benchmark
+test-benchmark: setup-envtest ## Run benchmarks for controllers.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -bench=. -benchmem -run=^$$ ./internal/controller/... | tee benchmark-results.txt
+
 .PHONY: setup-precommit
 setup-precommit: ## Install pre-commit and its dependencies
 	@echo "Installing pre-commit dependencies..."

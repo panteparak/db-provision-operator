@@ -87,6 +87,129 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
+  integration-test:
+    name: Integration Tests (${{ matrix.database }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [postgresql, mysql, mariadb]
+        include:
+          - database: postgresql
+            image: postgres:16-alpine
+            port: 5432
+            test_user: admin
+            test_password: password123
+          - database: mysql
+            image: mysql:8.0
+            port: 3306
+            test_user: root
+            test_password: password123
+          - database: mariadb
+            image: mariadb:11.2
+            port: 3306
+            test_user: root
+            test_password: password123
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ env.GO_VERSION_FILE }}
+          cache: true  # Enable Go module caching
+
+      - name: Start ${{ matrix.database }} container
+        run: |
+          echo "Starting ${{ matrix.database }} container..."
+          if [ "${{ matrix.database }}" = "postgresql" ]; then
+            docker run -d --name test-db \
+              -e POSTGRES_USER=admin \
+              -e POSTGRES_PASSWORD=password123 \
+              -e POSTGRES_DB=postgres \
+              -p ${{ matrix.port }}:5432 \
+              --health-cmd "pg_isready -U admin" \
+              --health-interval 5s \
+              --health-timeout 5s \
+              --health-retries 10 \
+              ${{ matrix.image }}
+          elif [ "${{ matrix.database }}" = "mysql" ]; then
+            docker run -d --name test-db \
+              -e MYSQL_ROOT_PASSWORD=password123 \
+              -e MYSQL_USER=admin \
+              -e MYSQL_PASSWORD=password123 \
+              -e MYSQL_DATABASE=mysql \
+              -p ${{ matrix.port }}:3306 \
+              --health-cmd "mysqladmin ping -h 127.0.0.1 -u root -ppassword123" \
+              --health-interval 5s \
+              --health-timeout 5s \
+              --health-retries 20 \
+              ${{ matrix.image }}
+          elif [ "${{ matrix.database }}" = "mariadb" ]; then
+            docker run -d --name test-db \
+              -e MARIADB_ROOT_PASSWORD=password123 \
+              -e MARIADB_USER=admin \
+              -e MARIADB_PASSWORD=password123 \
+              -e MARIADB_DATABASE=mysql \
+              -p ${{ matrix.port }}:3306 \
+              --health-cmd "mariadb-admin ping -h 127.0.0.1 -u root -ppassword123" \
+              --health-interval 5s \
+              --health-timeout 5s \
+              --health-retries 20 \
+              ${{ matrix.image }}
+          fi
+          echo "Container started, waiting for health check..."
+
+      - name: Wait for database to be healthy
+        run: |
+          echo "Waiting for ${{ matrix.database }} to be healthy..."
+          timeout=120
+          elapsed=0
+          while [ $elapsed -lt $timeout ]; do
+            health=$(docker inspect --format='{{.State.Health.Status}}' test-db 2>/dev/null || echo "unknown")
+            echo "Health status: $health (${elapsed}s elapsed)"
+            if [ "$health" = "healthy" ]; then
+              echo "${{ matrix.database }} is healthy!"
+              exit 0
+            fi
+            sleep 5
+            elapsed=$((elapsed + 5))
+          done
+          echo "Timeout waiting for ${{ matrix.database }} to be healthy"
+          docker logs test-db
+          exit 1
+
+      - name: Run integration tests
+        env:
+          INTEGRATION_TEST_DATABASE: ${{ matrix.database }}
+          INTEGRATION_TEST_HOST: 127.0.0.1
+          INTEGRATION_TEST_PORT: ${{ matrix.port }}
+          INTEGRATION_TEST_USER: ${{ matrix.test_user }}
+          INTEGRATION_TEST_PASSWORD: ${{ matrix.test_password }}
+        run: make test-integration
+
+      - name: Collect container logs on failure
+        if: failure()
+        run: |
+          echo "=== Database container logs ==="
+          docker logs test-db || true
+
+      - name: Cleanup database container
+        if: always()
+        run: |
+          docker stop test-db || true
+          docker rm test-db || true
+
+      - name: Upload integration coverage report
+        uses: codecov/codecov-action@v4
+        with:
+          files: cover-integration.out
+          flags: integration-${{ matrix.database }}
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
   # Build each platform in parallel using shared matrix from setup job
   docker-build:
     name: Docker Build (${{ matrix.config.platform }})
@@ -449,7 +572,7 @@ jobs:
     runs-on: ubuntu-latest
     # For push: wait for docker-merge (multi-arch manifest)
     # For PR: docker-merge is skipped, so we only check docker-build
-    needs: [setup, lint, unit-test, docker-build, docker-merge, manifests, generate]
+    needs: [setup, lint, unit-test, integration-test, docker-build, docker-merge, manifests, generate]
     if: always()
     steps:
       - name: Check job results
@@ -458,6 +581,7 @@ jobs:
           echo "  setup: ${{ needs.setup.result }}"
           echo "  lint: ${{ needs.lint.result }}"
           echo "  unit-test: ${{ needs.unit-test.result }}"
+          echo "  integration-test: ${{ needs.integration-test.result }}"
           echo "  docker-build: ${{ needs.docker-build.result }}"
           echo "  docker-merge: ${{ needs.docker-merge.result }}"
           echo "  manifests: ${{ needs.manifests.result }}"
@@ -468,6 +592,7 @@ jobs:
           [[ "${{ needs.setup.result }}" != "success" ]] && FAILED="${FAILED} setup"
           [[ "${{ needs.lint.result }}" != "success" ]] && FAILED="${FAILED} lint"
           [[ "${{ needs.unit-test.result }}" != "success" ]] && FAILED="${FAILED} unit-test"
+          [[ "${{ needs.integration-test.result }}" != "success" ]] && FAILED="${FAILED} integration-test"
           [[ "${{ needs.docker-build.result }}" != "success" ]] && FAILED="${FAILED} docker-build"
           [[ "${{ needs.manifests.result }}" != "success" ]] && FAILED="${FAILED} manifests"
           [[ "${{ needs.generate.result }}" != "success" ]] && FAILED="${FAILED} generate"
@@ -494,6 +619,7 @@ jobs:
     needs: [gate]
     strategy:
       fail-fast: false
+      max-parallel: 6  # Run all database/install combinations in parallel
       matrix:
         database: [postgresql, mysql, mariadb]
         install_method: [kustomize, helm]
@@ -539,6 +665,16 @@ jobs:
 
       - name: Verify k3d installation
         run: k3d version
+
+      # Pre-pull database images in parallel to avoid serial downloads during test setup
+      - name: Pre-pull database images
+        run: |
+          echo "Pre-pulling database images in parallel..."
+          docker pull postgres:16-alpine &
+          docker pull mysql:8.0 &
+          docker pull mariadb:11.2 &
+          wait
+          echo "All database images pulled successfully"
 
       - name: Create k3d cluster
         run: |
@@ -749,6 +885,7 @@ jobs:
           echo "Pipeline summary:"
           echo "  ✅ Lint"
           echo "  ✅ Unit Tests"
+          echo "  ✅ Integration Tests"
           echo "  ✅ Docker Build"
           echo "  ✅ Manifests Verification"
           echo "  ✅ Generated Code Verification"
