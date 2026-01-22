@@ -1,0 +1,17 @@
+# MySQL Database Instance
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseInstance
+metadata:
+  name: mysql-primary
+spec:
+  engine: mysql
+  connection:
+    host: mysql.database.svc.cluster.local
+    port: 3306
+    database: mysql
+    secretRef:
+      name: mysql-admin-credentials
+  healthCheck:
+    enabled: true
+    intervalSeconds: 30
+    timeoutSeconds: 5

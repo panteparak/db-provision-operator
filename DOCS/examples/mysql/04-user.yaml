@@ -1,0 +1,23 @@
+# Application User
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseUser
+metadata:
+  name: myapp-mysql-user
+spec:
+  instanceRef:
+    name: mysql-primary
+  username: myapp_user
+  passwordSecret:
+    generate: true
+    length: 32
+    secretName: myapp-mysql-credentials
+    secretTemplate:
+      labels:
+        app: myapp
+      data:
+        DATABASE_URL: "mysql://{{ .Username }}:{{ .Password }}@{{ .Host }}:{{ .Port }}/myapp"
+  mysql:
+    maxUserConnections: 100
+    authPlugin: caching_sha2_password
+    allowedHosts:
+      - "%"

@@ -1,0 +1,13 @@
+# User Grants
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseGrant
+metadata:
+  name: myapp-mysql-grant
+spec:
+  userRef:
+    name: myapp-mysql-user
+  mysql:
+    grants:
+      - level: database
+        database: myapp
+        privileges: [SELECT, INSERT, UPDATE, DELETE]

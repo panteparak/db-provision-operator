@@ -1,0 +1,18 @@
+# PostgreSQL Database Instance
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseInstance
+metadata:
+  name: postgres-primary
+spec:
+  engine: postgres
+  connection:
+    host: postgres.database.svc.cluster.local
+    port: 5432
+    database: postgres
+    sslMode: prefer
+    secretRef:
+      name: postgres-admin-credentials
+  healthCheck:
+    enabled: true
+    intervalSeconds: 30
+    timeoutSeconds: 5

@@ -1,0 +1,26 @@
+# Backup Schedule
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseBackupSchedule
+metadata:
+  name: myapp-daily-backup
+spec:
+  databaseRef:
+    name: myapp-database
+  schedule: "0 2 * * *"
+  timezone: "UTC"
+  retention:
+    keepLast: 7
+    keepDaily: 7
+    keepWeekly: 4
+  backupTemplate:
+    storage:
+      type: pvc
+      pvc:
+        claimName: backup-storage
+        subPath: postgres/myapp
+    compression:
+      enabled: true
+      algorithm: gzip
+    postgres:
+      format: custom
+      jobs: 4

@@ -1,0 +1,17 @@
+# Application Database
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: Database
+metadata:
+  name: myapp-database
+spec:
+  instanceRef:
+    name: postgres-primary
+  name: myapp
+  deletionPolicy: Retain
+  postgres:
+    encoding: UTF8
+    extensions:
+      - name: uuid-ossp
+        schema: public
+      - name: pgcrypto
+        schema: public

@@ -1,0 +1,32 @@
+# TLS-secured PostgreSQL connection
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-tls-certs
+type: kubernetes.io/tls
+data:
+  ca.crt: <base64-encoded-ca-cert>
+  tls.crt: <base64-encoded-client-cert>
+  tls.key: <base64-encoded-client-key>
+---
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseInstance
+metadata:
+  name: postgres-tls
+spec:
+  engine: postgres
+  connection:
+    host: postgres.database.svc.cluster.local
+    port: 5432
+    database: postgres
+    sslMode: verify-full
+    secretRef:
+      name: postgres-admin-credentials
+    tls:
+      secretRef:
+        name: postgres-tls-certs
+        keys:
+          ca: ca.crt
+          cert: tls.crt
+          key: tls.key

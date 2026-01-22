@@ -271,6 +271,24 @@ clean-dashboards: ## Remove copied dashboard files
 	@rm -rf config/grafana/dashboards
 	@echo "Dashboard copies removed"
 
+##@ Documentation
+
+.PHONY: docs-deps
+docs-deps: ## Install documentation dependencies
+	pip install -r docs/requirements.txt
+
+.PHONY: docs-serve
+docs-serve: docs-deps ## Serve documentation locally
+	mkdocs serve --dev-addr=0.0.0.0:8000
+
+.PHONY: docs-build
+docs-build: docs-deps ## Build documentation
+	mkdocs build --strict
+
+.PHONY: docs-deploy
+docs-deploy: docs-deps ## Deploy docs to gh-pages (manual)
+	mkdocs gh-deploy --force
+
 ##@ Build
 
 .PHONY: build
