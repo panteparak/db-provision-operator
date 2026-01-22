@@ -1,0 +1,29 @@
+apiVersion: v1
+entries:
+  db-provision-operator:
+  - apiVersion: v2
+    appVersion: 0.1.0
+    created: "2026-01-22T10:37:20.280701855Z"
+    description: A Kubernetes operator for managing database provisioning (databases,
+      users, roles, grants, backups)
+    digest: 125c2354c5bc1a54093a801f1c091c546126fa1e63ee7a27789479d64f3660b8
+    home: https://github.com/panteparak/db-provision-operator
+    keywords:
+    - database
+    - postgresql
+    - mysql
+    - operator
+    - kubernetes
+    - provisioning
+    - backup
+    kubeVersion: '>=1.26.0-0'
+    maintainers:
+    - name: panteparak
+    name: db-provision-operator
+    sources:
+    - https://github.com/panteparak/db-provision-operator
+    type: application
+    urls:
+    - https://panteparak.github.io/db-provision-operator/charts/db-provision-operator-0.1.0.tgz
+    version: 0.1.0
+generated: "2026-01-22T10:37:20.279561692Z"
