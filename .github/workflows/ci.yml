@@ -563,6 +563,26 @@ jobs:
             exit 1
           fi
 
+  docs:
+    name: Docs Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: docs/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r docs/requirements.txt
+
+      - name: Build docs
+        run: mkdocs build --strict
+
   # ============================================================================
   # Stage 2: Gate (Wait for all parallel jobs)
   # ============================================================================
@@ -572,7 +592,7 @@ jobs:
     runs-on: ubuntu-latest
     # For push: wait for docker-merge (multi-arch manifest)
     # For PR: docker-merge is skipped, so we only check docker-build
-    needs: [setup, lint, unit-test, integration-test, docker-build, docker-merge, manifests, generate]
+    needs: [setup, lint, unit-test, integration-test, docker-build, docker-merge, manifests, generate, docs]
     if: always()
     steps:
       - name: Check job results
@@ -586,6 +606,7 @@ jobs:
           echo "  docker-merge: ${{ needs.docker-merge.result }}"
           echo "  manifests: ${{ needs.manifests.result }}"
           echo "  generate: ${{ needs.generate.result }}"
+          echo "  docs: ${{ needs.docs.result }}"
 
           # Check required jobs (must be success)
           FAILED=""
@@ -596,6 +617,7 @@ jobs:
           [[ "${{ needs.docker-build.result }}" != "success" ]] && FAILED="${FAILED} docker-build"
           [[ "${{ needs.manifests.result }}" != "success" ]] && FAILED="${FAILED} manifests"
           [[ "${{ needs.generate.result }}" != "success" ]] && FAILED="${FAILED} generate"
+          [[ "${{ needs.docs.result }}" != "success" ]] && FAILED="${FAILED} docs"
 
           # docker-merge is only required for push events (skipped for PRs)
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
@@ -889,6 +911,7 @@ jobs:
           echo "  ✅ Docker Build"
           echo "  ✅ Manifests Verification"
           echo "  ✅ Generated Code Verification"
+          echo "  ✅ Docs Build"
           echo "  ✅ E2E Tests (PostgreSQL + kustomize)"
           echo "  ✅ E2E Tests (PostgreSQL + helm)"
           echo "  ✅ E2E Tests (MySQL + kustomize)"
