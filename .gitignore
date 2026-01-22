@@ -33,3 +33,4 @@ config/grafana/dashboards/
 
 # E2E debug logs
 e2e-debug-*.log
+site/

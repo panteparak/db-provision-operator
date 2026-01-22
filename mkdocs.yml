@@ -93,6 +93,8 @@ extra:
 
 copyright: Copyright &copy; 2024-2026 panteparak
 
+docs_dir: DOCS
+
 nav:
   - Home: index.md
   - Getting Started:
