@@ -42,7 +42,7 @@ jobs:
           echo "matrix=$(echo $PLATFORMS | jq -c .)" >> $GITHUB_OUTPUT
 
   # ============================================================================
-  # Stage 1: Parallel Jobs (Lint, Unit Tests, Docker Build)
+  # Stage 1: Parallel Jobs (Lint, Unit Tests, Docker Build, Docs)
   # ============================================================================
 
   lint:
@@ -90,6 +90,7 @@ jobs:
   integration-test:
     name: Integration Tests (${{ matrix.database }})
     runs-on: ubuntu-latest
+    needs: [gate]
     strategy:
       fail-fast: false
       matrix:
@@ -592,7 +593,7 @@ jobs:
     runs-on: ubuntu-latest
     # For push: wait for docker-merge (multi-arch manifest)
     # For PR: docker-merge is skipped, so we only check docker-build
-    needs: [setup, lint, unit-test, integration-test, docker-build, docker-merge, manifests, generate, docs]
+    needs: [setup, lint, unit-test, docker-build, docker-merge, manifests, generate, docs]
     if: always()
     steps:
       - name: Check job results
@@ -601,7 +602,6 @@ jobs:
           echo "  setup: ${{ needs.setup.result }}"
           echo "  lint: ${{ needs.lint.result }}"
           echo "  unit-test: ${{ needs.unit-test.result }}"
-          echo "  integration-test: ${{ needs.integration-test.result }}"
           echo "  docker-build: ${{ needs.docker-build.result }}"
           echo "  docker-merge: ${{ needs.docker-merge.result }}"
           echo "  manifests: ${{ needs.manifests.result }}"
@@ -613,7 +613,6 @@ jobs:
           [[ "${{ needs.setup.result }}" != "success" ]] && FAILED="${FAILED} setup"
           [[ "${{ needs.lint.result }}" != "success" ]] && FAILED="${FAILED} lint"
           [[ "${{ needs.unit-test.result }}" != "success" ]] && FAILED="${FAILED} unit-test"
-          [[ "${{ needs.integration-test.result }}" != "success" ]] && FAILED="${FAILED} integration-test"
           [[ "${{ needs.docker-build.result }}" != "success" ]] && FAILED="${FAILED} docker-build"
           [[ "${{ needs.manifests.result }}" != "success" ]] && FAILED="${FAILED} manifests"
           [[ "${{ needs.generate.result }}" != "success" ]] && FAILED="${FAILED} generate"
@@ -632,13 +631,19 @@ jobs:
           echo "All required checks passed successfully"
 
   # ============================================================================
-  # Stage 3: E2E Tests (Matrix: Database x Installation Method)
+  # Stage 3: Integration Tests (after Gate passes)
+  # ============================================================================
+
+  # Note: integration-test job is defined above but runs here after gate
+
+  # ============================================================================
+  # Stage 4: E2E Tests (Matrix: Database x Installation Method)
   # ============================================================================
 
   e2e:
     name: E2E (${{ matrix.database }}/${{ matrix.install_method }})
     runs-on: ubuntu-latest
-    needs: [gate]
+    needs: [integration-test]
     strategy:
       fail-fast: false
       max-parallel: 6  # Run all database/install combinations in parallel
@@ -892,7 +897,7 @@ jobs:
         run: k3d cluster delete e2e-${{ matrix.database }} || true
 
   # ============================================================================
-  # Stage 4: CI Success
+  # Stage 5: CI Success
   # ============================================================================
 
   ci-success:
@@ -907,11 +912,13 @@ jobs:
           echo "Pipeline summary:"
           echo "  ✅ Lint"
           echo "  ✅ Unit Tests"
-          echo "  ✅ Integration Tests"
           echo "  ✅ Docker Build"
           echo "  ✅ Manifests Verification"
           echo "  ✅ Generated Code Verification"
           echo "  ✅ Docs Build"
+          echo "  ✅ Integration Tests (PostgreSQL)"
+          echo "  ✅ Integration Tests (MySQL)"
+          echo "  ✅ Integration Tests (MariaDB)"
           echo "  ✅ E2E Tests (PostgreSQL + kustomize)"
           echo "  ✅ E2E Tests (PostgreSQL + helm)"
           echo "  ✅ E2E Tests (MySQL + kustomize)"
@@ -920,7 +927,7 @@ jobs:
           echo "  ✅ E2E Tests (MariaDB + helm)"
 
   # ============================================================================
-  # Stage 5: Release (only on tags)
+  # Stage 6: Release (only on tags)
   # ============================================================================
 
   release:
