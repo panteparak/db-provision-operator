@@ -1,97 +1,35 @@
-# DB Provision Operator - Next Phase Context
+# Development Roadmap
 
-This document provides the necessary context for continuing development in future phases.
+This document provides the development roadmap and context for the db-provision-operator.
 
 ## Current State Summary
 
-### Completed (Phase 1 - Core MVP)
+### Completed Phases
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| DatabaseInstance CRD | ✅ Complete | Connection management, health checks |
-| Database CRD | ✅ Complete | CRUD operations, extensions, schemas |
-| DatabaseUser CRD | ✅ Complete | User management, password generation |
-| PostgreSQL Adapter | ✅ Complete | Full CRUD, grants, backup/restore |
-| MySQL Adapter | ✅ Complete | Full CRUD, grants, backup/restore |
-| Secret Manager | ✅ Complete | Credentials, TLS, templates |
-| Controllers | ✅ Complete | Reconciliation, finalizers, status |
-| Build | ✅ Passing | `go build ./...` and `go vet ./...` |
-
-### Completed (Phase 2 - Extended Controllers)
-
-| Component | Status | Notes |
-|-----------|--------|-------|
-| DatabaseRole CRD | ✅ Complete | Role management for PostgreSQL/MySQL |
-| DatabaseGrant CRD | ✅ Complete | Fine-grained grant management |
-| DatabaseBackup CRD | ✅ Complete | Backup lifecycle management |
-| DatabaseRestore CRD | ✅ Complete | Restore from backup or path |
-| DatabaseBackupSchedule CRD | ✅ Complete | Cron scheduling, retention policies |
-| Retry Utility | ✅ Complete | Exponential backoff with jitter |
-| Tests | ✅ Complete | 45 controller tests passing |
-
-### Completed (Phase 2.5 - Storage & Monitoring)
-
-| Component | Status | Notes |
-|-----------|--------|-------|
-| S3 Storage Backend | ✅ Complete | AWS S3 compatible with custom endpoints |
-| GCS Storage Backend | ✅ Complete | Google Cloud Storage |
-| Azure Blob Backend | ✅ Complete | Azure Blob Storage |
-| PVC Storage Backend | ✅ Complete | Kubernetes PVC storage |
-| Compression | ✅ Complete | gzip, lz4, zstd algorithms |
-| Encryption | ✅ Complete | AES-256-GCM encryption |
-| Prometheus Metrics | ✅ Complete | 25 metrics, 100% coverage |
-| ServiceMonitor | ✅ Complete | Auto-discovery for Prometheus |
-| PrometheusRules | ✅ Complete | 10+ alerting rules |
-| Tests | ✅ Complete | 70+ tests passing |
-
-### Build Status
-
-```bash
-$ go build ./...
-# Success - no errors
-
-$ go vet ./...
-# Success - no warnings
-```
-
-### Git Status
-
-```
-commit 1b4cd1c feat: implement Phase 1 Core MVP - controllers, adapters, and secret manager
-Author: Pan Teparak <panteparak@me.com>
-```
-
-## Known Limitations
-
-### 1. Test Environment
-
-**Issue**: `make test` fails due to missing envtest binaries
-
-**Error**:
-```
-unable to start control plane: unable to read testenv config from file...
-unable to start the controlplane. Please ensure that "localhost:35097" is a valid URL
-```
-
-**Resolution Needed**:
-1. Run `make envtest` to download binaries
-2. Or set up `KUBEBUILDER_ASSETS` environment variable
-3. Consider adding testcontainers for database testing
-
-### 2. No Actual Database Connection Tests
-
-The integration tests require real PostgreSQL and MySQL instances. Consider:
-- Docker Compose setup for local testing
-- GitHub Actions with service containers
-- Testcontainers-go for automated test databases
-
-### 3. Backup/Restore Requires CLI Tools
-
-The backup and restore operations shell out to:
-- `pg_dump` / `pg_restore` / `psql` (PostgreSQL)
-- `mysqldump` / `mysql` (MySQL)
-
-These must be included in the operator container image.
+| Phase | Component | Status | Notes |
+|-------|-----------|--------|-------|
+| **Phase 1** | DatabaseInstance CRD | Complete | Connection management, health checks |
+| | Database CRD | Complete | CRUD operations, extensions, schemas |
+| | DatabaseUser CRD | Complete | User management, password generation |
+| | PostgreSQL Adapter | Complete | Full CRUD, grants, backup/restore |
+| | MySQL Adapter | Complete | Full CRUD, grants, backup/restore |
+| | Secret Manager | Complete | Credentials, TLS, templates |
+| | Controllers | Complete | Reconciliation, finalizers, status |
+| **Phase 2** | DatabaseRole CRD | Complete | Role management for PostgreSQL/MySQL |
+| | DatabaseGrant CRD | Complete | Fine-grained grant management |
+| | DatabaseBackup CRD | Complete | Backup lifecycle management |
+| | DatabaseRestore CRD | Complete | Restore from backup or path |
+| | DatabaseBackupSchedule CRD | Complete | Cron scheduling, retention policies |
+| | Retry Utility | Complete | Exponential backoff with jitter |
+| **Phase 2.5** | S3 Storage Backend | Complete | AWS S3 compatible with custom endpoints |
+| | GCS Storage Backend | Complete | Google Cloud Storage |
+| | Azure Blob Backend | Complete | Azure Blob Storage |
+| | PVC Storage Backend | Complete | Kubernetes PVC storage |
+| | Compression | Complete | gzip, lz4, zstd algorithms |
+| | Encryption | Complete | AES-256-GCM encryption |
+| | Prometheus Metrics | Complete | 25 metrics, 100% coverage |
+| | ServiceMonitor | Complete | Auto-discovery for Prometheus |
+| | PrometheusRules | Complete | 10+ alerting rules |
 
 ## Phase 3 Planned Work
 
@@ -177,21 +115,8 @@ db-provision-operator/
 │   ├── adapter/
 │   │   ├── types/types.go        # Adapter interfaces and option types
 │   │   ├── adapter.go            # Factory and helpers
-│   │   ├── postgres/
-│   │   │   ├── adapter.go        # Connection management
-│   │   │   ├── database.go       # Database operations
-│   │   │   ├── user.go           # User operations
-│   │   │   ├── grants.go         # Grant operations
-│   │   │   ├── schema.go         # Schema operations
-│   │   │   ├── backup.go         # Backup operations
-│   │   │   └── restore.go        # Restore operations
-│   │   └── mysql/
-│   │       ├── adapter.go        # Connection management
-│   │       ├── database.go       # Database operations
-│   │       ├── user.go           # User operations
-│   │       ├── grants.go         # Grant operations
-│   │       ├── backup.go         # Backup operations
-│   │       └── restore.go        # Restore operations
+│   │   ├── postgres/             # PostgreSQL implementation
+│   │   └── mysql/                # MySQL implementation
 │   │
 │   ├── controller/
 │   │   ├── databaseinstance_controller.go
@@ -205,7 +130,7 @@ db-provision-operator/
 │   │
 │   ├── metrics/
 │   │   ├── metrics.go            # Prometheus metrics definitions
-│   │   └── metrics_test.go       # Metrics tests (100% coverage)
+│   │   └── metrics_test.go       # Metrics tests
 │   │
 │   ├── storage/
 │   │   ├── storage.go            # Storage interface
@@ -214,8 +139,7 @@ db-provision-operator/
 │   │   ├── azure.go              # Azure Blob Storage backend
 │   │   ├── pvc.go                # PVC storage backend
 │   │   ├── compression.go        # gzip, lz4, zstd compression
-│   │   ├── encryption.go         # AES-256-GCM encryption
-│   │   └── storage_test.go       # Storage tests
+│   │   └── encryption.go         # AES-256-GCM encryption
 │   │
 │   ├── secret/
 │   │   └── manager.go            # Secret management
@@ -229,21 +153,13 @@ db-provision-operator/
 ├── config/
 │   ├── crd/bases/                # Generated CRD manifests
 │   ├── rbac/                     # Generated RBAC manifests
-│   ├── prometheus/
-│   │   ├── monitor.yaml          # ServiceMonitor for Prometheus
-│   │   ├── rules.yaml            # PrometheusRule for alerts
-│   │   └── kustomization.yaml
+│   ├── prometheus/               # Prometheus monitoring
 │   └── samples/                  # Example resources
 │
 ├── cmd/
 │   └── main.go                   # Operator entrypoint
 │
-└── DOCS/
-    ├── PROJECT_OVERVIEW.md
-    ├── ARCHITECTURE.md
-    ├── DESIGN_DECISIONS.md
-    ├── PHASE1_IMPLEMENTATION.md
-    └── NEXT_PHASE_CONTEXT.md     # This file
+└── docs/                         # Project documentation
 ```
 
 ## Quick Commands
@@ -269,19 +185,11 @@ make undeploy           # Remove operator
 make uninstall          # Remove CRDs
 ```
 
-## Contact and Resources
-
-- **Repository**: github.com/db-provision-operator
-- **API Group**: dbops.dbprovision.io
-- **API Version**: v1alpha1
-- **Operator SDK**: v1.42.0
-- **Go Version**: 1.21+
-
 ## Handoff Checklist
 
 Before starting next phase:
 
-- [ ] Review this document and ARCHITECTURE.md
+- [ ] Review architecture documentation
 - [ ] Run `go build ./...` to verify clean build
 - [ ] Run `make generate && make manifests` to ensure generated files are current
 - [ ] Review open issues/TODOs in code

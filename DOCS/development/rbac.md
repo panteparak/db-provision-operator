@@ -216,29 +216,7 @@ While the operator has cluster-wide Secret access, you should:
 
 ### Restricting Secret Access (Optional)
 
-If you want to restrict which namespaces the operator can access Secrets from, you can:
-
-1. **Use namespace selectors** in a custom ClusterRole:
-
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: manager-role
-rules:
-  # CRD access (all namespaces)
-  - apiGroups: ["dbops.dbprovision.io"]
-    resources: ["*"]
-    verbs: ["*"]
-  # Restricted Secret access - only labeled namespaces
-  - apiGroups: [""]
-    resources: ["secrets"]
-    verbs: ["get", "list", "watch"]
-    # Note: Kubernetes doesn't support namespace selectors in ClusterRoles
-    # You would need to use multiple RoleBindings instead
-```
-
-2. **Use multiple RoleBindings** instead of ClusterRoleBinding:
+If you want to restrict which namespaces the operator can access Secrets from, you can use multiple RoleBindings instead of ClusterRoleBinding:
 
 ```yaml
 # Create Role in each namespace where secrets should be accessible
@@ -319,58 +297,6 @@ kubectl delete databaseinstance test-cross-ns
 kubectl delete namespace test-secrets
 ```
 
-### Check Operator Logs for RBAC Issues
-
-```bash
-kubectl logs -n db-provision-operator-system \
-  -l control-plane=controller-manager \
-  --tail=50 | grep -i "forbidden\|unauthorized\|rbac"
-```
-
-If you see RBAC errors, verify:
-1. ClusterRoleBinding exists: `kubectl get clusterrolebinding manager-rolebinding`
-2. ClusterRole has Secret permissions: `kubectl get clusterrole manager-role -o yaml`
-3. ServiceAccount exists: `kubectl get sa controller-manager -n db-provision-operator-system`
-
-## E2E Test Verification
-
-The E2E tests include a specific test case that verifies cross-namespace RBAC works correctly:
-
-**Test**: `test/e2e/postgresql_test.go` and `test/e2e/mysql_test.go`
-
-```go
-Context("Cross-namespace Secret reference", func() {
-    It("should support cross-namespace Secret reference (ClusterRoleBinding test)", func() {
-        // The DatabaseInstance is in 'default' namespace
-        // The Secret is in 'postgres' (or 'mysql') namespace
-        // This test verifies that the cross-namespace RBAC works correctly
-
-        By("verifying DatabaseInstance can access Secret from different namespace")
-        obj, err := dynamicClient.Resource(databaseInstanceGVR).
-            Namespace(testNamespace).Get(ctx, instanceName, metav1.GetOptions{})
-        Expect(err).NotTo(HaveOccurred())
-
-        phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
-        Expect(phase).To(Equal("Ready"))
-
-        // Verify the secret reference points to a different namespace
-        secretRef, _, _ := unstructured.NestedMap(obj.Object, "spec", "connection", "secretRef")
-        Expect(secretRef["namespace"]).To(Equal(secretNamespace))
-        Expect(testNamespace).NotTo(Equal(secretNamespace))
-    })
-})
-```
-
-Run the E2E tests to verify:
-
-```bash
-# PostgreSQL (Secret in 'postgres' namespace, DatabaseInstance in 'default')
-make test-e2e-postgresql
-
-# MySQL (Secret in 'mysql' namespace, DatabaseInstance in 'default')
-make test-e2e-mysql
-```
-
 ## Troubleshooting
 
 ### Error: "secrets is forbidden"
@@ -392,7 +318,7 @@ make test-e2e-mysql
    make deploy IMG=<your-image>
    ```
 
-### Error: DatabaseInstance stuck in Pending
+### DatabaseInstance stuck in Pending
 
 **Symptom**: DatabaseInstance never becomes Ready when using cross-namespace Secret
 
@@ -404,13 +330,3 @@ make test-e2e-mysql
    ```bash
    kubectl auth can-i get secrets --as=system:serviceaccount:db-provision-operator-system:controller-manager -n <secret-namespace>
    ```
-
-## Summary
-
-| Component | Scope | Purpose |
-|-----------|-------|---------|
-| ClusterRole | Cluster-wide | Defines permissions for Secrets and CRDs |
-| ClusterRoleBinding | Cluster-wide | Binds ClusterRole to ServiceAccount |
-| ServiceAccount | Namespace-scoped | Identity used by operator pod |
-
-The use of **ClusterRole** + **ClusterRoleBinding** (instead of namespace-scoped Role + RoleBinding) is what enables cross-namespace Secret access in the db-provision-operator.

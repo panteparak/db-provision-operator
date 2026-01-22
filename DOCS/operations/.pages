@@ -1,0 +1,5 @@
+title: Operations
+nav:
+  - Overview: index.md
+  - Monitoring: monitoring.md
+  - Troubleshooting: troubleshooting.md

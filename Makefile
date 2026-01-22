@@ -275,7 +275,7 @@ clean-dashboards: ## Remove copied dashboard files
 
 .PHONY: docs-deps
 docs-deps: ## Install documentation dependencies
-	pip install -r DOCS/requirements.txt
+	pip install -r docs/requirements.txt
 
 .PHONY: docs-serve
 docs-serve: docs-deps ## Serve documentation locally

@@ -1,0 +1,6 @@
+title: Architecture
+nav:
+  - Overview: index.md
+  - System Overview: overview.md
+  - Design Decisions: design.md
+  - Security: security.md

@@ -1,4 +1,16 @@
-# DB Provision Operator - Architecture
+# System Overview
+
+## Introduction
+
+The **db-provision-operator** is a Kubernetes operator designed to provide unified database management across multiple database engines. It enables declarative management of database servers, databases, users, and access controls through Kubernetes Custom Resource Definitions (CRDs).
+
+## Project Goals
+
+1. **Unified Database Management**: Provide a consistent API for managing databases across different engines (PostgreSQL, MySQL, and future engines)
+2. **Kubernetes-Native**: Leverage Kubernetes patterns (controllers, CRDs, finalizers) for lifecycle management
+3. **Security-First**: Secure credential management with automatic password generation and secret templating
+4. **Production-Ready**: Support for TLS/mTLS, health checks, deletion protection, and graceful cleanup
+5. **Extensibility**: Adapter-based architecture for easy addition of new database engines
 
 ## High-Level Architecture
 
@@ -54,9 +66,43 @@
                     └───────────────────────────────┘
 ```
 
+## Technology Stack
+
+| Component | Technology | Version |
+|-----------|------------|---------|
+| Operator Framework | Operator SDK | v1.42.0 |
+| Kubernetes Client | controller-runtime | Latest |
+| PostgreSQL Driver | pgx/v5 | v5.x |
+| MySQL Driver | go-sql-driver/mysql | v1.x |
+| Go Version | Go | 1.21+ |
+
+## Custom Resource Definitions (CRDs)
+
+### Primary Resources
+
+| CRD | API Group | Description |
+|-----|-----------|-------------|
+| `DatabaseInstance` | `dbops.dbprovision.io/v1alpha1` | Represents a database server connection |
+| `Database` | `dbops.dbprovision.io/v1alpha1` | Represents a database within an instance |
+| `DatabaseUser` | `dbops.dbprovision.io/v1alpha1` | Represents a database user/role |
+| `DatabaseRole` | `dbops.dbprovision.io/v1alpha1` | Represents a permission group |
+| `DatabaseGrant` | `dbops.dbprovision.io/v1alpha1` | Represents fine-grained access control |
+| `DatabaseBackup` | `dbops.dbprovision.io/v1alpha1` | Represents a backup operation |
+| `DatabaseBackupSchedule` | `dbops.dbprovision.io/v1alpha1` | Represents scheduled backups |
+| `DatabaseRestore` | `dbops.dbprovision.io/v1alpha1` | Represents a restore operation |
+
+### Resource Hierarchy
+
+```
+DatabaseInstance (server connection)
+├── Database (logical database)
+│   └── DatabaseUser (user with access to database)
+└── DatabaseUser (instance-level user/role)
+```
+
 ## Component Architecture
 
-### 1. Controllers Layer
+### Controllers Layer
 
 Controllers implement the reconciliation loop pattern, watching CRD resources and ensuring the actual state matches the desired state.
 
@@ -67,19 +113,6 @@ Responsibilities:
 ├── Perform periodic health checks
 ├── Maintain connection status in status field
 └── Handle graceful deletion (finalizer cleanup)
-
-Reconciliation Flow:
-1. Fetch DatabaseInstance resource
-2. Check skip-reconcile annotation
-3. Handle deletion if marked
-4. Add finalizer if missing
-5. Get credentials from Secret
-6. Get TLS credentials if enabled
-7. Create database adapter
-8. Connect and ping
-9. Get server version
-10. Update status (Ready/Failed)
-11. Requeue for health check interval
 ```
 
 #### Database Controller
@@ -89,20 +122,6 @@ Responsibilities:
 ├── Configure database settings (encoding, collation, extensions)
 ├── Manage database lifecycle
 └── Drop database on deletion (if policy allows)
-
-Reconciliation Flow:
-1. Fetch Database resource
-2. Check skip-reconcile annotation
-3. Handle deletion if marked
-4. Add finalizer if missing
-5. Fetch referenced DatabaseInstance
-6. Wait if instance not ready
-7. Create adapter and connect
-8. Check if database exists
-9. Create database if missing
-10. Update database settings
-11. Get database info
-12. Update status (Ready/Failed)
 ```
 
 #### DatabaseUser Controller
@@ -113,23 +132,9 @@ Responsibilities:
 ├── Create credentials secrets
 ├── Configure user attributes and grants
 └── Drop user on deletion (if policy allows)
-
-Reconciliation Flow:
-1. Fetch DatabaseUser resource
-2. Check skip-reconcile annotation
-3. Handle deletion if marked
-4. Add finalizer if missing
-5. Fetch referenced DatabaseInstance
-6. Wait if instance not ready
-7. Determine password (generate or existing)
-8. Create adapter and connect
-9. Check if user exists
-10. Create or update user
-11. Ensure credentials secret
-12. Update status (Ready/Failed)
 ```
 
-### 2. Adapter Layer
+### Adapter Layer
 
 The adapter layer provides a unified interface for database operations across different engines.
 
@@ -176,57 +181,7 @@ DatabaseAdapter (main interface)
     └── SchemaExists(ctx, name) (bool, error)
 ```
 
-#### PostgreSQL Adapter
-```
-Package: internal/adapter/postgres
-
-Files:
-├── adapter.go       # Core adapter, connection management
-├── database.go      # Database operations
-├── user.go          # User/role operations
-├── grants.go        # Grant/revoke operations
-├── schema.go        # Schema operations
-├── backup.go        # pg_dump integration
-└── restore.go       # pg_restore/psql integration
-
-Connection:
-└── Uses pgx/v5 connection pool with TLS support
-
-Features:
-├── Connection pooling with configurable limits
-├── TLS/mTLS with custom CA
-├── All PostgreSQL role attributes
-├── Schema-level privileges
-├── Default privileges (ALTER DEFAULT PRIVILEGES)
-├── Extension management
-└── Async backup/restore with progress tracking
-```
-
-#### MySQL Adapter
-```
-Package: internal/adapter/mysql
-
-Files:
-├── adapter.go       # Core adapter, connection management
-├── database.go      # Database operations
-├── user.go          # User operations
-├── grants.go        # Grant/revoke operations
-├── backup.go        # mysqldump integration
-└── restore.go       # mysql restore integration
-
-Connection:
-└── Uses go-sql-driver/mysql with TLS support
-
-Features:
-├── Charset/collation configuration
-├── Authentication plugins (mysql_native_password, caching_sha2_password)
-├── Resource limits (MAX_QUERIES_PER_HOUR, etc.)
-├── Multi-level grants (global, database, table, column, routine)
-├── TLS modes (NONE, PREFERRED, REQUIRED, VERIFY_CA, VERIFY_IDENTITY)
-└── Async backup/restore with progress tracking
-```
-
-### 3. Secret Manager
+### Secret Manager
 
 ```
 Package: internal/secret
@@ -238,39 +193,6 @@ Responsibilities:
 ├── Create/update/delete Secrets with owner references
 ├── Render secret templates with database connection info
 └── Support configurable key names for credentials
-
-Key Functions:
-├── GetCredentials(ctx, namespace, ref) - Get username/password
-├── GetTLSCredentials(ctx, namespace, tlsConfig) - Get TLS certs
-├── GeneratePassword(opts) - Secure password generation
-├── EnsureSecretWithOwner(ctx, ...) - Create or update secret
-├── RenderSecretTemplate(tmpl, data) - Template rendering
-└── GetPassword(ctx, namespace, ref) - Get existing password
-```
-
-### 4. Utility Layer
-
-```
-Package: internal/util
-
-Components:
-
-Conditions (conditions.go):
-├── SetReadyCondition - Resource readiness
-├── SetConnectedCondition - Connection status
-├── SetHealthyCondition - Health check status
-├── SetSyncedCondition - Sync status
-└── SetDegradedCondition - Degraded status
-
-Finalizers (finalizers.go):
-├── FinalizerDatabaseInstance - "dbops.dbprovision.io/database-instance"
-├── FinalizerDatabase - "dbops.dbprovision.io/database"
-└── FinalizerDatabaseUser - "dbops.dbprovision.io/database-user"
-
-Annotations (annotations.go):
-├── ShouldSkipReconcile - Check skip-reconcile annotation
-├── HasForceDeleteAnnotation - Check force-delete annotation
-└── IsMarkedForDeletion - Check deletion timestamp
 ```
 
 ## Data Flow
@@ -352,69 +274,38 @@ Check Deletion Protection
         Resource Removed from Cluster
 ```
 
-## Security Architecture
+## Project Structure
 
-### Credential Management
 ```
-┌─────────────────────────────────────────────────────┐
-│                  Secret Sources                      │
-├─────────────────────────────────────────────────────┤
-│  ┌─────────────────┐    ┌─────────────────┐        │
-│  │ Admin Creds     │    │ TLS Certs       │        │
-│  │ (user-provided) │    │ (user-provided) │        │
-│  └────────┬────────┘    └────────┬────────┘        │
-│           │                      │                  │
-│           └──────────┬───────────┘                  │
-│                      ▼                              │
-│            ┌─────────────────┐                     │
-│            │  Secret Manager │                     │
-│            └────────┬────────┘                     │
-│                     │                              │
-│    ┌────────────────┼────────────────┐            │
-│    ▼                ▼                ▼            │
-│ ┌──────┐      ┌──────────┐    ┌───────────┐      │
-│ │ Read │      │ Generate │    │  Create   │      │
-│ │Creds │      │ Password │    │  Secret   │      │
-│ └──────┘      └──────────┘    └───────────┘      │
-└─────────────────────────────────────────────────────┘
+db-provision-operator/
+├── api/v1alpha1/           # CRD type definitions
+├── cmd/main.go             # Operator entrypoint
+├── config/                 # Kubernetes manifests
+│   ├── crd/               # Generated CRD manifests
+│   ├── rbac/              # RBAC configuration
+│   └── samples/           # Example resources
+├── internal/
+│   ├── adapter/           # Database adapters
+│   │   ├── postgres/      # PostgreSQL implementation
+│   │   ├── mysql/         # MySQL implementation
+│   │   └── types/         # Shared adapter types
+│   ├── controller/        # Kubernetes controllers
+│   ├── secret/            # Secret management
+│   └── util/              # Utility functions
+└── docs/                  # Project documentation
 ```
 
-### TLS Configuration
-```
-TLSConfig:
-├── Enabled: bool
-├── Mode: disable|require|verify-ca|verify-full (PostgreSQL)
-├── Mode: NONE|PREFERRED|REQUIRED|VERIFY_CA|VERIFY_IDENTITY (MySQL)
-├── SecretRef:
-│   ├── Name: secret name
-│   └── Keys:
-│       ├── CA: ca.crt (default)
-│       ├── Cert: tls.crt (default)
-│       └── Key: tls.key (default)
-└── InsecureSkipVerify: bool
-```
+## Supported Database Engines
 
-## Error Handling
+### PostgreSQL
+- Full support for database operations (create, drop, update)
+- User/role management with all PostgreSQL attributes
+- Schema-level and default privileges
+- Extensions management
+- Backup/restore using pg_dump and pg_restore
 
-### Retry Strategy
-```
-Error Type              │ Behavior
-────────────────────────┼──────────────────────────
-Resource Not Found      │ Don't requeue
-Connection Failed       │ Requeue after 30s
-Secret Not Found        │ Requeue after 30s
-Instance Not Ready      │ Requeue after 10s
-Database Operation Fail │ Requeue after 30s
-Deletion Protected      │ Return error, don't delete
-```
-
-### Status Conditions
-```
-Condition   │ Meaning
-────────────┼─────────────────────────────────
-Ready       │ Resource is fully reconciled
-Connected   │ Can connect to database server
-Healthy     │ Health check passed
-Synced      │ Resource matches desired state
-Degraded    │ Resource partially functional
-```
+### MySQL
+- Database operations with charset/collation support
+- User management with resource limits and authentication plugins
+- Grant management at multiple levels (global, database, table, column, routine)
+- Backup/restore using mysqldump

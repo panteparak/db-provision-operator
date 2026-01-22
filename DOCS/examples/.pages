@@ -1,0 +1,6 @@
+title: Examples
+nav:
+  - Overview: index.md
+  - PostgreSQL: postgresql.md
+  - MySQL: mysql.md
+  - Advanced: advanced.md

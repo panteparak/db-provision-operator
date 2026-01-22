@@ -42,6 +42,7 @@ theme:
 plugins:
   - search:
       separator: '[\s\-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
+  - awesome-pages
 
 markdown_extensions:
   - abbr
@@ -93,44 +94,4 @@ extra:
 
 copyright: Copyright &copy; 2024-2026 panteparak
 
-docs_dir: DOCS
-
-nav:
-  - Home: index.md
-  - Getting Started:
-      - getting-started/index.md
-      - Installation: getting-started/installation.md
-      - Quick Start: getting-started/quickstart.md
-  - User Guide:
-      - user-guide/index.md
-      - Database Instances: user-guide/database-instances.md
-      - Databases: user-guide/databases.md
-      - Users: user-guide/users.md
-      - Roles: user-guide/roles.md
-      - Grants: user-guide/grants.md
-      - Backups: user-guide/backups.md
-  - Engine Guides:
-      - engines/index.md
-      - PostgreSQL: engines/postgresql.md
-      - MySQL: engines/mysql.md
-      - MariaDB: engines/mariadb.md
-  - API Reference:
-      - api/index.md
-  - Examples:
-      - examples/index.md
-      - PostgreSQL: examples/postgresql.md
-      - MySQL: examples/mysql.md
-      - Advanced: examples/advanced.md
-  - Architecture:
-      - architecture/index.md
-      - Design: architecture/design.md
-      - Security: architecture/security.md
-  - Operations:
-      - operations/index.md
-      - Monitoring: operations/monitoring.md
-      - Troubleshooting: operations/troubleshooting.md
-  - Development:
-      - development/index.md
-      - Contributing: development/contributing.md
-      - Testing: development/testing.md
-      - CI/CD: development/ci-cd.md
+docs_dir: docs
