@@ -1,0 +1,20 @@
+# Read-Write Role
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseRole
+metadata:
+  name: myapp-readwrite
+spec:
+  instanceRef:
+    name: postgres-primary
+  roleName: myapp_readwrite
+  postgres:
+    login: false
+    grants:
+      - database: myapp
+        schema: public
+        tables: ["*"]
+        privileges: [SELECT, INSERT, UPDATE, DELETE]
+      - database: myapp
+        schema: public
+        sequences: ["*"]
+        privileges: [USAGE, SELECT, UPDATE]

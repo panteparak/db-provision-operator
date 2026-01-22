@@ -1,0 +1,16 @@
+# MariaDB Database Instance
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseInstance
+metadata:
+  name: mariadb-primary
+spec:
+  engine: mariadb
+  connection:
+    host: mariadb.database.svc.cluster.local
+    port: 3306
+    database: mysql
+    secretRef:
+      name: mariadb-admin-credentials
+  healthCheck:
+    enabled: true
+    intervalSeconds: 30

@@ -1,0 +1,28 @@
+# Cross-namespace example
+# DatabaseInstance in 'database' namespace, resources in 'app' namespace
+---
+# In database namespace: Instance
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseInstance
+metadata:
+  name: shared-postgres
+  namespace: database
+spec:
+  engine: postgres
+  connection:
+    host: postgres.database.svc.cluster.local
+    port: 5432
+    secretRef:
+      name: postgres-admin-credentials
+---
+# In app namespace: Database referencing cross-namespace instance
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: Database
+metadata:
+  name: team-a-database
+  namespace: app-team-a
+spec:
+  instanceRef:
+    name: shared-postgres
+    namespace: database
+  name: team_a_db

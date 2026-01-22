@@ -1,0 +1,46 @@
+# Backup to AWS S3
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: s3-backup-credentials
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: your-access-key-id
+  AWS_SECRET_ACCESS_KEY: your-secret-access-key
+---
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseBackupSchedule
+metadata:
+  name: production-backup-s3
+spec:
+  databaseRef:
+    name: production-database
+  schedule: "0 */6 * * *"
+  timezone: "UTC"
+  retention:
+    keepLast: 10
+    keepDaily: 7
+    keepWeekly: 4
+    keepMonthly: 3
+  backupTemplate:
+    storage:
+      type: s3
+      s3:
+        bucket: my-company-db-backups
+        region: us-east-1
+        prefix: production/postgres
+        secretRef:
+          name: s3-backup-credentials
+    compression:
+      enabled: true
+      algorithm: zstd
+    encryption:
+      enabled: true
+      algorithm: aes-256-gcm
+      secretRef:
+        name: backup-encryption-key
+        key: encryption-key
+    postgres:
+      format: custom
+      jobs: 4

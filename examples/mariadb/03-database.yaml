@@ -1,0 +1,12 @@
+# Application Database
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: Database
+metadata:
+  name: myapp-mariadb-database
+spec:
+  instanceRef:
+    name: mariadb-primary
+  name: myapp
+  mysql:
+    charset: utf8mb4
+    collation: utf8mb4_unicode_ci

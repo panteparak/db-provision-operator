@@ -1,0 +1,11 @@
+# Assign Role to User
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseGrant
+metadata:
+  name: myapp-user-grant
+spec:
+  userRef:
+    name: myapp-user
+  postgres:
+    roles:
+      - myapp_readwrite

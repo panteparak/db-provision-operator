@@ -1,0 +1,20 @@
+# Application User
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseUser
+metadata:
+  name: myapp-user
+spec:
+  instanceRef:
+    name: postgres-primary
+  username: myapp_user
+  passwordSecret:
+    generate: true
+    length: 32
+    secretName: myapp-user-credentials
+    secretTemplate:
+      labels:
+        app: myapp
+      data:
+        DATABASE_URL: "postgresql://{{ .Username }}:{{ .Password }}@{{ .Host }}:{{ .Port }}/myapp?sslmode=prefer"
+  postgres:
+    connectionLimit: 50

@@ -1,0 +1,13 @@
+# Application Database
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: Database
+metadata:
+  name: myapp-mysql-database
+spec:
+  instanceRef:
+    name: mysql-primary
+  name: myapp
+  deletionPolicy: Retain
+  mysql:
+    charset: utf8mb4
+    collation: utf8mb4_unicode_ci
