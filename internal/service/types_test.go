@@ -50,7 +50,7 @@ func TestConfig_Validate(t *testing.T) {
 			name:    "invalid engine",
 			config:  &Config{Engine: "oracle", Host: "localhost", Port: 5432, Username: "user"},
 			wantErr: true,
-			errMsg:  "engine must be 'postgres' or 'mysql'",
+			errMsg:  "engine must be 'postgres', 'mysql', or 'mariadb'",
 		},
 		{
 			name:    "missing host",
@@ -96,6 +96,11 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name:    "valid mysql config",
 			config:  &Config{Engine: "mysql", Host: "localhost", Port: 3306, Username: "user"},
+			wantErr: false,
+		},
+		{
+			name:    "valid mariadb config",
+			config:  &Config{Engine: "mariadb", Host: "localhost", Port: 3306, Username: "user"},
 			wantErr: false,
 		},
 		{
@@ -214,6 +219,7 @@ func TestConfig_GetEngineType(t *testing.T) {
 	}{
 		{"postgres", dbopsv1alpha1.EngineTypePostgres},
 		{"mysql", dbopsv1alpha1.EngineTypeMySQL},
+		{"mariadb", dbopsv1alpha1.EngineTypeMariaDB},
 		{"unknown", dbopsv1alpha1.EngineType("unknown")},
 	}
 

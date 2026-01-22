@@ -22,12 +22,13 @@ import (
 )
 
 // EngineType defines the database engine type
-// +kubebuilder:validation:Enum=postgres;mysql;cockroachdb
+// +kubebuilder:validation:Enum=postgres;mysql;mariadb;cockroachdb
 type EngineType string
 
 const (
 	EngineTypePostgres    EngineType = "postgres"
 	EngineTypeMySQL       EngineType = "mysql"
+	EngineTypeMariaDB     EngineType = "mariadb"
 	EngineTypeCockroachDB EngineType = "cockroachdb"
 )
 

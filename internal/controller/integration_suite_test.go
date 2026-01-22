@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"testing"
 	"time"
 
@@ -43,6 +42,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/controller/testutil"
 	"github.com/db-provision-operator/internal/secret"
 )
 
@@ -68,45 +68,17 @@ var (
 	intCfg       *rest.Config
 	intK8sClient client.Client
 	intDBConfig  IntegrationDBConfig
+	dbContainer  *testutil.DatabaseContainer
+	testProfiler *testutil.TestProfiler
 )
 
-// getIntegrationDBConfig reads database configuration from environment variables
-func getIntegrationDBConfig() IntegrationDBConfig {
-	database := os.Getenv("INTEGRATION_TEST_DATABASE")
-	if database == "" {
-		database = "postgresql" // default
+// getIntegrationEngine reads the database engine from environment variable
+func getIntegrationEngine() string {
+	engine := os.Getenv("INTEGRATION_TEST_DATABASE")
+	if engine == "" {
+		engine = "postgresql" // default
 	}
-
-	host := os.Getenv("INTEGRATION_TEST_HOST")
-	if host == "" {
-		host = "localhost"
-	}
-
-	portStr := os.Getenv("INTEGRATION_TEST_PORT")
-	port := int32(5432) // default PostgreSQL port
-	if portStr != "" {
-		if p, err := strconv.Atoi(portStr); err == nil {
-			port = int32(p)
-		}
-	}
-
-	user := os.Getenv("INTEGRATION_TEST_USER")
-	if user == "" {
-		user = "admin"
-	}
-
-	password := os.Getenv("INTEGRATION_TEST_PASSWORD")
-	if password == "" {
-		password = "password123"
-	}
-
-	return IntegrationDBConfig{
-		Database: database,
-		Host:     host,
-		Port:     port,
-		User:     user,
-		Password: password,
-	}
+	return engine
 }
 
 // getEngineType converts database name to EngineType
@@ -129,14 +101,39 @@ func TestIntegration(t *testing.T) {
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
-	// Load database configuration from environment
-	intDBConfig = getIntegrationDBConfig()
-	GinkgoWriter.Printf("Integration test database: %s at %s:%d\n",
+	// Initialize profiler for performance metrics
+	var err error
+	testProfiler, err = testutil.NewTestProfiler("test-reports")
+	Expect(err).NotTo(HaveOccurred(), "Failed to create test profiler")
+	err = testProfiler.StartCPUProfile()
+	Expect(err).NotTo(HaveOccurred(), "Failed to start CPU profiling")
+
+	// Get engine type from environment (for CI matrix) or default to postgresql
+	engine := getIntegrationEngine()
+
+	// Start database container using testcontainers-go (once per test session)
+	ctx := context.Background()
+	dbContainer, err = testutil.StartDatabaseContainer(ctx, testutil.DatabaseContainerConfig{
+		Engine:   engine,
+		User:     "admin",
+		Password: "password123",
+		Database: "testdb",
+	})
+	Expect(err).NotTo(HaveOccurred(), "Failed to start database container")
+
+	host, port, user, password, _ := dbContainer.ConnectionInfo()
+	intDBConfig = IntegrationDBConfig{
+		Database: engine,
+		Host:     host,
+		Port:     int32(port),
+		User:     user,
+		Password: password,
+	}
+	GinkgoWriter.Printf("Integration test database: %s at %s:%d (testcontainers-go)\n",
 		intDBConfig.Database, intDBConfig.Host, intDBConfig.Port)
 
 	intCtx, intCancel = context.WithCancel(context.TODO())
 
-	var err error
 	err = dbopsv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -223,6 +220,42 @@ var _ = AfterSuite(func() {
 	intCancel()
 	err := intTestEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
+
+	// Stop the database container
+	if dbContainer != nil {
+		By("stopping the database container")
+		err = dbContainer.Stop(context.Background())
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	// Stop profiling and generate report
+	if testProfiler != nil {
+		By("generating test performance report")
+		testProfiler.StopCPUProfile()
+		err = testProfiler.WriteMemoryProfile()
+		if err != nil {
+			GinkgoWriter.Printf("Warning: Failed to write memory profile: %v\n", err)
+		}
+		err = testProfiler.GenerateReport()
+		if err != nil {
+			GinkgoWriter.Printf("Warning: Failed to generate report: %v\n", err)
+		} else {
+			GinkgoWriter.Printf("Test report generated at: %s/report.html\n", testProfiler.OutputDir())
+		}
+	}
+})
+
+// Profiler hooks for each test
+var _ = BeforeEach(func() {
+	if testProfiler != nil {
+		testProfiler.MarkTestStart(CurrentSpecReport().FullText())
+	}
+})
+
+var _ = AfterEach(func() {
+	if testProfiler != nil {
+		testProfiler.MarkTestEnd(CurrentSpecReport().FullText(), !CurrentSpecReport().Failed())
+	}
 })
 
 // getFirstFoundEnvTestBinaryDirIntegration locates the first binary in the specified path.

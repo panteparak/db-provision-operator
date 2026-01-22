@@ -95,22 +95,6 @@ jobs:
       fail-fast: false
       matrix:
         database: [postgresql, mysql, mariadb]
-        include:
-          - database: postgresql
-            image: postgres:16-alpine
-            port: 5432
-            test_user: admin
-            test_password: password123
-          - database: mysql
-            image: mysql:8.0
-            port: 3306
-            test_user: root
-            test_password: password123
-          - database: mariadb
-            image: mariadb:11.2
-            port: 3306
-            test_user: root
-            test_password: password123
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -121,86 +105,23 @@ jobs:
           go-version-file: ${{ env.GO_VERSION_FILE }}
           cache: true  # Enable Go module caching
 
-      - name: Start ${{ matrix.database }} container
-        run: |
-          echo "Starting ${{ matrix.database }} container..."
-          if [ "${{ matrix.database }}" = "postgresql" ]; then
-            docker run -d --name test-db \
-              -e POSTGRES_USER=admin \
-              -e POSTGRES_PASSWORD=password123 \
-              -e POSTGRES_DB=postgres \
-              -p ${{ matrix.port }}:5432 \
-              --health-cmd "pg_isready -U admin" \
-              --health-interval 5s \
-              --health-timeout 5s \
-              --health-retries 10 \
-              ${{ matrix.image }}
-          elif [ "${{ matrix.database }}" = "mysql" ]; then
-            docker run -d --name test-db \
-              -e MYSQL_ROOT_PASSWORD=password123 \
-              -e MYSQL_USER=admin \
-              -e MYSQL_PASSWORD=password123 \
-              -e MYSQL_DATABASE=mysql \
-              -p ${{ matrix.port }}:3306 \
-              --health-cmd "mysqladmin ping -h 127.0.0.1 -u root -ppassword123" \
-              --health-interval 5s \
-              --health-timeout 5s \
-              --health-retries 20 \
-              ${{ matrix.image }}
-          elif [ "${{ matrix.database }}" = "mariadb" ]; then
-            docker run -d --name test-db \
-              -e MARIADB_ROOT_PASSWORD=password123 \
-              -e MARIADB_USER=admin \
-              -e MARIADB_PASSWORD=password123 \
-              -e MARIADB_DATABASE=mysql \
-              -p ${{ matrix.port }}:3306 \
-              --health-cmd "mariadb-admin ping -h 127.0.0.1 -u root -ppassword123" \
-              --health-interval 5s \
-              --health-timeout 5s \
-              --health-retries 20 \
-              ${{ matrix.image }}
-          fi
-          echo "Container started, waiting for health check..."
-
-      - name: Wait for database to be healthy
-        run: |
-          echo "Waiting for ${{ matrix.database }} to be healthy..."
-          timeout=120
-          elapsed=0
-          while [ $elapsed -lt $timeout ]; do
-            health=$(docker inspect --format='{{.State.Health.Status}}' test-db 2>/dev/null || echo "unknown")
-            echo "Health status: $health (${elapsed}s elapsed)"
-            if [ "$health" = "healthy" ]; then
-              echo "${{ matrix.database }} is healthy!"
-              exit 0
-            fi
-            sleep 5
-            elapsed=$((elapsed + 5))
-          done
-          echo "Timeout waiting for ${{ matrix.database }} to be healthy"
-          docker logs test-db
-          exit 1
-
+      # testcontainers-go manages Docker containers programmatically
+      # No manual container setup needed - tests handle their own lifecycle
       - name: Run integration tests
         env:
           INTEGRATION_TEST_DATABASE: ${{ matrix.database }}
-          INTEGRATION_TEST_HOST: 127.0.0.1
-          INTEGRATION_TEST_PORT: ${{ matrix.port }}
-          INTEGRATION_TEST_USER: ${{ matrix.test_user }}
-          INTEGRATION_TEST_PASSWORD: ${{ matrix.test_password }}
+          # testcontainers-go will automatically start and configure containers
+          TESTCONTAINERS_RYUK_DISABLED: false
         run: make test-integration
 
-      - name: Collect container logs on failure
-        if: failure()
-        run: |
-          echo "=== Database container logs ==="
-          docker logs test-db || true
-
-      - name: Cleanup database container
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
         if: always()
-        run: |
-          docker stop test-db || true
-          docker rm test-db || true
+        with:
+          name: test-reports-${{ matrix.database }}
+          path: test-reports/
+          retention-days: 30
+          if-no-files-found: ignore
 
       - name: Upload integration coverage report
         uses: codecov/codecov-action@v4

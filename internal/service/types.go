@@ -117,7 +117,7 @@ func ConfigFromEnv(getEnv func(string) string) (*Config, error) {
 		switch cfg.Engine {
 		case "postgres":
 			cfg.Port = 5432
-		case "mysql":
+		case "mysql", "mariadb":
 			cfg.Port = 3306
 		}
 	}
@@ -127,7 +127,7 @@ func ConfigFromEnv(getEnv func(string) string) (*Config, error) {
 		switch cfg.Engine {
 		case "postgres":
 			cfg.Database = "postgres"
-		case "mysql":
+		case "mysql", "mariadb":
 			cfg.Database = "mysql"
 		}
 	}
@@ -221,6 +221,8 @@ func (c *Config) GetEngineType() dbopsv1alpha1.EngineType {
 		return dbopsv1alpha1.EngineTypePostgres
 	case "mysql":
 		return dbopsv1alpha1.EngineTypeMySQL
+	case "mariadb":
+		return dbopsv1alpha1.EngineTypeMariaDB
 	default:
 		return dbopsv1alpha1.EngineType(c.Engine)
 	}
@@ -235,8 +237,8 @@ func (c *Config) Validate() error {
 	if c.Engine == "" {
 		return &ValidationError{Field: "engine", Message: "engine is required"}
 	}
-	if c.Engine != "postgres" && c.Engine != "mysql" {
-		return &ValidationError{Field: "engine", Message: "engine must be 'postgres' or 'mysql'"}
+	if c.Engine != "postgres" && c.Engine != "mysql" && c.Engine != "mariadb" {
+		return &ValidationError{Field: "engine", Message: "engine must be 'postgres', 'mysql', or 'mariadb'"}
 	}
 	if c.Host == "" {
 		return &ValidationError{Field: "host", Message: "host is required"}
@@ -328,7 +330,7 @@ func (b *ConfigBuilder) WithEngine(engine string) *ConfigBuilder {
 		if b.config.Database == "" {
 			b.config.Database = "postgres"
 		}
-	case "mysql":
+	case "mysql", "mariadb":
 		if b.config.Port == 0 {
 			b.config.Port = 3306
 		}
@@ -515,7 +517,7 @@ func ConfigFromInstance(spec *dbopsv1alpha1.DatabaseInstanceSpec, username, pass
 		switch spec.Engine {
 		case dbopsv1alpha1.EngineTypePostgres:
 			cfg.Database = "postgres"
-		case dbopsv1alpha1.EngineTypeMySQL:
+		case dbopsv1alpha1.EngineTypeMySQL, dbopsv1alpha1.EngineTypeMariaDB:
 			cfg.Database = "mysql"
 		}
 	}
@@ -525,7 +527,7 @@ func ConfigFromInstance(spec *dbopsv1alpha1.DatabaseInstanceSpec, username, pass
 		switch spec.Engine {
 		case dbopsv1alpha1.EngineTypePostgres:
 			cfg.Port = 5432
-		case dbopsv1alpha1.EngineTypeMySQL:
+		case dbopsv1alpha1.EngineTypeMySQL, dbopsv1alpha1.EngineTypeMariaDB:
 			cfg.Port = 3306
 		}
 	}

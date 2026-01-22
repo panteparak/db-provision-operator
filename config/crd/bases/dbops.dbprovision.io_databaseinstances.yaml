@@ -138,6 +138,7 @@ spec:
                 - enum:
                   - postgres
                   - mysql
+                  - mariadb
                   - cockroachdb
                 - enum:
                   - postgres

@@ -29,7 +29,8 @@ func NewAdapter(engine dbopsv1alpha1.EngineType, config ConnectionConfig) (Datab
 	switch engine {
 	case dbopsv1alpha1.EngineTypePostgres:
 		return postgres.NewAdapter(config), nil
-	case dbopsv1alpha1.EngineTypeMySQL:
+	case dbopsv1alpha1.EngineTypeMySQL, dbopsv1alpha1.EngineTypeMariaDB:
+		// MariaDB is MySQL-compatible and uses the same adapter
 		return mysql.NewAdapter(config), nil
 	case dbopsv1alpha1.EngineTypeCockroachDB:
 		return nil, fmt.Errorf("CockroachDB adapter not yet implemented")

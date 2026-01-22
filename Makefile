@@ -113,8 +113,23 @@ test: manifests generate fmt vet setup-envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
 .PHONY: test-integration
-test-integration: manifests generate setup-envtest ## Run integration tests (controllers with manager).
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./internal/controller/... -v -tags=integration -timeout=10m -coverprofile cover-integration.out
+test-integration: manifests generate setup-envtest ## Run integration tests with testcontainers-go and profiling.
+	@mkdir -p test-reports
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
+	go test ./internal/controller/... -v -tags=integration -timeout=15m \
+		-coverprofile cover-integration.out
+	@echo "Integration tests completed. Reports available in test-reports/"
+
+.PHONY: test-integration-security
+test-integration-security: manifests generate setup-envtest ## Run integration security tests only.
+	@mkdir -p test-reports
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
+	go test ./internal/controller/... -v -tags=integration -timeout=15m \
+		-run "Security" -coverprofile cover-integration-security.out
+
+.PHONY: clean-test-reports
+clean-test-reports: ## Clean test reports directory.
+	rm -rf test-reports/
 
 .PHONY: test-benchmark
 test-benchmark: setup-envtest ## Run benchmarks for controllers.
