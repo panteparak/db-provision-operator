@@ -101,9 +101,10 @@ func TestIntegration(t *testing.T) {
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
-	// Initialize profiler for performance metrics
+	// Initialize profiler for performance metrics - output to project root
 	var err error
-	testProfiler, err = testutil.NewTestProfiler("test-reports")
+	reportDir := filepath.Join("..", "..", "test-reports")
+	testProfiler, err = testutil.NewTestProfiler(reportDir)
 	Expect(err).NotTo(HaveOccurred(), "Failed to create test profiler")
 	err = testProfiler.StartCPUProfile()
 	Expect(err).NotTo(HaveOccurred(), "Failed to start CPU profiling")
@@ -328,7 +329,7 @@ var _ = Describe("Integration Tests", func() {
 					return nil
 				}
 				return updatedInstance.Finalizers
-			}, timeout, interval).Should(ContainElement("dbops.dbprovision.io/databaseinstance"))
+			}, timeout, interval).Should(ContainElement("dbops.dbprovision.io/instance-protection"))
 
 			// Cleanup
 			updatedInstance := &dbopsv1alpha1.DatabaseInstance{}
@@ -399,7 +400,8 @@ var _ = Describe("Integration Tests", func() {
 
 		It("should handle Database creation with instanceRef", func() {
 			instanceName := fmt.Sprintf("int-test-instance-3-%s", intDBConfig.Database)
-			dbName := fmt.Sprintf("int_test_db_%s", intDBConfig.Database)
+			dbName := fmt.Sprintf("int-test-db-%s", intDBConfig.Database)
+			dbServerName := "int_test_db"
 
 			// Create credentials secret with actual database credentials
 			credSecret := &corev1.Secret{
@@ -456,6 +458,7 @@ var _ = Describe("Integration Tests", func() {
 					InstanceRef: dbopsv1alpha1.InstanceReference{
 						Name: instanceName,
 					},
+					Name: dbServerName,
 				},
 			}
 			Expect(intK8sClient.Create(intCtx, database)).To(Succeed())
@@ -471,7 +474,7 @@ var _ = Describe("Integration Tests", func() {
 					return nil
 				}
 				return updatedDB.Finalizers
-			}, timeout, interval).Should(ContainElement("dbops.dbprovision.io/database"))
+			}, timeout, interval).Should(ContainElement("dbops.dbprovision.io/database-protection"))
 
 			// Wait for Database to be Ready
 			Eventually(func() string {
@@ -561,6 +564,10 @@ var _ = Describe("Integration Tests", func() {
 					Username: fmt.Sprintf("testuser_%s", intDBConfig.Database),
 					InstanceRef: dbopsv1alpha1.InstanceReference{
 						Name: instanceName,
+					},
+					PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+						Generate:   true,
+						SecretName: userName + "-credentials",
 					},
 				},
 			}

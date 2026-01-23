@@ -361,7 +361,7 @@ var _ = Describe("Security Tests", func() {
 			defer cleanup(instance, credSecret)
 
 			// Create a test database
-			dbName := fmt.Sprintf("sec_priv_test_%s", intDBConfig.Database)
+			dbName := fmt.Sprintf("sec-priv-test-%s", intDBConfig.Database)
 			db := &dbopsv1alpha1.Database{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      dbName,
@@ -369,6 +369,7 @@ var _ = Describe("Security Tests", func() {
 				},
 				Spec: dbopsv1alpha1.DatabaseSpec{
 					InstanceRef: dbopsv1alpha1.InstanceReference{Name: instanceName},
+					Name:        "secprivtestdb",
 				},
 			}
 			Expect(intK8sClient.Create(intCtx, db)).To(Succeed())
@@ -401,35 +402,80 @@ var _ = Describe("Security Tests", func() {
 				return string(created.Status.Phase)
 			}, timeout, interval).Should(Equal(string(dbopsv1alpha1.PhaseReady)))
 
-			// Try to grant dangerous privileges
-			dangerousPrivileges := [][]string{
-				{"ALL"},
-				{"SUPER"},       // MySQL specific
-				{"SUPERUSER"},   // PostgreSQL specific
-				{"CREATE USER"}, // Ability to create other users
-				{"GRANT OPTION"},
+			// Try to grant dangerous privileges based on engine type
+			// The new API uses engine-specific grant configs
+			var grants []*dbopsv1alpha1.DatabaseGrant
+
+			if intDBConfig.Database == "postgresql" {
+				// PostgreSQL dangerous privileges
+				dangerousPrivileges := [][]string{
+					{"ALL"},
+					{"CREATE"},
+					{"CONNECT", "TEMPORARY"},
+				}
+
+				for i, privs := range dangerousPrivileges {
+					grantName := fmt.Sprintf("dangerous-grant-%d-%s", i, intDBConfig.Database)
+					grant := &dbopsv1alpha1.DatabaseGrant{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      grantName,
+							Namespace: testNamespace,
+						},
+						Spec: dbopsv1alpha1.DatabaseGrantSpec{
+							UserRef:     dbopsv1alpha1.UserReference{Name: userName},
+							DatabaseRef: &dbopsv1alpha1.DatabaseReference{Name: dbName},
+							Postgres: &dbopsv1alpha1.PostgresGrantConfig{
+								Grants: []dbopsv1alpha1.PostgresGrant{
+									{
+										Database:   "testdb",
+										Privileges: privs,
+									},
+								},
+							},
+						},
+					}
+					grants = append(grants, grant)
+				}
+			} else {
+				// MySQL/MariaDB dangerous privileges
+				dangerousPrivileges := [][]string{
+					{"ALL"},
+					{"SUPER"},
+					{"CREATE USER"},
+					{"GRANT OPTION"},
+				}
+
+				for i, privs := range dangerousPrivileges {
+					grantName := fmt.Sprintf("dangerous-grant-%d-%s", i, intDBConfig.Database)
+					grant := &dbopsv1alpha1.DatabaseGrant{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      grantName,
+							Namespace: testNamespace,
+						},
+						Spec: dbopsv1alpha1.DatabaseGrantSpec{
+							UserRef:     dbopsv1alpha1.UserReference{Name: userName},
+							DatabaseRef: &dbopsv1alpha1.DatabaseReference{Name: dbName},
+							MySQL: &dbopsv1alpha1.MySQLGrantConfig{
+								Grants: []dbopsv1alpha1.MySQLGrant{
+									{
+										Level:      dbopsv1alpha1.MySQLGrantLevelDatabase,
+										Database:   "testdb",
+										Privileges: privs,
+									},
+								},
+							},
+						},
+					}
+					grants = append(grants, grant)
+				}
 			}
 
-			for i, privs := range dangerousPrivileges {
-				By(fmt.Sprintf("Testing dangerous privilege set %d: %v", i+1, privs))
-
-				grantName := fmt.Sprintf("dangerous-grant-%d-%s", i, intDBConfig.Database)
-				grant := &dbopsv1alpha1.DatabaseGrant{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      grantName,
-						Namespace: testNamespace,
-					},
-					Spec: dbopsv1alpha1.DatabaseGrantSpec{
-						InstanceRef: dbopsv1alpha1.InstanceReference{Name: instanceName},
-						UserRef:     dbopsv1alpha1.UserReference{Name: userName},
-						DatabaseRef: dbopsv1alpha1.DatabaseReference{Name: dbName},
-						Privileges:  privs,
-					},
-				}
+			for i, grant := range grants {
+				By(fmt.Sprintf("Testing dangerous privilege grant %d", i+1))
 
 				err := intK8sClient.Create(intCtx, grant)
 				if err != nil {
-					GinkgoWriter.Printf("  Dangerous privilege %v rejected at API level\n", privs)
+					GinkgoWriter.Printf("  Dangerous privilege rejected at API level: %v\n", err)
 					continue
 				}
 
@@ -439,7 +485,7 @@ var _ = Describe("Security Tests", func() {
 					if err := intK8sClient.Get(intCtx, client.ObjectKeyFromObject(grant), &created); err != nil {
 						return ""
 					}
-					GinkgoWriter.Printf("  Grant %s phase: %s\n", grantName, created.Status.Phase)
+					GinkgoWriter.Printf("  Grant %s phase: %s\n", grant.Name, created.Status.Phase)
 					return string(created.Status.Phase)
 				}, timeout, interval).Should(Or(
 					Equal(string(dbopsv1alpha1.PhaseFailed)),

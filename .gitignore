@@ -34,3 +34,8 @@ config/grafana/dashboards/
 # E2E debug logs
 e2e-debug-*.log
 site/
+
+# Test reports and profiling output
+test-reports/
+*.pprof
+cover*.out
