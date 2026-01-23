@@ -525,8 +525,9 @@ var _ = Describe("Security Tests", func() {
 				Spec: dbopsv1alpha1.DatabaseInstanceSpec{
 					Engine: getEngineType(intDBConfig.Database),
 					Connection: dbopsv1alpha1.ConnectionConfig{
-						Host: intDBConfig.Host,
-						Port: intDBConfig.Port,
+						Host:     intDBConfig.Host,
+						Port:     intDBConfig.Port,
+						Database: intDBConfig.DBName, // Use correct database so failure is due to credentials
 						SecretRef: &dbopsv1alpha1.CredentialSecretRef{
 							Name: instanceName + "-creds",
 						},
@@ -570,8 +571,9 @@ var _ = Describe("Security Tests", func() {
 				Spec: dbopsv1alpha1.DatabaseInstanceSpec{
 					Engine: getEngineType(intDBConfig.Database),
 					Connection: dbopsv1alpha1.ConnectionConfig{
-						Host: "192.0.2.1", // TEST-NET-1, should not be routable
-						Port: intDBConfig.Port,
+						Host:     "192.0.2.1", // TEST-NET-1, should not be routable
+						Port:     intDBConfig.Port,
+						Database: intDBConfig.DBName,
 						SecretRef: &dbopsv1alpha1.CredentialSecretRef{
 							Name: instanceName + "-creds",
 						},
