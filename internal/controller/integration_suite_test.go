@@ -54,7 +54,8 @@ import (
 
 // IntegrationDBConfig holds database configuration from environment variables
 type IntegrationDBConfig struct {
-	Database string // postgresql, mysql, mariadb
+	Database string // postgresql, mysql, mariadb (engine type)
+	DBName   string // actual database name to connect to (e.g., "testdb")
 	Host     string
 	Port     int32
 	User     string
@@ -122,9 +123,10 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).NotTo(HaveOccurred(), "Failed to start database container")
 
-	host, port, user, password, _ := dbContainer.ConnectionInfo()
+	host, port, user, password, dbName := dbContainer.ConnectionInfo()
 	intDBConfig = IntegrationDBConfig{
 		Database: engine,
+		DBName:   dbName, // actual database name (e.g., "testdb")
 		Host:     host,
 		Port:     int32(port),
 		User:     user,
@@ -308,8 +310,9 @@ var _ = Describe("Integration Tests", func() {
 				Spec: dbopsv1alpha1.DatabaseInstanceSpec{
 					Engine: getEngineType(intDBConfig.Database),
 					Connection: dbopsv1alpha1.ConnectionConfig{
-						Host: intDBConfig.Host,
-						Port: intDBConfig.Port,
+						Host:     intDBConfig.Host,
+						Port:     intDBConfig.Port,
+						Database: intDBConfig.DBName,
 						SecretRef: &dbopsv1alpha1.CredentialSecretRef{
 							Name: instanceName + "-creds",
 						},
@@ -365,8 +368,9 @@ var _ = Describe("Integration Tests", func() {
 				Spec: dbopsv1alpha1.DatabaseInstanceSpec{
 					Engine: getEngineType(intDBConfig.Database),
 					Connection: dbopsv1alpha1.ConnectionConfig{
-						Host: intDBConfig.Host,
-						Port: intDBConfig.Port,
+						Host:     intDBConfig.Host,
+						Port:     intDBConfig.Port,
+						Database: intDBConfig.DBName,
 						SecretRef: &dbopsv1alpha1.CredentialSecretRef{
 							Name: instanceName + "-creds",
 						},
@@ -425,8 +429,9 @@ var _ = Describe("Integration Tests", func() {
 				Spec: dbopsv1alpha1.DatabaseInstanceSpec{
 					Engine: getEngineType(intDBConfig.Database),
 					Connection: dbopsv1alpha1.ConnectionConfig{
-						Host: intDBConfig.Host,
-						Port: intDBConfig.Port,
+						Host:     intDBConfig.Host,
+						Port:     intDBConfig.Port,
+						Database: intDBConfig.DBName,
 						SecretRef: &dbopsv1alpha1.CredentialSecretRef{
 							Name: instanceName + "-creds",
 						},
@@ -531,8 +536,9 @@ var _ = Describe("Integration Tests", func() {
 				Spec: dbopsv1alpha1.DatabaseInstanceSpec{
 					Engine: getEngineType(intDBConfig.Database),
 					Connection: dbopsv1alpha1.ConnectionConfig{
-						Host: intDBConfig.Host,
-						Port: intDBConfig.Port,
+						Host:     intDBConfig.Host,
+						Port:     intDBConfig.Port,
+						Database: intDBConfig.DBName,
 						SecretRef: &dbopsv1alpha1.CredentialSecretRef{
 							Name: instanceName + "-creds",
 						},
