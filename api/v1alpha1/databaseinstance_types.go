@@ -24,7 +24,7 @@ import (
 type DatabaseInstanceSpec struct {
 	// Engine type (required, immutable)
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum=postgres;mysql;cockroachdb
+	// +kubebuilder:validation:Enum=postgres;mysql;mariadb;cockroachdb
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="engine is immutable"
 	Engine EngineType `json:"engine"`
 
