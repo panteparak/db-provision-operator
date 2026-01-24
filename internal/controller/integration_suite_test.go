@@ -115,9 +115,18 @@ var _ = BeforeSuite(func() {
 
 	// Start database container using testcontainers-go (once per test session)
 	ctx := context.Background()
+
+	// Use appropriate admin user for each database engine
+	// MySQL/MariaDB: "root" has full privileges
+	// PostgreSQL: any user created with WithUsername has superuser privileges
+	adminUser := "admin"
+	if engine == "mysql" || engine == "mariadb" {
+		adminUser = "root" // root user has CREATE DATABASE privileges
+	}
+
 	dbContainer, err = testutil.StartDatabaseContainer(ctx, testutil.DatabaseContainerConfig{
 		Engine:   engine,
-		User:     "admin",
+		User:     adminUser,
 		Password: "password123",
 		Database: "testdb",
 	})
