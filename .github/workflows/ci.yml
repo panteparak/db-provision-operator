@@ -461,6 +461,54 @@ jobs:
             --set grafanaDashboards.enabled=true \
             --debug > /dev/null
 
+      # Validate rendered YAML for duplicate keys (helm template doesn't catch this)
+      - name: Validate Helm template YAML (strict)
+        run: |
+          validate_helm_yaml() {
+            python3 -c "
+          import sys, yaml
+          from yaml import SafeLoader
+
+          def no_duplicates_constructor(loader, node, deep=False):
+              mapping = {}
+              for key_node, value_node in node.value:
+                  key = loader.construct_object(key_node, deep=deep)
+                  if key in mapping:
+                      raise yaml.constructor.ConstructorError(
+                          'while constructing a mapping', node.start_mark,
+                          f'found duplicate key \"{key}\"', key_node.start_mark
+                      )
+                  mapping[key] = loader.construct_object(value_node, deep=deep)
+              return mapping
+
+          SafeLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, no_duplicates_constructor)
+
+          try:
+              list(yaml.safe_load_all(sys.stdin))
+          except Exception as e:
+              print(f'✗ Validation failed: {e}', file=sys.stderr)
+              sys.exit(1)
+          "
+          }
+
+          echo "Testing default values..."
+          helm template test charts/db-provision-operator --set image.tag=test | validate_helm_yaml
+          echo "✓ Default values OK"
+
+          echo "Testing with custom replica count..."
+          helm template test charts/db-provision-operator \
+            --set image.tag=test \
+            --set replicaCount=2 | validate_helm_yaml
+          echo "✓ Custom replica count OK"
+
+          echo "Testing with Grafana dashboards enabled..."
+          helm template test charts/db-provision-operator \
+            --set image.tag=test \
+            --set grafanaDashboards.enabled=true | validate_helm_yaml
+          echo "✓ Grafana dashboards OK"
+
+          echo "All Helm template validations passed!"
+
   generate:
     name: Verify Generated Code
     runs-on: ubuntu-latest
