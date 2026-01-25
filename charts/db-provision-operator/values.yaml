@@ -34,9 +34,8 @@ serviceAccount:
 podAnnotations:
   kubectl.kubernetes.io/default-container: manager
 
-# -- Pod labels
-podLabels:
-  control-plane: controller-manager
+# -- Pod labels (control-plane label is already in selectorLabels)
+podLabels: {}
 
 # -- Pod security context
 podSecurityContext:
