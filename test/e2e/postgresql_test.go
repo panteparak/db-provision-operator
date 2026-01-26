@@ -59,16 +59,23 @@ var _ = Describe("postgresql", Ordered, func() {
 		return postgresHost
 	}
 
+	// Admin credentials read from secret (least-privilege account)
+	var adminUsername, adminPassword string
+
 	BeforeAll(func() {
 		By("setting up PostgreSQL verifier")
-		// Get the admin password from the secret
-		password, err := getSecretValue(ctx, secretNamespace, secretName, "password")
+		// Get the admin credentials from the secret (least-privilege account)
+		var err error
+		adminUsername, err = getSecretValue(ctx, secretNamespace, secretName, "username")
+		Expect(err).NotTo(HaveOccurred(), "Failed to get PostgreSQL username from secret")
+
+		adminPassword, err = getSecretValue(ctx, secretNamespace, secretName, "password")
 		Expect(err).NotTo(HaveOccurred(), "Failed to get PostgreSQL password from secret")
 
 		verifierHost := getVerifierHost()
-		GinkgoWriter.Printf("Using verifier host: %s\n", verifierHost)
+		GinkgoWriter.Printf("Using verifier host: %s with admin user: %s\n", verifierHost, adminUsername)
 
-		cfg := testutil.PostgresEngineConfig(verifierHost, 5432, "postgres", password)
+		cfg := testutil.PostgresEngineConfig(verifierHost, 5432, adminUsername, adminPassword)
 		verifier = testutil.NewPostgresVerifier(cfg)
 
 		// Connect with retry since database may still be starting
@@ -364,10 +371,10 @@ var _ = Describe("postgresql", Ordered, func() {
 			owner, err := verifier.GetDatabaseOwner(ctx, databaseName)
 			Expect(err).NotTo(HaveOccurred(), "Failed to get database owner")
 
-			By("verifying owner is the admin user (postgres)")
+			By("verifying owner is the admin user from credentials")
 			// The database is created by the operator using the admin credentials
-			// so the owner should be the admin user
-			Expect(owner).To(Equal("postgres"), "Database owner should be 'postgres' (admin user)")
+			// so the owner should be the admin user (dbprovision_admin for least-privilege setup)
+			Expect(owner).To(Equal(adminUsername), "Database owner should be '%s' (admin user)", adminUsername)
 			GinkgoWriter.Printf("Database '%s' owner: %s\n", databaseName, owner)
 		})
 	})
@@ -408,16 +415,12 @@ var _ = Describe("postgresql", Ordered, func() {
 
 		It("should enforce granted permissions (SELECT, INSERT allowed)", func() {
 			By("getting user credentials")
-			secretName := userName + "-credentials"
-			password, err := getSecretValue(ctx, testNamespace, secretName, "password")
+			userSecretName := userName + "-credentials"
+			password, err := getSecretValue(ctx, testNamespace, userSecretName, "password")
 			if err != nil {
 				password, err = getSecretValue(ctx, testNamespace, userName, "password")
 			}
 			Expect(err).NotTo(HaveOccurred(), "Failed to get user password")
-
-			By("getting admin credentials for setup")
-			adminPassword, err := getSecretValue(ctx, secretNamespace, "postgres-credentials", "password")
-			Expect(err).NotTo(HaveOccurred(), "Failed to get admin password")
 
 			By("connecting as the granted user")
 			userConn, err := verifier.ConnectAsUser(ctx, userName, password, databaseName)
@@ -425,8 +428,8 @@ var _ = Describe("postgresql", Ordered, func() {
 			defer userConn.Close()
 
 			By("creating a test table using admin connection first")
-			// Use admin connection to create table for testing SELECT/INSERT
-			adminConn, err := verifier.ConnectAsUser(ctx, "postgres", adminPassword, databaseName)
+			// Use admin connection (from BeforeAll) to create table for testing SELECT/INSERT
+			adminConn, err := verifier.ConnectAsUser(ctx, adminUsername, adminPassword, databaseName)
 			Expect(err).NotTo(HaveOccurred(), "Should connect as admin")
 
 			// Create and grant permissions on test table
@@ -457,7 +460,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			GinkgoWriter.Printf("DELETE correctly denied: %v\n", err)
 
 			By("cleaning up test table")
-			adminConn, _ = verifier.ConnectAsUser(ctx, "postgres", adminPassword, databaseName)
+			adminConn, _ = verifier.ConnectAsUser(ctx, adminUsername, adminPassword, databaseName)
 			if adminConn != nil {
 				_ = adminConn.CanDropTable(ctx, testTable)
 				adminConn.Close()

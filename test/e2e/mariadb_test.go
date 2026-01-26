@@ -53,6 +53,9 @@ var _ = Describe("mariadb", Ordered, func() {
 	// MariaDB uses MySQL verifier since it's protocol-compatible
 	var verifier *testutil.MySQLVerifier
 
+	// Admin credentials read from secret (least-privilege account)
+	var adminUsername, adminPassword string
+
 	// getVerifierHost returns the host for the verifier to connect to.
 	// In CI, we use port-forwarding so the verifier connects to localhost.
 	// Locally, we may connect directly to the K8s service.
@@ -65,14 +68,18 @@ var _ = Describe("mariadb", Ordered, func() {
 
 	BeforeAll(func() {
 		By("setting up MariaDB verifier (using MySQL verifier - protocol compatible)")
-		// Get the admin password from the secret
-		password, err := getSecretValue(ctx, secretNamespace, secretName, "password")
+		// Get the admin credentials from the secret (least-privilege account)
+		var err error
+		adminUsername, err = getSecretValue(ctx, secretNamespace, secretName, "username")
+		Expect(err).NotTo(HaveOccurred(), "Failed to get MariaDB username from secret")
+
+		adminPassword, err = getSecretValue(ctx, secretNamespace, secretName, "password")
 		Expect(err).NotTo(HaveOccurred(), "Failed to get MariaDB password from secret")
 
 		verifierHost := getVerifierHost()
-		GinkgoWriter.Printf("Using verifier host: %s\n", verifierHost)
+		GinkgoWriter.Printf("Using verifier host: %s with admin user: %s\n", verifierHost, adminUsername)
 
-		cfg := testutil.MariaDBEngineConfig(verifierHost, 3306, "root", password)
+		cfg := testutil.MariaDBEngineConfig(verifierHost, 3306, adminUsername, adminPassword)
 		verifier = testutil.NewMySQLVerifier(cfg)
 
 		// Connect with retry since database may still be starting
@@ -414,19 +421,16 @@ var _ = Describe("mariadb", Ordered, func() {
 
 		It("should enforce granted permissions (SELECT, INSERT allowed)", func() {
 			By("getting user credentials")
-			secretName := userName + "-credentials"
-			password, err := getSecretValue(ctx, testNamespace, secretName, "password")
+			userSecretName := userName + "-credentials"
+			password, err := getSecretValue(ctx, testNamespace, userSecretName, "password")
 			if err != nil {
 				password, err = getSecretValue(ctx, testNamespace, userName, "password")
 			}
 			Expect(err).NotTo(HaveOccurred(), "Failed to get user password")
 
-			By("getting admin credentials for setup")
-			adminPassword, err := getSecretValue(ctx, secretNamespace, "mariadb-credentials", "password")
-			Expect(err).NotTo(HaveOccurred(), "Failed to get admin password")
-
 			By("creating a test table using admin connection first")
-			adminConn, err := verifier.ConnectAsUser(ctx, "root", adminPassword, databaseName)
+			// Use admin connection (from BeforeAll) to create table for testing SELECT/INSERT
+			adminConn, err := verifier.ConnectAsUser(ctx, adminUsername, adminPassword, databaseName)
 			Expect(err).NotTo(HaveOccurred(), "Should connect as admin")
 
 			// Create test table
@@ -461,7 +465,7 @@ var _ = Describe("mariadb", Ordered, func() {
 			GinkgoWriter.Printf("DELETE correctly denied: %v\n", err)
 
 			By("cleaning up test table")
-			adminConn, _ = verifier.ConnectAsUser(ctx, "root", adminPassword, databaseName)
+			adminConn, _ = verifier.ConnectAsUser(ctx, adminUsername, adminPassword, databaseName)
 			if adminConn != nil {
 				_ = adminConn.CanDropTable(ctx, testTable)
 				adminConn.Close()
