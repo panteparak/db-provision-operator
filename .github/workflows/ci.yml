@@ -627,6 +627,7 @@ jobs:
             pod: postgres-0
             port: 5432
             db_timeout: 180s
+            image: postgres:16-alpine
           - database: mysql
             fixture: test/e2e/fixtures/mysql.yaml
             namespace: mysql
@@ -634,6 +635,7 @@ jobs:
             pod: mysql-0
             port: 3306
             db_timeout: 600s
+            image: mysql:8.0
           - database: mariadb
             fixture: test/e2e/fixtures/mariadb.yaml
             namespace: mariadb
@@ -641,6 +643,7 @@ jobs:
             pod: mariadb-0
             port: 3306
             db_timeout: 600s
+            image: mariadb:11
 
     steps:
       - name: Checkout code
@@ -662,15 +665,12 @@ jobs:
       - name: Verify k3d installation
         run: k3d version
 
-      # Pre-pull database images in parallel to avoid serial downloads during test setup
-      - name: Pre-pull database images
+      # Pre-pull database image to avoid Docker Hub rate limits during deployment
+      - name: Pre-pull database image
         run: |
-          echo "Pre-pulling database images in parallel..."
-          docker pull postgres:16-alpine &
-          docker pull mysql:8.0 &
-          docker pull mariadb:11.2 &
-          wait
-          echo "All database images pulled successfully"
+          echo "Pre-pulling ${{ matrix.image }}..."
+          docker pull ${{ matrix.image }}
+          echo "Database image pulled successfully"
 
       - name: Create k3d cluster
         run: |
@@ -684,6 +684,14 @@ jobs:
           kubectl wait --for=condition=Ready nodes --all --timeout=60s
           kubectl cluster-info
           kubectl get nodes
+
+      # Import pre-pulled database image into k3d cluster
+      - name: Import database image into k3d
+        run: |
+          echo "Importing ${{ matrix.image }} into k3d cluster..."
+          k3d image import ${{ matrix.image }} \
+            -c e2e-${{ matrix.database }}
+          echo "Database image imported successfully"
 
       - name: Deploy ${{ matrix.database }}
         run: |
