@@ -1,5 +1,6 @@
 # PostgreSQL deployment for E2E testing
-# Deploys a single-replica PostgreSQL instance with credentials secret
+# Deploys a single-replica PostgreSQL instance with least-privilege admin account
+# The init script creates dbprovision_admin with CREATEDB, CREATEROLE, pg_signal_backend
 ---
 apiVersion: v1
 kind: Namespace
@@ -9,6 +10,42 @@ metadata:
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/component: database
 ---
+# Init script that creates the least-privilege admin account
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-scripts
+  namespace: postgres
+data:
+  01-create-admin.sql: |
+    -- Create least-privilege admin for DB Provision Operator
+    -- This role has the minimum privileges needed to manage databases, users, and roles
+
+    CREATE ROLE dbprovision_admin WITH
+        LOGIN
+        CREATEDB
+        CREATEROLE
+        PASSWORD 'adminpassword123';
+
+    -- Grant connection termination capability (required for force-drop)
+    GRANT pg_signal_backend TO dbprovision_admin;
+
+    -- PostgreSQL 14+ has pg_read_all_data for backup operations
+    DO $$
+    BEGIN
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pg_read_all_data') THEN
+            EXECUTE 'GRANT pg_read_all_data TO dbprovision_admin';
+        END IF;
+    END $$;
+
+    -- Grant CONNECT on default database
+    GRANT CONNECT ON DATABASE postgres TO dbprovision_admin;
+
+    -- Verify setup
+    SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolcanlogin
+    FROM pg_roles WHERE rolname = 'dbprovision_admin';
+---
+# Credentials for the operator (using least-privilege admin account)
 apiVersion: v1
 kind: Secret
 metadata:
@@ -16,8 +53,8 @@ metadata:
   namespace: postgres
 type: Opaque
 stringData:
-  username: postgres
-  password: testpassword123
+  username: dbprovision_admin
+  password: adminpassword123
 ---
 apiVersion: v1
 kind: Service
@@ -59,16 +96,12 @@ spec:
           image: postgres:16-alpine
           imagePullPolicy: IfNotPresent
           env:
+            # The superuser is only used for init scripts
+            # Operator connects using dbprovision_admin
             - name: POSTGRES_USER
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-credentials
-                  key: username
+              value: postgres
             - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-credentials
-                  key: password
+              value: superuserpassword123
             - name: POSTGRES_DB
               value: postgres
             - name: PGDATA
@@ -107,6 +140,13 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+      volumes:
+        - name: init-scripts
+          configMap:
+            name: postgres-init-scripts
   volumeClaimTemplates:
     - metadata:
         name: data

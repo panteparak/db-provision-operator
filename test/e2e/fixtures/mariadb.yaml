@@ -1,6 +1,7 @@
 # MariaDB deployment for E2E testing
-# Deploys a single-replica MariaDB instance with credentials secret
+# Deploys a single-replica MariaDB instance with least-privilege admin account
 # MariaDB is MySQL-compatible and uses the MySQL adapter
+# The init script creates dbprovision_admin with necessary privileges
 ---
 apiVersion: v1
 kind: Namespace
@@ -10,6 +11,51 @@ metadata:
     app.kubernetes.io/name: mariadb
     app.kubernetes.io/component: database
 ---
+# Init script that creates the least-privilege admin account
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mariadb-init-scripts
+  namespace: mariadb
+data:
+  01-create-admin.sql: |
+    -- Create least-privilege admin for DB Provision Operator
+    -- This user has the minimum privileges needed to manage databases, users, and grants
+    -- Note: MariaDB uses slightly different syntax than MySQL for some operations
+
+    CREATE USER 'dbprovision_admin'@'%' IDENTIFIED BY 'adminpassword123';
+
+    -- Database operations
+    GRANT CREATE, DROP, ALTER ON *.* TO 'dbprovision_admin'@'%';
+
+    -- User management with grant option for role delegation
+    GRANT CREATE USER ON *.* TO 'dbprovision_admin'@'%' WITH GRANT OPTION;
+
+    -- System table access for metadata queries
+    GRANT SELECT ON mysql.user TO 'dbprovision_admin'@'%';
+    GRANT SELECT ON mysql.db TO 'dbprovision_admin'@'%';
+    GRANT SELECT ON mysql.tables_priv TO 'dbprovision_admin'@'%';
+    GRANT SELECT ON mysql.columns_priv TO 'dbprovision_admin'@'%';
+    GRANT SELECT ON mysql.procs_priv TO 'dbprovision_admin'@'%';
+
+    -- Administrative operations
+    GRANT RELOAD ON *.* TO 'dbprovision_admin'@'%';
+    GRANT PROCESS ON *.* TO 'dbprovision_admin'@'%';
+
+    -- Connection management (MariaDB 10.5.2+ uses CONNECTION ADMIN with space)
+    GRANT CONNECTION ADMIN ON *.* TO 'dbprovision_admin'@'%';
+
+    -- Data operations for managed databases and backup operations
+    -- INSERT, UPDATE, DELETE are needed to grant these privileges to application users
+    GRANT SELECT, INSERT, UPDATE, DELETE, SHOW VIEW, TRIGGER, LOCK TABLES ON *.* TO 'dbprovision_admin'@'%';
+    -- Note: information_schema access is automatic
+
+    FLUSH PRIVILEGES;
+
+    -- Verify setup
+    SHOW GRANTS FOR 'dbprovision_admin'@'%';
+---
+# Credentials for the operator (using least-privilege admin account)
 apiVersion: v1
 kind: Secret
 metadata:
@@ -17,8 +63,8 @@ metadata:
   namespace: mariadb
 type: Opaque
 stringData:
-  username: root
-  password: testpassword123
+  username: dbprovision_admin
+  password: adminpassword123
 ---
 apiVersion: v1
 kind: Service
@@ -60,11 +106,10 @@ spec:
           image: mariadb:11
           imagePullPolicy: IfNotPresent
           env:
+            # Root password only used for init scripts
+            # Operator connects using dbprovision_admin
             - name: MARIADB_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mariadb-credentials
-                  key: password
+              value: rootpassword123
             - name: MARIADB_DATABASE
               value: mysql
           ports:
@@ -104,6 +149,13 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/mysql
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+      volumes:
+        - name: init-scripts
+          configMap:
+            name: mariadb-init-scripts
   volumeClaimTemplates:
     - metadata:
         name: data

@@ -116,33 +116,56 @@ var _ = BeforeSuite(func() {
 	// Start database container using testcontainers-go (once per test session)
 	ctx := context.Background()
 
-	// Use appropriate admin user for each database engine
-	// MySQL/MariaDB: "root" has full privileges
-	// PostgreSQL: any user created with WithUsername has superuser privileges
-	adminUser := "admin"
+	// Step 1: Start container with superuser
+	// This simulates a DBA setting up the database server
+	superUser := "postgres"
+	superPassword := "superuser_password123"
 	if engine == "mysql" || engine == "mariadb" {
-		adminUser = "root" // root user has CREATE DATABASE privileges
+		superUser = "root"
 	}
 
 	dbContainer, err = testutil.StartDatabaseContainer(ctx, testutil.DatabaseContainerConfig{
 		Engine:   engine,
-		User:     adminUser,
-		Password: "password123",
+		User:     superUser,
+		Password: superPassword,
 		Database: "testdb",
 	})
 	Expect(err).NotTo(HaveOccurred(), "Failed to start database container")
 
+	// Step 2: Create a least-privilege admin account
+	// This simulates a DBA creating the operator's admin account
+	adminCfg := testutil.AdminAccountConfig{
+		Username: "dbprovision_admin",
+		Password: "admin_password123",
+	}
+
+	GinkgoWriter.Printf("Creating least-privilege admin account for %s...\n", engine)
+	if engine == "postgresql" || engine == "postgres" {
+		err = dbContainer.SetupPostgresAdminAccount(ctx, adminCfg)
+	} else {
+		// MySQL and MariaDB use the same setup
+		err = dbContainer.SetupMySQLAdminAccount(ctx, adminCfg)
+	}
+	Expect(err).NotTo(HaveOccurred(), "Failed to create admin account")
+
+	// Verify we're NOT using superuser anymore
+	isSuperuser, err := dbContainer.IsSuperuser(ctx)
+	Expect(err).NotTo(HaveOccurred(), "Failed to check superuser status")
+	Expect(isSuperuser).To(BeFalse(), "Admin account should NOT be a superuser")
+	GinkgoWriter.Printf("Verified: admin account is NOT a superuser\n")
+
+	// Step 3: Get connection info (now using the admin account)
 	host, port, user, password, dbName := dbContainer.ConnectionInfo()
 	intDBConfig = IntegrationDBConfig{
 		Database: engine,
 		DBName:   dbName, // actual database name (e.g., "testdb")
 		Host:     host,
 		Port:     int32(port),
-		User:     user,
-		Password: password,
+		User:     user,     // Now "dbprovision_admin"
+		Password: password, // Now "admin_password123"
 	}
-	GinkgoWriter.Printf("Integration test database: %s at %s:%d (testcontainers-go)\n",
-		intDBConfig.Database, intDBConfig.Host, intDBConfig.Port)
+	GinkgoWriter.Printf("Integration test database: %s at %s:%d using least-privilege admin '%s'\n",
+		intDBConfig.Database, intDBConfig.Host, intDBConfig.Port, intDBConfig.User)
 
 	intCtx, intCancel = context.WithCancel(context.TODO())
 
@@ -228,10 +251,16 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
+	var err error
+
 	By("tearing down the integration test environment")
-	intCancel()
-	err := intTestEnv.Stop()
-	Expect(err).NotTo(HaveOccurred())
+	if intCancel != nil {
+		intCancel()
+	}
+	if intTestEnv != nil {
+		err = intTestEnv.Stop()
+		Expect(err).NotTo(HaveOccurred())
+	}
 
 	// Stop the database container
 	if dbContainer != nil {

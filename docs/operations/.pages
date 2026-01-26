@@ -1,5 +1,6 @@
 title: Operations
 nav:
   - Overview: index.md
+  - Admin Account Setup: admin-account-setup.md
   - Monitoring: monitoring.md
   - Troubleshooting: troubleshooting.md

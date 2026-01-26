@@ -6,6 +6,7 @@ Operational guides for running DB Provision Operator in production.
 
 This section covers:
 
+- [Admin Account Setup](admin-account-setup.md) - Set up least-privilege database admin accounts
 - [Monitoring](monitoring.md) - Prometheus metrics, Grafana dashboards, alerting
 - [Troubleshooting](troubleshooting.md) - Common issues and solutions
 

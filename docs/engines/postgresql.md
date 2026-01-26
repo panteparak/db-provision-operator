@@ -10,6 +10,33 @@ Complete guide for using DB Provision Operator with PostgreSQL.
 - PostgreSQL 15.x
 - PostgreSQL 16.x
 
+## Admin Account Requirements
+
+The operator requires a privileged database account to manage databases, users, and roles. For production security, create a dedicated least-privilege admin account instead of using the `postgres` superuser.
+
+**Required privileges:**
+
+| Privilege/Attribute | Purpose |
+|---------------------|---------|
+| `LOGIN` | Connect to the database |
+| `CREATEDB` | Create and drop databases |
+| `CREATEROLE` | Create and manage users/roles |
+| `pg_signal_backend` | Terminate connections (for force-drop) |
+| `pg_read_all_data` (PG14+) | Backup operations |
+
+**Quick setup:**
+
+```sql
+CREATE ROLE dbprovision_admin WITH
+    LOGIN CREATEDB CREATEROLE
+    PASSWORD 'your-secure-password';
+GRANT pg_signal_backend TO dbprovision_admin;
+GRANT pg_read_all_data TO dbprovision_admin;  -- PostgreSQL 14+
+```
+
+!!! info "Complete Setup Guide"
+    See [Admin Account Setup](../operations/admin-account-setup.md) for complete SQL scripts, verification steps, and security recommendations.
+
 ## DatabaseInstance
 
 ### Basic Configuration

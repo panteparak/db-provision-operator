@@ -8,6 +8,37 @@ Complete guide for using DB Provision Operator with MySQL.
 - MySQL 8.0.x
 - MySQL 8.4.x
 
+## Admin Account Requirements
+
+The operator requires a privileged database account to manage databases, users, and grants. For production security, create a dedicated least-privilege admin account instead of using `root`.
+
+**Required privileges:**
+
+| Privilege | Purpose |
+|-----------|---------|
+| `CREATE, DROP, ALTER ON *.*` | Database operations |
+| `CREATE USER ON *.*` | User management |
+| `GRANT OPTION ON *.*` | Delegate privileges |
+| `SELECT ON mysql.*` | Query user metadata |
+| `RELOAD ON *.*` | FLUSH PRIVILEGES |
+| `CONNECTION_ADMIN ON *.*` | Kill connections (force-drop) |
+| `ROLE_ADMIN ON *.*` | Role management (MySQL 8.0+) |
+
+**Quick setup:**
+
+```sql
+CREATE USER 'dbprovision_admin'@'%' IDENTIFIED BY 'your-secure-password';
+GRANT CREATE, DROP, ALTER ON *.* TO 'dbprovision_admin'@'%';
+GRANT CREATE USER ON *.* TO 'dbprovision_admin'@'%';
+GRANT GRANT OPTION ON *.* TO 'dbprovision_admin'@'%';
+GRANT SELECT ON mysql.* TO 'dbprovision_admin'@'%';
+GRANT RELOAD, CONNECTION_ADMIN, ROLE_ADMIN ON *.* TO 'dbprovision_admin'@'%';
+FLUSH PRIVILEGES;
+```
+
+!!! info "Complete Setup Guide"
+    See [Admin Account Setup](../operations/admin-account-setup.md) for complete SQL scripts, verification steps, and security recommendations.
+
 ## DatabaseInstance
 
 ### Basic Configuration

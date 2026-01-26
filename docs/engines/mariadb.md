@@ -9,6 +9,38 @@ Complete guide for using DB Provision Operator with MariaDB.
 - MariaDB 10.11.x (LTS)
 - MariaDB 11.x
 
+## Admin Account Requirements
+
+The operator requires a privileged database account to manage databases, users, and grants. For production security, create a dedicated least-privilege admin account instead of using `root`.
+
+**Required privileges:**
+
+| Privilege | Purpose |
+|-----------|---------|
+| `CREATE, DROP, ALTER ON *.*` | Database operations |
+| `CREATE USER ON *.*` | User management |
+| `WITH GRANT OPTION` | Delegate privileges |
+| `SELECT ON mysql.*` | Query user metadata |
+| `RELOAD ON *.*` | FLUSH PRIVILEGES |
+| `CONNECTION ADMIN ON *.*` | Kill connections (MariaDB 10.5.2+) |
+
+**Quick setup:**
+
+```sql
+CREATE USER 'dbprovision_admin'@'%' IDENTIFIED BY 'your-secure-password';
+GRANT CREATE, DROP, ALTER ON *.* TO 'dbprovision_admin'@'%';
+GRANT CREATE USER ON *.* TO 'dbprovision_admin'@'%' WITH GRANT OPTION;
+GRANT SELECT ON mysql.* TO 'dbprovision_admin'@'%';
+GRANT RELOAD, CONNECTION ADMIN ON *.* TO 'dbprovision_admin'@'%';
+FLUSH PRIVILEGES;
+```
+
+!!! note "MariaDB vs MySQL Differences"
+    MariaDB uses `CONNECTION ADMIN` (with a space) instead of MySQL's `CONNECTION_ADMIN`. Roles in MariaDB are implemented as users, not a separate `CREATE ROLE` statement like MySQL 8.0+.
+
+!!! info "Complete Setup Guide"
+    See [Admin Account Setup](../operations/admin-account-setup.md) for complete SQL scripts, verification steps, and security recommendations.
+
 ## MariaDB vs MySQL
 
 MariaDB is a MySQL-compatible fork with additional features:
