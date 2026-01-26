@@ -2,134 +2,138 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/api/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/architecture/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/architecture/design/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/architecture/overview/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/architecture/security/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/development/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/development/ci-cd/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/development/contributing/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/development/rbac/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/development/roadmap/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/development/testing/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/engines/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/engines/mariadb/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/engines/mysql/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/engines/postgresql/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/examples/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/examples/advanced/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/examples/mysql/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/examples/postgresql/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/getting-started/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/getting-started/installation/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/getting-started/quickstart/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/operations/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
+    </url>
+    <url>
+         <loc>https://panteparak.github.io/db-provision-operator/operations/admin-account-setup/</loc>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/operations/monitoring/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/operations/troubleshooting/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/user-guide/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/user-guide/backups/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/user-guide/database-instances/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/user-guide/databases/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/user-guide/grants/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/user-guide/roles/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
     <url>
          <loc>https://panteparak.github.io/db-provision-operator/user-guide/users/</loc>
-         <lastmod>2026-01-25</lastmod>
+         <lastmod>2026-01-26</lastmod>
     </url>
 </urlset>
