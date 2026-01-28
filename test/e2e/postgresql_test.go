@@ -362,6 +362,77 @@ var _ = Describe("postgresql", Ordered, func() {
 		})
 	})
 
+	// ===== Least Privilege Verification =====
+	// These tests verify the operator uses a least-privilege account, NOT superuser
+
+	Context("Least Privilege Verification", func() {
+		It("should operate with non-superuser account", func() {
+			By("verifying the operator account is NOT a superuser")
+			// Query pg_roles to check if current user (dbprovision_admin) has superuser
+			var isSuperuser bool
+			err := verifier.QueryRow(ctx, "postgres",
+				"SELECT rolsuper FROM pg_roles WHERE rolname = current_user",
+				&isSuperuser)
+			Expect(err).NotTo(HaveOccurred(), "Failed to query superuser status")
+			Expect(isSuperuser).To(BeFalse(),
+				"Operator account should NOT be a superuser (rolsuper should be false)")
+
+			GinkgoWriter.Printf("Verified: %s is NOT a superuser\n", adminUsername)
+		})
+
+		It("should have CREATEDB privilege", func() {
+			By("verifying the operator account has CREATEDB")
+			var hasCreateDB bool
+			err := verifier.QueryRow(ctx, "postgres",
+				"SELECT rolcreatedb FROM pg_roles WHERE rolname = current_user",
+				&hasCreateDB)
+			Expect(err).NotTo(HaveOccurred(), "Failed to query CREATEDB status")
+			Expect(hasCreateDB).To(BeTrue(),
+				"Operator account should have CREATEDB privilege")
+
+			GinkgoWriter.Printf("Verified: %s has CREATEDB privilege\n", adminUsername)
+		})
+
+		It("should have CREATEROLE privilege", func() {
+			By("verifying the operator account has CREATEROLE")
+			var hasCreateRole bool
+			err := verifier.QueryRow(ctx, "postgres",
+				"SELECT rolcreaterole FROM pg_roles WHERE rolname = current_user",
+				&hasCreateRole)
+			Expect(err).NotTo(HaveOccurred(), "Failed to query CREATEROLE status")
+			Expect(hasCreateRole).To(BeTrue(),
+				"Operator account should have CREATEROLE privilege")
+
+			GinkgoWriter.Printf("Verified: %s has CREATEROLE privilege\n", adminUsername)
+		})
+
+		It("should have pg_signal_backend membership for force-drop", func() {
+			By("verifying the operator account has pg_signal_backend role")
+			var hasSignalBackend bool
+			err := verifier.QueryRow(ctx, "postgres",
+				"SELECT pg_has_role(current_user, 'pg_signal_backend', 'MEMBER')",
+				&hasSignalBackend)
+			Expect(err).NotTo(HaveOccurred(), "Failed to query pg_signal_backend membership")
+			Expect(hasSignalBackend).To(BeTrue(),
+				"Operator account should be a member of pg_signal_backend for force-drop")
+
+			GinkgoWriter.Printf("Verified: %s is a member of pg_signal_backend\n", adminUsername)
+		})
+
+		It("should print privilege summary", func() {
+			By("printing complete privilege summary for documentation")
+			GinkgoWriter.Printf("\n========== PostgreSQL Least-Privilege Summary ==========\n")
+			GinkgoWriter.Printf("Admin Account: %s\n", adminUsername)
+			GinkgoWriter.Printf("Required Privileges:\n")
+			GinkgoWriter.Printf("  - LOGIN: Yes (can connect)\n")
+			GinkgoWriter.Printf("  - CREATEDB: Yes (create/drop databases)\n")
+			GinkgoWriter.Printf("  - CREATEROLE: Yes (manage users/roles)\n")
+			GinkgoWriter.Printf("  - pg_signal_backend: Yes (terminate connections)\n")
+			GinkgoWriter.Printf("  - SUPERUSER: No (not required, not granted)\n")
+			GinkgoWriter.Printf("=========================================================\n\n")
+		})
+	})
+
 	// ===== Functionality Verification Tests =====
 	// These tests verify that database operations actually work, not just that CRs become Ready
 

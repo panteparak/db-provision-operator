@@ -12,26 +12,100 @@ Complete guide for using DB Provision Operator with PostgreSQL.
 
 ## Admin Account Requirements
 
-The operator requires a privileged database account to manage databases, users, and roles. For production security, create a dedicated least-privilege admin account instead of using the `postgres` superuser.
+The operator requires a privileged database account to manage databases, users, and roles. For production security, create a dedicated **least-privilege admin account** instead of using the `postgres` superuser.
 
-**Required privileges:**
+!!! warning "Never Use Superuser"
+    The operator is designed to work **without SUPERUSER privileges**. Using a superuser account violates the principle of least privilege and creates security risks.
 
-| Privilege/Attribute | Purpose |
-|---------------------|---------|
-| `LOGIN` | Connect to the database |
-| `CREATEDB` | Create and drop databases |
-| `CREATEROLE` | Create and manage users/roles |
-| `pg_signal_backend` | Terminate connections (for force-drop) |
-| `pg_read_all_data` (PG14+) | Backup operations |
+### Privilege Matrix
 
-**Quick setup:**
+This table shows the exact privileges required for each operator action:
+
+| Operation | Required Privileges | SQL to Grant |
+|-----------|-------------------|--------------|
+| **Create Database** | `CREATEDB` | `ALTER ROLE ... WITH CREATEDB` |
+| **Drop Database** | `CREATEDB` | `ALTER ROLE ... WITH CREATEDB` |
+| **Force Drop Database** | `CREATEDB`, `pg_signal_backend` | See setup below |
+| **Create User/Role** | `CREATEROLE` | `ALTER ROLE ... WITH CREATEROLE` |
+| **Drop User/Role** | `CREATEROLE` | `ALTER ROLE ... WITH CREATEROLE` |
+| **Alter User/Role** | `CREATEROLE` | `ALTER ROLE ... WITH CREATEROLE` |
+| **Grant Privileges** | `CREATEROLE` | `ALTER ROLE ... WITH CREATEROLE` |
+| **Revoke Privileges** | `CREATEROLE` | `ALTER ROLE ... WITH CREATEROLE` |
+| **Grant Role Membership** | `CREATEROLE` | `ALTER ROLE ... WITH CREATEROLE` |
+| **Terminate Connections** | `pg_signal_backend` | `GRANT pg_signal_backend TO ...` |
+| **Query Metadata** | `CONNECT` | `GRANT CONNECT ON DATABASE ...` |
+| **Backup Operations** | `pg_read_all_data` (PG14+) | `GRANT pg_read_all_data TO ...` |
+
+### Understanding Each Privilege
+
+| Privilege | What It Allows | What Happens Without It |
+|-----------|----------------|------------------------|
+| `LOGIN` | Connect to the database server | Cannot authenticate |
+| `CREATEDB` | Create and drop databases | `CREATE DATABASE` fails with "permission denied" |
+| `CREATEROLE` | Create, modify, and drop roles/users | `CREATE USER` fails with "permission denied" |
+| `pg_signal_backend` | Terminate other connections | Force-drop fails when database has active connections |
+| `pg_read_all_data` | Read all tables without explicit grants | Backup operations fail (PostgreSQL 14+) |
+
+### Complete Setup Script (Copy-Paste)
 
 ```sql
+-- =============================================================
+-- PostgreSQL Least-Privilege Admin Account Setup
+-- Compatible with: PostgreSQL 14+
+-- =============================================================
+
+-- 1. Create the operator admin role with minimum privileges
 CREATE ROLE dbprovision_admin WITH
-    LOGIN CREATEDB CREATEROLE
+    LOGIN
+    CREATEDB
+    CREATEROLE
     PASSWORD 'your-secure-password';
+
+-- 2. Grant connection termination capability
+--    Required for: force-drop database (terminates active connections)
 GRANT pg_signal_backend TO dbprovision_admin;
-GRANT pg_read_all_data TO dbprovision_admin;  -- PostgreSQL 14+
+
+-- 3. Grant read access for backup operations (PostgreSQL 14+ only)
+--    Required for: pg_dump backups
+GRANT pg_read_all_data TO dbprovision_admin;
+
+-- 4. Grant template1 access for database creation
+GRANT CONNECT ON DATABASE template1 TO dbprovision_admin;
+
+-- 5. Verify the setup (expected: f, t, t, t)
+--    f = not superuser (GOOD!)
+--    t = can create roles
+--    t = can create databases
+--    t = can login
+SELECT rolsuper, rolcreaterole, rolcreatedb, rolcanlogin
+FROM pg_roles WHERE rolname = 'dbprovision_admin';
+
+-- 6. Verify role memberships
+SELECT r.rolname AS role, m.rolname AS member_of
+FROM pg_roles r
+JOIN pg_auth_members am ON r.oid = am.roleid
+JOIN pg_roles m ON am.member = m.oid
+WHERE m.rolname = 'dbprovision_admin';
+-- Should show: pg_signal_backend, pg_read_all_data
+```
+
+### PostgreSQL 12/13 Compatibility
+
+For PostgreSQL versions before 14.x, the `pg_read_all_data` role doesn't exist. Use this alternative:
+
+```sql
+-- PostgreSQL 12/13 setup (without pg_read_all_data)
+CREATE ROLE dbprovision_admin WITH
+    LOGIN
+    CREATEDB
+    CREATEROLE
+    PASSWORD 'your-secure-password';
+
+GRANT pg_signal_backend TO dbprovision_admin;
+GRANT CONNECT ON DATABASE template1 TO dbprovision_admin;
+
+-- For backups on PG12/13, grant SELECT on individual databases
+-- or use pg_dump with the database owner account
 ```
 
 !!! info "Complete Setup Guide"

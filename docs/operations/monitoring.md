@@ -18,17 +18,97 @@ metrics:
     interval: 30s
 ```
 
-### Available Metrics
+### Metrics Namespace
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `db_provision_reconcile_total` | Counter | Total reconciliations |
-| `db_provision_reconcile_errors_total` | Counter | Failed reconciliations |
-| `db_provision_reconcile_duration_seconds` | Histogram | Reconciliation duration |
-| `db_provision_resource_status` | Gauge | Resource status (1=Ready, 0=NotReady) |
-| `db_provision_database_connection_status` | Gauge | Instance connection status |
-| `db_provision_backup_last_success_timestamp` | Gauge | Last successful backup time |
-| `db_provision_backup_size_bytes` | Gauge | Backup size |
+!!! warning "Correct Metric Prefix"
+    All metrics use the `dbops_` namespace prefix. Do not use `db_provision_` - that prefix is incorrect.
+
+### Available Metrics (27 total)
+
+All metrics use the `dbops_` namespace prefix.
+
+#### Connection Metrics
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `dbops_connection_attempts_total` | Counter | instance, engine, status, namespace | Total connection attempts (status: success/failure) |
+| `dbops_connection_latency_seconds` | Histogram | instance, engine, namespace | Connection latency distribution (buckets: 1ms to 10s) |
+
+#### Instance Health Metrics
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `dbops_instance_healthy` | Gauge | instance, engine, namespace | Instance health (1=healthy, 0=unhealthy) |
+| `dbops_instance_last_health_check_timestamp_seconds` | Gauge | instance, engine, namespace | Unix timestamp of last health check |
+
+#### Database Operation Metrics
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `dbops_database_operations_total` | Counter | operation, engine, status, namespace | Total database operations (create/update/delete) |
+| `dbops_database_operation_duration_seconds` | Histogram | operation, engine, namespace | Operation duration distribution |
+| `dbops_database_size_bytes` | Gauge | database, instance, engine, namespace | Database size in bytes |
+
+#### User/Role/Grant Operation Metrics
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `dbops_user_operations_total` | Counter | operation, engine, status, namespace | Total user operations |
+| `dbops_role_operations_total` | Counter | operation, engine, status, namespace | Total role operations |
+| `dbops_grant_operations_total` | Counter | operation, engine, status, namespace | Total grant operations |
+
+#### Backup Metrics
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `dbops_backup_operations_total` | Counter | engine, status, namespace | Total backup operations |
+| `dbops_backup_duration_seconds` | Histogram | engine, namespace | Backup duration (buckets: 1s to 1h) |
+| `dbops_backup_size_bytes` | Gauge | database, engine, namespace | Backup size in bytes |
+| `dbops_backup_last_success_timestamp_seconds` | Gauge | database, engine, namespace | Last successful backup Unix timestamp |
+
+#### Restore Metrics
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `dbops_restore_operations_total` | Counter | engine, status, namespace | Total restore operations |
+| `dbops_restore_duration_seconds` | Histogram | engine, namespace | Restore duration distribution |
+
+#### Schedule Metrics
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `dbops_scheduled_backups_total` | Counter | status, namespace | Total scheduled backup triggers |
+| `dbops_schedule_next_backup_timestamp_seconds` | Gauge | database, namespace | Next scheduled backup Unix timestamp |
+
+#### Resource Metrics
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `dbops_resource_count` | Gauge | resource_type, phase, namespace | Count of resources by type and phase |
+
+#### Info Metrics (for Grafana Tables)
+
+Info metrics expose resource metadata as labels. The value is always `1`, following the kube-state-metrics pattern.
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `dbops_instance_info` | Gauge | instance, namespace, engine, version, host, port, phase | Instance metadata |
+| `dbops_database_info` | Gauge | database, namespace, instance_ref, db_name, phase | Database metadata |
+| `dbops_user_info` | Gauge | user, namespace, instance_ref, username, phase | User metadata |
+| `dbops_role_info` | Gauge | role, namespace, instance_ref, role_name, phase | Role metadata |
+| `dbops_grant_info` | Gauge | grant, namespace, user_ref, database_ref, privileges, phase | Grant metadata |
+| `dbops_backup_info` | Gauge | backup, namespace, database_ref, storage_type, phase | Backup metadata |
+| `dbops_schedule_info` | Gauge | schedule, namespace, database_ref, cron, paused | Schedule metadata |
+| `dbops_restore_info` | Gauge | restore, namespace, backup_ref, target_instance, phase | Restore metadata |
+
+### Label Values
+
+| Label | Possible Values |
+|-------|-----------------|
+| `status` | `success`, `failure` |
+| `operation` | `create`, `update`, `delete`, `connect`, `backup`, `restore` |
+| `engine` | `postgres`, `mysql`, `mariadb` |
+| `phase` | `Pending`, `Ready`, `Failed`, `Deleting` |
 
 ### ServiceMonitor
 
@@ -52,61 +132,223 @@ spec:
 
 ## Grafana Dashboards
 
-### Import Dashboard
+The operator provides **9 pre-built Grafana dashboards** in the `dashboards/` directory.
 
-Import the provided dashboard JSON:
+### Dashboard Overview
 
-```bash
-# Download dashboard
-curl -o db-provision-dashboard.json \
-  https://raw.githubusercontent.com/panteparak/db-provision-operator/main/dashboards/db-provision-operator.json
+| Dashboard | File | Purpose |
+|-----------|------|---------|
+| Overview | `overview.json` | High-level summary of all resources |
+| Instances | `instances.json` | Database instance health and connections |
+| Databases | `databases.json` | Database operations and sizes |
+| Users | `users.json` | User management operations |
+| Roles | `roles.json` | Role management operations |
+| Grants | `grants.json` | Grant operations and permissions |
+| Backups | `backups.json` | Backup operations, sizes, and success rates |
+| Schedules | `schedules.json` | Backup schedule status and timing |
+| Restores | `restores.json` | Restore operations and durations |
 
-# Import via Grafana API
-curl -X POST http://admin:admin@localhost:3000/api/dashboards/db/import \
-  -H "Content-Type: application/json" \
-  -d @db-provision-dashboard.json
+### Dashboard Details
+
+#### 1. Overview Dashboard (`overview.json`)
+
+The main entry point showing:
+
+- **Resource Summary**: Count of instances, databases, users, roles, grants
+- **Health Status**: Healthy vs unhealthy instances
+- **Operation Rates**: Create/update/delete operations per minute
+- **Error Rates**: Failed operations across all resource types
+- **Recent Activity**: Timeline of resource changes
+
+**Key metrics used:**
+- `dbops_resource_count`
+- `dbops_instance_healthy`
+- `dbops_*_operations_total`
+
+#### 2. Instances Dashboard (`instances.json`)
+
+Detailed instance monitoring:
+
+- **Instance Table**: List all instances with engine, host, port, phase
+- **Connection Status**: Health status per instance
+- **Connection Latency**: P50, P90, P99 latency percentiles
+- **Connection Attempts**: Success/failure rates over time
+- **Health Check History**: Timeline of health check results
+
+**Key metrics used:**
+- `dbops_instance_info`
+- `dbops_instance_healthy`
+- `dbops_connection_latency_seconds`
+- `dbops_connection_attempts_total`
+
+#### 3. Databases Dashboard (`databases.json`)
+
+Database operations and sizes:
+
+- **Database Table**: List databases with instance, name, phase
+- **Database Sizes**: Size per database over time
+- **Operation Counts**: Create/update/delete operations
+- **Operation Duration**: P50, P90, P99 duration percentiles
+
+**Key metrics used:**
+- `dbops_database_info`
+- `dbops_database_size_bytes`
+- `dbops_database_operations_total`
+- `dbops_database_operation_duration_seconds`
+
+#### 4. Users Dashboard (`users.json`)
+
+User management:
+
+- **User Table**: List users with instance, username, phase
+- **Operation Counts**: User create/update/delete operations
+- **Operation Status**: Success vs failure rates
+
+**Key metrics used:**
+- `dbops_user_info`
+- `dbops_user_operations_total`
+
+#### 5. Roles Dashboard (`roles.json`)
+
+Role management:
+
+- **Role Table**: List roles with instance, role name, phase
+- **Operation Counts**: Role operations over time
+
+**Key metrics used:**
+- `dbops_role_info`
+- `dbops_role_operations_total`
+
+#### 6. Grants Dashboard (`grants.json`)
+
+Permission grants:
+
+- **Grant Table**: List grants with user, database, privileges, phase
+- **Operation Counts**: Grant operations over time
+
+**Key metrics used:**
+- `dbops_grant_info`
+- `dbops_grant_operations_total`
+
+#### 7. Backups Dashboard (`backups.json`)
+
+Backup monitoring:
+
+- **Backup Table**: List backups with database, storage type, phase
+- **Backup Success Rate**: Success vs failure over time
+- **Backup Sizes**: Size per backup
+- **Backup Duration**: Duration histogram
+- **Last Success Age**: Time since last successful backup
+
+**Key metrics used:**
+- `dbops_backup_info`
+- `dbops_backup_operations_total`
+- `dbops_backup_size_bytes`
+- `dbops_backup_duration_seconds`
+- `dbops_backup_last_success_timestamp_seconds`
+
+#### 8. Schedules Dashboard (`schedules.json`)
+
+Backup scheduling:
+
+- **Schedule Table**: List schedules with database, cron, paused status
+- **Scheduled Backup Counts**: Triggered backups over time
+- **Next Backup Times**: Upcoming scheduled backups
+- **Schedule Status**: Active vs paused schedules
+
+**Key metrics used:**
+- `dbops_schedule_info`
+- `dbops_scheduled_backups_total`
+- `dbops_schedule_next_backup_timestamp_seconds`
+
+#### 9. Restores Dashboard (`restores.json`)
+
+Restore operations:
+
+- **Restore Table**: List restores with backup, target instance, phase
+- **Restore Counts**: Operations over time
+- **Restore Duration**: Duration histogram
+
+**Key metrics used:**
+- `dbops_restore_info`
+- `dbops_restore_operations_total`
+- `dbops_restore_duration_seconds`
+
+### Installing Dashboards
+
+#### Via Helm (Recommended)
+
+```yaml
+# values.yaml
+grafana:
+  dashboards:
+    enabled: true
+    provider:
+      name: db-provision-operator
+      folder: DB Provision
 ```
 
-### Dashboard Panels
+#### Manual Import (All Dashboards)
 
-The dashboard includes:
+```bash
+# Import all dashboards
+for dashboard in dashboards/*.json; do
+  curl -X POST http://admin:admin@localhost:3000/api/dashboards/db/import \
+    -H "Content-Type: application/json" \
+    -d "{\"dashboard\": $(cat $dashboard), \"overwrite\": true}"
+done
+```
 
-1. **Overview**
-   - Total resources by type
-   - Resource status distribution
-   - Reconciliation rate
+#### Via ConfigMap (Kubernetes)
 
-2. **Instance Health**
-   - Connection status per instance
-   - Health check results
-   - Connection latency
-
-3. **Reconciliation**
-   - Reconciliation rate
-   - Error rate
-   - Duration percentiles
-
-4. **Backups**
-   - Backup success/failure rate
-   - Backup sizes over time
-   - Next scheduled backups
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-dbops
+  labels:
+    grafana_dashboard: "1"
+data:
+  overview.json: |
+    <dashboard JSON content>
+```
 
 ### Custom Queries
 
-**Resources by status:**
+**Instance health status:**
 ```promql
-sum by (kind, status) (db_provision_resource_status)
+dbops_instance_healthy{engine="postgres"}
 ```
 
-**Reconciliation error rate:**
+**Connection error rate:**
 ```promql
-rate(db_provision_reconcile_errors_total[5m])
-/ rate(db_provision_reconcile_total[5m])
+rate(dbops_connection_attempts_total{status="failure"}[5m])
+/ rate(dbops_connection_attempts_total[5m])
 ```
 
-**Backup age:**
+**Database operations by type:**
 ```promql
-time() - db_provision_backup_last_success_timestamp
+sum by (operation, status) (rate(dbops_database_operations_total[5m]))
+```
+
+**Backup age (seconds since last success):**
+```promql
+time() - dbops_backup_last_success_timestamp_seconds
+```
+
+**Resource counts by phase:**
+```promql
+sum by (resource_type, phase) (dbops_resource_count)
+```
+
+**Connection latency P99:**
+```promql
+histogram_quantile(0.99, rate(dbops_connection_latency_seconds_bucket[5m]))
+```
+
+**Backup duration P95:**
+```promql
+histogram_quantile(0.95, rate(dbops_backup_duration_seconds_bucket[5m]))
 ```
 
 ## Alerting
@@ -125,40 +367,52 @@ spec:
       rules:
         # Instance connectivity
         - alert: DatabaseInstanceUnhealthy
-          expr: db_provision_database_connection_status == 0
+          expr: dbops_instance_healthy == 0
           for: 5m
           labels:
             severity: critical
           annotations:
-            summary: "Database instance {{ $labels.name }} is unhealthy"
-            description: "Instance has been unhealthy for more than 5 minutes"
+            summary: "Database instance {{ $labels.instance }} is unhealthy"
+            description: "Instance {{ $labels.instance }} ({{ $labels.engine }}) has been unhealthy for more than 5 minutes"
 
-        # Reconciliation errors
-        - alert: HighReconcileErrorRate
+        # High connection error rate
+        - alert: HighConnectionErrorRate
           expr: |
-            rate(db_provision_reconcile_errors_total[5m])
-            / rate(db_provision_reconcile_total[5m]) > 0.1
+            rate(dbops_connection_attempts_total{status="failure"}[5m])
+            / rate(dbops_connection_attempts_total[5m]) > 0.1
           for: 10m
           labels:
             severity: warning
           annotations:
-            summary: "High reconciliation error rate"
-            description: "More than 10% of reconciliations are failing"
+            summary: "High connection error rate for {{ $labels.instance }}"
+            description: "More than 10% of connection attempts are failing"
+
+        # High operation error rate
+        - alert: HighDatabaseOperationErrorRate
+          expr: |
+            rate(dbops_database_operations_total{status="failure"}[5m])
+            / rate(dbops_database_operations_total[5m]) > 0.1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High database operation error rate"
+            description: "More than 10% of database operations are failing"
 
         # Backup alerts
         - alert: BackupFailed
           expr: |
-            db_provision_backup_status{phase="Failed"} == 1
+            increase(dbops_backup_operations_total{status="failure"}[1h]) > 0
           for: 1m
           labels:
             severity: warning
           annotations:
-            summary: "Backup {{ $labels.name }} failed"
-            description: "Database backup has failed"
+            summary: "Backup failed for {{ $labels.engine }}"
+            description: "A backup operation failed in the last hour"
 
         - alert: BackupOverdue
           expr: |
-            time() - db_provision_backup_last_success_timestamp > 86400
+            time() - dbops_backup_last_success_timestamp_seconds > 86400
           for: 1h
           labels:
             severity: warning
@@ -166,16 +420,38 @@ spec:
             summary: "Backup overdue for {{ $labels.database }}"
             description: "No successful backup in the last 24 hours"
 
-        # Resource stuck
+        # Resource stuck in pending
         - alert: ResourceStuckPending
           expr: |
-            db_provision_resource_status{phase="Pending"} == 1
+            dbops_resource_count{phase="Pending"} > 0
           for: 30m
           labels:
             severity: warning
           annotations:
-            summary: "Resource {{ $labels.kind }}/{{ $labels.name }} stuck in Pending"
-            description: "Resource has been Pending for more than 30 minutes"
+            summary: "Resources stuck in Pending state"
+            description: "{{ $value }} {{ $labels.resource_type }} resources have been Pending for more than 30 minutes"
+
+        # Connection latency
+        - alert: HighConnectionLatency
+          expr: |
+            histogram_quantile(0.95, rate(dbops_connection_latency_seconds_bucket[5m])) > 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High connection latency for {{ $labels.instance }}"
+            description: "P95 connection latency is above 1 second"
+
+        # Restore failures
+        - alert: RestoreFailed
+          expr: |
+            increase(dbops_restore_operations_total{status="failure"}[1h]) > 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Database restore failed"
+            description: "A restore operation failed in the last hour"
 ```
 
 ### Alert Severity Guidelines

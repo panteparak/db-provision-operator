@@ -10,31 +10,135 @@ Complete guide for using DB Provision Operator with MySQL.
 
 ## Admin Account Requirements
 
-The operator requires a privileged database account to manage databases, users, and grants. For production security, create a dedicated least-privilege admin account instead of using `root`.
+The operator requires a privileged database account to manage databases, users, and grants. For production security, create a dedicated **least-privilege admin account** instead of using `root`.
 
-**Required privileges:**
+!!! warning "Never Use Root or ALL PRIVILEGES"
+    The operator is designed to work **without SUPER privilege or ALL PRIVILEGES**. Using root or granting ALL PRIVILEGES violates the principle of least privilege and creates security risks.
 
-| Privilege | Purpose |
-|-----------|---------|
-| `CREATE, DROP, ALTER ON *.*` | Database operations |
-| `CREATE USER ON *.*` | User management |
-| `GRANT OPTION ON *.*` | Delegate privileges |
-| `SELECT ON mysql.*` | Query user metadata |
-| `RELOAD ON *.*` | FLUSH PRIVILEGES |
-| `CONNECTION_ADMIN ON *.*` | Kill connections (force-drop) |
-| `ROLE_ADMIN ON *.*` | Role management (MySQL 8.0+) |
+### Privilege Matrix
 
-**Quick setup:**
+This table shows the exact privileges required for each operator action:
+
+| Operation | Required Privileges | SQL to Grant |
+|-----------|-------------------|--------------|
+| **Create Database** | `CREATE ON *.*` | `GRANT CREATE ON *.* TO ...` |
+| **Drop Database** | `DROP ON *.*` | `GRANT DROP ON *.* TO ...` |
+| **Alter Database** | `ALTER ON *.*` | `GRANT ALTER ON *.* TO ...` |
+| **Force Drop Database** | `DROP ON *.*`, `CONNECTION_ADMIN ON *.*` | See setup below |
+| **Create User** | `CREATE USER ON *.*` | `GRANT CREATE USER ON *.* TO ...` |
+| **Drop User** | `CREATE USER ON *.*` | Same grant handles both operations |
+| **Alter User** | `CREATE USER ON *.*` | Same grant handles all user operations |
+| **Grant Privileges** | `GRANT OPTION ON *.*` | `GRANT GRANT OPTION ON *.* TO ...` |
+| **Create Role** (8.0+) | `ROLE_ADMIN ON *.*` | `GRANT ROLE_ADMIN ON *.* TO ...` |
+| **Grant Role** (8.0+) | `ROLE_ADMIN ON *.*` | Same grant handles role operations |
+| **Query User Info** | `SELECT ON mysql.*` | `GRANT SELECT ON mysql.user TO ...` |
+| **Apply Changes** | `RELOAD ON *.*` | `GRANT RELOAD ON *.* TO ...` |
+| **Kill Connections** | `CONNECTION_ADMIN ON *.*` | `GRANT CONNECTION_ADMIN ON *.* TO ...` |
+| **View Processes** | `PROCESS ON *.*` | `GRANT PROCESS ON *.* TO ...` |
+
+### Understanding Each Privilege
+
+| Privilege | What It Allows | What Happens Without It |
+|-----------|----------------|------------------------|
+| `CREATE` | Create databases and tables | `CREATE DATABASE` fails |
+| `DROP` | Drop databases and tables | `DROP DATABASE` fails |
+| `ALTER` | Modify database/table structure | `ALTER DATABASE` fails |
+| `CREATE USER` | Create, drop, and alter users | `CREATE USER` fails |
+| `GRANT OPTION` | Grant/revoke privileges to others | Cannot delegate privileges to app users |
+| `SELECT ON mysql.*` | Read user/grant metadata | Cannot verify existing users/grants |
+| `RELOAD` | Execute FLUSH statements | `FLUSH PRIVILEGES` fails |
+| `CONNECTION_ADMIN` | Kill user connections | Force-drop fails with active connections |
+| `ROLE_ADMIN` | Manage roles (MySQL 8.0+) | `CREATE ROLE` fails |
+| `PROCESS` | View server process list | Cannot monitor connections |
+
+### Complete Setup Script (Copy-Paste)
 
 ```sql
+-- =============================================================
+-- MySQL 8.0+ Least-Privilege Admin Account Setup
+-- Compatible with: MySQL 8.0.x, 8.4.x
+-- =============================================================
+
+-- 1. Create the operator admin user
 CREATE USER 'dbprovision_admin'@'%' IDENTIFIED BY 'your-secure-password';
+
+-- 2. Database operations (create, drop, alter databases)
 GRANT CREATE, DROP, ALTER ON *.* TO 'dbprovision_admin'@'%';
+
+-- 3. User management (create, drop, alter users)
+GRANT CREATE USER ON *.* TO 'dbprovision_admin'@'%';
+
+-- 4. Privilege delegation (grant privileges to app users)
+GRANT GRANT OPTION ON *.* TO 'dbprovision_admin'@'%';
+
+-- 5. Query user and grant metadata from system tables
+GRANT SELECT ON mysql.user TO 'dbprovision_admin'@'%';
+GRANT SELECT ON mysql.db TO 'dbprovision_admin'@'%';
+GRANT SELECT ON mysql.tables_priv TO 'dbprovision_admin'@'%';
+GRANT SELECT ON mysql.columns_priv TO 'dbprovision_admin'@'%';
+GRANT SELECT ON mysql.procs_priv TO 'dbprovision_admin'@'%';
+GRANT SELECT ON mysql.global_grants TO 'dbprovision_admin'@'%';
+
+-- 6. Administrative operations
+GRANT RELOAD ON *.* TO 'dbprovision_admin'@'%';  -- FLUSH PRIVILEGES
+GRANT PROCESS ON *.* TO 'dbprovision_admin'@'%'; -- View processes
+
+-- 7. Connection management (required for force-drop)
+GRANT CONNECTION_ADMIN ON *.* TO 'dbprovision_admin'@'%';
+
+-- 8. Role management (MySQL 8.0+)
+GRANT ROLE_ADMIN ON *.* TO 'dbprovision_admin'@'%';
+
+-- 9. Data privileges (needed to grant these to app users)
+--    The admin must have privileges it will grant to others
+GRANT SELECT, INSERT, UPDATE, DELETE ON *.* TO 'dbprovision_admin'@'%';
+GRANT SHOW VIEW, TRIGGER, LOCK TABLES ON *.* TO 'dbprovision_admin'@'%';
+
+-- 10. Apply changes
+FLUSH PRIVILEGES;
+
+-- 11. Verify setup (should NOT show ALL PRIVILEGES or SUPER)
+SHOW GRANTS FOR 'dbprovision_admin'@'%';
+
+-- Expected output should list individual privileges, NOT:
+--   GRANT ALL PRIVILEGES ON *.* TO 'dbprovision_admin'@'%'
+```
+
+### MySQL 5.7 Compatibility
+
+For MySQL 5.7, some dynamic privileges don't exist. Use this alternative:
+
+```sql
+-- MySQL 5.7 setup (without dynamic privileges)
+CREATE USER 'dbprovision_admin'@'%' IDENTIFIED BY 'your-secure-password';
+
+-- Database operations
+GRANT CREATE, DROP, ALTER ON *.* TO 'dbprovision_admin'@'%';
+
+-- User management
 GRANT CREATE USER ON *.* TO 'dbprovision_admin'@'%';
 GRANT GRANT OPTION ON *.* TO 'dbprovision_admin'@'%';
+
+-- Metadata access
 GRANT SELECT ON mysql.* TO 'dbprovision_admin'@'%';
-GRANT RELOAD, CONNECTION_ADMIN, ROLE_ADMIN ON *.* TO 'dbprovision_admin'@'%';
+
+-- Administrative
+GRANT RELOAD, PROCESS ON *.* TO 'dbprovision_admin'@'%';
+
+-- Data privileges (for granting to app users)
+GRANT SELECT, INSERT, UPDATE, DELETE ON *.* TO 'dbprovision_admin'@'%';
+GRANT SHOW VIEW, TRIGGER, LOCK TABLES ON *.* TO 'dbprovision_admin'@'%';
+
+-- Note: MySQL 5.7 doesn't have CONNECTION_ADMIN or ROLE_ADMIN
+-- Force-drop requires SUPER or process termination from another tool
+
 FLUSH PRIVILEGES;
 ```
+
+!!! note "MySQL 5.7 Limitations"
+    - No `CONNECTION_ADMIN`: Force-drop with active connections may require SUPER
+    - No `ROLE_ADMIN`: Native roles require MySQL 8.0+
+    - No `mysql.global_grants` table
 
 !!! info "Complete Setup Guide"
     See [Admin Account Setup](../operations/admin-account-setup.md) for complete SQL scripts, verification steps, and security recommendations.

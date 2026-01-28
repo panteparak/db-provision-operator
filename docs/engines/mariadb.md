@@ -11,32 +11,145 @@ Complete guide for using DB Provision Operator with MariaDB.
 
 ## Admin Account Requirements
 
-The operator requires a privileged database account to manage databases, users, and grants. For production security, create a dedicated least-privilege admin account instead of using `root`.
+The operator requires a privileged database account to manage databases, users, and grants. For production security, create a dedicated **least-privilege admin account** instead of using `root`.
 
-**Required privileges:**
+!!! warning "Never Use Root or ALL PRIVILEGES"
+    The operator is designed to work **without SUPER privilege or ALL PRIVILEGES**. Using root or granting ALL PRIVILEGES violates the principle of least privilege and creates security risks.
 
-| Privilege | Purpose |
-|-----------|---------|
-| `CREATE, DROP, ALTER ON *.*` | Database operations |
-| `CREATE USER ON *.*` | User management |
-| `WITH GRANT OPTION` | Delegate privileges |
-| `SELECT ON mysql.*` | Query user metadata |
-| `RELOAD ON *.*` | FLUSH PRIVILEGES |
-| `CONNECTION ADMIN ON *.*` | Kill connections (MariaDB 10.5.2+) |
+### Key Differences from MySQL
 
-**Quick setup:**
+| Feature | MariaDB | MySQL 8.0+ |
+|---------|---------|------------|
+| Kill connections privilege | `CONNECTION ADMIN` (with space) | `CONNECTION_ADMIN` (underscore) |
+| Role management | Roles are users with `CREATE USER` | `ROLE_ADMIN` privilege |
+| Global grants table | Not available | `mysql.global_grants` |
+
+### Privilege Matrix
+
+This table shows the exact privileges required for each operator action:
+
+| Operation | Required Privileges | SQL to Grant |
+|-----------|-------------------|--------------|
+| **Create Database** | `CREATE ON *.*` | `GRANT CREATE ON *.* TO ...` |
+| **Drop Database** | `DROP ON *.*` | `GRANT DROP ON *.* TO ...` |
+| **Alter Database** | `ALTER ON *.*` | `GRANT ALTER ON *.* TO ...` |
+| **Force Drop Database** | `DROP ON *.*`, `CONNECTION ADMIN ON *.*` | See setup below |
+| **Create User** | `CREATE USER ON *.*` | `GRANT CREATE USER ON *.* TO ...` |
+| **Drop User** | `CREATE USER ON *.*` | Same grant handles both operations |
+| **Alter User** | `CREATE USER ON *.*` | Same grant handles all user operations |
+| **Grant Privileges** | `WITH GRANT OPTION` | `GRANT ... WITH GRANT OPTION` |
+| **Create Role** | `CREATE USER ON *.*` | MariaDB roles are users |
+| **Grant Role** | `WITH GRANT OPTION` | Same as grant privileges |
+| **Query User Info** | `SELECT ON mysql.*` | `GRANT SELECT ON mysql.user TO ...` |
+| **Apply Changes** | `RELOAD ON *.*` | `GRANT RELOAD ON *.* TO ...` |
+| **Kill Connections** | `CONNECTION ADMIN ON *.*` | `GRANT CONNECTION ADMIN ON *.* TO ...` |
+| **View Processes** | `PROCESS ON *.*` | `GRANT PROCESS ON *.* TO ...` |
+
+### Understanding Each Privilege
+
+| Privilege | What It Allows | What Happens Without It |
+|-----------|----------------|------------------------|
+| `CREATE` | Create databases and tables | `CREATE DATABASE` fails |
+| `DROP` | Drop databases and tables | `DROP DATABASE` fails |
+| `ALTER` | Modify database/table structure | `ALTER DATABASE` fails |
+| `CREATE USER` | Create, drop, and alter users/roles | `CREATE USER` fails |
+| `WITH GRANT OPTION` | Grant/revoke privileges to others | Cannot delegate privileges |
+| `SELECT ON mysql.*` | Read user/grant metadata | Cannot verify existing users |
+| `RELOAD` | Execute FLUSH statements | `FLUSH PRIVILEGES` fails |
+| `CONNECTION ADMIN` | Kill user connections (10.5.2+) | Force-drop fails with active connections |
+| `PROCESS` | View server process list | Cannot monitor connections |
+
+### Complete Setup Script (Copy-Paste)
 
 ```sql
+-- =============================================================
+-- MariaDB 10.5+ Least-Privilege Admin Account Setup
+-- Compatible with: MariaDB 10.5.x, 10.6.x (LTS), 10.11.x (LTS), 11.x
+-- =============================================================
+
+-- 1. Create the operator admin user
 CREATE USER 'dbprovision_admin'@'%' IDENTIFIED BY 'your-secure-password';
+
+-- 2. Database operations (create, drop, alter databases)
 GRANT CREATE, DROP, ALTER ON *.* TO 'dbprovision_admin'@'%';
+
+-- 3. User management with grant delegation
+--    Note: WITH GRANT OPTION is critical for role/privilege delegation
 GRANT CREATE USER ON *.* TO 'dbprovision_admin'@'%' WITH GRANT OPTION;
-GRANT SELECT ON mysql.* TO 'dbprovision_admin'@'%';
-GRANT RELOAD, CONNECTION ADMIN ON *.* TO 'dbprovision_admin'@'%';
+
+-- 4. Query user and grant metadata from system tables
+--    Note: MariaDB doesn't have mysql.global_grants
+GRANT SELECT ON mysql.user TO 'dbprovision_admin'@'%';
+GRANT SELECT ON mysql.db TO 'dbprovision_admin'@'%';
+GRANT SELECT ON mysql.tables_priv TO 'dbprovision_admin'@'%';
+GRANT SELECT ON mysql.columns_priv TO 'dbprovision_admin'@'%';
+GRANT SELECT ON mysql.procs_priv TO 'dbprovision_admin'@'%';
+GRANT SELECT ON mysql.roles_mapping TO 'dbprovision_admin'@'%';
+
+-- 5. Administrative operations
+GRANT RELOAD ON *.* TO 'dbprovision_admin'@'%';  -- FLUSH PRIVILEGES
+GRANT PROCESS ON *.* TO 'dbprovision_admin'@'%'; -- View processes
+
+-- 6. Connection management (required for force-drop)
+--    IMPORTANT: Note the space in "CONNECTION ADMIN" (not underscore!)
+GRANT CONNECTION ADMIN ON *.* TO 'dbprovision_admin'@'%';
+
+-- 7. Data privileges (needed to grant these to app users)
+GRANT SELECT, INSERT, UPDATE, DELETE ON *.* TO 'dbprovision_admin'@'%';
+GRANT SHOW VIEW, TRIGGER, LOCK TABLES ON *.* TO 'dbprovision_admin'@'%';
+
+-- 8. Apply changes
+FLUSH PRIVILEGES;
+
+-- 9. Verify setup (should NOT show ALL PRIVILEGES or SUPER)
+SHOW GRANTS FOR 'dbprovision_admin'@'%';
+
+-- Expected output should list individual privileges, NOT:
+--   GRANT ALL PRIVILEGES ON *.* TO 'dbprovision_admin'@'%'
+```
+
+### MariaDB 10.4 and Earlier
+
+For MariaDB versions before 10.5, `CONNECTION ADMIN` doesn't exist:
+
+```sql
+-- MariaDB 10.4 and earlier setup
+CREATE USER 'dbprovision_admin'@'%' IDENTIFIED BY 'your-secure-password';
+
+-- Database operations
+GRANT CREATE, DROP, ALTER ON *.* TO 'dbprovision_admin'@'%';
+
+-- User management
+GRANT CREATE USER ON *.* TO 'dbprovision_admin'@'%' WITH GRANT OPTION;
+
+-- Metadata access
+GRANT SELECT ON mysql.user TO 'dbprovision_admin'@'%';
+GRANT SELECT ON mysql.db TO 'dbprovision_admin'@'%';
+GRANT SELECT ON mysql.tables_priv TO 'dbprovision_admin'@'%';
+GRANT SELECT ON mysql.columns_priv TO 'dbprovision_admin'@'%';
+GRANT SELECT ON mysql.procs_priv TO 'dbprovision_admin'@'%';
+
+-- Administrative
+GRANT RELOAD, PROCESS ON *.* TO 'dbprovision_admin'@'%';
+
+-- Data privileges
+GRANT SELECT, INSERT, UPDATE, DELETE ON *.* TO 'dbprovision_admin'@'%';
+GRANT SHOW VIEW, TRIGGER, LOCK TABLES ON *.* TO 'dbprovision_admin'@'%';
+
+-- Note: MariaDB < 10.5 doesn't have CONNECTION ADMIN
+-- Force-drop requires SUPER or process termination from another tool
+
 FLUSH PRIVILEGES;
 ```
 
+!!! warning "MariaDB 10.4 Limitations"
+    - No `CONNECTION ADMIN`: Force-drop with active connections may require SUPER
+    - Consider upgrading to MariaDB 10.5+ for full operator support
+
 !!! note "MariaDB vs MySQL Differences"
-    MariaDB uses `CONNECTION ADMIN` (with a space) instead of MySQL's `CONNECTION_ADMIN`. Roles in MariaDB are implemented as users, not a separate `CREATE ROLE` statement like MySQL 8.0+.
+    - MariaDB uses `CONNECTION ADMIN` (with a space) instead of MySQL's `CONNECTION_ADMIN`
+    - MariaDB roles are implemented as users, not requiring a separate `ROLE_ADMIN` privilege
+    - MariaDB doesn't have `mysql.global_grants` table
 
 !!! info "Complete Setup Guide"
     See [Admin Account Setup](../operations/admin-account-setup.md) for complete SQL scripts, verification steps, and security recommendations.
