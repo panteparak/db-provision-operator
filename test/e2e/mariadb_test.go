@@ -370,91 +370,9 @@ var _ = Describe("mariadb", Ordered, func() {
 		})
 	})
 
-	// ===== Least Privilege Verification =====
-	// These tests verify the operator uses a least-privilege account, NOT root/superuser
-	// MariaDB uses MySQL verifier since they share the same protocol
-
-	Context("Least Privilege Verification", func() {
-		It("should operate without SUPER privilege", func() {
-			By("verifying the operator account does NOT have SUPER privilege")
-			var superPriv string
-			err := verifier.QueryRow(ctx, "",
-				"SELECT Super_priv FROM mysql.user WHERE User = SUBSTRING_INDEX(CURRENT_USER(), '@', 1)",
-				&superPriv)
-			Expect(err).NotTo(HaveOccurred(), "Failed to query SUPER privilege status")
-			Expect(superPriv).To(Equal("N"),
-				"Operator account should NOT have SUPER privilege (should be 'N', not 'Y')")
-
-			GinkgoWriter.Printf("Verified: %s does NOT have SUPER privilege\n", adminUsername)
-		})
-
-		It("should not have ALL PRIVILEGES", func() {
-			By("verifying operator does not have SUPER privilege (indicates not ALL PRIVILEGES)")
-			// If an account has ALL PRIVILEGES, it would have Super_priv = 'Y'
-			// Since we already check Super_priv = 'N' in the previous test,
-			// this confirms the account doesn't have ALL PRIVILEGES.
-			// Additionally, check that the account doesn't have SHUTDOWN privilege
-			// which is another indicator of excessive privileges.
-			var shutdownPriv string
-			err := verifier.QueryRow(ctx, "",
-				"SELECT Shutdown_priv FROM mysql.user WHERE User = SUBSTRING_INDEX(CURRENT_USER(), '@', 1)",
-				&shutdownPriv)
-			Expect(err).NotTo(HaveOccurred(), "Failed to query SHUTDOWN privilege")
-			Expect(shutdownPriv).To(Equal("N"),
-				"Operator account should NOT have SHUTDOWN privilege (indicates not ALL PRIVILEGES)")
-
-			GinkgoWriter.Printf("Verified: %s does NOT have ALL PRIVILEGES (SHUTDOWN=%s)\n", adminUsername, shutdownPriv)
-		})
-
-		It("should have required operational privileges", func() {
-			By("verifying operator has CREATE privilege")
-			var createPriv string
-			err := verifier.QueryRow(ctx, "",
-				"SELECT Create_priv FROM mysql.user WHERE User = SUBSTRING_INDEX(CURRENT_USER(), '@', 1)",
-				&createPriv)
-			Expect(err).NotTo(HaveOccurred(), "Failed to query CREATE privilege")
-			Expect(createPriv).To(Equal("Y"), "Operator should have CREATE privilege")
-
-			By("verifying operator has DROP privilege")
-			var dropPriv string
-			err = verifier.QueryRow(ctx, "",
-				"SELECT Drop_priv FROM mysql.user WHERE User = SUBSTRING_INDEX(CURRENT_USER(), '@', 1)",
-				&dropPriv)
-			Expect(err).NotTo(HaveOccurred(), "Failed to query DROP privilege")
-			Expect(dropPriv).To(Equal("Y"), "Operator should have DROP privilege")
-
-			GinkgoWriter.Printf("Verified: %s has required operational privileges (CREATE=%s, DROP=%s)\n",
-				adminUsername, createPriv, dropPriv)
-		})
-
-		It("should have CREATE USER privilege", func() {
-			By("verifying operator has CREATE USER for user management")
-			var createUserPriv string
-			err := verifier.QueryRow(ctx, "",
-				"SELECT Create_user_priv FROM mysql.user WHERE User = SUBSTRING_INDEX(CURRENT_USER(), '@', 1)",
-				&createUserPriv)
-			Expect(err).NotTo(HaveOccurred(), "Failed to query CREATE USER privilege")
-			Expect(createUserPriv).To(Equal("Y"),
-				"Operator account should have CREATE USER privilege")
-
-			GinkgoWriter.Printf("Verified: %s has CREATE USER privilege\n", adminUsername)
-		})
-
-		It("should print privilege summary", func() {
-			By("printing complete privilege summary for documentation")
-			GinkgoWriter.Printf("\n========== MariaDB Least-Privilege Summary ==========\n")
-			GinkgoWriter.Printf("Admin Account: %s\n", adminUsername)
-			GinkgoWriter.Printf("Required Privileges:\n")
-			GinkgoWriter.Printf("  - CREATE, DROP, ALTER: Yes (database operations)\n")
-			GinkgoWriter.Printf("  - CREATE USER: Yes (user management)\n")
-			GinkgoWriter.Printf("  - WITH GRANT OPTION: Yes (privilege delegation)\n")
-			GinkgoWriter.Printf("  - CONNECTION ADMIN: Yes (terminate connections) [note: space not underscore]\n")
-			GinkgoWriter.Printf("  - SUPER: No (not required, not granted)\n")
-			GinkgoWriter.Printf("  - ALL PRIVILEGES: No (not required, not granted)\n")
-			GinkgoWriter.Printf("Note: MariaDB uses 'CONNECTION ADMIN' (with space), not 'CONNECTION_ADMIN'\n")
-			GinkgoWriter.Printf("=====================================================\n\n")
-		})
-	})
+	// NOTE: Least-privilege verification tests have been moved to integration tests
+	// (internal/controller/integration_privileges_test.go) since they only need
+	// database access, not a full K8s cluster. This saves ~10 minutes of E2E time.
 
 	// ===== Functionality Verification Tests =====
 	// These tests verify that database operations actually work, not just that CRs become Ready

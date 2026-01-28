@@ -418,3 +418,17 @@ func (dc *DatabaseContainer) IsSuperuser(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("unsupported engine: %s", dc.engine)
 	}
 }
+
+// WaitForReady waits for the database to be ready to accept connections
+// This is useful for integration tests that need to ensure the database is fully initialized
+func (dc *DatabaseContainer) WaitForReady(ctx context.Context) error {
+	dc.mu.Lock()
+	defer dc.mu.Unlock()
+
+	db, err := dc.waitForDatabaseReadyUnlocked(ctx, 30, 500*time.Millisecond)
+	if err != nil {
+		return err
+	}
+	db.Close()
+	return nil
+}

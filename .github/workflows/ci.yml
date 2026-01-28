@@ -86,6 +86,31 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
+  envtest:
+    name: Controller Tests (envtest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ env.GO_VERSION_FILE }}
+          cache: true
+
+      - name: Run envtest-based controller tests
+        run: make test-envtest
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v4
+        with:
+          files: cover-envtest.out
+          flags: envtest
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
   template-comparison:
     name: Template Comparison
     runs-on: ubuntu-latest
@@ -590,7 +615,7 @@ jobs:
     runs-on: ubuntu-latest
     # For push: wait for docker-merge (multi-arch manifest)
     # For PR: docker-merge is skipped, so we only check docker-build
-    needs: [setup, lint, unit-test, template-comparison, docker-build, docker-merge, manifests, generate, docs]
+    needs: [setup, lint, unit-test, envtest, template-comparison, docker-build, docker-merge, manifests, generate, docs]
     if: always()
     steps:
       - name: Check job results
@@ -599,6 +624,7 @@ jobs:
           echo "  setup: ${{ needs.setup.result }}"
           echo "  lint: ${{ needs.lint.result }}"
           echo "  unit-test: ${{ needs.unit-test.result }}"
+          echo "  envtest: ${{ needs.envtest.result }}"
           echo "  template-comparison: ${{ needs.template-comparison.result }}"
           echo "  docker-build: ${{ needs.docker-build.result }}"
           echo "  docker-merge: ${{ needs.docker-merge.result }}"
@@ -611,6 +637,7 @@ jobs:
           [[ "${{ needs.setup.result }}" != "success" ]] && FAILED="${FAILED} setup"
           [[ "${{ needs.lint.result }}" != "success" ]] && FAILED="${FAILED} lint"
           [[ "${{ needs.unit-test.result }}" != "success" ]] && FAILED="${FAILED} unit-test"
+          [[ "${{ needs.envtest.result }}" != "success" ]] && FAILED="${FAILED} envtest"
           [[ "${{ needs.template-comparison.result }}" != "success" ]] && FAILED="${FAILED} template-comparison"
           [[ "${{ needs.docker-build.result }}" != "success" ]] && FAILED="${FAILED} docker-build"
           [[ "${{ needs.manifests.result }}" != "success" ]] && FAILED="${FAILED} manifests"
@@ -906,7 +933,8 @@ jobs:
           echo ""
           echo "Pipeline summary:"
           echo "  ✅ Lint"
-          echo "  ✅ Unit Tests"
+          echo "  ✅ Unit Tests (fast, no envtest)"
+          echo "  ✅ Controller Tests (envtest)"
           echo "  ✅ Template Comparison (Helm ≡ Kustomize)"
           echo "  ✅ Docker Build"
           echo "  ✅ Manifests Verification"

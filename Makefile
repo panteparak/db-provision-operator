@@ -109,8 +109,19 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet setup-envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
+test: manifests generate fmt vet ## Run unit tests (fast, no envtest).
+	go test $$(go list ./... | grep -v /e2e | grep -v /controller) -coverprofile cover.out
+
+.PHONY: test-envtest
+test-envtest: manifests generate setup-envtest ## Run envtest-based controller and validation tests.
+	@echo "Running envtest-based controller tests..."
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
+	go test ./internal/controller/... -v -tags=envtest -timeout=10m \
+		-coverprofile cover-envtest.out
+	@echo "Running CRD validation tests..."
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
+	go test ./api/v1alpha1/... -v -tags=envtest -timeout=5m \
+		-coverprofile cover-validation.out
 
 .PHONY: test-integration
 test-integration: manifests generate setup-envtest ## Run integration tests with testcontainers-go and profiling.

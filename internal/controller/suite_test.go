@@ -1,4 +1,4 @@
-//go:build !integration
+//go:build envtest && !integration
 
 /*
 Copyright 2026.
