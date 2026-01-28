@@ -343,6 +343,31 @@ func (c *PostgresUserConnection) CanDropTable(ctx context.Context, tableName str
 	return c.Exec(ctx, query)
 }
 
+// QueryRow executes a query that returns a single row on a specific database.
+// The dest parameter should be a pointer to scan the result into.
+func (v *PostgresVerifier) QueryRow(ctx context.Context, database string, query string, dest interface{}) error {
+	// If database is empty or same as admin database, use existing pool
+	if database == "" || database == v.config.AdminDatabase {
+		if v.pool == nil {
+			return fmt.Errorf("not connected to database")
+		}
+		return v.pool.QueryRow(ctx, query).Scan(dest)
+	}
+
+	// Create a new connection to the specific database
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
+		url.QueryEscape(v.config.Username), url.QueryEscape(v.config.Password),
+		v.config.Host, v.config.Port, database)
+
+	pool, err := pgxpool.New(ctx, connStr)
+	if err != nil {
+		return fmt.Errorf("failed to connect to database %s: %w", database, err)
+	}
+	defer pool.Close()
+
+	return pool.QueryRow(ctx, query).Scan(dest)
+}
+
 // Ensure PostgresVerifier implements DatabaseVerifier
 var _ DatabaseVerifier = (*PostgresVerifier)(nil)
 

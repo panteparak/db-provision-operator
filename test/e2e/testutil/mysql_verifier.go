@@ -450,6 +450,16 @@ func (c *MySQLUserConnection) CanDropTable(ctx context.Context, tableName string
 	return c.Exec(ctx, query)
 }
 
+// QueryRow executes a query that returns a single row.
+// The database parameter is ignored for MySQL since system tables are accessible
+// from any connection. The dest parameter should be a pointer to scan the result into.
+func (v *MySQLVerifier) QueryRow(ctx context.Context, database string, query string, dest interface{}) error {
+	if v.db == nil {
+		return fmt.Errorf("not connected to database")
+	}
+	return v.db.QueryRowContext(ctx, query).Scan(dest)
+}
+
 // Ensure MySQLVerifier implements DatabaseVerifier
 var _ DatabaseVerifier = (*MySQLVerifier)(nil)
 
