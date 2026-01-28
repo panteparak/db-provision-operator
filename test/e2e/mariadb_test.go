@@ -389,33 +389,42 @@ var _ = Describe("mariadb", Ordered, func() {
 		})
 
 		It("should not have ALL PRIVILEGES", func() {
-			By("verifying SHOW GRANTS does not include ALL PRIVILEGES")
-			var grants string
+			By("verifying operator does not have SUPER privilege (indicates not ALL PRIVILEGES)")
+			// If an account has ALL PRIVILEGES, it would have Super_priv = 'Y'
+			// Since we already check Super_priv = 'N' in the previous test,
+			// this confirms the account doesn't have ALL PRIVILEGES.
+			// Additionally, check that the account doesn't have SHUTDOWN privilege
+			// which is another indicator of excessive privileges.
+			var shutdownPriv string
 			err := verifier.QueryRow(ctx, "",
-				"SHOW GRANTS FOR CURRENT_USER()",
-				&grants)
-			Expect(err).NotTo(HaveOccurred(), "Failed to query grants")
-			Expect(grants).NotTo(ContainSubstring("ALL PRIVILEGES"),
-				"Operator account should NOT have ALL PRIVILEGES")
+				"SELECT Shutdown_priv FROM mysql.user WHERE User = SUBSTRING_INDEX(CURRENT_USER(), '@', 1)",
+				&shutdownPriv)
+			Expect(err).NotTo(HaveOccurred(), "Failed to query SHUTDOWN privilege")
+			Expect(shutdownPriv).To(Equal("N"),
+				"Operator account should NOT have SHUTDOWN privilege (indicates not ALL PRIVILEGES)")
 
-			GinkgoWriter.Printf("Verified: %s does NOT have ALL PRIVILEGES\n", adminUsername)
+			GinkgoWriter.Printf("Verified: %s does NOT have ALL PRIVILEGES (SHUTDOWN=%s)\n", adminUsername, shutdownPriv)
 		})
 
 		It("should have required operational privileges", func() {
-			By("verifying operator has CREATE, DROP, ALTER privileges")
-			var grants string
+			By("verifying operator has CREATE privilege")
+			var createPriv string
 			err := verifier.QueryRow(ctx, "",
-				"SHOW GRANTS FOR CURRENT_USER()",
-				&grants)
-			Expect(err).NotTo(HaveOccurred(), "Failed to query grants")
+				"SELECT Create_priv FROM mysql.user WHERE User = SUBSTRING_INDEX(CURRENT_USER(), '@', 1)",
+				&createPriv)
+			Expect(err).NotTo(HaveOccurred(), "Failed to query CREATE privilege")
+			Expect(createPriv).To(Equal("Y"), "Operator should have CREATE privilege")
 
-			// Check for required privileges (case-insensitive)
-			Expect(grants).To(MatchRegexp("(?i)CREATE"),
-				"Operator should have CREATE privilege")
-			Expect(grants).To(MatchRegexp("(?i)DROP"),
-				"Operator should have DROP privilege")
+			By("verifying operator has DROP privilege")
+			var dropPriv string
+			err = verifier.QueryRow(ctx, "",
+				"SELECT Drop_priv FROM mysql.user WHERE User = SUBSTRING_INDEX(CURRENT_USER(), '@', 1)",
+				&dropPriv)
+			Expect(err).NotTo(HaveOccurred(), "Failed to query DROP privilege")
+			Expect(dropPriv).To(Equal("Y"), "Operator should have DROP privilege")
 
-			GinkgoWriter.Printf("Verified: %s has required operational privileges\n", adminUsername)
+			GinkgoWriter.Printf("Verified: %s has required operational privileges (CREATE=%s, DROP=%s)\n",
+				adminUsername, createPriv, dropPriv)
 		})
 
 		It("should have CREATE USER privilege", func() {

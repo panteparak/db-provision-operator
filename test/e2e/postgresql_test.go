@@ -502,20 +502,31 @@ var _ = Describe("postgresql", Ordered, func() {
 			// Use admin connection (from BeforeAll) to create table for testing SELECT/INSERT
 			adminConn, err := verifier.ConnectAsUser(ctx, adminUsername, adminPassword, databaseName)
 			Expect(err).NotTo(HaveOccurred(), "Should connect as admin")
+			defer adminConn.Close()
 
-			// Create and grant permissions on test table
+			// Create test table
 			err = adminConn.CanCreateTable(ctx, testTable)
 			Expect(err).NotTo(HaveOccurred(), "Admin should create test table")
 
 			// Grant SELECT, INSERT to the test user on the table
-			err = adminConn.Exec(ctx, "GRANT SELECT, INSERT ON "+testTable+" TO "+userName)
-			Expect(err).NotTo(HaveOccurred(), "Should grant permissions on table")
-
-			// Grant USAGE on the sequence (required for SERIAL/auto-increment columns)
+			// Use Eventually to handle transient "tuple concurrently updated" errors
+			// that can occur when the operator is also modifying user grants
 			seqName := testTable + "_id_seq"
-			err = adminConn.Exec(ctx, "GRANT USAGE ON SEQUENCE "+seqName+" TO "+userName)
-			Expect(err).NotTo(HaveOccurred(), "Should grant USAGE on sequence")
-			adminConn.Close()
+			Eventually(func() error {
+				// Reconnect for each retry to get a fresh connection
+				retryConn, connErr := verifier.ConnectAsUser(ctx, adminUsername, adminPassword, databaseName)
+				if connErr != nil {
+					return connErr
+				}
+				defer retryConn.Close()
+
+				// Grant on table
+				if grantErr := retryConn.Exec(ctx, "GRANT SELECT, INSERT ON "+testTable+" TO "+userName); grantErr != nil {
+					return grantErr
+				}
+				// Grant on sequence
+				return retryConn.Exec(ctx, "GRANT USAGE ON SEQUENCE "+seqName+" TO "+userName)
+			}, 30*time.Second, 2*time.Second).Should(Succeed(), "Should grant permissions on table and sequence")
 
 			By("verifying SELECT is allowed")
 			err = userConn.CanSelectData(ctx, testTable)
