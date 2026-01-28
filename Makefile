@@ -135,6 +135,11 @@ clean-test-reports: ## Clean test reports directory.
 test-benchmark: setup-envtest ## Run benchmarks for controllers.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -bench=. -benchmem -run=^$$ ./internal/controller/... | tee benchmark-results.txt
 
+.PHONY: test-templates
+test-templates: ## Compare Helm and Kustomize template outputs for equivalence.
+	@echo "Comparing Helm and Kustomize templates..."
+	go test -v ./test/template/... -count=1
+
 .PHONY: setup-precommit
 setup-precommit: ## Install pre-commit and its dependencies
 	@echo "Installing pre-commit dependencies..."
