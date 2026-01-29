@@ -20,6 +20,7 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -411,7 +412,7 @@ func TestPostgresAdapter_ConcurrentOperations(t *testing.T) {
 
 		for i := 0; i < numUsers; i++ {
 			go func(idx int) {
-				username := "concurrent_user_" + string(rune('a'+idx))
+				username := fmt.Sprintf("concurrent_user_%d", idx)
 				err := adapter.CreateUser(ctx, types.CreateUserOptions{
 					Username: username,
 					Password: "testpass",
@@ -429,7 +430,7 @@ func TestPostgresAdapter_ConcurrentOperations(t *testing.T) {
 
 		// Verify all users exist
 		for i := 0; i < numUsers; i++ {
-			username := "concurrent_user_" + string(rune('a'+i))
+			username := fmt.Sprintf("concurrent_user_%d", i)
 			exists, err := adapter.UserExists(ctx, username)
 			assert.NoError(t, err)
 			assert.True(t, exists, "User %s should exist", username)

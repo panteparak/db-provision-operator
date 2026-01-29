@@ -33,17 +33,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
-var (
-	testEnv   *envtest.Environment
-	k8sClient client.Client
-	ctx       context.Context
-	cancel    context.CancelFunc
-)
+// setupTestEnv starts an envtest environment and returns a client and context.
+// Cleanup is handled automatically via t.Cleanup.
+func setupTestEnv(t *testing.T) (client.Client, context.Context) {
+	t.Helper()
 
-func setupTestEnv(t *testing.T) {
-	ctx, cancel = context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 
-	testEnv = &envtest.Environment{
+	testEnv := &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 	}
@@ -56,21 +53,21 @@ func setupTestEnv(t *testing.T) {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(AddToScheme(scheme))
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
+	k8sClient, err := client.New(cfg, client.Options{Scheme: scheme})
 	require.NoError(t, err)
 	require.NotNil(t, k8sClient)
-}
 
-func teardownTestEnv(t *testing.T) {
-	cancel()
-	err := testEnv.Stop()
-	require.NoError(t, err)
+	t.Cleanup(func() {
+		cancel()
+		_ = testEnv.Stop()
+	})
+
+	return k8sClient, ctx
 }
 
 // TestDatabaseValidation tests Database CRD validation
 func TestDatabaseValidation(t *testing.T) {
-	setupTestEnv(t)
-	defer teardownTestEnv(t)
+	k8sClient, ctx := setupTestEnv(t)
 
 	tests := []struct {
 		name      string
@@ -223,8 +220,7 @@ func TestDatabaseValidation(t *testing.T) {
 
 // TestDatabaseUserValidation tests DatabaseUser CRD validation
 func TestDatabaseUserValidation(t *testing.T) {
-	setupTestEnv(t)
-	defer teardownTestEnv(t)
+	k8sClient, ctx := setupTestEnv(t)
 
 	tests := []struct {
 		name      string
@@ -315,8 +311,7 @@ func TestDatabaseUserValidation(t *testing.T) {
 
 // TestDatabaseInstanceValidation tests DatabaseInstance CRD validation
 func TestDatabaseInstanceValidation(t *testing.T) {
-	setupTestEnv(t)
-	defer teardownTestEnv(t)
+	k8sClient, ctx := setupTestEnv(t)
 
 	tests := []struct {
 		name      string
@@ -456,8 +451,7 @@ func TestDatabaseInstanceValidation(t *testing.T) {
 
 // TestDatabaseRoleValidation tests DatabaseRole CRD validation
 func TestDatabaseRoleValidation(t *testing.T) {
-	setupTestEnv(t)
-	defer teardownTestEnv(t)
+	k8sClient, ctx := setupTestEnv(t)
 
 	tests := []struct {
 		name      string
@@ -533,8 +527,7 @@ func TestDatabaseRoleValidation(t *testing.T) {
 
 // TestHealthCheckConfigValidation tests HealthCheckConfig validation
 func TestHealthCheckConfigValidation(t *testing.T) {
-	setupTestEnv(t)
-	defer teardownTestEnv(t)
+	k8sClient, ctx := setupTestEnv(t)
 
 	tests := []struct {
 		name      string
@@ -624,8 +617,7 @@ func TestHealthCheckConfigValidation(t *testing.T) {
 
 // TestBackupScheduleValidation tests DatabaseBackupSchedule validation
 func TestBackupScheduleValidation(t *testing.T) {
-	setupTestEnv(t)
-	defer teardownTestEnv(t)
+	k8sClient, ctx := setupTestEnv(t)
 
 	tests := []struct {
 		name      string

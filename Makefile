@@ -110,7 +110,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet ## Run unit tests (fast, no envtest).
-	go test $$(go list ./... | grep -v /e2e | grep -v /controller) -coverprofile cover.out
+	go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
 .PHONY: test-envtest
 test-envtest: manifests generate setup-envtest ## Run envtest-based controller and validation tests.
@@ -127,7 +127,7 @@ test-envtest: manifests generate setup-envtest ## Run envtest-based controller a
 test-integration: manifests generate setup-envtest ## Run integration tests with testcontainers-go and profiling.
 	@mkdir -p test-reports
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
-	go test ./internal/controller/... -v -tags=integration -timeout=15m \
+	go test ./internal/controller/... ./internal/adapter/... -v -tags=integration -timeout=15m \
 		-coverprofile cover-integration.out
 	@echo "Integration tests completed. Reports available in test-reports/"
 

@@ -20,6 +20,7 @@ package mysql
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -416,7 +417,7 @@ func TestMySQLAdapter_ConcurrentOperations(t *testing.T) {
 
 		for i := 0; i < numDatabases; i++ {
 			go func(idx int) {
-				dbName := "concurrent_db_" + string(rune('a'+idx))
+				dbName := fmt.Sprintf("concurrent_db_%d", idx)
 				err := adapter.CreateDatabase(ctx, types.CreateDatabaseOptions{
 					Name: dbName,
 				})
@@ -432,7 +433,7 @@ func TestMySQLAdapter_ConcurrentOperations(t *testing.T) {
 
 		// Verify all databases exist
 		for i := 0; i < numDatabases; i++ {
-			dbName := "concurrent_db_" + string(rune('a'+i))
+			dbName := fmt.Sprintf("concurrent_db_%d", i)
 			exists, err := adapter.DatabaseExists(ctx, dbName)
 			assert.NoError(t, err)
 			assert.True(t, exists, "Database %s should exist", dbName)
