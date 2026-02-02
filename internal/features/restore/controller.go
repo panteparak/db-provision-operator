@@ -28,8 +28,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/logging"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -74,7 +76,7 @@ func NewController(cfg ControllerConfig) *Controller {
 
 // Reconcile implements the reconciliation loop for DatabaseRestore resources.
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := c.logger.WithValues("restore", req.NamespacedName)
+	log := logf.FromContext(ctx).WithValues("restore", req.NamespacedName)
 
 	// Fetch the DatabaseRestore resource
 	restore := &dbopsv1alpha1.DatabaseRestore{}
@@ -119,7 +121,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 }
 
 func (c *Controller) reconcile(ctx context.Context, restore *dbopsv1alpha1.DatabaseRestore) (ctrl.Result, error) {
-	log := c.logger.WithValues("restore", restore.Name, "namespace", restore.Namespace)
+	log := logf.FromContext(ctx).WithValues("restore", restore.Name, "namespace", restore.Namespace)
 
 	// Set initial phase if needed
 	if restore.Status.Phase == "" {
@@ -190,7 +192,7 @@ func (c *Controller) reconcile(ctx context.Context, restore *dbopsv1alpha1.Datab
 }
 
 func (c *Controller) handleDeletion(ctx context.Context, restore *dbopsv1alpha1.DatabaseRestore) (ctrl.Result, error) {
-	log := c.logger.WithValues("restore", restore.Name, "namespace", restore.Namespace)
+	log := logf.FromContext(ctx).WithValues("restore", restore.Name, "namespace", restore.Namespace)
 
 	if !controllerutil.ContainsFinalizer(restore, util.FinalizerDatabaseRestore) {
 		return ctrl.Result{}, nil
@@ -212,7 +214,7 @@ func (c *Controller) handleDeletion(ctx context.Context, restore *dbopsv1alpha1.
 }
 
 func (c *Controller) handleDeadlineExceeded(ctx context.Context, restore *dbopsv1alpha1.DatabaseRestore, message string) (ctrl.Result, error) {
-	log := c.logger.WithValues("restore", restore.Name, "namespace", restore.Namespace)
+	log := logf.FromContext(ctx).WithValues("restore", restore.Name, "namespace", restore.Namespace)
 
 	log.Info("Restore deadline exceeded", "message", message)
 
@@ -231,7 +233,7 @@ func (c *Controller) handleDeadlineExceeded(ctx context.Context, restore *dbopsv
 }
 
 func (c *Controller) handleValidationError(ctx context.Context, restore *dbopsv1alpha1.DatabaseRestore, err error) (ctrl.Result, error) {
-	log := c.logger.WithValues("restore", restore.Name, "namespace", restore.Namespace)
+	log := logf.FromContext(ctx).WithValues("restore", restore.Name, "namespace", restore.Namespace)
 
 	log.Info("Restore validation failed", "error", err.Error())
 
@@ -250,7 +252,7 @@ func (c *Controller) handleValidationError(ctx context.Context, restore *dbopsv1
 }
 
 func (c *Controller) handleError(ctx context.Context, restore *dbopsv1alpha1.DatabaseRestore, err error, operation string) (ctrl.Result, error) {
-	log := c.logger.WithValues("restore", restore.Name, "namespace", restore.Namespace)
+	log := logf.FromContext(ctx).WithValues("restore", restore.Name, "namespace", restore.Namespace)
 
 	log.Error(err, "Reconciliation failed", "operation", operation)
 
@@ -269,7 +271,7 @@ func (c *Controller) handleError(ctx context.Context, restore *dbopsv1alpha1.Dat
 }
 
 func (c *Controller) handlePending(ctx context.Context, restore *dbopsv1alpha1.DatabaseRestore, message string) (ctrl.Result, error) {
-	log := c.logger.WithValues("restore", restore.Name, "namespace", restore.Namespace)
+	log := logf.FromContext(ctx).WithValues("restore", restore.Name, "namespace", restore.Namespace)
 
 	log.V(1).Info("Restore pending", "reason", message)
 
@@ -288,7 +290,7 @@ func (c *Controller) handlePending(ctx context.Context, restore *dbopsv1alpha1.D
 }
 
 func (c *Controller) handleCompleted(ctx context.Context, restore *dbopsv1alpha1.DatabaseRestore, result *Result) (ctrl.Result, error) {
-	log := c.logger.WithValues("restore", restore.Name, "namespace", restore.Namespace)
+	log := logf.FromContext(ctx).WithValues("restore", restore.Name, "namespace", restore.Namespace)
 
 	completedAt := metav1.Now()
 	restore.Status.Phase = dbopsv1alpha1.PhaseCompleted
@@ -328,7 +330,7 @@ func (c *Controller) handleCompleted(ctx context.Context, restore *dbopsv1alpha1
 
 // SetupWithManager registers the controller with the manager.
 func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	return logging.BuildController(mgr).
 		For(&dbopsv1alpha1.DatabaseRestore{}).
 		Named("databaserestore-feature").
 		Complete(c)

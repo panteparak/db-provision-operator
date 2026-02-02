@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/metrics"
@@ -55,7 +56,7 @@ func NewHandler(cfg HandlerConfig) *Handler {
 // Create creates a new database on the target instance.
 // Implements API.Create
 func (h *Handler) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (*Result, error) {
-	log := h.logger.WithValues("database", spec.Name, "namespace", namespace)
+	log := logf.FromContext(ctx).WithValues("database", spec.Name, "namespace", namespace)
 
 	// 1. Validation
 	if spec.Name == "" {
@@ -116,7 +117,7 @@ func (h *Handler) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, 
 // Update updates an existing database with new settings.
 // Implements API.Update
 func (h *Handler) Update(ctx context.Context, name string, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (*Result, error) {
-	log := h.logger.WithValues("database", name, "namespace", namespace)
+	log := logf.FromContext(ctx).WithValues("database", name, "namespace", namespace)
 
 	result, err := h.repo.Update(ctx, name, spec, namespace)
 	if err != nil {
@@ -150,7 +151,7 @@ func (h *Handler) Update(ctx context.Context, name string, spec *dbopsv1alpha1.D
 // Delete removes a database from the target instance.
 // Implements API.Delete
 func (h *Handler) Delete(ctx context.Context, name string, spec *dbopsv1alpha1.DatabaseSpec, namespace string, force bool) error {
-	log := h.logger.WithValues("database", name, "namespace", namespace, "force", force)
+	log := logf.FromContext(ctx).WithValues("database", name, "namespace", namespace, "force", force)
 
 	// Get engine for metrics
 	engine, err := h.repo.GetEngine(ctx, spec, namespace)
@@ -238,7 +239,7 @@ func (h *Handler) UpdateDatabaseMetrics(ctx context.Context, name string, spec *
 // OnInstanceConnected handles the InstanceConnected event.
 // This is called when a DatabaseInstance successfully connects.
 func (h *Handler) OnInstanceConnected(ctx context.Context, event *eventbus.InstanceConnected) error {
-	h.logger.V(1).Info("Instance connected, databases on this instance are now accessible",
+	logf.FromContext(ctx).V(1).Info("Instance connected, databases on this instance are now accessible",
 		"instance", event.InstanceName,
 		"namespace", event.Namespace,
 		"engine", event.Engine)
@@ -248,7 +249,7 @@ func (h *Handler) OnInstanceConnected(ctx context.Context, event *eventbus.Insta
 // OnInstanceDisconnected handles the InstanceDisconnected event.
 // This is called when a DatabaseInstance loses connection.
 func (h *Handler) OnInstanceDisconnected(ctx context.Context, event *eventbus.InstanceDisconnected) error {
-	h.logger.Info("Instance disconnected, databases on this instance may be inaccessible",
+	logf.FromContext(ctx).Info("Instance disconnected, databases on this instance may be inaccessible",
 		"instance", event.InstanceName,
 		"namespace", event.Namespace,
 		"reason", event.Reason)

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 )
@@ -115,7 +116,7 @@ func (r *Repository) CreateBackupFromTemplate(ctx context.Context, schedule *dbo
 		return nil, fmt.Errorf("create backup: %w", err)
 	}
 
-	r.logger.Info("Created backup from template", "backup", backupName, "schedule", schedule.Name)
+	logf.FromContext(ctx).Info("Created backup from template", "backup", backupName, "schedule", schedule.Name)
 	return backup, nil
 }
 
@@ -124,7 +125,7 @@ func (r *Repository) DeleteBackup(ctx context.Context, backup *dbopsv1alpha1.Dat
 	if err := r.client.Delete(ctx, backup); err != nil && !errors.IsNotFound(err) {
 		return fmt.Errorf("delete backup %s: %w", backup.Name, err)
 	}
-	r.logger.Info("Deleted backup", "backup", backup.Name)
+	logf.FromContext(ctx).Info("Deleted backup", "backup", backup.Name)
 	return nil
 }
 
@@ -133,7 +134,7 @@ func (r *Repository) DeleteBackups(ctx context.Context, backups []dbopsv1alpha1.
 	var deleted []string
 	for i := range backups {
 		if err := r.DeleteBackup(ctx, &backups[i]); err != nil {
-			r.logger.Error(err, "Failed to delete backup", "backup", backups[i].Name)
+			logf.FromContext(ctx).Error(err, "Failed to delete backup", "backup", backups[i].Name)
 			continue
 		}
 		deleted = append(deleted, backups[i].Name)

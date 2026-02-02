@@ -24,6 +24,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/robfig/cron/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/metrics"
@@ -57,7 +58,7 @@ func NewHandler(cfg HandlerConfig) *Handler {
 
 // TriggerBackup triggers a backup from the schedule template.
 func (h *Handler) TriggerBackup(ctx context.Context, schedule *dbopsv1alpha1.DatabaseBackupSchedule) (*TriggerResult, error) {
-	log := h.logger.WithValues("schedule", schedule.Name, "namespace", schedule.Namespace)
+	log := logf.FromContext(ctx).WithValues("schedule", schedule.Name, "namespace", schedule.Namespace)
 
 	backup, err := h.repo.CreateBackupFromTemplate(ctx, schedule)
 	if err != nil {
@@ -90,7 +91,7 @@ func (h *Handler) TriggerBackup(ctx context.Context, schedule *dbopsv1alpha1.Dat
 
 // EvaluateSchedule evaluates whether a backup is due based on the cron schedule.
 func (h *Handler) EvaluateSchedule(ctx context.Context, schedule *dbopsv1alpha1.DatabaseBackupSchedule) (*ScheduleEvaluation, error) {
-	log := h.logger.WithValues("schedule", schedule.Name, "namespace", schedule.Namespace)
+	log := logf.FromContext(ctx).WithValues("schedule", schedule.Name, "namespace", schedule.Namespace)
 
 	// Parse timezone
 	loc, err := h.getTimezone(schedule.Spec.Timezone)
@@ -150,7 +151,7 @@ func (h *Handler) EvaluateSchedule(ctx context.Context, schedule *dbopsv1alpha1.
 
 // EnforceRetention enforces the retention policy by deleting old backups.
 func (h *Handler) EnforceRetention(ctx context.Context, schedule *dbopsv1alpha1.DatabaseBackupSchedule) (*RetentionResult, error) {
-	log := h.logger.WithValues("schedule", schedule.Name, "namespace", schedule.Namespace)
+	log := logf.FromContext(ctx).WithValues("schedule", schedule.Name, "namespace", schedule.Namespace)
 
 	if schedule.Spec.Retention == nil {
 		return &RetentionResult{
@@ -214,7 +215,7 @@ func (h *Handler) EnforceRetention(ctx context.Context, schedule *dbopsv1alpha1.
 
 // HandleConcurrency handles concurrency policy for running backups.
 func (h *Handler) HandleConcurrency(ctx context.Context, schedule *dbopsv1alpha1.DatabaseBackupSchedule) (*ConcurrencyResult, error) {
-	log := h.logger.WithValues("schedule", schedule.Name, "namespace", schedule.Namespace)
+	log := logf.FromContext(ctx).WithValues("schedule", schedule.Name, "namespace", schedule.Namespace)
 
 	backups, err := h.repo.ListBackupsForSchedule(ctx, schedule)
 	if err != nil {
@@ -365,7 +366,7 @@ func (h *Handler) UpdateLastBackupStatus(schedule *dbopsv1alpha1.DatabaseBackupS
 
 // OnBackupCompleted handles the BackupCompleted event.
 func (h *Handler) OnBackupCompleted(ctx context.Context, event *eventbus.BackupCompleted) error {
-	h.logger.V(1).Info("Backup completed, schedule statistics may need update",
+	logf.FromContext(ctx).V(1).Info("Backup completed, schedule statistics may need update",
 		"backup", event.BackupName,
 		"namespace", event.Namespace,
 		"size", event.SizeBytes,
@@ -376,7 +377,7 @@ func (h *Handler) OnBackupCompleted(ctx context.Context, event *eventbus.BackupC
 
 // OnBackupFailed handles the BackupFailed event.
 func (h *Handler) OnBackupFailed(ctx context.Context, event *eventbus.BackupFailed) error {
-	h.logger.V(1).Info("Backup failed, schedule statistics may need update",
+	logf.FromContext(ctx).V(1).Info("Backup failed, schedule statistics may need update",
 		"backup", event.BackupName,
 		"namespace", event.Namespace,
 		"error", event.Error)

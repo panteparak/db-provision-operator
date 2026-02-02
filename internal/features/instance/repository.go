@@ -23,6 +23,7 @@ import (
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/secret"
@@ -65,7 +66,7 @@ func (r *Repository) withService(ctx context.Context, instance *dbopsv1alpha1.Da
 	if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
 		tlsCreds, err := r.secretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
 		if err != nil {
-			r.logger.Error(err, "Failed to get TLS credentials")
+			logf.FromContext(ctx).Error(err, "Failed to get TLS credentials")
 		} else {
 			tlsCA = tlsCreds.CA
 			tlsCert = tlsCreds.Cert
@@ -75,7 +76,7 @@ func (r *Repository) withService(ctx context.Context, instance *dbopsv1alpha1.Da
 
 	// Build service config
 	cfg := service.ConfigFromInstance(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
-	cfg.Logger = r.logger
+	cfg.Logger = logf.FromContext(ctx)
 
 	// Create instance service
 	svc, err := service.NewInstanceService(cfg)
@@ -106,7 +107,7 @@ func (r *Repository) Connect(ctx context.Context, instance *dbopsv1alpha1.Databa
 		// Get version
 		version, err := svc.GetVersion(ctx)
 		if err != nil {
-			r.logger.Error(err, "Failed to get version")
+			logf.FromContext(ctx).Error(err, "Failed to get version")
 		}
 
 		result.Connected = true

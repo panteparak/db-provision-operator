@@ -24,6 +24,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	adapterpkg "github.com/db-provision-operator/internal/adapter/types"
@@ -62,7 +63,7 @@ func NewHandler(cfg HandlerConfig) *Handler {
 
 // Execute performs a database restore operation.
 func (h *Handler) Execute(ctx context.Context, restore *dbopsv1alpha1.DatabaseRestore) (*Result, error) {
-	log := h.logger.WithValues("restore", restore.Name, "namespace", restore.Namespace)
+	log := logf.FromContext(ctx).WithValues("restore", restore.Name, "namespace", restore.Namespace)
 
 	// Check if operations are paused
 	if h.paused {
@@ -236,7 +237,7 @@ func (h *Handler) IsTerminal(restore *dbopsv1alpha1.DatabaseRestore) bool {
 // OnBackupCompleted handles the BackupCompleted event.
 // This could trigger pending restores that were waiting for this backup.
 func (h *Handler) OnBackupCompleted(ctx context.Context, event *eventbus.BackupCompleted) error {
-	h.logger.V(1).Info("Backup completed, pending restores may proceed",
+	logf.FromContext(ctx).V(1).Info("Backup completed, pending restores may proceed",
 		"backup", event.BackupName,
 		"namespace", event.Namespace,
 		"storagePath", event.StoragePath)
@@ -248,7 +249,7 @@ func (h *Handler) OnBackupCompleted(ctx context.Context, event *eventbus.BackupC
 // OnInstanceDisconnected handles the InstanceDisconnected event.
 // This pauses restore operations for the affected instance.
 func (h *Handler) OnInstanceDisconnected(ctx context.Context, event *eventbus.InstanceDisconnected) error {
-	h.logger.V(1).Info("Instance disconnected, pausing restore operations",
+	logf.FromContext(ctx).V(1).Info("Instance disconnected, pausing restore operations",
 		"instance", event.InstanceName,
 		"namespace", event.Namespace,
 		"reason", event.Reason)
@@ -259,7 +260,7 @@ func (h *Handler) OnInstanceDisconnected(ctx context.Context, event *eventbus.In
 // OnInstanceConnected handles the InstanceConnected event.
 // This resumes restore operations for the affected instance.
 func (h *Handler) OnInstanceConnected(ctx context.Context, event *eventbus.InstanceConnected) error {
-	h.logger.V(1).Info("Instance connected, resuming restore operations",
+	logf.FromContext(ctx).V(1).Info("Instance connected, resuming restore operations",
 		"instance", event.InstanceName,
 		"namespace", event.Namespace)
 	h.paused = false

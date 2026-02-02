@@ -26,8 +26,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/logging"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -71,7 +73,7 @@ func NewController(cfg ControllerConfig) *Controller {
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseinstances/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := c.logger.WithValues("instance", req.NamespacedName)
+	log := logf.FromContext(ctx).WithValues("instance", req.NamespacedName)
 
 	// 1. Fetch the DatabaseInstance resource
 	instance := &dbopsv1alpha1.DatabaseInstance{}
@@ -104,7 +106,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 // reconcile handles the main reconciliation logic.
 func (c *Controller) reconcile(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance) (ctrl.Result, error) {
-	log := c.logger.WithValues("instance", instance.Name, "namespace", instance.Namespace)
+	log := logf.FromContext(ctx).WithValues("instance", instance.Name, "namespace", instance.Namespace)
 
 	// Attempt connection
 	result, err := c.handler.Connect(ctx, instance.Name, instance.Namespace)
@@ -154,7 +156,7 @@ func (c *Controller) reconcile(ctx context.Context, instance *dbopsv1alpha1.Data
 
 // handleDeletion handles the deletion of a DatabaseInstance resource.
 func (c *Controller) handleDeletion(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance) (ctrl.Result, error) {
-	log := c.logger.WithValues("instance", instance.Name, "namespace", instance.Namespace)
+	log := logf.FromContext(ctx).WithValues("instance", instance.Name, "namespace", instance.Namespace)
 
 	if !controllerutil.ContainsFinalizer(instance, util.FinalizerDatabaseInstance) {
 		return ctrl.Result{}, nil
@@ -177,7 +179,7 @@ func (c *Controller) handleDeletion(ctx context.Context, instance *dbopsv1alpha1
 
 // handleError handles errors during reconciliation.
 func (c *Controller) handleError(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance, err error, operation string) (ctrl.Result, error) {
-	log := c.logger.WithValues("instance", instance.Name, "namespace", instance.Namespace)
+	log := logf.FromContext(ctx).WithValues("instance", instance.Name, "namespace", instance.Namespace)
 
 	log.Error(err, "Reconciliation failed", "operation", operation)
 
@@ -206,7 +208,7 @@ func (c *Controller) handleError(ctx context.Context, instance *dbopsv1alpha1.Da
 
 // SetupWithManager registers the controller with the manager.
 func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	return logging.BuildController(mgr).
 		For(&dbopsv1alpha1.DatabaseInstance{}).
 		Named("databaseinstance").
 		Complete(c)

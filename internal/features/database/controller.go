@@ -27,8 +27,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/logging"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -80,7 +82,7 @@ func NewController(cfg ControllerConfig) *Controller {
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseinstances,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := c.logger.WithValues("database", req.NamespacedName)
+	log := logf.FromContext(ctx).WithValues("database", req.NamespacedName)
 
 	// 1. Fetch the Database resource
 	database := &dbopsv1alpha1.Database{}
@@ -113,7 +115,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 // reconcile handles the main reconciliation logic.
 func (c *Controller) reconcile(ctx context.Context, database *dbopsv1alpha1.Database) (ctrl.Result, error) {
-	log := c.logger.WithValues("database", database.Name, "namespace", database.Namespace)
+	log := logf.FromContext(ctx).WithValues("database", database.Name, "namespace", database.Namespace)
 
 	// 1. Check if database exists
 	exists, err := c.handler.Exists(ctx, database.Spec.Name, &database.Spec, database.Namespace)
@@ -192,7 +194,7 @@ func (c *Controller) reconcile(ctx context.Context, database *dbopsv1alpha1.Data
 
 // handleDeletion handles the deletion of a Database resource.
 func (c *Controller) handleDeletion(ctx context.Context, database *dbopsv1alpha1.Database) (ctrl.Result, error) {
-	log := c.logger.WithValues("database", database.Name, "namespace", database.Namespace)
+	log := logf.FromContext(ctx).WithValues("database", database.Name, "namespace", database.Namespace)
 
 	if !controllerutil.ContainsFinalizer(database, util.FinalizerDatabase) {
 		return ctrl.Result{}, nil
@@ -244,7 +246,7 @@ func (c *Controller) handleDeletion(ctx context.Context, database *dbopsv1alpha1
 
 // handleError handles errors during reconciliation.
 func (c *Controller) handleError(ctx context.Context, database *dbopsv1alpha1.Database, err error, operation string) (ctrl.Result, error) {
-	log := c.logger.WithValues("database", database.Name, "namespace", database.Namespace)
+	log := logf.FromContext(ctx).WithValues("database", database.Name, "namespace", database.Namespace)
 
 	log.Error(err, "Reconciliation failed", "operation", operation)
 
@@ -268,13 +270,13 @@ func (c *Controller) updatePhase(ctx context.Context, database *dbopsv1alpha1.Da
 	database.Status.Phase = phase
 	database.Status.Message = message
 	if err := c.Status().Update(ctx, database); err != nil {
-		c.logger.Error(err, "Failed to update phase", "phase", phase)
+		logf.FromContext(ctx).Error(err, "Failed to update phase", "phase", phase)
 	}
 }
 
 // SetupWithManager registers the controller with the manager.
 func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	return logging.BuildController(mgr).
 		For(&dbopsv1alpha1.Database{}).
 		Named("database").
 		Complete(c)

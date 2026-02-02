@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/metrics"
@@ -53,7 +54,7 @@ func NewHandler(cfg HandlerConfig) *Handler {
 
 // Apply applies grants to a database user.
 func (h *Handler) Apply(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*Result, error) {
-	log := h.logger.WithValues("userRef", spec.UserRef.Name, "namespace", namespace)
+	log := logf.FromContext(ctx).WithValues("userRef", spec.UserRef.Name, "namespace", namespace)
 
 	// Get engine for metrics
 	engine, err := h.repo.GetEngine(ctx, spec, namespace)
@@ -100,7 +101,7 @@ func (h *Handler) Apply(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSp
 
 // Revoke revokes grants from a database user.
 func (h *Handler) Revoke(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) error {
-	log := h.logger.WithValues("userRef", spec.UserRef.Name, "namespace", namespace)
+	log := logf.FromContext(ctx).WithValues("userRef", spec.UserRef.Name, "namespace", namespace)
 
 	// Get engine for metrics
 	engine, err := h.repo.GetEngine(ctx, spec, namespace)
@@ -148,7 +149,7 @@ func (h *Handler) Exists(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantS
 
 // OnUserCreated handles the UserCreated event to apply pending grants.
 func (h *Handler) OnUserCreated(ctx context.Context, event *eventbus.UserCreated) error {
-	h.logger.V(1).Info("User created, checking for pending grants",
+	logf.FromContext(ctx).V(1).Info("User created, checking for pending grants",
 		"username", event.Username,
 		"namespace", event.Namespace)
 	// In a full implementation, this would query for DatabaseGrant resources
@@ -158,7 +159,7 @@ func (h *Handler) OnUserCreated(ctx context.Context, event *eventbus.UserCreated
 
 // OnDatabaseCreated handles the DatabaseCreated event to apply pending grants.
 func (h *Handler) OnDatabaseCreated(ctx context.Context, event *eventbus.DatabaseCreated) error {
-	h.logger.V(1).Info("Database created, checking for pending grants",
+	logf.FromContext(ctx).V(1).Info("Database created, checking for pending grants",
 		"database", event.DatabaseName,
 		"namespace", event.Namespace)
 	// In a full implementation, this would query for DatabaseGrant resources
@@ -168,7 +169,7 @@ func (h *Handler) OnDatabaseCreated(ctx context.Context, event *eventbus.Databas
 
 // OnDatabaseDeleted handles the DatabaseDeleted event to handle grant cleanup.
 func (h *Handler) OnDatabaseDeleted(ctx context.Context, event *eventbus.DatabaseDeleted) error {
-	h.logger.V(1).Info("Database deleted, grants may need cleanup",
+	logf.FromContext(ctx).V(1).Info("Database deleted, grants may need cleanup",
 		"database", event.DatabaseName,
 		"namespace", event.Namespace)
 	// In a full implementation, this would notify or update grants

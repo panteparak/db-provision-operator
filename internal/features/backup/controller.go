@@ -28,8 +28,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/logging"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -73,7 +75,7 @@ func NewController(cfg ControllerConfig) *Controller {
 
 // Reconcile implements the reconciliation loop for DatabaseBackup resources.
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := c.logger.WithValues("backup", req.NamespacedName)
+	log := logf.FromContext(ctx).WithValues("backup", req.NamespacedName)
 
 	// Fetch the DatabaseBackup resource
 	backup := &dbopsv1alpha1.DatabaseBackup{}
@@ -118,7 +120,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 }
 
 func (c *Controller) reconcile(ctx context.Context, backup *dbopsv1alpha1.DatabaseBackup) (ctrl.Result, error) {
-	log := c.logger.WithValues("backup", backup.Name, "namespace", backup.Namespace)
+	log := logf.FromContext(ctx).WithValues("backup", backup.Name, "namespace", backup.Namespace)
 
 	// Set initial phase
 	if backup.Status.Phase == "" {
@@ -230,7 +232,7 @@ func (c *Controller) reconcile(ctx context.Context, backup *dbopsv1alpha1.Databa
 }
 
 func (c *Controller) handleCompletedBackup(ctx context.Context, backup *dbopsv1alpha1.DatabaseBackup) (ctrl.Result, error) {
-	log := c.logger.WithValues("backup", backup.Name, "namespace", backup.Namespace)
+	log := logf.FromContext(ctx).WithValues("backup", backup.Name, "namespace", backup.Namespace)
 
 	// Check if expired
 	if c.handler.IsExpired(backup) {
@@ -254,7 +256,7 @@ func (c *Controller) handleCompletedBackup(ctx context.Context, backup *dbopsv1a
 }
 
 func (c *Controller) handleDeletion(ctx context.Context, backup *dbopsv1alpha1.DatabaseBackup) (ctrl.Result, error) {
-	log := c.logger.WithValues("backup", backup.Name, "namespace", backup.Namespace)
+	log := logf.FromContext(ctx).WithValues("backup", backup.Name, "namespace", backup.Namespace)
 
 	if !controllerutil.ContainsFinalizer(backup, util.FinalizerDatabaseBackup) {
 		return ctrl.Result{}, nil
@@ -289,7 +291,7 @@ func (c *Controller) handleDeletion(ctx context.Context, backup *dbopsv1alpha1.D
 }
 
 func (c *Controller) handleError(ctx context.Context, backup *dbopsv1alpha1.DatabaseBackup, err error, operation string) (ctrl.Result, error) {
-	log := c.logger.WithValues("backup", backup.Name, "namespace", backup.Namespace)
+	log := logf.FromContext(ctx).WithValues("backup", backup.Name, "namespace", backup.Namespace)
 
 	log.Error(err, "Reconciliation failed", "operation", operation)
 
@@ -309,7 +311,7 @@ func (c *Controller) handleError(ctx context.Context, backup *dbopsv1alpha1.Data
 }
 
 func (c *Controller) handlePending(ctx context.Context, backup *dbopsv1alpha1.DatabaseBackup, message string) (ctrl.Result, error) {
-	log := c.logger.WithValues("backup", backup.Name, "namespace", backup.Namespace)
+	log := logf.FromContext(ctx).WithValues("backup", backup.Name, "namespace", backup.Namespace)
 
 	log.V(1).Info("Backup pending", "reason", message)
 
@@ -326,7 +328,7 @@ func (c *Controller) handlePending(ctx context.Context, backup *dbopsv1alpha1.Da
 
 // SetupWithManager registers the controller with the manager.
 func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	return logging.BuildController(mgr).
 		For(&dbopsv1alpha1.DatabaseBackup{}).
 		Named("databasebackup-feature").
 		Complete(c)

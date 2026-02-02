@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/metrics"
@@ -55,7 +56,7 @@ func NewHandler(cfg HandlerConfig) *Handler {
 
 // Execute performs a backup operation.
 func (h *Handler) Execute(ctx context.Context, backup *dbopsv1alpha1.DatabaseBackup) (*Result, error) {
-	log := h.logger.WithValues("backup", backup.Name, "namespace", backup.Namespace)
+	log := logf.FromContext(ctx).WithValues("backup", backup.Name, "namespace", backup.Namespace)
 
 	// Get engine for metrics
 	engine, err := h.repo.GetEngine(ctx, backup)
@@ -144,7 +145,7 @@ func (h *Handler) Execute(ctx context.Context, backup *dbopsv1alpha1.DatabaseBac
 
 // Delete removes a backup from storage.
 func (h *Handler) Delete(ctx context.Context, backup *dbopsv1alpha1.DatabaseBackup) error {
-	log := h.logger.WithValues("backup", backup.Name, "namespace", backup.Namespace)
+	log := logf.FromContext(ctx).WithValues("backup", backup.Name, "namespace", backup.Namespace)
 
 	log.Info("Deleting backup")
 
@@ -196,7 +197,7 @@ func (h *Handler) IsExpired(backup *dbopsv1alpha1.DatabaseBackup) bool {
 // OnDatabaseDeleted handles the DatabaseDeleted event.
 // This may be used for cleanup or notifications related to backups of deleted databases.
 func (h *Handler) OnDatabaseDeleted(ctx context.Context, event *eventbus.DatabaseDeleted) error {
-	h.logger.V(1).Info("Database deleted, backups may need attention",
+	logf.FromContext(ctx).V(1).Info("Database deleted, backups may need attention",
 		"database", event.DatabaseName,
 		"namespace", event.Namespace)
 	// In a full implementation, this could:
@@ -209,7 +210,7 @@ func (h *Handler) OnDatabaseDeleted(ctx context.Context, event *eventbus.Databas
 // OnInstanceDisconnected handles the InstanceDisconnected event.
 // This pauses backup operations for the disconnected instance.
 func (h *Handler) OnInstanceDisconnected(ctx context.Context, event *eventbus.InstanceDisconnected) error {
-	h.logger.V(1).Info("Instance disconnected, backup operations may fail",
+	logf.FromContext(ctx).V(1).Info("Instance disconnected, backup operations may fail",
 		"instance", event.InstanceName,
 		"namespace", event.Namespace,
 		"reason", event.Reason)
@@ -224,7 +225,7 @@ func (h *Handler) OnInstanceDisconnected(ctx context.Context, event *eventbus.In
 // OnInstanceConnected handles the InstanceConnected event.
 // This resumes backup operations for the reconnected instance.
 func (h *Handler) OnInstanceConnected(ctx context.Context, event *eventbus.InstanceConnected) error {
-	h.logger.V(1).Info("Instance connected, backup operations can resume",
+	logf.FromContext(ctx).V(1).Info("Instance connected, backup operations can resume",
 		"instance", event.InstanceName,
 		"namespace", event.Namespace)
 

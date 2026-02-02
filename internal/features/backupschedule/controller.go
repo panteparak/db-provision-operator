@@ -28,8 +28,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/logging"
 	"github.com/db-provision-operator/internal/metrics"
 	"github.com/db-provision-operator/internal/util"
 )
@@ -78,7 +80,7 @@ func NewController(cfg ControllerConfig) *Controller {
 
 // Reconcile implements the reconciliation loop for DatabaseBackupSchedule resources.
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := c.logger.WithValues("schedule", req.NamespacedName)
+	log := logf.FromContext(ctx).WithValues("schedule", req.NamespacedName)
 
 	// Fetch the DatabaseBackupSchedule resource
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{}
@@ -113,7 +115,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 }
 
 func (c *Controller) reconcile(ctx context.Context, schedule *dbopsv1alpha1.DatabaseBackupSchedule) (ctrl.Result, error) {
-	log := c.logger.WithValues("schedule", schedule.Name, "namespace", schedule.Namespace)
+	log := logf.FromContext(ctx).WithValues("schedule", schedule.Name, "namespace", schedule.Namespace)
 
 	// Handle paused schedule
 	if schedule.Spec.Paused {
@@ -228,7 +230,7 @@ func (c *Controller) reconcile(ctx context.Context, schedule *dbopsv1alpha1.Data
 }
 
 func (c *Controller) handlePaused(ctx context.Context, schedule *dbopsv1alpha1.DatabaseBackupSchedule) (ctrl.Result, error) {
-	log := c.logger.WithValues("schedule", schedule.Name, "namespace", schedule.Namespace)
+	log := logf.FromContext(ctx).WithValues("schedule", schedule.Name, "namespace", schedule.Namespace)
 
 	schedule.Status.Phase = dbopsv1alpha1.PhasePaused
 	schedule.Status.NextBackupTime = nil
@@ -247,7 +249,7 @@ func (c *Controller) handlePaused(ctx context.Context, schedule *dbopsv1alpha1.D
 }
 
 func (c *Controller) handleDeletion(ctx context.Context, schedule *dbopsv1alpha1.DatabaseBackupSchedule) (ctrl.Result, error) {
-	log := c.logger.WithValues("schedule", schedule.Name, "namespace", schedule.Namespace)
+	log := logf.FromContext(ctx).WithValues("schedule", schedule.Name, "namespace", schedule.Namespace)
 
 	if !controllerutil.ContainsFinalizer(schedule, util.FinalizerDatabaseBackupSchedule) {
 		return ctrl.Result{}, nil
@@ -273,7 +275,7 @@ func (c *Controller) handleDeletion(ctx context.Context, schedule *dbopsv1alpha1
 }
 
 func (c *Controller) handleError(ctx context.Context, schedule *dbopsv1alpha1.DatabaseBackupSchedule, err error, operation string) (ctrl.Result, error) {
-	log := c.logger.WithValues("schedule", schedule.Name, "namespace", schedule.Namespace)
+	log := logf.FromContext(ctx).WithValues("schedule", schedule.Name, "namespace", schedule.Namespace)
 
 	log.Error(err, "Reconciliation failed", "operation", operation)
 
@@ -293,7 +295,7 @@ func (c *Controller) handleError(ctx context.Context, schedule *dbopsv1alpha1.Da
 
 // SetupWithManager registers the controller with the manager.
 func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	return logging.BuildController(mgr).
 		For(&dbopsv1alpha1.DatabaseBackupSchedule{}).
 		Owns(&dbopsv1alpha1.DatabaseBackup{}).
 		Named("databasebackupschedule").

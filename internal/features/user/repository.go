@@ -23,6 +23,7 @@ import (
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/secret"
@@ -92,7 +93,7 @@ func (r *Repository) withService(ctx context.Context, spec *dbopsv1alpha1.Databa
 
 	// Build service config
 	cfg := service.ConfigFromInstance(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
-	cfg.Logger = r.logger
+	cfg.Logger = logf.FromContext(ctx)
 
 	// Create user service
 	svc, err := service.NewUserService(cfg)

@@ -30,6 +30,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/logging"
 	"github.com/db-provision-operator/internal/metrics"
 	"github.com/db-provision-operator/internal/secret"
 	"github.com/db-provision-operator/internal/service"
@@ -381,7 +382,7 @@ func (r *DatabaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		r.SecretManager = secret.NewManager(r.Client)
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	return logging.BuildController(mgr).
 		For(&dbopsv1alpha1.Database{}).
 		Named("database").
 		Complete(r)

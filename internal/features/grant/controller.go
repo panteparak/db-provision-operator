@@ -29,8 +29,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/logging"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -68,7 +70,7 @@ func NewController(cfg ControllerConfig) *Controller {
 
 // Reconcile implements the reconciliation loop for DatabaseGrant resources.
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := c.logger.WithValues("grant", req.NamespacedName)
+	log := logf.FromContext(ctx).WithValues("grant", req.NamespacedName)
 
 	// Fetch the DatabaseGrant resource
 	grant := &dbopsv1alpha1.DatabaseGrant{}
@@ -96,7 +98,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 }
 
 func (c *Controller) reconcile(ctx context.Context, grant *dbopsv1alpha1.DatabaseGrant) (ctrl.Result, error) {
-	log := c.logger.WithValues("grant", grant.Name, "namespace", grant.Namespace)
+	log := logf.FromContext(ctx).WithValues("grant", grant.Name, "namespace", grant.Namespace)
 
 	// Check if the referenced user exists and is ready
 	user, err := c.getUser(ctx, grant)
@@ -198,7 +200,7 @@ func (c *Controller) getInstance(ctx context.Context, user *dbopsv1alpha1.Databa
 }
 
 func (c *Controller) handleDeletion(ctx context.Context, grant *dbopsv1alpha1.DatabaseGrant) (ctrl.Result, error) {
-	log := c.logger.WithValues("grant", grant.Name, "namespace", grant.Namespace)
+	log := logf.FromContext(ctx).WithValues("grant", grant.Name, "namespace", grant.Namespace)
 
 	if !controllerutil.ContainsFinalizer(grant, util.FinalizerDatabaseGrant) {
 		return ctrl.Result{}, nil
@@ -245,7 +247,7 @@ func (c *Controller) handleDeletion(ctx context.Context, grant *dbopsv1alpha1.Da
 }
 
 func (c *Controller) handleError(ctx context.Context, grant *dbopsv1alpha1.DatabaseGrant, err error, operation string) (ctrl.Result, error) {
-	log := c.logger.WithValues("grant", grant.Name, "namespace", grant.Namespace)
+	log := logf.FromContext(ctx).WithValues("grant", grant.Name, "namespace", grant.Namespace)
 
 	log.Error(err, "Reconciliation failed", "operation", operation)
 
@@ -265,7 +267,7 @@ func (c *Controller) handleError(ctx context.Context, grant *dbopsv1alpha1.Datab
 }
 
 func (c *Controller) handlePending(ctx context.Context, grant *dbopsv1alpha1.DatabaseGrant, message string) (ctrl.Result, error) {
-	log := c.logger.WithValues("grant", grant.Name, "namespace", grant.Namespace)
+	log := logf.FromContext(ctx).WithValues("grant", grant.Name, "namespace", grant.Namespace)
 
 	log.V(1).Info("Grant pending", "reason", message)
 
@@ -285,7 +287,7 @@ func (c *Controller) updatePhase(ctx context.Context, grant *dbopsv1alpha1.Datab
 	grant.Status.Phase = phase
 	grant.Status.Message = message
 	if err := c.Status().Update(ctx, grant); err != nil {
-		c.logger.Error(err, "Failed to update phase", "phase", phase)
+		logf.FromContext(ctx).Error(err, "Failed to update phase", "phase", phase)
 	}
 }
 
@@ -305,7 +307,7 @@ func (c *Controller) getDeletionPolicy(_ *dbopsv1alpha1.DatabaseGrant) dbopsv1al
 
 // SetupWithManager registers the controller with the manager.
 func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	return logging.BuildController(mgr).
 		For(&dbopsv1alpha1.DatabaseGrant{}).
 		Named("databasegrant-feature").
 		Complete(c)

@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/adapter"
@@ -59,7 +60,7 @@ func NewRepository(cfg RepositoryConfig) *Repository {
 
 // ExecuteBackup performs the actual backup operation.
 func (r *Repository) ExecuteBackup(ctx context.Context, backup *dbopsv1alpha1.DatabaseBackup) (*BackupExecutionResult, error) {
-	log := r.logger.WithValues("backup", backup.Name, "namespace", backup.Namespace)
+	log := logf.FromContext(ctx).WithValues("backup", backup.Name, "namespace", backup.Namespace)
 
 	// Get the database
 	database, err := r.GetDatabase(ctx, backup)
@@ -189,7 +190,7 @@ func (r *Repository) DeleteBackup(ctx context.Context, backup *dbopsv1alpha1.Dat
 		return nil
 	}
 
-	log := r.logger.WithValues("backup", backup.Name, "path", backup.Status.Backup.Path)
+	log := logf.FromContext(ctx).WithValues("backup", backup.Name, "path", backup.Status.Backup.Path)
 	log.Info("Deleting backup file from storage")
 
 	err := storage.DeleteBackup(ctx, &storage.Config{

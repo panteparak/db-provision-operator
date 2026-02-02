@@ -28,8 +28,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/logging"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -73,7 +75,7 @@ func NewController(cfg ControllerConfig) *Controller {
 
 // Reconcile implements the reconciliation loop for DatabaseRole resources.
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := c.logger.WithValues("role", req.NamespacedName)
+	log := logf.FromContext(ctx).WithValues("role", req.NamespacedName)
 
 	// Fetch the DatabaseRole resource
 	role := &dbopsv1alpha1.DatabaseRole{}
@@ -101,7 +103,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 }
 
 func (c *Controller) reconcile(ctx context.Context, role *dbopsv1alpha1.DatabaseRole) (ctrl.Result, error) {
-	log := c.logger.WithValues("role", role.Name, "namespace", role.Namespace)
+	log := logf.FromContext(ctx).WithValues("role", role.Name, "namespace", role.Namespace)
 
 	// Check if role exists
 	exists, err := c.handler.Exists(ctx, role.Spec.RoleName, &role.Spec, role.Namespace)
@@ -157,7 +159,7 @@ func (c *Controller) reconcile(ctx context.Context, role *dbopsv1alpha1.Database
 }
 
 func (c *Controller) handleDeletion(ctx context.Context, role *dbopsv1alpha1.DatabaseRole) (ctrl.Result, error) {
-	log := c.logger.WithValues("role", role.Name, "namespace", role.Namespace)
+	log := logf.FromContext(ctx).WithValues("role", role.Name, "namespace", role.Namespace)
 
 	if !controllerutil.ContainsFinalizer(role, util.FinalizerDatabaseRole) {
 		return ctrl.Result{}, nil
@@ -205,7 +207,7 @@ func (c *Controller) handleDeletion(ctx context.Context, role *dbopsv1alpha1.Dat
 }
 
 func (c *Controller) handleError(ctx context.Context, role *dbopsv1alpha1.DatabaseRole, err error, operation string) (ctrl.Result, error) {
-	log := c.logger.WithValues("role", role.Name, "namespace", role.Namespace)
+	log := logf.FromContext(ctx).WithValues("role", role.Name, "namespace", role.Namespace)
 
 	log.Error(err, "Reconciliation failed", "operation", operation)
 
@@ -228,7 +230,7 @@ func (c *Controller) updatePhase(ctx context.Context, role *dbopsv1alpha1.Databa
 	role.Status.Phase = phase
 	role.Status.Message = message
 	if err := c.Status().Update(ctx, role); err != nil {
-		c.logger.Error(err, "Failed to update phase", "phase", phase)
+		logf.FromContext(ctx).Error(err, "Failed to update phase", "phase", phase)
 	}
 }
 
@@ -256,7 +258,7 @@ func (c *Controller) hasDeletionProtection(role *dbopsv1alpha1.DatabaseRole) boo
 
 // SetupWithManager registers the controller with the manager.
 func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	return logging.BuildController(mgr).
 		For(&dbopsv1alpha1.DatabaseRole{}).
 		Named("databaserole-feature").
 		Complete(c)

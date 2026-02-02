@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/metrics"
@@ -56,7 +57,7 @@ func NewHandler(cfg HandlerConfig) *Handler {
 
 // Create creates a new database user with the provided password.
 func (h *Handler) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, password string) (*Result, error) {
-	log := h.logger.WithValues("user", spec.Username, "namespace", namespace)
+	log := logf.FromContext(ctx).WithValues("user", spec.Username, "namespace", namespace)
 
 	if spec.Username == "" {
 		return nil, fmt.Errorf("username is required")
@@ -112,7 +113,7 @@ func (h *Handler) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSp
 
 // Update updates an existing database user.
 func (h *Handler) Update(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
-	log := h.logger.WithValues("user", username, "namespace", namespace)
+	log := logf.FromContext(ctx).WithValues("user", username, "namespace", namespace)
 
 	result, err := h.repo.Update(ctx, username, spec, namespace)
 	if err != nil {
@@ -141,7 +142,7 @@ func (h *Handler) Update(ctx context.Context, username string, spec *dbopsv1alph
 
 // Delete removes a database user.
 func (h *Handler) Delete(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, force bool) error {
-	log := h.logger.WithValues("user", username, "namespace", namespace)
+	log := logf.FromContext(ctx).WithValues("user", username, "namespace", namespace)
 
 	engine, _ := h.repo.GetEngine(ctx, spec, namespace)
 
@@ -174,7 +175,7 @@ func (h *Handler) Exists(ctx context.Context, username string, spec *dbopsv1alph
 
 // RotatePassword rotates the user's password.
 func (h *Handler) RotatePassword(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
-	log := h.logger.WithValues("user", username, "namespace", namespace)
+	log := logf.FromContext(ctx).WithValues("user", username, "namespace", namespace)
 
 	// Generate new password using PasswordConfig from spec if available
 	var passwordConfig *dbopsv1alpha1.PasswordConfig
@@ -208,7 +209,7 @@ func (h *Handler) RotatePassword(ctx context.Context, username string, spec *dbo
 
 // OnDatabaseCreated handles the DatabaseCreated event.
 func (h *Handler) OnDatabaseCreated(ctx context.Context, event *eventbus.DatabaseCreated) error {
-	h.logger.V(1).Info("Database created, users can now be granted access",
+	logf.FromContext(ctx).V(1).Info("Database created, users can now be granted access",
 		"database", event.DatabaseName,
 		"namespace", event.Namespace)
 	return nil
@@ -216,7 +217,7 @@ func (h *Handler) OnDatabaseCreated(ctx context.Context, event *eventbus.Databas
 
 // OnDatabaseDeleted handles the DatabaseDeleted event.
 func (h *Handler) OnDatabaseDeleted(ctx context.Context, event *eventbus.DatabaseDeleted) error {
-	h.logger.V(1).Info("Database deleted, user grants may need cleanup",
+	logf.FromContext(ctx).V(1).Info("Database deleted, user grants may need cleanup",
 		"database", event.DatabaseName,
 		"namespace", event.Namespace)
 	return nil

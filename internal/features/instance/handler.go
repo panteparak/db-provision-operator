@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/metrics"
@@ -54,7 +55,7 @@ func NewHandler(cfg HandlerConfig) *Handler {
 // Connect establishes a connection to the database instance.
 // Implements API.Connect
 func (h *Handler) Connect(ctx context.Context, name, namespace string) (*ConnectResult, error) {
-	log := h.logger.WithValues("instance", name, "namespace", namespace)
+	log := logf.FromContext(ctx).WithValues("instance", name, "namespace", namespace)
 
 	// Get the instance
 	instance, err := h.repo.GetInstance(ctx, name, namespace)
@@ -140,7 +141,7 @@ func (h *Handler) IsHealthy(ctx context.Context, name, namespace string) (bool, 
 
 // HandleDisconnect handles when an instance becomes disconnected.
 func (h *Handler) HandleDisconnect(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance, reason string) {
-	log := h.logger.WithValues("instance", instance.Name, "namespace", instance.Namespace)
+	log := logf.FromContext(ctx).WithValues("instance", instance.Name, "namespace", instance.Namespace)
 	engine := string(instance.Spec.Engine)
 
 	log.Info("Instance disconnected", "reason", reason)
@@ -176,7 +177,7 @@ func (h *Handler) HandleHealthCheckPassed(ctx context.Context, instance *dbopsv1
 
 // HandleHealthCheckFailed handles when a health check fails.
 func (h *Handler) HandleHealthCheckFailed(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance, reason string) {
-	log := h.logger.WithValues("instance", instance.Name, "namespace", instance.Namespace)
+	log := logf.FromContext(ctx).WithValues("instance", instance.Name, "namespace", instance.Namespace)
 	engine := string(instance.Spec.Engine)
 
 	log.Info("Health check failed", "reason", reason)

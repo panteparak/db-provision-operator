@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/logging"
 	"github.com/db-provision-operator/internal/metrics"
 	"github.com/db-provision-operator/internal/util"
 )
@@ -501,7 +502,7 @@ func (r *DatabaseBackupScheduleReconciler) handleDeletion(ctx context.Context, s
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *DatabaseBackupScheduleReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	return logging.BuildController(mgr).
 		For(&dbopsv1alpha1.DatabaseBackupSchedule{}).
 		Owns(&dbopsv1alpha1.DatabaseBackup{}).
 		Named("databasebackupschedule").

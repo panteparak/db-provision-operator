@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/metrics"
@@ -53,7 +54,7 @@ func NewHandler(cfg HandlerConfig) *Handler {
 
 // Create creates a new database role.
 func (h *Handler) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string) (*Result, error) {
-	log := h.logger.WithValues("role", spec.RoleName, "namespace", namespace)
+	log := logf.FromContext(ctx).WithValues("role", spec.RoleName, "namespace", namespace)
 
 	if spec.RoleName == "" {
 		return nil, fmt.Errorf("role name is required")
@@ -106,7 +107,7 @@ func (h *Handler) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseRoleSp
 
 // Update updates an existing database role.
 func (h *Handler) Update(ctx context.Context, roleName string, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string) (*Result, error) {
-	log := h.logger.WithValues("role", roleName, "namespace", namespace)
+	log := logf.FromContext(ctx).WithValues("role", roleName, "namespace", namespace)
 
 	result, err := h.repo.Update(ctx, roleName, spec, namespace)
 	if err != nil {
@@ -135,7 +136,7 @@ func (h *Handler) Update(ctx context.Context, roleName string, spec *dbopsv1alph
 
 // Delete removes a database role.
 func (h *Handler) Delete(ctx context.Context, roleName string, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string, force bool) error {
-	log := h.logger.WithValues("role", roleName, "namespace", namespace)
+	log := logf.FromContext(ctx).WithValues("role", roleName, "namespace", namespace)
 
 	engine, _ := h.repo.GetEngine(ctx, spec, namespace)
 
@@ -170,7 +171,7 @@ func (h *Handler) Exists(ctx context.Context, roleName string, spec *dbopsv1alph
 
 // OnDatabaseCreated handles the DatabaseCreated event.
 func (h *Handler) OnDatabaseCreated(ctx context.Context, event *eventbus.DatabaseCreated) error {
-	h.logger.V(1).Info("Database created, roles can now be granted access",
+	logf.FromContext(ctx).V(1).Info("Database created, roles can now be granted access",
 		"database", event.DatabaseName,
 		"namespace", event.Namespace)
 	return nil
@@ -178,7 +179,7 @@ func (h *Handler) OnDatabaseCreated(ctx context.Context, event *eventbus.Databas
 
 // OnDatabaseDeleted handles the DatabaseDeleted event.
 func (h *Handler) OnDatabaseDeleted(ctx context.Context, event *eventbus.DatabaseDeleted) error {
-	h.logger.V(1).Info("Database deleted, role grants may need cleanup",
+	logf.FromContext(ctx).V(1).Info("Database deleted, role grants may need cleanup",
 		"database", event.DatabaseName,
 		"namespace", event.Namespace)
 	return nil
