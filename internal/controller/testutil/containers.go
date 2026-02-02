@@ -28,6 +28,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/cockroachdb"
 	"github.com/testcontainers/testcontainers-go/modules/mariadb"
 	"github.com/testcontainers/testcontainers-go/modules/mysql"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -53,7 +54,7 @@ type DatabaseContainer struct {
 
 // DatabaseContainerConfig holds configuration for starting a database container
 type DatabaseContainerConfig struct {
-	Engine   string // "postgresql", "mysql", "mariadb"
+	Engine   string // "postgresql", "mysql", "mariadb", "cockroachdb"
 	Image    string // optional, uses default if empty
 	User     string
 	Password string
@@ -76,6 +77,8 @@ func StartDatabaseContainer(ctx context.Context, cfg DatabaseContainerConfig) (*
 		return dc.startMySQL(ctx, cfg)
 	case "mariadb":
 		return dc.startMariaDB(ctx, cfg)
+	case "cockroachdb":
+		return dc.startCockroachDB(ctx, cfg)
 	default:
 		return nil, fmt.Errorf("unsupported engine: %s", cfg.Engine)
 	}
@@ -174,6 +177,45 @@ func (dc *DatabaseContainer) startMariaDB(ctx context.Context, cfg DatabaseConta
 	return dc, nil
 }
 
+func (dc *DatabaseContainer) startCockroachDB(ctx context.Context, cfg DatabaseContainerConfig) (*DatabaseContainer, error) {
+	image := cfg.Image
+	if image == "" {
+		image = "cockroachdb/cockroach:latest-v23.1"
+	}
+
+	var opts []testcontainers.ContainerCustomizer
+	if cfg.Database != "" {
+		opts = append(opts, cockroachdb.WithDatabase(cfg.Database))
+	}
+	if cfg.User != "" {
+		opts = append(opts, cockroachdb.WithUser(cfg.User))
+	}
+	if cfg.Password != "" {
+		opts = append(opts, cockroachdb.WithPassword(cfg.Password))
+	} else {
+		opts = append(opts, cockroachdb.WithInsecure())
+	}
+
+	container, err := cockroachdb.Run(ctx, image, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start cockroachdb: %w", err)
+	}
+
+	dc.container = container
+	host, err := container.Host(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cockroachdb host: %w", err)
+	}
+	port, err := container.MappedPort(ctx, "26257/tcp")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cockroachdb port: %w", err)
+	}
+
+	dc.host = host
+	dc.port = port.Int()
+	return dc, nil
+}
+
 // Stop terminates the container
 func (dc *DatabaseContainer) Stop(ctx context.Context) error {
 	dc.mu.Lock()
@@ -214,7 +256,7 @@ func (dc *DatabaseContainer) waitForDatabaseReadyUnlocked(ctx context.Context, m
 	var dsn string
 
 	switch dc.engine {
-	case "postgresql", "postgres":
+	case "postgresql", "postgres", "cockroachdb":
 		dsn = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 			dc.host, dc.port, dc.user, dc.password, dc.database)
 	case "mysql", "mariadb":
@@ -385,6 +427,20 @@ func (dc *DatabaseContainer) IsSuperuser(ctx context.Context) (bool, error) {
 		var isSuperuser bool
 		err = db.QueryRowContext(ctx, "SELECT rolsuper FROM pg_roles WHERE rolname = current_user").Scan(&isSuperuser)
 		return isSuperuser, err
+
+	case "cockroachdb":
+		// CockroachDB has no SUPERUSER concept; root user is the admin
+		dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+			dc.host, dc.port, dc.user, dc.password, dc.database)
+		db, err := sql.Open("pgx", dsn)
+		if err != nil {
+			return false, err
+		}
+		defer db.Close()
+
+		var isAdmin bool
+		err = db.QueryRowContext(ctx, "SELECT current_user = 'root'").Scan(&isAdmin)
+		return isAdmin, err
 
 	case "mysql", "mariadb":
 		dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",

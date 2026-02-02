@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/adapter/cockroachdb"
 	"github.com/db-provision-operator/internal/adapter/mysql"
 	"github.com/db-provision-operator/internal/adapter/postgres"
 )
@@ -33,7 +34,7 @@ func NewAdapter(engine dbopsv1alpha1.EngineType, config ConnectionConfig) (Datab
 		// MariaDB is MySQL-compatible and uses the same adapter
 		return mysql.NewAdapter(config), nil
 	case dbopsv1alpha1.EngineTypeCockroachDB:
-		return nil, fmt.Errorf("CockroachDB adapter not yet implemented")
+		return cockroachdb.NewAdapter(config), nil
 	default:
 		return nil, fmt.Errorf("unsupported engine type: %s", engine)
 	}

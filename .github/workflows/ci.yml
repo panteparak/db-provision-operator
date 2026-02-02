@@ -147,7 +147,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        database: [postgresql, mysql, mariadb]
+        database: [postgresql, mysql, mariadb, cockroachdb]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -943,6 +943,7 @@ jobs:
           echo "  ✅ Integration Tests (PostgreSQL)"
           echo "  ✅ Integration Tests (MySQL)"
           echo "  ✅ Integration Tests (MariaDB)"
+          echo "  ✅ Integration Tests (CockroachDB)"
           echo "  ✅ E2E Tests (PostgreSQL)"
           echo "  ✅ E2E Tests (MySQL)"
           echo "  ✅ E2E Tests (MariaDB)"

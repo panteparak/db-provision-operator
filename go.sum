@@ -325,6 +325,8 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/testcontainers/testcontainers-go v0.36.0 h1:YpffyLuHtdp5EUsI5mT4sRw8GZhO/5ozyDT1xWGXt00=
 github.com/testcontainers/testcontainers-go v0.36.0/go.mod h1:yk73GVJ0KUZIHUtFna6MO7QS144qYpoY8lEEtU9Hed0=
+github.com/testcontainers/testcontainers-go/modules/cockroachdb v0.36.0 h1:cthdjqzVRDnBaxfPQz1mRprpoiOIky+rhTonLb4e6fQ=
+github.com/testcontainers/testcontainers-go/modules/cockroachdb v0.36.0/go.mod h1:D3xkWM9oW0YcuiuMUlIzqVeYAHGy+tbBElI5YYO/wyU=
 github.com/testcontainers/testcontainers-go/modules/mariadb v0.36.0 h1:JrBOApOZ25GOkA+wX4YW4+MxCZ4VB62TC41CFyOi+LI=
 github.com/testcontainers/testcontainers-go/modules/mariadb v0.36.0/go.mod h1:6A8KkwZ+iOinzhyzvg3C082Xk0ihFyLDQads38fM07M=
 github.com/testcontainers/testcontainers-go/modules/mysql v0.36.0 h1:WUYu/gB23et+T9XCqfmYJB7eWW8/1qqPCxNIaRbS0yk=

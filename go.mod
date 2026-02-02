@@ -23,6 +23,7 @@ require (
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.36.0
+	github.com/testcontainers/testcontainers-go/modules/cockroachdb v0.36.0
 	github.com/testcontainers/testcontainers-go/modules/mariadb v0.36.0
 	github.com/testcontainers/testcontainers-go/modules/mysql v0.36.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.36.0
