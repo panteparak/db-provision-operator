@@ -126,10 +126,19 @@ test-envtest: manifests generate setup-envtest ## Run envtest-based controller a
 .PHONY: test-integration
 test-integration: manifests generate setup-envtest ## Run integration tests with testcontainers-go and profiling.
 	@mkdir -p test-reports
+	$(eval ADAPTER_PATH := $(if $(INTEGRATION_TEST_DATABASE),$(call get-adapter-path,$(INTEGRATION_TEST_DATABASE)),./internal/adapter/...))
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
-	go test ./internal/controller/... ./internal/adapter/... -v -tags=integration -timeout=15m \
+	go test ./internal/controller/... $(ADAPTER_PATH) -v -tags=integration -timeout=15m \
 		-coverprofile cover-integration.out
 	@echo "Integration tests completed. Reports available in test-reports/"
+
+# Map database name to adapter package path
+define get-adapter-path
+$(if $(filter postgresql postgres,$(1)),./internal/adapter/postgres/...,\
+$(if $(filter mysql mariadb,$(1)),./internal/adapter/mysql/...,\
+$(if $(filter cockroachdb,$(1)),./internal/adapter/cockroachdb/...,\
+./internal/adapter/...)))
+endef
 
 .PHONY: test-integration-security
 test-integration-security: manifests generate setup-envtest ## Run integration security tests only.
