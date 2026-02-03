@@ -99,6 +99,23 @@ jobs:
           go-version-file: ${{ env.GO_VERSION_FILE }}
           cache: true
 
+      # Derive K8S version from go.mod (same logic as Makefile)
+      - name: Get envtest K8S version
+        id: envtest-version
+        run: |
+          K8S_VERSION=$(go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $3}')
+          echo "version=$K8S_VERSION" >> $GITHUB_OUTPUT
+          echo "Using Kubernetes version: $K8S_VERSION"
+
+      # Cache envtest binaries (~100MB) to speed up CI
+      - name: Cache envtest binaries
+        uses: actions/cache@v4
+        with:
+          path: bin/k8s
+          key: envtest-${{ runner.os }}-k8s-${{ steps.envtest-version.outputs.version }}
+          restore-keys: |
+            envtest-${{ runner.os }}-k8s-
+
       - name: Run envtest-based controller tests
         run: make test-envtest
 
@@ -157,6 +174,23 @@ jobs:
         with:
           go-version-file: ${{ env.GO_VERSION_FILE }}
           cache: true  # Enable Go module caching
+
+      # Derive K8S version from go.mod (same logic as Makefile)
+      - name: Get envtest K8S version
+        id: envtest-version
+        run: |
+          K8S_VERSION=$(go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $3}')
+          echo "version=$K8S_VERSION" >> $GITHUB_OUTPUT
+          echo "Using Kubernetes version: $K8S_VERSION"
+
+      # Cache envtest binaries (~100MB) to speed up CI
+      - name: Cache envtest binaries
+        uses: actions/cache@v4
+        with:
+          path: bin/k8s
+          key: envtest-${{ runner.os }}-k8s-${{ steps.envtest-version.outputs.version }}
+          restore-keys: |
+            envtest-${{ runner.os }}-k8s-
 
       # testcontainers-go manages Docker containers programmatically
       # No manual container setup needed - tests handle their own lifecycle
