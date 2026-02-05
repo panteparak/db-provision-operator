@@ -175,7 +175,7 @@ setup-precommit: ## Install pre-commit and its dependencies
 ##@ E2E Testing (k3d)
 
 # E2E Testing with k3d
-E2E_K3D_CLUSTER ?= db-provision-operator-e2e
+E2E_K3D_CLUSTER ?= dbprov-e2e
 E2E_IMG ?= db-provision-operator:e2e
 
 .PHONY: test-e2e-postgresql
@@ -189,6 +189,12 @@ test-e2e-mysql: ## Run E2E tests with MySQL
 	$(MAKE) e2e-setup-cluster E2E_DATABASE=mysql
 	$(MAKE) e2e-run-tests E2E_DATABASE=mysql || ($(MAKE) e2e-cleanup E2E_DATABASE=mysql && exit 1)
 	$(MAKE) e2e-cleanup E2E_DATABASE=mysql
+
+.PHONY: test-e2e-mariadb
+test-e2e-mariadb: ## Run E2E tests with MariaDB
+	$(MAKE) e2e-setup-cluster E2E_DATABASE=mariadb
+	$(MAKE) e2e-run-tests E2E_DATABASE=mariadb || ($(MAKE) e2e-cleanup E2E_DATABASE=mariadb && exit 1)
+	$(MAKE) e2e-cleanup E2E_DATABASE=mariadb
 
 .PHONY: e2e-setup-cluster
 e2e-setup-cluster: ## Set up k3d cluster with database for E2E tests
@@ -206,11 +212,20 @@ e2e-setup-cluster: ## Set up k3d cluster with database for E2E tests
 	@echo "Deploying $(E2E_DATABASE)..."
 	kubectl apply -f test/e2e/fixtures/$(E2E_DATABASE).yaml
 	@if [ "$(E2E_DATABASE)" = "postgresql" ]; then \
+		echo "Waiting for PostgreSQL pod to be created..."; \
+		for i in $$(seq 1 30); do kubectl get pod/postgres-0 -n postgres >/dev/null 2>&1 && break || sleep 2; done; \
 		echo "Waiting for PostgreSQL to be ready..."; \
 		kubectl wait --for=condition=Ready pod/postgres-0 -n postgres --timeout=180s; \
 	elif [ "$(E2E_DATABASE)" = "mysql" ]; then \
+		echo "Waiting for MySQL pod to be created..."; \
+		for i in $$(seq 1 30); do kubectl get pod/mysql-0 -n mysql >/dev/null 2>&1 && break || sleep 2; done; \
 		echo "Waiting for MySQL to be ready..."; \
 		kubectl wait --for=condition=Ready pod/mysql-0 -n mysql --timeout=180s; \
+	elif [ "$(E2E_DATABASE)" = "mariadb" ]; then \
+		echo "Waiting for MariaDB pod to be created..."; \
+		for i in $$(seq 1 30); do kubectl get pod/mariadb-0 -n mariadb >/dev/null 2>&1 && break || sleep 2; done; \
+		echo "Waiting for MariaDB to be ready..."; \
+		kubectl wait --for=condition=Ready pod/mariadb-0 -n mariadb --timeout=180s; \
 	fi
 	@echo "Building operator image..."
 	$(MAKE) docker-build IMG=$(E2E_IMG)
@@ -227,8 +242,27 @@ e2e-setup-cluster: ## Set up k3d cluster with database for E2E tests
 
 .PHONY: e2e-run-tests
 e2e-run-tests: ## Run E2E tests for specified database
+	@echo "Setting up port-forwarding for $(E2E_DATABASE)..."
+	@if [ "$(E2E_DATABASE)" = "postgresql" ]; then \
+		kubectl port-forward -n postgres svc/postgres 5432:5432 & \
+		echo $$! > /tmp/e2e-port-forward.pid; \
+		export E2E_LOCAL_PORT=5432; \
+	elif [ "$(E2E_DATABASE)" = "mysql" ]; then \
+		kubectl port-forward -n mysql svc/mysql 3306:3306 & \
+		echo $$! > /tmp/e2e-port-forward.pid; \
+		export E2E_LOCAL_PORT=3306; \
+	elif [ "$(E2E_DATABASE)" = "mariadb" ]; then \
+		kubectl port-forward -n mariadb svc/mariadb 3306:3306 & \
+		echo $$! > /tmp/e2e-port-forward.pid; \
+		export E2E_LOCAL_PORT=3306; \
+	fi
+	@sleep 3
 	@echo "Running E2E tests for $(E2E_DATABASE)..."
-	go test ./test/e2e/... -v -tags=e2e -ginkgo.focus="$(E2E_DATABASE)" -ginkgo.v -timeout=10m
+	E2E_DATABASE_HOST=127.0.0.1 go test ./test/e2e/... -v -tags=e2e -ginkgo.focus="$(E2E_DATABASE)" -ginkgo.v -timeout=10m; \
+		TEST_EXIT=$$?; \
+		kill $$(cat /tmp/e2e-port-forward.pid) 2>/dev/null || true; \
+		rm -f /tmp/e2e-port-forward.pid; \
+		exit $$TEST_EXIT
 
 .PHONY: e2e-cleanup
 e2e-cleanup: ## Clean up k3d cluster

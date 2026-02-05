@@ -21,6 +21,7 @@ package e2e
 import (
 	"context"
 	"os"
+	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -59,6 +60,16 @@ var _ = Describe("postgresql", Ordered, func() {
 		return postgresHost
 	}
 
+	// getVerifierPort returns the port for the verifier to connect to.
+	getVerifierPort := func() int32 {
+		if portStr := os.Getenv("E2E_DATABASE_PORT"); portStr != "" {
+			if port, err := strconv.ParseInt(portStr, 10, 32); err == nil {
+				return int32(port)
+			}
+		}
+		return 5432
+	}
+
 	// Admin credentials read from secret (least-privilege account)
 	var adminUsername, adminPassword string
 
@@ -73,9 +84,10 @@ var _ = Describe("postgresql", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred(), "Failed to get PostgreSQL password from secret")
 
 		verifierHost := getVerifierHost()
-		GinkgoWriter.Printf("Using verifier host: %s with admin user: %s\n", verifierHost, adminUsername)
+		verifierPort := getVerifierPort()
+		GinkgoWriter.Printf("Using verifier host: %s:%d with admin user: %s\n", verifierHost, verifierPort, adminUsername)
 
-		cfg := testutil.PostgresEngineConfig(verifierHost, 5432, adminUsername, adminPassword)
+		cfg := testutil.PostgresEngineConfig(verifierHost, verifierPort, adminUsername, adminPassword)
 		verifier = testutil.NewPostgresVerifier(cfg)
 
 		// Connect with retry since database may still be starting

@@ -48,8 +48,14 @@ func GetSpecBuilder(engine dbopsv1alpha1.EngineType) SpecBuilder {
 	switch engine {
 	case dbopsv1alpha1.EngineTypePostgres:
 		return NewPostgresSpecBuilder()
-	case dbopsv1alpha1.EngineTypeMySQL:
+	case dbopsv1alpha1.EngineTypeMySQL, dbopsv1alpha1.EngineTypeMariaDB:
+		// MariaDB is MySQL-compatible and uses the same CRD fields (spec.MySQL)
 		return NewMySQLSpecBuilder()
+	case dbopsv1alpha1.EngineTypeCockroachDB:
+		// CockroachDB is PostgreSQL wire-compatible and uses spec.Postgres fields.
+		// The CockroachDB adapter silently ignores unsupported PG attributes
+		// (SUPERUSER, REPLICATION, BYPASSRLS).
+		return NewPostgresSpecBuilder()
 	default:
 		// Return empty builder for unknown engines
 		// This provides safe defaults without panicking

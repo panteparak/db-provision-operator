@@ -21,6 +21,7 @@ package e2e
 import (
 	"context"
 	"os"
+	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -62,6 +63,16 @@ var _ = Describe("mysql", Ordered, func() {
 		return mysqlHost
 	}
 
+	// getVerifierPort returns the port for the verifier to connect to.
+	getVerifierPort := func() int32 {
+		if portStr := os.Getenv("E2E_DATABASE_PORT"); portStr != "" {
+			if port, err := strconv.ParseInt(portStr, 10, 32); err == nil {
+				return int32(port)
+			}
+		}
+		return 3306
+	}
+
 	BeforeAll(func() {
 		By("setting up MySQL verifier")
 		// Get the admin credentials from the secret (least-privilege account)
@@ -73,9 +84,10 @@ var _ = Describe("mysql", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred(), "Failed to get MySQL password from secret")
 
 		verifierHost := getVerifierHost()
-		GinkgoWriter.Printf("Using verifier host: %s with admin user: %s\n", verifierHost, adminUsername)
+		verifierPort := getVerifierPort()
+		GinkgoWriter.Printf("Using verifier host: %s:%d with admin user: %s\n", verifierHost, verifierPort, adminUsername)
 
-		cfg := testutil.MySQLEngineConfig(verifierHost, 3306, adminUsername, adminPassword)
+		cfg := testutil.MySQLEngineConfig(verifierHost, verifierPort, adminUsername, adminPassword)
 		verifier = testutil.NewMySQLVerifier(cfg)
 
 		// Connect with retry since database may still be starting
