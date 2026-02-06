@@ -159,7 +159,8 @@ func (s *GrantService) Apply(ctx context.Context, opts ApplyGrantServiceOptions)
 			}
 		}
 
-	case dbopsv1alpha1.EngineTypeMySQL:
+	case dbopsv1alpha1.EngineTypeMySQL, dbopsv1alpha1.EngineTypeMariaDB:
+		// MariaDB uses the same MySQL wire protocol and grant syntax
 		if opts.Spec.MySQL != nil {
 			// Grant roles
 			if len(opts.Spec.MySQL.Roles) > 0 {
@@ -231,7 +232,8 @@ func (s *GrantService) Revoke(ctx context.Context, opts ApplyGrantServiceOptions
 			}
 		}
 
-	case dbopsv1alpha1.EngineTypeMySQL:
+	case dbopsv1alpha1.EngineTypeMySQL, dbopsv1alpha1.EngineTypeMariaDB:
+		// MariaDB uses the same MySQL wire protocol and grant syntax
 		if opts.Spec.MySQL != nil {
 			// Revoke roles
 			if len(opts.Spec.MySQL.Roles) > 0 {
