@@ -1,0 +1,61 @@
+# Docker Compose for E2E testing
+# Runs databases outside k3d for faster iteration and easier debugging
+# Ports are configurable via environment variables
+#
+# Usage:
+#   docker compose -f docker-compose.e2e.yml up -d --wait
+#   E2E_POSTGRES_PORT=15432 docker compose -f docker-compose.e2e.yml up -d --wait
+#
+# From k3d, connect via host.k3d.internal:<port>
+# From host, connect via localhost:<port>
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: e2e-postgres
+    ports:
+      - "${E2E_POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: superuserpassword123
+      POSTGRES_DB: postgres
+    volumes:
+      - ./test/e2e/fixtures/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  mysql:
+    image: mysql:8.0
+    container_name: e2e-mysql
+    ports:
+      - "${E2E_MYSQL_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword123
+    volumes:
+      - ./test/e2e/fixtures/mysql-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "--silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
+
+  mariadb:
+    image: mariadb:11
+    container_name: e2e-mariadb
+    ports:
+      - "${E2E_MARIADB_PORT:-3307}:3306"
+    environment:
+      MARIADB_ROOT_PASSWORD: rootpassword123
+    volumes:
+      - ./test/e2e/fixtures/mariadb-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
