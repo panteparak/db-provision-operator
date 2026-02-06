@@ -3,6 +3,7 @@ nav:
   - Overview: index.md
   - Contributing: contributing.md
   - Testing: testing.md
+  - E2E Testing: e2e-testing.md
   - CI/CD: ci-cd.md
   - Cross-Namespace RBAC: rbac.md
   - Roadmap: roadmap.md
