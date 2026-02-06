@@ -1,0 +1,36 @@
+# MySQL DatabaseInstance for local E2E testing (Docker Compose)
+# Uses host.k3d.internal to connect from k3d to Docker host
+#
+# Usage:
+#   kubectl apply -f test/e2e/fixtures/mysql-local.yaml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mysql
+  labels:
+    app.kubernetes.io/name: mysql
+    app.kubernetes.io/component: database
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-credentials
+  namespace: mysql
+type: Opaque
+stringData:
+  username: dbprovision_admin
+  password: adminpassword123
+---
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseInstance
+metadata:
+  name: mysql-instance
+  namespace: mysql
+spec:
+  engine: mysql
+  connection:
+    host: host.k3d.internal
+    port: 3306
+  credentialsSecretRef:
+    name: mysql-credentials

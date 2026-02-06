@@ -1,0 +1,37 @@
+# MariaDB DatabaseInstance for local E2E testing (Docker Compose)
+# Uses host.k3d.internal to connect from k3d to Docker host
+# Note: MariaDB uses port 3307 to avoid conflict with MySQL
+#
+# Usage:
+#   kubectl apply -f test/e2e/fixtures/mariadb-local.yaml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mariadb
+  labels:
+    app.kubernetes.io/name: mariadb
+    app.kubernetes.io/component: database
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mariadb-credentials
+  namespace: mariadb
+type: Opaque
+stringData:
+  username: dbprovision_admin
+  password: adminpassword123
+---
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseInstance
+metadata:
+  name: mariadb-instance
+  namespace: mariadb
+spec:
+  engine: mariadb
+  connection:
+    host: host.k3d.internal
+    port: 3307
+  credentialsSecretRef:
+    name: mariadb-credentials

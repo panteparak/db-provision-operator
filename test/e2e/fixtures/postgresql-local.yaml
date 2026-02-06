@@ -1,0 +1,36 @@
+# PostgreSQL DatabaseInstance for local E2E testing (Docker Compose)
+# Uses host.k3d.internal to connect from k3d to Docker host
+#
+# Usage:
+#   kubectl apply -f test/e2e/fixtures/postgresql-local.yaml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: postgresql
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: database
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-credentials
+  namespace: postgresql
+type: Opaque
+stringData:
+  username: dbprovision_admin
+  password: adminpassword123
+---
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseInstance
+metadata:
+  name: postgres-instance
+  namespace: postgresql
+spec:
+  engine: postgresql
+  connection:
+    host: host.k3d.internal
+    port: 5432
+  credentialsSecretRef:
+    name: postgres-credentials
