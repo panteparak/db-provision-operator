@@ -697,7 +697,8 @@ jobs:
   # Note: integration-test job is defined above but runs here after gate
 
   # ============================================================================
-  # Stage 4: E2E Tests (Helm deployment only - Kustomize equivalence verified by template-comparison)
+  # Stage 4: E2E Tests (Docker Compose + k3d + Helm)
+  # Uses same Makefile micro-steps as local development for consistency
   # ============================================================================
 
   e2e:
@@ -711,29 +712,11 @@ jobs:
         database: [postgresql, mysql, mariadb]
         include:
           - database: postgresql
-            fixture: test/e2e/fixtures/postgresql.yaml
-            namespace: postgres
-            service: postgres
-            pod: postgres-0
             port: 5432
-            db_timeout: 180s
-            image: postgres:16-alpine
           - database: mysql
-            fixture: test/e2e/fixtures/mysql.yaml
-            namespace: mysql
-            service: mysql
-            pod: mysql-0
             port: 3306
-            db_timeout: 600s
-            image: mysql:8.0
           - database: mariadb
-            fixture: test/e2e/fixtures/mariadb.yaml
-            namespace: mariadb
-            service: mariadb
-            pod: mariadb-0
-            port: 3306
-            db_timeout: 600s
-            image: mariadb:11
+            port: 3307
 
     steps:
       - name: Checkout code
@@ -743,7 +726,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true  # Enable Go module caching
+          cache: true
 
       - name: Get short SHA
         id: short-sha
@@ -752,58 +735,21 @@ jobs:
       - name: Install k3d
         run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
 
-      - name: Verify k3d installation
-        run: k3d version
+      # Start databases via Docker Compose (Makefile micro-step)
+      - name: Start databases
+        run: make e2e-db-up
 
-      # Pre-pull database image to avoid Docker Hub rate limits during deployment
-      - name: Pre-pull database image
-        run: |
-          echo "Pre-pulling ${{ matrix.image }}..."
-          docker pull ${{ matrix.image }}
-          echo "Database image pulled successfully"
-
+      # Create k3d cluster (Makefile micro-step)
       - name: Create k3d cluster
-        run: |
-          k3d cluster create e2e-${{ matrix.database }} \
-            --agents 1 \
-            --wait \
-            --timeout 120s
+        run: make e2e-cluster-create
 
-      - name: Wait for cluster ready
-        run: |
-          kubectl wait --for=condition=Ready nodes --all --timeout=60s
-          kubectl cluster-info
-          kubectl get nodes
-
-      # Import pre-pulled database image into k3d cluster
-      - name: Import database image into k3d
-        run: |
-          echo "Importing ${{ matrix.image }} into k3d cluster..."
-          k3d image import ${{ matrix.image }} \
-            -c e2e-${{ matrix.database }}
-          echo "Database image imported successfully"
-
-      - name: Deploy ${{ matrix.database }}
-        run: |
-          kubectl apply -f ${{ matrix.fixture }}
-          echo "Waiting for ${{ matrix.database }} pod to be ready (timeout: ${{ matrix.db_timeout }})..."
-          kubectl wait --for=condition=Ready pod/${{ matrix.pod }} \
-            -n ${{ matrix.namespace }} --timeout=${{ matrix.db_timeout }}
-
-      - name: Verify database is accessible
-        run: |
-          echo "=== Pods in ${{ matrix.namespace }} namespace ==="
-          kubectl get pods -n ${{ matrix.namespace }}
-          echo "=== Database pod logs ==="
-          kubectl logs ${{ matrix.pod }} -n ${{ matrix.namespace }} --tail=30
-
-      # For push events: Pull image from registry
+      # For push events: Pull operator image from registry
       - name: Pull operator image from registry
         if: github.event_name != 'pull_request'
         run: |
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.short-sha.outputs.sha }}
 
-      # For PRs: Download and load image from artifact
+      # For PRs: Download and load operator image from artifact
       - name: Download operator image artifact
         if: github.event_name == 'pull_request'
         uses: actions/download-artifact@v4
@@ -813,14 +759,17 @@ jobs:
 
       - name: Load operator image for PR
         if: github.event_name == 'pull_request'
-        run: |
-          docker load -i /tmp/operator-image.tar
+        run: docker load -i /tmp/operator-image.tar
 
-      - name: Load image into k3d
-        run: |
-          k3d image import ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.short-sha.outputs.sha }} \
-            -c e2e-${{ matrix.database }}
+      # Load operator image into k3d (Makefile micro-step with custom image)
+      - name: Load operator image into k3d
+        run: make e2e-image-load E2E_IMG=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.short-sha.outputs.sha }}
 
+      # Install CRDs (Makefile micro-step)
+      - name: Install CRDs
+        run: make e2e-install-crds
+
+      # Deploy operator via Helm (intentionally uses Helm, not Kustomize)
       - name: Install Helm
         uses: azure/setup-helm@v4
         with:
@@ -839,118 +788,33 @@ jobs:
 
       - name: Wait for operator ready
         run: |
-          echo "Waiting for operator deployment..."
           kubectl wait --for=condition=Available \
             deployment -l app.kubernetes.io/name=db-provision-operator \
             -n db-provision-operator-system \
             --timeout=120s
-          echo "=== Operator pods ==="
-          kubectl get pods -n db-provision-operator-system
 
-      - name: Start port-forward for database access
-        run: |
-          echo "Starting port-forward to ${{ matrix.service }} service..."
-          kubectl port-forward -n ${{ matrix.namespace }} svc/${{ matrix.service }} ${{ matrix.port }}:${{ matrix.port }} &
-          echo $! > /tmp/port-forward.pid
-          # Wait for port-forward to be ready
-          sleep 3
-          # Verify port-forward is working
-          if ! nc -z localhost ${{ matrix.port }}; then
-            echo "Port-forward failed to start"
-            exit 1
-          fi
-          echo "Port-forward ready on localhost:${{ matrix.port }}"
+      # Create DatabaseInstance pointing to Docker host (Makefile micro-step)
+      - name: Create DatabaseInstance
+        run: make e2e-create-db-instance E2E_DATABASE=${{ matrix.database }}
 
-      - name: Run E2E tests for ${{ matrix.database }}
-        env:
-          E2E_DATABASE_ENGINE: ${{ matrix.database }}
-          E2E_DATABASE_HOST: localhost
-          E2E_DATABASE_PORT: ${{ matrix.port }}
-        run: |
-          go test ./test/e2e/... -v -tags=e2e \
-            -ginkgo.focus="${{ matrix.database }}" \
-            -ginkgo.v \
-            -ginkgo.fail-fast=false \
-            -timeout=10m
+      # Run E2E tests (Makefile micro-step)
+      - name: Run E2E tests
+        run: make e2e-local-run-tests E2E_DATABASE=${{ matrix.database }}
 
       - name: Collect logs on failure
         if: failure()
         run: |
-          echo "=============================================="
-          echo "=== OPERATOR LOGS (last 500 lines) ==="
-          echo "=============================================="
-          kubectl logs -n db-provision-operator-system \
-            -l control-plane=controller-manager --tail=500 || true
-          echo ""
-          echo "=============================================="
-          echo "=== OPERATOR POD DESCRIPTION ==="
-          echo "=============================================="
-          kubectl describe pods -n db-provision-operator-system \
-            -l control-plane=controller-manager || true
-          echo ""
-          echo "=============================================="
-          echo "=== DATABASE POD LOGS ==="
-          echo "=============================================="
-          kubectl logs ${{ matrix.pod }} -n ${{ matrix.namespace }} --tail=100 || true
-          echo ""
-          echo "=============================================="
-          echo "=== DATABASE POD DESCRIPTION ==="
-          echo "=============================================="
-          kubectl describe pod ${{ matrix.pod }} -n ${{ matrix.namespace }} || true
-          echo ""
-          echo "=============================================="
-          echo "=== DatabaseInstance CRs (with status) ==="
-          echo "=============================================="
-          kubectl get databaseinstances -A -o yaml || true
-          echo ""
-          echo "=== DatabaseInstance Description ==="
-          kubectl describe databaseinstances -A || true
-          echo ""
-          echo "=============================================="
-          echo "=== Database CRs (with status) ==="
-          echo "=============================================="
-          kubectl get databases -A -o yaml || true
-          echo ""
-          echo "=== Database Description ==="
-          kubectl describe databases -A || true
-          echo ""
-          echo "=============================================="
-          echo "=== DatabaseUser CRs (with status) ==="
-          echo "=============================================="
-          kubectl get databaseusers -A -o yaml || true
-          echo ""
-          echo "=== DatabaseUser Description ==="
-          kubectl describe databaseusers -A || true
-          echo ""
-          echo "=============================================="
-          echo "=== DatabaseRole CRs (with status) ==="
-          echo "=============================================="
-          kubectl get databaseroles -A -o yaml || true
-          echo ""
-          echo "=== DatabaseRole Description ==="
-          kubectl describe databaseroles -A || true
-          echo ""
-          echo "=============================================="
-          echo "=== DatabaseGrant CRs (with status) ==="
-          echo "=============================================="
-          kubectl get databasegrants -A -o yaml || true
-          echo ""
-          echo "=== DatabaseGrant Description ==="
-          kubectl describe databasegrants -A || true
-          echo ""
-          echo "=============================================="
-          echo "=== KUBERNETES EVENTS (last 100) ==="
-          echo "=============================================="
-          kubectl get events -A --sort-by='.lastTimestamp' | tail -100 || true
-          echo ""
-          echo "=============================================="
-          echo "=== ALL PODS STATUS ==="
-          echo "=============================================="
-          kubectl get pods -A || true
+          echo "=== OPERATOR LOGS ===" && kubectl logs -n db-provision-operator-system -l control-plane=controller-manager --tail=500 || true
+          echo "=== OPERATOR POD ===" && kubectl describe pods -n db-provision-operator-system -l control-plane=controller-manager || true
+          echo "=== DATABASE CONTAINERS ===" && docker compose -f docker-compose.e2e.yml logs --tail=100 || true
+          echo "=== CRs ===" && kubectl get databaseinstances,databases,databaseusers,databaseroles,databasegrants -A -o yaml || true
+          echo "=== EVENTS ===" && kubectl get events -A --sort-by='.lastTimestamp' | tail -100 || true
+          echo "=== PODS ===" && kubectl get pods -A || true
 
+      # Cleanup (Makefile micro-step)
       - name: Cleanup
         if: always()
-        run: k3d cluster delete e2e-${{ matrix.database }} || true
+        run: make e2e-local-cleanup
 
   # ============================================================================
   # Stage 5: CI Success
