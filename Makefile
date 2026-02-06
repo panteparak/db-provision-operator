@@ -317,6 +317,127 @@ e2e-debug: ## Show debug information for E2E cluster (pods, pvcs, events) - also
 	@echo ""
 	@echo "Debug log saved to: $(E2E_DEBUG_LOG)"
 
+##@ E2E Local Testing (Docker Compose + k3d)
+# These targets run databases in Docker Compose and operator in k3d
+# Same micro-steps are used by CI for consistency
+
+# Configuration (override via environment)
+E2E_POSTGRES_PORT ?= 5432
+E2E_MYSQL_PORT ?= 3306
+E2E_MARIADB_PORT ?= 3307
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MICRO-STEPS: Each can be called independently (by CI or locally)
+# ─────────────────────────────────────────────────────────────────────────────
+
+.PHONY: e2e-db-up
+e2e-db-up: ## Start databases via Docker Compose with health checks
+	@echo "Starting databases..."
+	docker compose -f docker-compose.e2e.yml up -d --wait --wait-timeout 180
+	@echo "All databases are healthy and ready"
+
+.PHONY: e2e-db-down
+e2e-db-down: ## Stop databases and remove volumes
+	docker compose -f docker-compose.e2e.yml down -v
+
+.PHONY: e2e-cluster-create
+e2e-cluster-create: ## Create k3d cluster (idempotent)
+	@if k3d cluster list 2>/dev/null | grep -q "$(E2E_K3D_CLUSTER)"; then \
+		echo "Cluster $(E2E_K3D_CLUSTER) already exists"; \
+	else \
+		k3d cluster create $(E2E_K3D_CLUSTER) \
+			--agents 0 --wait --timeout 120s --no-lb --no-rollback \
+			--k3s-arg "--disable=traefik@server:*" \
+			--k3s-arg "--disable=servicelb@server:*" \
+			--k3s-arg "--disable=metrics-server@server:*"; \
+	fi
+	kubectl wait --for=condition=Ready nodes --all --timeout=60s
+
+.PHONY: e2e-cluster-delete
+e2e-cluster-delete: ## Delete k3d cluster
+	k3d cluster delete $(E2E_K3D_CLUSTER) || true
+
+.PHONY: e2e-docker-build
+e2e-docker-build: ## Build operator Docker image for E2E
+	docker build -t $(E2E_IMG) .
+
+.PHONY: e2e-image-load
+e2e-image-load: ## Load operator image into k3d cluster
+	k3d image import $(E2E_IMG) -c $(E2E_K3D_CLUSTER)
+
+.PHONY: e2e-install-crds
+e2e-install-crds: ## Install CRDs into cluster
+	$(MAKE) install
+
+.PHONY: e2e-deploy-operator
+e2e-deploy-operator: ## Deploy operator to cluster
+	$(MAKE) deploy IMG=$(E2E_IMG)
+	kubectl wait --for=condition=Available \
+		deployment/db-provision-operator-controller-manager \
+		-n db-provision-operator-system --timeout=120s
+
+.PHONY: e2e-create-db-instance
+e2e-create-db-instance: ## Create DatabaseInstance CR pointing to Docker host (requires E2E_DATABASE)
+	@echo "Creating DatabaseInstance for $(E2E_DATABASE)..."
+	@kubectl apply -f test/e2e/fixtures/$(E2E_DATABASE)-local.yaml
+	@echo "Waiting for DatabaseInstance to be ready..."
+	@kubectl wait --for=jsonpath='{.status.phase}'=Ready \
+		databaseinstance -n $(E2E_DATABASE) --all --timeout=60s
+
+.PHONY: e2e-local-run-tests
+e2e-local-run-tests: ## Run E2E tests for local setup (requires E2E_DATABASE)
+	@echo "Running E2E tests for $(E2E_DATABASE)..."
+	E2E_DATABASE_ENGINE=$(E2E_DATABASE) \
+	E2E_DATABASE_HOST=127.0.0.1 \
+	E2E_DATABASE_PORT=$$(case $(E2E_DATABASE) in \
+		postgresql) echo $(E2E_POSTGRES_PORT);; \
+		mysql) echo $(E2E_MYSQL_PORT);; \
+		mariadb) echo $(E2E_MARIADB_PORT);; \
+	esac) \
+	go test ./test/e2e/... -v -tags=e2e -ginkgo.focus="$(E2E_DATABASE)" -ginkgo.v -timeout=10m
+
+# ─────────────────────────────────────────────────────────────────────────────
+# UNIFIED TARGETS: One command to run everything
+# ─────────────────────────────────────────────────────────────────────────────
+
+.PHONY: e2e-local-setup
+e2e-local-setup: ## Set up local E2E environment (DBs + k3d + operator)
+	$(MAKE) e2e-db-up
+	$(MAKE) e2e-cluster-create
+	$(MAKE) e2e-docker-build
+	$(MAKE) e2e-image-load
+	$(MAKE) e2e-install-crds
+	$(MAKE) e2e-deploy-operator
+
+.PHONY: e2e-local-postgresql
+e2e-local-postgresql: e2e-local-setup ## Run PostgreSQL E2E tests (full setup + test)
+	$(MAKE) e2e-create-db-instance E2E_DATABASE=postgresql
+	$(MAKE) e2e-local-run-tests E2E_DATABASE=postgresql
+
+.PHONY: e2e-local-mysql
+e2e-local-mysql: e2e-local-setup ## Run MySQL E2E tests (full setup + test)
+	$(MAKE) e2e-create-db-instance E2E_DATABASE=mysql
+	$(MAKE) e2e-local-run-tests E2E_DATABASE=mysql
+
+.PHONY: e2e-local-mariadb
+e2e-local-mariadb: e2e-local-setup ## Run MariaDB E2E tests (full setup + test)
+	$(MAKE) e2e-create-db-instance E2E_DATABASE=mariadb
+	$(MAKE) e2e-local-run-tests E2E_DATABASE=mariadb
+
+.PHONY: e2e-local-all
+e2e-local-all: e2e-local-setup ## Run all local E2E tests
+	$(MAKE) e2e-create-db-instance E2E_DATABASE=postgresql
+	$(MAKE) e2e-local-run-tests E2E_DATABASE=postgresql
+	$(MAKE) e2e-create-db-instance E2E_DATABASE=mysql
+	$(MAKE) e2e-local-run-tests E2E_DATABASE=mysql
+	$(MAKE) e2e-create-db-instance E2E_DATABASE=mariadb
+	$(MAKE) e2e-local-run-tests E2E_DATABASE=mariadb
+
+.PHONY: e2e-local-cleanup
+e2e-local-cleanup: ## Clean up local E2E environment
+	$(MAKE) e2e-cluster-delete
+	$(MAKE) e2e-db-down
+
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
 	$(GOLANGCI_LINT) run
