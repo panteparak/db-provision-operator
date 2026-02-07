@@ -32,6 +32,7 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/logging"
+	"github.com/db-provision-operator/internal/reconcileutil"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -176,6 +177,7 @@ func (c *Controller) reconcile(ctx context.Context, backup *dbopsv1alpha1.Databa
 	}
 	if err := c.Status().Update(ctx, backup); err != nil {
 		log.Error(err, "Failed to update status")
+		return ctrl.Result{}, err
 	}
 
 	// Execute backup via handler
@@ -307,7 +309,7 @@ func (c *Controller) handleError(ctx context.Context, backup *dbopsv1alpha1.Data
 	// Update info metric for Grafana table views (even on error)
 	c.handler.UpdateInfoMetric(backup)
 
-	return ctrl.Result{RequeueAfter: RequeueAfterError}, nil
+	return reconcileutil.ClassifyRequeue(err)
 }
 
 func (c *Controller) handlePending(ctx context.Context, backup *dbopsv1alpha1.DatabaseBackup, message string) (ctrl.Result, error) {

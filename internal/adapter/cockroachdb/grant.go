@@ -85,6 +85,11 @@ func (a *Adapter) RevokeRole(ctx context.Context, grantee string, roles []string
 // SetDefaultPrivileges sets default privileges for new objects in CockroachDB.
 // CockroachDB supports ALTER DEFAULT PRIVILEGES with the same syntax as PostgreSQL.
 func (a *Adapter) SetDefaultPrivileges(ctx context.Context, grantee string, opts []types.DefaultPrivilegeGrantOptions) error {
+	// Verify connection before proceeding
+	if _, err := a.getPool(); err != nil {
+		return err
+	}
+
 	for _, opt := range opts {
 		if err := a.setDefaultPrivilege(ctx, grantee, opt); err != nil {
 			return err

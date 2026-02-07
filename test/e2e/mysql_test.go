@@ -73,6 +73,26 @@ var _ = Describe("mysql", Ordered, func() {
 		return 3306
 	}
 
+	// getInstanceHost returns the host for the DatabaseInstance CR.
+	// For local Docker Compose testing, use host.k3d.internal.
+	// For in-cluster testing, use the K8s service DNS.
+	getInstanceHost := func() string {
+		if host := os.Getenv("E2E_INSTANCE_HOST"); host != "" {
+			return host
+		}
+		return mysqlHost
+	}
+
+	// getInstancePort returns the port for the DatabaseInstance CR.
+	getInstancePort := func() int64 {
+		if portStr := os.Getenv("E2E_INSTANCE_PORT"); portStr != "" {
+			if port, err := strconv.ParseInt(portStr, 10, 64); err == nil {
+				return port
+			}
+		}
+		return 3306
+	}
+
 	BeforeAll(func() {
 		By("setting up MySQL verifier")
 		// Get the admin credentials from the secret (least-privilege account)
@@ -110,8 +130,8 @@ var _ = Describe("mysql", Ordered, func() {
 					"spec": map[string]interface{}{
 						"engine": "mysql",
 						"connection": map[string]interface{}{
-							"host":     mysqlHost,
-							"port":     int64(3306),
+							"host":     getInstanceHost(),
+							"port":     getInstancePort(),
 							"database": "mysql",
 							"secretRef": map[string]interface{}{
 								"name":      secretName,

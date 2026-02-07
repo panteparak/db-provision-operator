@@ -31,6 +31,11 @@ spec:
   engine: mysql
   connection:
     host: host.k3d.internal
-    port: 3306
-  credentialsSecretRef:
-    name: mysql-credentials
+    port: 13306
+    database: mysql
+    secretRef:
+      name: mysql-credentials
+      namespace: mysql
+  healthCheck:
+    enabled: true
+    intervalSeconds: 30

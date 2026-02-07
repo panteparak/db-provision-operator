@@ -124,7 +124,8 @@ func (s *GrantService) Apply(ctx context.Context, opts ApplyGrantServiceOptions)
 	}
 
 	switch s.config.GetEngineType() {
-	case dbopsv1alpha1.EngineTypePostgres:
+	case dbopsv1alpha1.EngineTypePostgres, dbopsv1alpha1.EngineTypeCockroachDB:
+		// CockroachDB uses PostgreSQL wire protocol and the same grant syntax
 		if opts.Spec.Postgres != nil {
 			// Grant roles
 			if len(opts.Spec.Postgres.Roles) > 0 {
@@ -147,7 +148,7 @@ func (s *GrantService) Apply(ctx context.Context, opts ApplyGrantServiceOptions)
 				result.AppliedDirectGrants = len(opts.Spec.Postgres.Grants)
 			}
 
-			// Apply default privileges
+			// Apply default privileges (Note: CockroachDB has limited default privilege support)
 			if len(opts.Spec.Postgres.DefaultPrivileges) > 0 {
 				op.Debug("setting default privileges", "count", len(opts.Spec.Postgres.DefaultPrivileges))
 				defPrivOpts := s.buildDefaultPrivilegeOptions(opts.Spec.Postgres.DefaultPrivileges)
@@ -208,7 +209,8 @@ func (s *GrantService) Revoke(ctx context.Context, opts ApplyGrantServiceOptions
 	var revokedCount int
 
 	switch s.config.GetEngineType() {
-	case dbopsv1alpha1.EngineTypePostgres:
+	case dbopsv1alpha1.EngineTypePostgres, dbopsv1alpha1.EngineTypeCockroachDB:
+		// CockroachDB uses PostgreSQL wire protocol and the same grant syntax
 		if opts.Spec.Postgres != nil {
 			// Revoke roles
 			if len(opts.Spec.Postgres.Roles) > 0 {

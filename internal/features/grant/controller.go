@@ -33,6 +33,7 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/logging"
+	"github.com/db-provision-operator/internal/reconcileutil"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -223,10 +224,16 @@ func (c *Controller) handleDeletion(ctx context.Context, grant *dbopsv1alpha1.Da
 	// Check deletion policy - only revoke if policy is Delete
 	if c.getDeletionPolicy(grant) == dbopsv1alpha1.DeletionPolicyDelete {
 		c.updatePhase(ctx, grant, dbopsv1alpha1.PhaseDeleting, "Revoking grants")
+		force := util.HasForceDeleteAnnotation(grant)
 
 		if err := c.handler.Revoke(ctx, &grant.Spec, grant.Namespace); err != nil {
-			// Log error but don't block deletion
 			log.Error(err, "Failed to revoke grants")
+			if !force {
+				// Don't remove finalizer if revoke fails — prevents privilege leaks.
+				// The resource will be retried until the revoke succeeds.
+				return ctrl.Result{RequeueAfter: RequeueAfterError}, err
+			}
+			// Force delete: continue with finalizer removal despite failure
 		} else {
 			log.Info("Grants revoked successfully")
 		}
@@ -263,7 +270,7 @@ func (c *Controller) handleError(ctx context.Context, grant *dbopsv1alpha1.Datab
 	// Update info metric for Grafana table views (even on error)
 	c.handler.UpdateInfoMetric(grant)
 
-	return ctrl.Result{RequeueAfter: RequeueAfterError}, err
+	return reconcileutil.ClassifyRequeue(err)
 }
 
 func (c *Controller) handlePending(ctx context.Context, grant *dbopsv1alpha1.DatabaseGrant, message string) (ctrl.Result, error) {

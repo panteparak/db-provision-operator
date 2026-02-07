@@ -32,6 +32,10 @@ import (
 //   - CockroachDB does NOT support SUPERUSER, REPLICATION, or BYPASSRLS
 //   - These PostgreSQL-specific attributes are silently ignored
 //
+// Insecure mode handling:
+//   - CockroachDB in --insecure mode does NOT support password authentication
+//   - If password setting fails with "insecure mode" error, the user is created without password
+//
 // The LOGIN attribute distinguishes users from roles in CockroachDB.
 func (a *Adapter) CreateUser(ctx context.Context, opts types.CreateUserOptions) error {
 	pool, err := a.getPool()
@@ -39,17 +43,64 @@ func (a *Adapter) CreateUser(ctx context.Context, opts types.CreateUserOptions) 
 		return err
 	}
 
+	// Build CREATE ROLE statement
+	query, hasPassword := a.buildCreateUserQuery(opts)
+
+	_, err = pool.Exec(ctx, query)
+	if err != nil {
+		// Check if this is an insecure mode error - CockroachDB doesn't support passwords in insecure mode
+		if hasPassword && isInsecureModeError(err) {
+			// Retry without password for insecure mode compatibility
+			queryNoPassword, _ := a.buildCreateUserQuery(types.CreateUserOptions{
+				Username:        opts.Username,
+				Password:        "", // No password
+				CreateDB:        opts.CreateDB,
+				CreateRole:      opts.CreateRole,
+				Inherit:         opts.Inherit,
+				ConnectionLimit: opts.ConnectionLimit,
+				ValidUntil:      opts.ValidUntil,
+				InRoles:         opts.InRoles,
+				ConfigParams:    opts.ConfigParams,
+			})
+			if _, retryErr := pool.Exec(ctx, queryNoPassword); retryErr != nil {
+				return fmt.Errorf("failed to create user %s (insecure mode, no password): %w", opts.Username, retryErr)
+			}
+			// User created successfully without password in insecure mode
+		} else {
+			return fmt.Errorf("failed to create user %s: %w", opts.Username, err)
+		}
+	}
+
+	// Set configuration parameters if any
+	for param, value := range opts.ConfigParams {
+		query := fmt.Sprintf("ALTER ROLE %s SET %s = %s",
+			escapeIdentifier(opts.Username),
+			escapeIdentifier(param),
+			escapeLiteral(value))
+		if _, err := pool.Exec(ctx, query); err != nil {
+			return fmt.Errorf("failed to set config param %s for user %s: %w", param, opts.Username, err)
+		}
+	}
+
+	return nil
+}
+
+// buildCreateUserQuery constructs the CREATE ROLE query for a user.
+// Returns the query string and whether a password was included.
+func (a *Adapter) buildCreateUserQuery(opts types.CreateUserOptions) (string, bool) {
 	var sb strings.Builder
 	sb.WriteString("CREATE ROLE ")
 	sb.WriteString(escapeIdentifier(opts.Username))
 
 	var roleOpts []string
+	hasPassword := false
 
 	// Users always get LOGIN (this is what distinguishes them from roles)
 	roleOpts = append(roleOpts, "LOGIN")
 
 	if opts.Password != "" {
 		roleOpts = append(roleOpts, fmt.Sprintf("PASSWORD %s", escapeLiteral(opts.Password)))
+		hasPassword = true
 	}
 
 	// CockroachDB-supported role attributes with least-privilege defaults
@@ -65,11 +116,8 @@ func (a *Adapter) CreateUser(ctx context.Context, opts types.CreateUserOptions) 
 		roleOpts = append(roleOpts, "NOCREATEROLE")
 	}
 
-	if opts.Inherit {
-		roleOpts = append(roleOpts, "INHERIT")
-	} else {
-		roleOpts = append(roleOpts, "NOINHERIT")
-	}
+	// Note: CockroachDB does NOT support INHERIT/NOINHERIT
+	// The Inherit field is silently ignored for CockroachDB compatibility
 
 	if opts.ConnectionLimit != 0 {
 		roleOpts = append(roleOpts, fmt.Sprintf("CONNECTION LIMIT %d", opts.ConnectionLimit))
@@ -92,23 +140,18 @@ func (a *Adapter) CreateUser(ctx context.Context, opts types.CreateUserOptions) 
 		sb.WriteString(strings.Join(roleOpts, " "))
 	}
 
-	_, err = pool.Exec(ctx, sb.String())
-	if err != nil {
-		return fmt.Errorf("failed to create user %s: %w", opts.Username, err)
-	}
+	return sb.String(), hasPassword
+}
 
-	// Set configuration parameters if any
-	for param, value := range opts.ConfigParams {
-		query := fmt.Sprintf("ALTER ROLE %s SET %s = %s",
-			escapeIdentifier(opts.Username),
-			escapeIdentifier(param),
-			escapeLiteral(value))
-		if _, err := pool.Exec(ctx, query); err != nil {
-			return fmt.Errorf("failed to set config param %s for user %s: %w", param, opts.Username, err)
-		}
+// isInsecureModeError checks if the error indicates CockroachDB is running in insecure mode
+// and cannot set passwords.
+func isInsecureModeError(err error) bool {
+	if err == nil {
+		return false
 	}
-
-	return nil
+	errStr := err.Error()
+	return strings.Contains(errStr, "insecure mode") ||
+		strings.Contains(errStr, "password is not supported in insecure")
 }
 
 // DropUser drops an existing CockroachDB user.
@@ -180,13 +223,8 @@ func (a *Adapter) UpdateUser(ctx context.Context, username string, opts types.Up
 		}
 	}
 
-	if opts.Inherit != nil {
-		if *opts.Inherit {
-			alterOpts = append(alterOpts, "INHERIT")
-		} else {
-			alterOpts = append(alterOpts, "NOINHERIT")
-		}
-	}
+	// Note: CockroachDB does NOT support INHERIT/NOINHERIT
+	// The Inherit field is silently ignored for CockroachDB compatibility
 
 	if opts.Login != nil {
 		if *opts.Login {
@@ -236,6 +274,7 @@ func (a *Adapter) UpdateUser(ctx context.Context, username string, opts types.Up
 }
 
 // UpdatePassword updates a user's password in CockroachDB.
+// In insecure mode, password updates are silently ignored since passwords don't work.
 func (a *Adapter) UpdatePassword(ctx context.Context, username, password string) error {
 	pool, err := a.getPool()
 	if err != nil {
@@ -247,6 +286,10 @@ func (a *Adapter) UpdatePassword(ctx context.Context, username, password string)
 		escapeLiteral(password))
 	_, err = pool.Exec(ctx, query)
 	if err != nil {
+		// In insecure mode, password updates are not supported - silently ignore
+		if isInsecureModeError(err) {
+			return nil
+		}
 		return fmt.Errorf("failed to update password for user %s: %w", username, err)
 	}
 

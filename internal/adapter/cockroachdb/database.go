@@ -192,6 +192,16 @@ func (a *Adapter) getDatabaseSchemas(ctx context.Context, database string) ([]st
 // CockroachDB does NOT support extensions (no CREATE EXTENSION).
 // Supported: schemas, default privileges.
 func (a *Adapter) UpdateDatabase(ctx context.Context, name string, opts types.UpdateDatabaseOptions) error {
+	// No-op case: return nil if nothing to do
+	if len(opts.Schemas) == 0 && len(opts.DefaultPrivileges) == 0 {
+		return nil
+	}
+
+	// Verify connection before proceeding
+	if _, err := a.getPool(); err != nil {
+		return err
+	}
+
 	// Handle schemas
 	for _, schema := range opts.Schemas {
 		if err := a.createSchema(ctx, name, schema); err != nil {

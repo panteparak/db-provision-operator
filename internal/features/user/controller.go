@@ -33,6 +33,7 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/logging"
+	"github.com/db-provision-operator/internal/reconcileutil"
 	"github.com/db-provision-operator/internal/secret"
 	"github.com/db-provision-operator/internal/util"
 )
@@ -254,6 +255,9 @@ func (c *Controller) handleDeletion(ctx context.Context, user *dbopsv1alpha1.Dat
 		force := util.HasForceDeleteAnnotation(user)
 		if err := c.handler.Delete(ctx, user.Spec.Username, &user.Spec, user.Namespace, force); err != nil {
 			log.Error(err, "Failed to delete user")
+			if !force {
+				return ctrl.Result{RequeueAfter: RequeueAfterError}, err
+			}
 		}
 	}
 
@@ -286,7 +290,7 @@ func (c *Controller) handleError(ctx context.Context, user *dbopsv1alpha1.Databa
 	// Update info metric for Grafana table views (even on error)
 	c.handler.UpdateInfoMetric(user)
 
-	return ctrl.Result{RequeueAfter: RequeueAfterError}, err
+	return reconcileutil.ClassifyRequeue(err)
 }
 
 func (c *Controller) updatePhase(ctx context.Context, user *dbopsv1alpha1.DatabaseUser, phase dbopsv1alpha1.Phase, message string) {

@@ -1,0 +1,44 @@
+# CockroachDB DatabaseInstance for local E2E testing (Docker Compose)
+# Uses host.k3d.internal to connect from k3d to Docker host
+#
+# Usage:
+#   kubectl apply -f test/e2e/fixtures/cockroachdb-local.yaml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cockroachdb
+  labels:
+    app.kubernetes.io/name: cockroachdb
+    app.kubernetes.io/component: database
+---
+# NOTE: CockroachDB in insecure mode doesn't support password authentication.
+# Use 'root' user which doesn't require password in insecure mode.
+# In production, use secure mode with certificates.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cockroachdb-credentials
+  namespace: cockroachdb
+type: Opaque
+stringData:
+  username: root
+  password: ""
+---
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseInstance
+metadata:
+  name: cockroachdb-instance
+  namespace: cockroachdb
+spec:
+  engine: cockroachdb
+  connection:
+    host: host.k3d.internal
+    port: 26257
+    database: defaultdb
+    secretRef:
+      name: cockroachdb-credentials
+      namespace: cockroachdb
+  healthCheck:
+    enabled: true
+    intervalSeconds: 30

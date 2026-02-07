@@ -15,23 +15,32 @@ Dockerfile.cross
 
 # Go workspace file
 go.work
+go.work.sum
 
 # Kubernetes Generated files - skip generated files, except for vendored files
 !vendor/**/zz_generated.*
 
-# editor and IDE paraphernalia
+# Editor and IDE paraphernalia
 .idea
 .vscode
 *.swp
 *.swo
 *~
 
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
 # Dashboard assets - copied from dashboards/ during CI release
 # These directories are populated by `make copy-dashboards` or CI
 charts/db-provision-operator/dashboards/
 config/grafana/dashboards/
 
-# E2E debug logs
+# E2E debug logs and test artifacts
 e2e-debug-*.log
 site/
 
@@ -39,3 +48,23 @@ site/
 test-reports/
 *.pprof
 cover*.out
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Local environment overrides
+.env
+.env.local
+.envrc
+
+# Kind/k3d cluster configs (local dev)
+*.kubeconfig
+
+# Build cache
+.cache/
+
+# Claude Code plans (local only)
+.claude/

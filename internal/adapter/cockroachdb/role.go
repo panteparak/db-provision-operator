@@ -64,11 +64,8 @@ func (a *Adapter) CreateRole(ctx context.Context, opts types.CreateRoleOptions) 
 		roleOpts = append(roleOpts, "NOCREATEROLE")
 	}
 
-	if opts.Inherit {
-		roleOpts = append(roleOpts, "INHERIT")
-	} else {
-		roleOpts = append(roleOpts, "NOINHERIT")
-	}
+	// Note: CockroachDB does NOT support INHERIT/NOINHERIT
+	// The Inherit field is silently ignored for CockroachDB compatibility
 
 	if len(opts.InRoles) > 0 {
 		var roles []string
@@ -172,13 +169,8 @@ func (a *Adapter) UpdateRole(ctx context.Context, roleName string, opts types.Up
 		}
 	}
 
-	if opts.Inherit != nil {
-		if *opts.Inherit {
-			alterOpts = append(alterOpts, "INHERIT")
-		} else {
-			alterOpts = append(alterOpts, "NOINHERIT")
-		}
-	}
+	// Note: CockroachDB does NOT support INHERIT/NOINHERIT
+	// The Inherit field is silently ignored for CockroachDB compatibility
 
 	if len(alterOpts) > 0 {
 		query := fmt.Sprintf("ALTER ROLE %s WITH %s",

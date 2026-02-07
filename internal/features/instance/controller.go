@@ -30,6 +30,7 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/logging"
+	"github.com/db-provision-operator/internal/reconcileutil"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -203,7 +204,7 @@ func (c *Controller) handleError(ctx context.Context, instance *dbopsv1alpha1.Da
 	// Update info metric for Grafana table views (even on error)
 	c.handler.UpdateInfoMetric(instance)
 
-	return ctrl.Result{RequeueAfter: RequeueAfterError}, err
+	return reconcileutil.ClassifyRequeue(err)
 }
 
 // SetupWithManager registers the controller with the manager.

@@ -7,7 +7,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: postgresql
+  name: postgres
   labels:
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/component: database
@@ -16,7 +16,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: postgres-credentials
-  namespace: postgresql
+  namespace: postgres
 type: Opaque
 stringData:
   username: dbprovision_admin
@@ -26,11 +26,16 @@ apiVersion: dbops.dbprovision.io/v1alpha1
 kind: DatabaseInstance
 metadata:
   name: postgres-instance
-  namespace: postgresql
+  namespace: postgres
 spec:
-  engine: postgresql
+  engine: postgres
   connection:
     host: host.k3d.internal
-    port: 5432
-  credentialsSecretRef:
-    name: postgres-credentials
+    port: 15432
+    database: postgres
+    secretRef:
+      name: postgres-credentials
+      namespace: postgres
+  healthCheck:
+    enabled: true
+    intervalSeconds: 30

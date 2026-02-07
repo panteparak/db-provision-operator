@@ -31,6 +31,7 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/logging"
+	"github.com/db-provision-operator/internal/reconcileutil"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -142,6 +143,7 @@ func (c *Controller) reconcile(ctx context.Context, database *dbopsv1alpha1.Data
 			util.ReasonCreating, "Database is initializing")
 		if statusErr := c.Status().Update(ctx, database); statusErr != nil {
 			log.Error(statusErr, "Failed to update status")
+			return ctrl.Result{}, statusErr
 		}
 		return ctrl.Result{RequeueAfter: RequeueAfterCreating}, nil
 	}
@@ -225,7 +227,12 @@ func (c *Controller) handleDeletion(ctx context.Context, database *dbopsv1alpha1
 		force := util.HasForceDeleteAnnotation(database)
 		if err := c.handler.Delete(ctx, database.Spec.Name, &database.Spec, database.Namespace, force); err != nil {
 			log.Error(err, "Failed to delete database")
-			// Continue with finalizer removal even if delete fails
+			if !force {
+				// Don't remove finalizer if external deletion fails — prevents data leaks.
+				// The resource will be retried until the external deletion succeeds.
+				return ctrl.Result{RequeueAfter: RequeueAfterError}, err
+			}
+			// Force delete: continue with finalizer removal despite failure
 		} else {
 			log.Info("Successfully deleted database from instance")
 		}
@@ -262,7 +269,7 @@ func (c *Controller) handleError(ctx context.Context, database *dbopsv1alpha1.Da
 	// Update info metric for Grafana table views (even on error)
 	c.handler.UpdateInfoMetric(database)
 
-	return ctrl.Result{RequeueAfter: RequeueAfterError}, err
+	return reconcileutil.ClassifyRequeue(err)
 }
 
 // updatePhase updates the database phase and message.

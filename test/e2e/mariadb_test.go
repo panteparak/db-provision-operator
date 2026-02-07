@@ -77,6 +77,26 @@ var _ = Describe("mariadb", Ordered, func() {
 		return 3306
 	}
 
+	// getInstanceHost returns the host for the DatabaseInstance CR.
+	// For local Docker Compose testing, use host.k3d.internal.
+	// For in-cluster testing, use the K8s service DNS.
+	getInstanceHost := func() string {
+		if host := os.Getenv("E2E_INSTANCE_HOST"); host != "" {
+			return host
+		}
+		return mariadbHost
+	}
+
+	// getInstancePort returns the port for the DatabaseInstance CR.
+	getInstancePort := func() int64 {
+		if portStr := os.Getenv("E2E_INSTANCE_PORT"); portStr != "" {
+			if port, err := strconv.ParseInt(portStr, 10, 64); err == nil {
+				return port
+			}
+		}
+		return 3306
+	}
+
 	BeforeAll(func() {
 		By("setting up MariaDB verifier (using MySQL verifier - protocol compatible)")
 		// Get the admin credentials from the secret (least-privilege account)
@@ -112,11 +132,11 @@ var _ = Describe("mariadb", Ordered, func() {
 						"namespace": testNamespace,
 					},
 					"spec": map[string]interface{}{
-						// Use "mysql" engine type - MariaDB is MySQL-compatible
-						"engine": "mysql",
+						// MariaDB has its own engine type
+						"engine": "mariadb",
 						"connection": map[string]interface{}{
-							"host":     mariadbHost,
-							"port":     int64(3306),
+							"host":     getInstanceHost(),
+							"port":     getInstancePort(),
 							"database": "mysql",
 							"secretRef": map[string]interface{}{
 								"name":      secretName,

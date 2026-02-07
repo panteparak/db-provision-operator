@@ -250,7 +250,7 @@ var _ = Describe("Database Operations", func() {
 				}
 				err := adapter.UpdateDatabase(ctx, "testdb", opts)
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("failed to create schema"))
+				Expect(err.Error()).To(ContainSubstring("not connected"))
 			})
 
 			It("should return error when setting default privileges", func() {
@@ -265,7 +265,7 @@ var _ = Describe("Database Operations", func() {
 				}
 				err := adapter.UpdateDatabase(ctx, "testdb", opts)
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("failed to set default privileges"))
+				Expect(err.Error()).To(ContainSubstring("not connected"))
 			})
 		})
 

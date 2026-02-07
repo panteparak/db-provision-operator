@@ -32,32 +32,31 @@ import (
 	"github.com/db-provision-operator/test/e2e/testutil"
 )
 
-var _ = Describe("postgresql", Ordered, func() {
+var _ = Describe("cockroachdb", Ordered, func() {
 	const (
-		instanceName    = "postgres-e2e-instance"
-		databaseName    = "testdb"
-		userName        = "testuser"
-		testNamespace   = "default"
-		postgresHost    = "postgres.postgres.svc.cluster.local" // K8s DNS for CR (runs inside cluster)
-		secretName      = "postgres-credentials"
-		secretNamespace = "postgres"
-		timeout         = 2 * time.Minute
-		interval        = 2 * time.Second
+		instanceName      = "cockroachdb-e2e-instance"
+		databaseName      = "testdb"
+		userName          = "testuser"
+		testNamespace     = "default"
+		cockroachdbHost   = "host.k3d.internal" // Docker host from k3d (CockroachDB runs in Docker Compose)
+		secretName        = "cockroachdb-credentials"
+		secretNamespace   = "cockroachdb"
+		timeout           = 2 * time.Minute
+		interval          = 2 * time.Second
+		defaultCRDBPort   = int32(26257)
 	)
 
 	ctx := context.Background()
 
 	// Database verifier for validating actual database state
-	var verifier *testutil.PostgresVerifier
+	var verifier *testutil.CockroachDBVerifier
 
 	// getVerifierHost returns the host for the verifier to connect to.
-	// In CI, we use port-forwarding so the verifier connects to localhost.
-	// Locally, we may connect directly to the K8s service.
 	getVerifierHost := func() string {
 		if host := os.Getenv("E2E_DATABASE_HOST"); host != "" {
 			return host
 		}
-		return postgresHost
+		return cockroachdbHost
 	}
 
 	// getVerifierPort returns the port for the verifier to connect to.
@@ -67,17 +66,15 @@ var _ = Describe("postgresql", Ordered, func() {
 				return int32(port)
 			}
 		}
-		return 5432
+		return defaultCRDBPort
 	}
 
 	// getInstanceHost returns the host for the DatabaseInstance CR.
-	// For local Docker Compose testing, use host.k3d.internal.
-	// For in-cluster testing, use the K8s service DNS.
 	getInstanceHost := func() string {
 		if host := os.Getenv("E2E_INSTANCE_HOST"); host != "" {
 			return host
 		}
-		return postgresHost
+		return cockroachdbHost
 	}
 
 	// getInstancePort returns the port for the DatabaseInstance CR.
@@ -87,33 +84,33 @@ var _ = Describe("postgresql", Ordered, func() {
 				return port
 			}
 		}
-		return 5432
+		return int64(defaultCRDBPort)
 	}
 
 	// Admin credentials read from secret (least-privilege account)
 	var adminUsername, adminPassword string
 
 	BeforeAll(func() {
-		By("setting up PostgreSQL verifier")
+		By("setting up CockroachDB verifier")
 		// Get the admin credentials from the secret (least-privilege account)
 		var err error
 		adminUsername, err = getSecretValue(ctx, secretNamespace, secretName, "username")
-		Expect(err).NotTo(HaveOccurred(), "Failed to get PostgreSQL username from secret")
+		Expect(err).NotTo(HaveOccurred(), "Failed to get CockroachDB username from secret")
 
 		adminPassword, err = getSecretValue(ctx, secretNamespace, secretName, "password")
-		Expect(err).NotTo(HaveOccurred(), "Failed to get PostgreSQL password from secret")
+		Expect(err).NotTo(HaveOccurred(), "Failed to get CockroachDB password from secret")
 
 		verifierHost := getVerifierHost()
 		verifierPort := getVerifierPort()
 		GinkgoWriter.Printf("Using verifier host: %s:%d with admin user: %s\n", verifierHost, verifierPort, adminUsername)
 
-		cfg := testutil.PostgresEngineConfig(verifierHost, verifierPort, adminUsername, adminPassword)
-		verifier = testutil.NewPostgresVerifier(cfg)
+		cfg := testutil.CockroachDBEngineConfig(verifierHost, verifierPort, adminUsername, adminPassword)
+		verifier = testutil.NewCockroachDBVerifier(cfg)
 
 		// Connect with retry since database may still be starting
 		Eventually(func() error {
 			return verifier.Connect(ctx)
-		}, timeout, interval).Should(Succeed(), "Should connect to PostgreSQL for verification")
+		}, timeout, interval).Should(Succeed(), "Should connect to CockroachDB for verification")
 	})
 
 	Context("DatabaseInstance lifecycle", func() {
@@ -128,11 +125,11 @@ var _ = Describe("postgresql", Ordered, func() {
 						"namespace": testNamespace,
 					},
 					"spec": map[string]interface{}{
-						"engine": "postgres",
+						"engine": "cockroachdb",
 						"connection": map[string]interface{}{
 							"host":     getInstanceHost(),
 							"port":     getInstancePort(),
-							"database": "postgres",
+							"database": "defaultdb", // CockroachDB default database
 							"secretRef": map[string]interface{}{
 								"name":      secretName,
 								"namespace": secretNamespace,
@@ -210,7 +207,7 @@ var _ = Describe("postgresql", Ordered, func() {
 				return phase
 			}, timeout, interval).Should(Equal("Ready"), "Database should become Ready")
 
-			By("verifying database actually exists in PostgreSQL")
+			By("verifying database actually exists in CockroachDB")
 			Eventually(func() bool {
 				exists, err := verifier.DatabaseExists(ctx, databaseName)
 				if err != nil {
@@ -218,7 +215,7 @@ var _ = Describe("postgresql", Ordered, func() {
 					return false
 				}
 				return exists
-			}, timeout, interval).Should(BeTrue(), "Database '%s' should exist in PostgreSQL", databaseName)
+			}, timeout, interval).Should(BeTrue(), "Database '%s' should exist in CockroachDB", databaseName)
 		})
 	})
 
@@ -255,7 +252,7 @@ var _ = Describe("postgresql", Ordered, func() {
 				return phase
 			}, timeout, interval).Should(Equal("Ready"), "DatabaseUser should become Ready")
 
-			By("verifying user actually exists in PostgreSQL")
+			By("verifying user actually exists in CockroachDB")
 			Eventually(func() bool {
 				exists, err := verifier.UserExists(ctx, userName)
 				if err != nil {
@@ -263,17 +260,12 @@ var _ = Describe("postgresql", Ordered, func() {
 					return false
 				}
 				return exists
-			}, timeout, interval).Should(BeTrue(), "User '%s' should exist in PostgreSQL", userName)
+			}, timeout, interval).Should(BeTrue(), "User '%s' should exist in CockroachDB", userName)
 		})
 	})
 
 	Context("Cross-namespace Secret reference", func() {
 		It("should support cross-namespace Secret reference (ClusterRoleBinding test)", func() {
-			// The DatabaseInstance already uses cross-namespace reference:
-			// - DatabaseInstance is in 'default' namespace
-			// - Secret is in 'postgres' namespace
-			// This test verifies that the cross-namespace RBAC works correctly
-
 			By("verifying DatabaseInstance can access Secret from different namespace")
 			obj, err := dynamicClient.Resource(databaseInstanceGVR).Namespace(testNamespace).Get(ctx, instanceName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred(), "Failed to get DatabaseInstance")
@@ -283,7 +275,7 @@ var _ = Describe("postgresql", Ordered, func() {
 
 			// Verify the secret reference points to a different namespace
 			secretRef, _, _ := unstructured.NestedMap(obj.Object, "spec", "connection", "secretRef")
-			Expect(secretRef["namespace"]).To(Equal(secretNamespace), "Secret should be in postgres namespace")
+			Expect(secretRef["namespace"]).To(Equal(secretNamespace), "Secret should be in cockroachdb namespace")
 			Expect(testNamespace).NotTo(Equal(secretNamespace), "Instance and Secret should be in different namespaces")
 		})
 	})
@@ -323,7 +315,7 @@ var _ = Describe("postgresql", Ordered, func() {
 				return phase
 			}, timeout, interval).Should(Equal("Ready"), "DatabaseRole should become Ready")
 
-			By("verifying role actually exists in PostgreSQL")
+			By("verifying role actually exists in CockroachDB")
 			Eventually(func() bool {
 				exists, err := verifier.RoleExists(ctx, roleName)
 				if err != nil {
@@ -331,7 +323,7 @@ var _ = Describe("postgresql", Ordered, func() {
 					return false
 				}
 				return exists
-			}, timeout, interval).Should(BeTrue(), "Role '%s' should exist in PostgreSQL", roleName)
+			}, timeout, interval).Should(BeTrue(), "Role '%s' should exist in CockroachDB", roleName)
 		})
 	})
 
@@ -340,6 +332,7 @@ var _ = Describe("postgresql", Ordered, func() {
 
 		It("should create a DatabaseGrant and become Ready", func() {
 			By("creating a DatabaseGrant CR")
+			// CockroachDB uses PostgreSQL-compatible grant syntax
 			grant := &unstructured.Unstructured{
 				Object: map[string]interface{}{
 					"apiVersion": "dbops.dbprovision.io/v1alpha1",
@@ -383,7 +376,6 @@ var _ = Describe("postgresql", Ordered, func() {
 
 			By("verifying user has USAGE privilege on public schema in testdb")
 			Eventually(func() bool {
-				// Must check on the specific database where grants were applied
 				hasPriv, err := verifier.HasPrivilegeOnDatabase(ctx, userName, "USAGE", "schema", "public", databaseName)
 				if err != nil {
 					GinkgoWriter.Printf("Error checking schema privilege: %v\n", err)
@@ -394,22 +386,13 @@ var _ = Describe("postgresql", Ordered, func() {
 		})
 	})
 
-	// NOTE: Least-privilege verification tests have been moved to integration tests
-	// (internal/controller/integration_privileges_test.go) since they only need
-	// database access, not a full K8s cluster. This saves ~10 minutes of E2E time.
-
-	// ===== Functionality Verification Tests =====
-	// These tests verify that database operations actually work, not just that CRs become Ready
-
 	Context("Database Ownership Verification", func() {
 		It("should set correct database owner", func() {
-			By("querying database owner from PostgreSQL system catalog")
+			By("querying database owner from CockroachDB")
 			owner, err := verifier.GetDatabaseOwner(ctx, databaseName)
 			Expect(err).NotTo(HaveOccurred(), "Failed to get database owner")
 
 			By("verifying owner is the admin user from credentials")
-			// The database is created by the operator using the admin credentials
-			// so the owner should be the admin user (dbprovision_admin for least-privilege setup)
 			Expect(owner).To(Equal(adminUsername), "Database owner should be '%s' (admin user)", adminUsername)
 			GinkgoWriter.Printf("Database '%s' owner: %s\n", databaseName, owner)
 		})
@@ -418,12 +401,9 @@ var _ = Describe("postgresql", Ordered, func() {
 	Context("User Credential Validation", func() {
 		It("should generate working credentials in Secret", func() {
 			By("getting user credentials from Secret")
-			// The DatabaseUser CR creates a secret with credentials
-			// Secret name follows the pattern: <username>-credentials or is specified in spec
 			secretName := userName + "-credentials"
 			password, err := getSecretValue(ctx, testNamespace, secretName, "password")
 			if err != nil {
-				// Try alternate secret naming
 				password, err = getSecretValue(ctx, testNamespace, userName, "password")
 			}
 			Expect(err).NotTo(HaveOccurred(), "Failed to get user password from Secret")
@@ -458,13 +438,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			}
 			Expect(err).NotTo(HaveOccurred(), "Failed to get user password")
 
-			By("connecting as the granted user")
-			userConn, err := verifier.ConnectAsUser(ctx, userName, password, databaseName)
-			Expect(err).NotTo(HaveOccurred(), "Should connect as user")
-			defer userConn.Close()
-
 			By("creating a test table using admin connection first")
-			// Use admin connection (from BeforeAll) to create table for testing SELECT/INSERT
 			adminConn, err := verifier.ConnectAsUser(ctx, adminUsername, adminPassword, databaseName)
 			Expect(err).NotTo(HaveOccurred(), "Should connect as admin")
 			defer adminConn.Close()
@@ -474,11 +448,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred(), "Admin should create test table")
 
 			// Grant SELECT, INSERT to the test user on the table
-			// Use Eventually to handle transient "tuple concurrently updated" errors
-			// that can occur when the operator is also modifying user grants
-			seqName := testTable + "_id_seq"
 			Eventually(func() error {
-				// Reconnect for each retry to get a fresh connection
 				retryConn, connErr := verifier.ConnectAsUser(ctx, adminUsername, adminPassword, databaseName)
 				if connErr != nil {
 					return connErr
@@ -486,12 +456,13 @@ var _ = Describe("postgresql", Ordered, func() {
 				defer retryConn.Close()
 
 				// Grant on table
-				if grantErr := retryConn.Exec(ctx, "GRANT SELECT, INSERT ON "+testTable+" TO "+userName); grantErr != nil {
-					return grantErr
-				}
-				// Grant on sequence
-				return retryConn.Exec(ctx, "GRANT USAGE ON SEQUENCE "+seqName+" TO "+userName)
-			}, 30*time.Second, 2*time.Second).Should(Succeed(), "Should grant permissions on table and sequence")
+				return retryConn.Exec(ctx, "GRANT SELECT, INSERT ON "+testTable+" TO "+userName)
+			}, 30*time.Second, 2*time.Second).Should(Succeed(), "Should grant permissions on table")
+
+			By("connecting as the granted user")
+			userConn, err := verifier.ConnectAsUser(ctx, userName, password, databaseName)
+			Expect(err).NotTo(HaveOccurred(), "Should connect as user")
+			defer userConn.Close()
 
 			By("verifying SELECT is allowed")
 			err = userConn.CanSelectData(ctx, testTable)
@@ -543,9 +514,6 @@ var _ = Describe("postgresql", Ordered, func() {
 							"name": instanceName,
 						},
 						"username": memberUser,
-						"postgres": map[string]interface{}{
-							"inRoles": []interface{}{roleName}, // Assign role via postgres.inRoles
-						},
 					},
 				},
 			}
@@ -563,6 +531,42 @@ var _ = Describe("postgresql", Ordered, func() {
 				return phase
 			}, timeout, interval).Should(Equal("Ready"))
 
+			By("creating a DatabaseGrant to assign role to user")
+			roleGrant := &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "dbops.dbprovision.io/v1alpha1",
+					"kind":       "DatabaseGrant",
+					"metadata": map[string]interface{}{
+						"name":      memberUser + "-role-grant",
+						"namespace": testNamespace,
+					},
+					"spec": map[string]interface{}{
+						"userRef": map[string]interface{}{
+							"name": memberUser,
+						},
+						"databaseRef": map[string]interface{}{
+							"name": databaseName,
+						},
+						"postgres": map[string]interface{}{
+							"roles": []interface{}{roleName},
+						},
+					},
+				},
+			}
+
+			_, err = dynamicClient.Resource(databaseGrantGVR).Namespace(testNamespace).Create(ctx, roleGrant, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred(), "Failed to create role grant")
+
+			By("waiting for grant to become Ready")
+			Eventually(func() string {
+				obj, err := dynamicClient.Resource(databaseGrantGVR).Namespace(testNamespace).Get(ctx, memberUser+"-role-grant", metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				return phase
+			}, timeout, interval).Should(Equal("Ready"))
+
 			By("verifying user is a member of the role")
 			Eventually(func() bool {
 				isMember, err := verifier.HasRoleMembership(ctx, memberUser, roleName)
@@ -572,6 +576,9 @@ var _ = Describe("postgresql", Ordered, func() {
 				}
 				return isMember
 			}, timeout, interval).Should(BeTrue(), "User '%s' should be a member of role '%s'", memberUser, roleName)
+
+			By("cleaning up role grant")
+			_ = dynamicClient.Resource(databaseGrantGVR).Namespace(testNamespace).Delete(ctx, memberUser+"-role-grant", metav1.DeleteOptions{})
 
 			By("cleaning up member user")
 			_ = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Delete(ctx, memberUser, metav1.DeleteOptions{})

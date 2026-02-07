@@ -322,9 +322,11 @@ e2e-debug: ## Show debug information for E2E cluster (pods, pvcs, events) - also
 # Same micro-steps are used by CI for consistency
 
 # Configuration (override via environment)
-E2E_POSTGRES_PORT ?= 5432
-E2E_MYSQL_PORT ?= 3306
-E2E_MARIADB_PORT ?= 3307
+# Using higher ports to avoid conflicts with local database instances
+E2E_POSTGRES_PORT ?= 15432
+E2E_MYSQL_PORT ?= 13306
+E2E_MARIADB_PORT ?= 13307
+E2E_COCKROACHDB_PORT ?= 26257
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MICRO-STEPS: Each can be called independently (by CI or locally)
@@ -376,24 +378,32 @@ e2e-deploy-operator: ## Deploy operator to cluster
 		deployment/db-provision-operator-controller-manager \
 		-n db-provision-operator-system --timeout=120s
 
+# Helper to get namespace based on database type (postgresql->postgres, others unchanged)
+define get_e2e_namespace
+$(if $(filter postgresql,$(1)),postgres,$(1))
+endef
+
+# Helper to get port based on database type
+define get_e2e_port
+$(if $(filter postgresql,$(1)),$(E2E_POSTGRES_PORT),$(if $(filter mysql,$(1)),$(E2E_MYSQL_PORT),$(if $(filter mariadb,$(1)),$(E2E_MARIADB_PORT),$(if $(filter cockroachdb,$(1)),$(E2E_COCKROACHDB_PORT),5432))))
+endef
+
 .PHONY: e2e-create-db-instance
 e2e-create-db-instance: ## Create DatabaseInstance CR pointing to Docker host (requires E2E_DATABASE)
 	@echo "Creating DatabaseInstance for $(E2E_DATABASE)..."
 	@kubectl apply -f test/e2e/fixtures/$(E2E_DATABASE)-local.yaml
 	@echo "Waiting for DatabaseInstance to be ready..."
 	@kubectl wait --for=jsonpath='{.status.phase}'=Ready \
-		databaseinstance -n $(E2E_DATABASE) --all --timeout=60s
+		databaseinstance -n $(call get_e2e_namespace,$(E2E_DATABASE)) --all --timeout=60s
 
 .PHONY: e2e-local-run-tests
 e2e-local-run-tests: ## Run E2E tests for local setup (requires E2E_DATABASE)
 	@echo "Running E2E tests for $(E2E_DATABASE)..."
 	E2E_DATABASE_ENGINE=$(E2E_DATABASE) \
 	E2E_DATABASE_HOST=127.0.0.1 \
-	E2E_DATABASE_PORT=$$(case $(E2E_DATABASE) in \
-		postgresql) echo $(E2E_POSTGRES_PORT);; \
-		mysql) echo $(E2E_MYSQL_PORT);; \
-		mariadb) echo $(E2E_MARIADB_PORT);; \
-	esac) \
+	E2E_DATABASE_PORT=$(call get_e2e_port,$(E2E_DATABASE)) \
+	E2E_INSTANCE_HOST=host.k3d.internal \
+	E2E_INSTANCE_PORT=$(call get_e2e_port,$(E2E_DATABASE)) \
 	go test ./test/e2e/... -v -tags=e2e -ginkgo.focus="$(E2E_DATABASE)" -ginkgo.v -timeout=10m
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -424,6 +434,11 @@ e2e-local-mariadb: e2e-local-setup ## Run MariaDB E2E tests (full setup + test)
 	$(MAKE) e2e-create-db-instance E2E_DATABASE=mariadb
 	$(MAKE) e2e-local-run-tests E2E_DATABASE=mariadb
 
+.PHONY: e2e-local-cockroachdb
+e2e-local-cockroachdb: e2e-local-setup ## Run CockroachDB E2E tests (full setup + test)
+	$(MAKE) e2e-create-db-instance E2E_DATABASE=cockroachdb
+	$(MAKE) e2e-local-run-tests E2E_DATABASE=cockroachdb
+
 .PHONY: e2e-local-all
 e2e-local-all: e2e-local-setup ## Run all local E2E tests
 	$(MAKE) e2e-create-db-instance E2E_DATABASE=postgresql
@@ -432,6 +447,8 @@ e2e-local-all: e2e-local-setup ## Run all local E2E tests
 	$(MAKE) e2e-local-run-tests E2E_DATABASE=mysql
 	$(MAKE) e2e-create-db-instance E2E_DATABASE=mariadb
 	$(MAKE) e2e-local-run-tests E2E_DATABASE=mariadb
+	$(MAKE) e2e-create-db-instance E2E_DATABASE=cockroachdb
+	$(MAKE) e2e-local-run-tests E2E_DATABASE=cockroachdb
 
 .PHONY: e2e-local-cleanup
 e2e-local-cleanup: ## Clean up local E2E environment

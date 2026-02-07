@@ -143,3 +143,16 @@ func MariaDBEngineConfig(host string, port int32, username, password string) Eng
 		Password:      password,
 	}
 }
+
+// CockroachDBEngineConfig creates configuration for CockroachDB verification
+// CockroachDB is PostgreSQL wire-protocol compatible
+func CockroachDBEngineConfig(host string, port int32, username, password string) EngineConfig {
+	return EngineConfig{
+		Name:          "cockroachdb",
+		Host:          host,
+		Port:          port,
+		AdminDatabase: "defaultdb", // CockroachDB default database
+		Username:      username,
+		Password:      password,
+	}
+}
