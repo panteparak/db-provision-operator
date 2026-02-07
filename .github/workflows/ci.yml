@@ -707,9 +707,9 @@ jobs:
     needs: [integration-test]
     strategy:
       fail-fast: false
-      max-parallel: 3  # Run all 3 database tests in parallel
+      max-parallel: 4  # Run all 4 database tests in parallel
       matrix:
-        database: [postgresql, mysql, mariadb]
+        database: [postgresql, mysql, mariadb, cockroachdb]
         include:
           - database: postgresql
             port: 5432
@@ -717,6 +717,8 @@ jobs:
             port: 3306
           - database: mariadb
             port: 3307
+          - database: cockroachdb
+            port: 26257
 
     steps:
       - name: Checkout code
