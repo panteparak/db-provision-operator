@@ -332,9 +332,9 @@ E2E_COCKROACHDB_PORT ?= 26257
 # MICRO-STEPS: Each can be called independently (by CI or locally)
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Map E2E_DATABASE to compose service names
+# Map E2E_DATABASE to compose service names (excluding init containers)
 define get_compose_services
-$(if $(filter postgresql,$(1)),postgres,$(if $(filter cockroachdb,$(1)),cockroachdb cockroachdb-init,$(1)))
+$(if $(filter postgresql,$(1)),postgres,$(if $(filter cockroachdb,$(1)),cockroachdb,$(1)))
 endef
 
 .PHONY: e2e-db-up
@@ -343,10 +343,16 @@ ifdef E2E_DATABASE
 	@echo "Starting $(E2E_DATABASE) on port $(call get_e2e_port,$(E2E_DATABASE))..."
 	E2E_POSTGRES_PORT=$(E2E_POSTGRES_PORT) E2E_MYSQL_PORT=$(E2E_MYSQL_PORT) E2E_MARIADB_PORT=$(E2E_MARIADB_PORT) E2E_COCKROACHDB_PORT=$(E2E_COCKROACHDB_PORT) \
 		docker compose -f docker-compose.e2e.yml up -d --wait --wait-timeout 180 $(call get_compose_services,$(E2E_DATABASE))
+  ifeq ($(E2E_DATABASE),cockroachdb)
+	@echo "Running CockroachDB initialization..."
+	E2E_COCKROACHDB_PORT=$(E2E_COCKROACHDB_PORT) docker compose -f docker-compose.e2e.yml up cockroachdb-init
+  endif
 else
 	@echo "Starting all databases (use E2E_DATABASE=<engine> to select one)..."
 	E2E_POSTGRES_PORT=$(E2E_POSTGRES_PORT) E2E_MYSQL_PORT=$(E2E_MYSQL_PORT) E2E_MARIADB_PORT=$(E2E_MARIADB_PORT) E2E_COCKROACHDB_PORT=$(E2E_COCKROACHDB_PORT) \
-		docker compose -f docker-compose.e2e.yml up -d --wait --wait-timeout 180
+		docker compose -f docker-compose.e2e.yml up -d --wait --wait-timeout 180 postgres mysql mariadb cockroachdb
+	@echo "Running CockroachDB initialization..."
+	E2E_COCKROACHDB_PORT=$(E2E_COCKROACHDB_PORT) docker compose -f docker-compose.e2e.yml up cockroachdb-init
 endif
 	@echo "Database(s) ready"
 
