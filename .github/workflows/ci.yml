@@ -503,9 +503,14 @@ jobs:
   manifests:
     name: Verify Manifests
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # Use a token with write access for auto-commit
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -517,12 +522,35 @@ jobs:
         run: make manifests
 
       - name: Check for uncommitted changes
+        id: check-changes
         run: |
           if [ -n "$(git status --porcelain)" ]; then
-            echo "Error: Generated manifests are out of date. Run 'make manifests' and commit the changes."
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Generated manifests are out of date:"
             git diff
-            exit 1
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "Manifests are up to date"
           fi
+
+      # Auto-commit on push to main branch
+      - name: Auto-commit manifests
+        if: steps.check-changes.outputs.has_changes == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: auto-generate manifests [skip ci]
+
+          Co-Authored-By: github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+          git push
+
+      # Fail on PRs if manifests are out of date (developer needs to run make manifests locally)
+      - name: Fail if manifests out of date (PR)
+        if: steps.check-changes.outputs.has_changes == 'true' && github.event_name == 'pull_request'
+        run: |
+          echo "::error::Generated manifests are out of date. Run 'make manifests' and commit the changes."
+          exit 1
 
       - name: Install Helm
         uses: azure/setup-helm@v4
