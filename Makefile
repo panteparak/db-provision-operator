@@ -340,11 +340,13 @@ endef
 .PHONY: e2e-db-up
 e2e-db-up: ## Start database(s) via Docker Compose. Use E2E_DATABASE to select specific engine (postgresql|mysql|mariadb|cockroachdb)
 ifdef E2E_DATABASE
-	@echo "Starting $(E2E_DATABASE)..."
-	docker compose -f docker-compose.e2e.yml up -d --wait --wait-timeout 180 $(call get_compose_services,$(E2E_DATABASE))
+	@echo "Starting $(E2E_DATABASE) on port $(call get_e2e_port,$(E2E_DATABASE))..."
+	E2E_POSTGRES_PORT=$(E2E_POSTGRES_PORT) E2E_MYSQL_PORT=$(E2E_MYSQL_PORT) E2E_MARIADB_PORT=$(E2E_MARIADB_PORT) E2E_COCKROACHDB_PORT=$(E2E_COCKROACHDB_PORT) \
+		docker compose -f docker-compose.e2e.yml up -d --wait --wait-timeout 180 $(call get_compose_services,$(E2E_DATABASE))
 else
 	@echo "Starting all databases (use E2E_DATABASE=<engine> to select one)..."
-	docker compose -f docker-compose.e2e.yml up -d --wait --wait-timeout 180
+	E2E_POSTGRES_PORT=$(E2E_POSTGRES_PORT) E2E_MYSQL_PORT=$(E2E_MYSQL_PORT) E2E_MARIADB_PORT=$(E2E_MARIADB_PORT) E2E_COCKROACHDB_PORT=$(E2E_COCKROACHDB_PORT) \
+		docker compose -f docker-compose.e2e.yml up -d --wait --wait-timeout 180
 endif
 	@echo "Database(s) ready"
 
