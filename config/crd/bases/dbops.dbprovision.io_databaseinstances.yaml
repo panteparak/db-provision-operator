@@ -133,6 +133,46 @@ spec:
                 - host
                 - port
                 type: object
+              discovery:
+                description: |-
+                  Discovery enables scanning for database resources not managed by Kubernetes CRs.
+                  Discovered resources can be adopted via annotations.
+                properties:
+                  enabled:
+                    default: false
+                    description: Enabled enables resource discovery
+                    type: boolean
+                  interval:
+                    default: 30m
+                    description: Interval specifies how often to scan for unmanaged
+                      resources (Go duration string)
+                    type: string
+                type: object
+              driftPolicy:
+                description: |-
+                  DriftPolicy defines the default drift detection policy for resources using this instance.
+                  Individual resources can override this policy.
+                properties:
+                  interval:
+                    default: 5m
+                    description: |-
+                      Interval specifies how often to check for drift (Go duration string)
+                      This is only meaningful when mode is "detect" or "correct"
+                    type: string
+                  mode:
+                    allOf:
+                    - enum:
+                      - ignore
+                      - detect
+                      - correct
+                    - enum:
+                      - ignore
+                      - detect
+                      - correct
+                    default: detect
+                    description: Mode determines how drift is handled
+                    type: string
+                type: object
               engine:
                 allOf:
                 - enum:
@@ -357,6 +397,85 @@ spec:
                   - type
                   type: object
                 type: array
+              discoveredResources:
+                description: |-
+                  DiscoveredResources contains resources found in the database that are not managed by CRs.
+                  Only populated when discovery is enabled.
+                properties:
+                  databases:
+                    description: Databases contains discovered database resources
+                    items:
+                      description: |-
+                        DiscoveredResource represents a resource found in the database
+                        that is not managed by a Kubernetes CR.
+                      properties:
+                        adopted:
+                          description: Adopted indicates if this resource has been
+                            adopted via annotation
+                          type: boolean
+                        discovered:
+                          description: Discovered is when this resource was first
+                            discovered
+                          format: date-time
+                          type: string
+                        name:
+                          description: Name is the name of the discovered resource
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  lastScan:
+                    description: LastScan is when the last discovery scan was performed
+                    format: date-time
+                    type: string
+                  roles:
+                    description: Roles contains discovered role resources
+                    items:
+                      description: |-
+                        DiscoveredResource represents a resource found in the database
+                        that is not managed by a Kubernetes CR.
+                      properties:
+                        adopted:
+                          description: Adopted indicates if this resource has been
+                            adopted via annotation
+                          type: boolean
+                        discovered:
+                          description: Discovered is when this resource was first
+                            discovered
+                          format: date-time
+                          type: string
+                        name:
+                          description: Name is the name of the discovered resource
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  users:
+                    description: Users contains discovered user resources
+                    items:
+                      description: |-
+                        DiscoveredResource represents a resource found in the database
+                        that is not managed by a Kubernetes CR.
+                      properties:
+                        adopted:
+                          description: Adopted indicates if this resource has been
+                            adopted via annotation
+                          type: boolean
+                        discovered:
+                          description: Discovered is when this resource was first
+                            discovered
+                          format: date-time
+                          type: string
+                        name:
+                          description: Name is the name of the discovered resource
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                type: object
               lastCheckedAt:
                 description: LastCheckedAt is the timestamp of the last health check
                 format: date-time

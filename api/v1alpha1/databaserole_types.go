@@ -41,6 +41,11 @@ type DatabaseRoleSpec struct {
 	// MySQL-specific configuration
 	// +optional
 	MySQL *MySQLRoleConfig `json:"mysql,omitempty"`
+
+	// DriftPolicy overrides the instance-level drift policy for this role.
+	// If not specified, the instance's drift policy is used.
+	// +optional
+	DriftPolicy *DriftPolicy `json:"driftPolicy,omitempty"`
 }
 
 // DatabaseRoleStatus defines the observed state of DatabaseRole.
@@ -57,6 +62,10 @@ type DatabaseRoleStatus struct {
 
 	// Role contains role-specific status information
 	Role *RoleInfo `json:"role,omitempty"`
+
+	// Drift contains drift detection status information
+	// +optional
+	Drift *DriftStatus `json:"drift,omitempty"`
 
 	// Conditions represent the latest available observations
 	// +optional

@@ -92,6 +92,13 @@ func (s *UserService) Close() error {
 	return nil
 }
 
+// Adapter returns the underlying database adapter.
+// This is useful for drift detection and other operations that need
+// direct adapter access.
+func (s *UserService) Adapter() adapter.DatabaseAdapter {
+	return s.adapter
+}
+
 // CreateOptions contains options for creating a user via the service.
 type CreateUserServiceOptions struct {
 	Spec     *dbopsv1alpha1.DatabaseUserSpec

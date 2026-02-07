@@ -40,6 +40,16 @@ type DatabaseInstanceSpec struct {
 	// +optional
 	HealthCheck *HealthCheckConfig `json:"healthCheck,omitempty"`
 
+	// DriftPolicy defines the default drift detection policy for resources using this instance.
+	// Individual resources can override this policy.
+	// +optional
+	DriftPolicy *DriftPolicy `json:"driftPolicy,omitempty"`
+
+	// Discovery enables scanning for database resources not managed by Kubernetes CRs.
+	// Discovered resources can be adopted via annotations.
+	// +optional
+	Discovery *DiscoveryConfig `json:"discovery,omitempty"`
+
 	// PostgreSQL-specific options (only valid when engine is "postgres")
 	// +optional
 	Postgres *PostgresInstanceConfig `json:"postgres,omitempty"`
@@ -92,6 +102,11 @@ type DatabaseInstanceStatus struct {
 
 	// ObservedGeneration is the last observed generation of the resource
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// DiscoveredResources contains resources found in the database that are not managed by CRs.
+	// Only populated when discovery is enabled.
+	// +optional
+	DiscoveredResources *DiscoveredResourcesStatus `json:"discoveredResources,omitempty"`
 
 	// Conditions represent the latest available observations
 	// +optional

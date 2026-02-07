@@ -92,6 +92,13 @@ func (s *RoleService) Close() error {
 	return nil
 }
 
+// Adapter returns the underlying database adapter.
+// This is useful for drift detection and other operations that need
+// direct adapter access.
+func (s *RoleService) Adapter() adapter.DatabaseAdapter {
+	return s.adapter
+}
+
 // Create creates a new database role with the given spec.
 // If the role already exists, it updates the role instead.
 func (s *RoleService) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseRoleSpec) (*Result, error) {

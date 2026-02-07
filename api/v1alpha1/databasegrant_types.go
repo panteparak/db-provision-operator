@@ -37,6 +37,11 @@ type DatabaseGrantSpec struct {
 	// MySQL-specific grants
 	// +optional
 	MySQL *MySQLGrantConfig `json:"mysql,omitempty"`
+
+	// DriftPolicy overrides the instance-level drift policy for this grant.
+	// If not specified, the instance's drift policy is used.
+	// +optional
+	DriftPolicy *DriftPolicy `json:"driftPolicy,omitempty"`
 }
 
 // DatabaseGrantStatus defines the observed state of DatabaseGrant.
@@ -53,6 +58,10 @@ type DatabaseGrantStatus struct {
 
 	// AppliedGrants contains information about applied grants
 	AppliedGrants *AppliedGrantsInfo `json:"appliedGrants,omitempty"`
+
+	// Drift contains drift detection status information
+	// +optional
+	Drift *DriftStatus `json:"drift,omitempty"`
 
 	// Conditions represent the latest available observations
 	// +optional

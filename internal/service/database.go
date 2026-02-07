@@ -94,6 +94,13 @@ func (s *DatabaseService) Close() error {
 	return nil
 }
 
+// Adapter returns the underlying database adapter.
+// This is useful for drift detection and other operations that need
+// direct adapter access.
+func (s *DatabaseService) Adapter() adapter.DatabaseAdapter {
+	return s.adapter
+}
+
 // Create creates a new database with the given spec.
 // If the database already exists, it returns success without error.
 // This method includes verification that the database accepts connections.

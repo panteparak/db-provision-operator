@@ -30,6 +30,7 @@ type (
 	GrantManager                 = types.GrantManager
 	BackupManager                = types.BackupManager
 	RestoreManager               = types.RestoreManager
+	ResourceDiscovery            = types.ResourceDiscovery
 	ConnectionConfig             = types.ConnectionConfig
 	CreateDatabaseOptions        = types.CreateDatabaseOptions
 	DropDatabaseOptions          = types.DropDatabaseOptions

@@ -348,6 +348,70 @@ var (
 		},
 		[]string{"restore", labelNamespace, "backup_ref", "target_instance", labelPhase},
 	)
+
+	// Drift detection metrics
+
+	// DriftDetected indicates if drift is detected for a resource (1) or not (0)
+	DriftDetected = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "drift_detected",
+			Help:      "Indicates if configuration drift is detected (1) or not (0)",
+		},
+		[]string{"resource_type", "name", labelNamespace},
+	)
+
+	// DriftCorrectionsTotal tracks total drift corrections performed
+	DriftCorrectionsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "drift_corrections_total",
+			Help:      "Total number of drift corrections performed",
+		},
+		[]string{"resource_type", labelStatus, labelNamespace},
+	)
+
+	// DriftDetectionsTotal tracks total drift detection checks
+	DriftDetectionsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "drift_detections_total",
+			Help:      "Total number of drift detection checks performed",
+		},
+		[]string{"resource_type", labelStatus, labelNamespace},
+	)
+
+	// Discovery metrics
+
+	// DiscoveredOrphans tracks the number of discovered unmanaged resources
+	DiscoveredOrphans = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "discovered_orphans",
+			Help:      "Number of discovered unmanaged database resources",
+		},
+		[]string{labelInstance, "resource_type", labelNamespace},
+	)
+
+	// DiscoveryScansTotal tracks total discovery scans performed
+	DiscoveryScansTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "discovery_scans_total",
+			Help:      "Total number of resource discovery scans",
+		},
+		[]string{labelInstance, labelStatus, labelNamespace},
+	)
+
+	// AdoptionsTotal tracks total resource adoptions
+	AdoptionsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "adoptions_total",
+			Help:      "Total number of resource adoptions",
+		},
+		[]string{"resource_type", labelStatus, labelNamespace},
+	)
 )
 
 func init() {
@@ -401,6 +465,16 @@ func init() {
 		BackupInfo,
 		ScheduleInfo,
 		RestoreInfo,
+
+		// Drift detection metrics
+		DriftDetected,
+		DriftCorrectionsTotal,
+		DriftDetectionsTotal,
+
+		// Discovery metrics
+		DiscoveredOrphans,
+		DiscoveryScansTotal,
+		AdoptionsTotal,
 	)
 }
 
@@ -663,6 +737,57 @@ func SetRestoreInfo(restore, namespace, backupRef, targetInstance, phase string)
 func DeleteRestoreInfo(restore, namespace string) {
 	RestoreInfo.DeletePartialMatch(prometheus.Labels{
 		"restore":      restore,
+		labelNamespace: namespace,
+	})
+}
+
+// Drift detection helper functions
+
+// SetDriftDetected sets whether drift is detected for a resource (1=detected, 0=no drift)
+func SetDriftDetected(resourceType, name, namespace string, detected bool) {
+	value := float64(0)
+	if detected {
+		value = 1
+	}
+	DriftDetected.WithLabelValues(resourceType, name, namespace).Set(value)
+}
+
+// RecordDriftCorrection records a drift correction attempt
+func RecordDriftCorrection(resourceType, namespace, status string) {
+	DriftCorrectionsTotal.WithLabelValues(resourceType, status, namespace).Inc()
+}
+
+// RecordDriftDetection records a drift detection check
+func RecordDriftDetection(resourceType, namespace, status string) {
+	DriftDetectionsTotal.WithLabelValues(resourceType, status, namespace).Inc()
+}
+
+// DeleteDriftMetrics removes drift metrics for a deleted resource
+func DeleteDriftMetrics(resourceType, name, namespace string) {
+	DriftDetected.DeleteLabelValues(resourceType, name, namespace)
+}
+
+// Discovery helper functions
+
+// SetDiscoveredOrphans sets the count of discovered orphan resources
+func SetDiscoveredOrphans(instance, resourceType, namespace string, count float64) {
+	DiscoveredOrphans.WithLabelValues(instance, resourceType, namespace).Set(count)
+}
+
+// RecordDiscoveryScan records a discovery scan attempt
+func RecordDiscoveryScan(instance, namespace, status string) {
+	DiscoveryScansTotal.WithLabelValues(instance, status, namespace).Inc()
+}
+
+// RecordAdoption records a resource adoption attempt
+func RecordAdoption(resourceType, namespace, status string) {
+	AdoptionsTotal.WithLabelValues(resourceType, status, namespace).Inc()
+}
+
+// DeleteDiscoveryMetrics removes discovery metrics for a deleted instance
+func DeleteDiscoveryMetrics(instance, namespace string) {
+	DiscoveredOrphans.DeletePartialMatch(prometheus.Labels{
+		labelInstance:  instance,
 		labelNamespace: namespace,
 	})
 }

@@ -489,6 +489,31 @@ type RestoreResult struct {
 	Warnings       []string
 }
 
+// ResourceDiscovery defines methods for discovering database resources.
+// This interface enables drift detection and discovery of unmanaged resources.
+// Each adapter implements this to list resources in a database-agnostic way,
+// filtering out system-level resources specific to each database engine.
+type ResourceDiscovery interface {
+	// ListDatabases returns all user-created databases, excluding system databases.
+	// System databases vary by engine:
+	// - PostgreSQL: postgres, template0, template1
+	// - MySQL: mysql, information_schema, performance_schema, sys
+	// - CockroachDB: system, defaultdb
+	ListDatabases(ctx context.Context) ([]string, error)
+
+	// ListUsers returns all user-created database users, excluding system users.
+	// System users vary by engine:
+	// - PostgreSQL: postgres, pg_* (internal roles)
+	// - MySQL: root, mysql.*, debian-sys-maint (on Debian/Ubuntu)
+	// - CockroachDB: root, node
+	ListUsers(ctx context.Context) ([]string, error)
+
+	// ListRoles returns all user-created roles, excluding system roles.
+	// For engines like MySQL that don't have native roles, this may return
+	// users with ROLE-like characteristics or an empty list.
+	ListRoles(ctx context.Context) ([]string, error)
+}
+
 // ConnectionConfig contains database connection configuration
 type ConnectionConfig struct {
 	Host     string

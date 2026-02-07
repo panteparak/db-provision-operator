@@ -88,6 +88,13 @@ func (s *InstanceService) Close() error {
 	return nil
 }
 
+// Adapter returns the underlying database adapter.
+// This is useful for operations that need direct adapter access,
+// such as resource discovery.
+func (s *InstanceService) Adapter() adapter.DatabaseAdapter {
+	return s.adapter
+}
+
 // HealthCheckResult contains the result of a health check.
 type HealthCheckResult struct {
 	Healthy      bool

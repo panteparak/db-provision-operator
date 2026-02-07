@@ -74,6 +74,31 @@ spec:
                 default: true
                 description: DeletionProtection prevents accidental deletion
                 type: boolean
+              driftPolicy:
+                description: |-
+                  DriftPolicy overrides the instance-level drift policy for this database.
+                  If not specified, the instance's drift policy is used.
+                properties:
+                  interval:
+                    default: 5m
+                    description: |-
+                      Interval specifies how often to check for drift (Go duration string)
+                      This is only meaningful when mode is "detect" or "correct"
+                    type: string
+                  mode:
+                    allOf:
+                    - enum:
+                      - ignore
+                      - detect
+                      - correct
+                    - enum:
+                      - ignore
+                      - detect
+                      - correct
+                    default: detect
+                    description: Mode determines how drift is handled
+                    type: string
+                type: object
               instanceRef:
                 description: InstanceRef references the DatabaseInstance to use
                 properties:
@@ -308,6 +333,47 @@ spec:
                     description: SizeBytes is the database size in bytes
                     format: int64
                     type: integer
+                type: object
+              drift:
+                description: Drift contains drift detection status information
+                properties:
+                  detected:
+                    description: Detected indicates if drift was detected
+                    type: boolean
+                  diffs:
+                    description: Diffs contains the specific differences found
+                    items:
+                      description: DriftDiff represents a single difference between
+                        desired and actual state.
+                      properties:
+                        actual:
+                          description: Actual is the actual value in the database
+                          type: string
+                        destructive:
+                          description: Destructive indicates if correcting this drift
+                            would be destructive
+                          type: boolean
+                        expected:
+                          description: Expected is the expected value from the CR
+                            spec
+                          type: string
+                        field:
+                          description: Field is the name of the field that differs
+                          type: string
+                        immutable:
+                          description: Immutable indicates if this field cannot be
+                            changed after creation
+                          type: boolean
+                      required:
+                      - actual
+                      - expected
+                      - field
+                      type: object
+                    type: array
+                  lastChecked:
+                    description: LastChecked is when drift was last checked
+                    format: date-time
+                    type: string
                 type: object
               message:
                 description: Message provides additional information about the current

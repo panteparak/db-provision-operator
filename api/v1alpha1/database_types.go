@@ -50,6 +50,11 @@ type DatabaseSpec struct {
 	// +kubebuilder:default=true
 	DeletionProtection bool `json:"deletionProtection,omitempty"`
 
+	// DriftPolicy overrides the instance-level drift policy for this database.
+	// If not specified, the instance's drift policy is used.
+	// +optional
+	DriftPolicy *DriftPolicy `json:"driftPolicy,omitempty"`
+
 	// PostgreSQL-specific configuration (required when instance engine is "postgres")
 	// +optional
 	Postgres *PostgresDatabaseConfig `json:"postgres,omitempty"`
@@ -81,6 +86,10 @@ type DatabaseStatus struct {
 	// MySQL contains MySQL-specific status information
 	// +optional
 	MySQL *MySQLDatabaseStatus `json:"mysql,omitempty"`
+
+	// Drift contains drift detection status information
+	// +optional
+	Drift *DriftStatus `json:"drift,omitempty"`
 
 	// Conditions represent the latest available observations
 	// +optional
