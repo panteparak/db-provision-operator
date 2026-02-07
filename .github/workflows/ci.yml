@@ -735,9 +735,9 @@ jobs:
       - name: Install k3d
         run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
 
-      # Start databases via Docker Compose (Makefile micro-step)
-      - name: Start databases
-        run: make e2e-db-up
+      # Start only the required database via Docker Compose (Makefile micro-step)
+      - name: Start database
+        run: make e2e-db-up E2E_DATABASE=${{ matrix.database }}
 
       # Create k3d cluster (Makefile micro-step)
       - name: Create k3d cluster

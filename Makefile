@@ -332,15 +332,29 @@ E2E_COCKROACHDB_PORT ?= 26257
 # MICRO-STEPS: Each can be called independently (by CI or locally)
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Map E2E_DATABASE to compose service names
+define get_compose_services
+$(if $(filter postgresql,$(1)),postgres,$(if $(filter cockroachdb,$(1)),cockroachdb cockroachdb-init,$(1)))
+endef
+
 .PHONY: e2e-db-up
-e2e-db-up: ## Start databases via Docker Compose with health checks
-	@echo "Starting databases..."
+e2e-db-up: ## Start database(s) via Docker Compose. Use E2E_DATABASE to select specific engine (postgresql|mysql|mariadb|cockroachdb)
+ifdef E2E_DATABASE
+	@echo "Starting $(E2E_DATABASE)..."
+	docker compose -f docker-compose.e2e.yml up -d --wait --wait-timeout 180 $(call get_compose_services,$(E2E_DATABASE))
+else
+	@echo "Starting all databases (use E2E_DATABASE=<engine> to select one)..."
 	docker compose -f docker-compose.e2e.yml up -d --wait --wait-timeout 180
-	@echo "All databases are healthy and ready"
+endif
+	@echo "Database(s) ready"
 
 .PHONY: e2e-db-down
-e2e-db-down: ## Stop databases and remove volumes
+e2e-db-down: ## Stop database(s) and remove volumes. Use E2E_DATABASE to select specific engine
+ifdef E2E_DATABASE
+	docker compose -f docker-compose.e2e.yml rm -fsv $(call get_compose_services,$(E2E_DATABASE))
+else
 	docker compose -f docker-compose.e2e.yml down -v
+endif
 
 .PHONY: e2e-cluster-create
 e2e-cluster-create: ## Create k3d cluster (idempotent)
@@ -411,8 +425,8 @@ e2e-local-run-tests: ## Run E2E tests for local setup (requires E2E_DATABASE)
 # ─────────────────────────────────────────────────────────────────────────────
 
 .PHONY: e2e-local-setup
-e2e-local-setup: ## Set up local E2E environment (DBs + k3d + operator)
-	$(MAKE) e2e-db-up
+e2e-local-setup: ## Set up local E2E environment (DB + k3d + operator). Use E2E_DATABASE for single DB or omit for all
+	$(MAKE) e2e-db-up $(if $(E2E_DATABASE),E2E_DATABASE=$(E2E_DATABASE),)
 	$(MAKE) e2e-cluster-create
 	$(MAKE) e2e-docker-build
 	$(MAKE) e2e-image-load
@@ -420,27 +434,32 @@ e2e-local-setup: ## Set up local E2E environment (DBs + k3d + operator)
 	$(MAKE) e2e-deploy-operator
 
 .PHONY: e2e-local-postgresql
-e2e-local-postgresql: e2e-local-setup ## Run PostgreSQL E2E tests (full setup + test)
+e2e-local-postgresql: ## Run PostgreSQL E2E tests (single DB setup + test)
+	$(MAKE) e2e-local-setup E2E_DATABASE=postgresql
 	$(MAKE) e2e-create-db-instance E2E_DATABASE=postgresql
 	$(MAKE) e2e-local-run-tests E2E_DATABASE=postgresql
 
 .PHONY: e2e-local-mysql
-e2e-local-mysql: e2e-local-setup ## Run MySQL E2E tests (full setup + test)
+e2e-local-mysql: ## Run MySQL E2E tests (single DB setup + test)
+	$(MAKE) e2e-local-setup E2E_DATABASE=mysql
 	$(MAKE) e2e-create-db-instance E2E_DATABASE=mysql
 	$(MAKE) e2e-local-run-tests E2E_DATABASE=mysql
 
 .PHONY: e2e-local-mariadb
-e2e-local-mariadb: e2e-local-setup ## Run MariaDB E2E tests (full setup + test)
+e2e-local-mariadb: ## Run MariaDB E2E tests (single DB setup + test)
+	$(MAKE) e2e-local-setup E2E_DATABASE=mariadb
 	$(MAKE) e2e-create-db-instance E2E_DATABASE=mariadb
 	$(MAKE) e2e-local-run-tests E2E_DATABASE=mariadb
 
 .PHONY: e2e-local-cockroachdb
-e2e-local-cockroachdb: e2e-local-setup ## Run CockroachDB E2E tests (full setup + test)
+e2e-local-cockroachdb: ## Run CockroachDB E2E tests (single DB setup + test)
+	$(MAKE) e2e-local-setup E2E_DATABASE=cockroachdb
 	$(MAKE) e2e-create-db-instance E2E_DATABASE=cockroachdb
 	$(MAKE) e2e-local-run-tests E2E_DATABASE=cockroachdb
 
 .PHONY: e2e-local-all
-e2e-local-all: e2e-local-setup ## Run all local E2E tests
+e2e-local-all: ## Run all local E2E tests (starts all DBs)
+	$(MAKE) e2e-local-setup
 	$(MAKE) e2e-create-db-instance E2E_DATABASE=postgresql
 	$(MAKE) e2e-local-run-tests E2E_DATABASE=postgresql
 	$(MAKE) e2e-create-db-instance E2E_DATABASE=mysql
@@ -451,9 +470,9 @@ e2e-local-all: e2e-local-setup ## Run all local E2E tests
 	$(MAKE) e2e-local-run-tests E2E_DATABASE=cockroachdb
 
 .PHONY: e2e-local-cleanup
-e2e-local-cleanup: ## Clean up local E2E environment
+e2e-local-cleanup: ## Clean up local E2E environment. Use E2E_DATABASE to cleanup specific DB only
 	$(MAKE) e2e-cluster-delete
-	$(MAKE) e2e-db-down
+	$(MAKE) e2e-db-down $(if $(E2E_DATABASE),E2E_DATABASE=$(E2E_DATABASE),)
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
