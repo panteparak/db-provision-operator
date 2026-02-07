@@ -99,7 +99,7 @@ func (a *Adapter) SetDefaultPrivileges(ctx context.Context, grantee string, opts
 }
 
 // GetGrants retrieves grants for a user or role in CockroachDB.
-// CockroachDB provides SHOW GRANTS which is more ergonomic than PostgreSQL's aclexplode().
+// Queries each database for grants to the specified grantee.
 func (a *Adapter) GetGrants(ctx context.Context, grantee string) ([]types.GrantInfo, error) {
 	pool, err := a.getPool()
 	if err != nil {
@@ -108,34 +108,55 @@ func (a *Adapter) GetGrants(ctx context.Context, grantee string) ([]types.GrantI
 
 	var grants []types.GrantInfo
 
-	// Query database-level grants using SHOW GRANTS
-	rows, err := pool.Query(ctx,
-		"SELECT database_name, privilege_type FROM crdb_internal.cluster_database_privileges WHERE grantee = $1",
-		grantee)
+	// First, get list of all databases
+	dbRows, err := pool.Query(ctx, "SELECT name FROM crdb_internal.databases WHERE name NOT IN ('system')")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get database grants: %w", err)
+		return nil, fmt.Errorf("failed to list databases: %w", err)
 	}
 
-	// Group privileges by database
-	dbPrivileges := make(map[string][]string)
-	for rows.Next() {
-		var dbName, privilege string
-		if err := rows.Scan(&dbName, &privilege); err != nil {
-			rows.Close()
+	var databases []string
+	for dbRows.Next() {
+		var dbName string
+		if err := dbRows.Scan(&dbName); err != nil {
+			dbRows.Close()
 			return nil, err
 		}
-		dbPrivileges[dbName] = append(dbPrivileges[dbName], privilege)
+		databases = append(databases, dbName)
 	}
-	rows.Close()
+	dbRows.Close()
 
-	for dbName, privs := range dbPrivileges {
-		grants = append(grants, types.GrantInfo{
-			Grantee:    grantee,
-			Database:   dbName,
-			ObjectType: "database",
-			ObjectName: dbName,
-			Privileges: privs,
-		})
+	// For each database, check grants for this grantee
+	for _, dbName := range databases {
+		query := fmt.Sprintf("SHOW GRANTS ON DATABASE %s", escapeIdentifier(dbName))
+		rows, err := pool.Query(ctx, query)
+		if err != nil {
+			continue // Skip databases we can't access
+		}
+
+		var privileges []string
+		for rows.Next() {
+			// SHOW GRANTS ON DATABASE returns: database_name, grantee, privilege_type, is_grantable
+			var dbNameResult, granteeResult, privilege string
+			var isGrantable bool
+			if err := rows.Scan(&dbNameResult, &granteeResult, &privilege, &isGrantable); err != nil {
+				rows.Close()
+				continue
+			}
+			if granteeResult == grantee {
+				privileges = append(privileges, privilege)
+			}
+		}
+		rows.Close()
+
+		if len(privileges) > 0 {
+			grants = append(grants, types.GrantInfo{
+				Grantee:    grantee,
+				Database:   dbName,
+				ObjectType: "database",
+				ObjectName: dbName,
+				Privileges: privileges,
+			})
+		}
 	}
 
 	return grants, nil
@@ -143,12 +164,33 @@ func (a *Adapter) GetGrants(ctx context.Context, grantee string) ([]types.GrantI
 
 // grantPrivileges grants privileges for a single grant option.
 func (a *Adapter) grantPrivileges(ctx context.Context, grantee string, opt types.GrantOptions) error {
+	pool, err := a.getPool()
+	if err != nil {
+		return err
+	}
+
 	database := opt.Database
 	if database == "" {
 		database = a.config.Database
 	}
 
 	var queries []string
+
+	// Handle database-level grants when no schema/table/sequence/function is specified
+	if opt.Schema == "" && len(opt.Tables) == 0 && len(opt.Sequences) == 0 && len(opt.Functions) == 0 && len(opt.Privileges) > 0 {
+		q := fmt.Sprintf("GRANT %s ON DATABASE %s TO %s",
+			strings.Join(opt.Privileges, ", "),
+			escapeIdentifier(database),
+			escapeIdentifier(grantee))
+		if opt.WithGrantOption {
+			q += " WITH GRANT OPTION"
+		}
+		// Database-level grants are executed on the default database
+		if _, err := pool.Exec(ctx, q); err != nil {
+			return fmt.Errorf("failed to grant database privileges: %w", err)
+		}
+		return nil
+	}
 
 	// Handle ALL TABLES IN SCHEMA or schema-level grants
 	if opt.Schema != "" && len(opt.Tables) == 0 && len(opt.Sequences) == 0 && len(opt.Functions) == 0 {
@@ -246,12 +288,30 @@ func (a *Adapter) grantPrivileges(ctx context.Context, grantee string, opt types
 
 // revokePrivileges revokes privileges for a single grant option.
 func (a *Adapter) revokePrivileges(ctx context.Context, grantee string, opt types.GrantOptions) error {
+	pool, err := a.getPool()
+	if err != nil {
+		return err
+	}
+
 	database := opt.Database
 	if database == "" {
 		database = a.config.Database
 	}
 
 	var queries []string
+
+	// Handle database-level revokes when no schema/table/sequence/function is specified
+	if opt.Schema == "" && len(opt.Tables) == 0 && len(opt.Sequences) == 0 && len(opt.Functions) == 0 && len(opt.Privileges) > 0 {
+		q := fmt.Sprintf("REVOKE %s ON DATABASE %s FROM %s",
+			strings.Join(opt.Privileges, ", "),
+			escapeIdentifier(database),
+			escapeIdentifier(grantee))
+		// Database-level revokes are executed on the default database
+		if _, err := pool.Exec(ctx, q); err != nil {
+			return fmt.Errorf("failed to revoke database privileges: %w", err)
+		}
+		return nil
+	}
 
 	// Handle ALL TABLES IN SCHEMA
 	if opt.Schema != "" && len(opt.Tables) == 0 {

@@ -71,6 +71,14 @@ func (a *Adapter) CreateUser(ctx context.Context, opts types.CreateUserOptions) 
 		}
 	}
 
+	// Grant role memberships (CockroachDB doesn't support IN ROLE in CREATE ROLE)
+	for _, role := range opts.InRoles {
+		grantQuery := fmt.Sprintf("GRANT %s TO %s", escapeIdentifier(role), escapeIdentifier(opts.Username))
+		if _, err := pool.Exec(ctx, grantQuery); err != nil {
+			return fmt.Errorf("failed to grant role %s to user %s: %w", role, opts.Username, err)
+		}
+	}
+
 	// Set configuration parameters if any
 	for param, value := range opts.ConfigParams {
 		query := fmt.Sprintf("ALTER ROLE %s SET %s = %s",
@@ -127,13 +135,8 @@ func (a *Adapter) buildCreateUserQuery(opts types.CreateUserOptions) (string, bo
 		roleOpts = append(roleOpts, fmt.Sprintf("VALID UNTIL %s", escapeLiteral(opts.ValidUntil)))
 	}
 
-	if len(opts.InRoles) > 0 {
-		var roles []string
-		for _, r := range opts.InRoles {
-			roles = append(roles, escapeIdentifier(r))
-		}
-		roleOpts = append(roleOpts, fmt.Sprintf("IN ROLE %s", strings.Join(roles, ", ")))
-	}
+	// Note: CockroachDB does NOT support IN ROLE in CREATE ROLE statements.
+	// Role membership is handled separately via GRANT after user creation.
 
 	if len(roleOpts) > 0 {
 		sb.WriteString(" WITH ")
@@ -155,13 +158,38 @@ func isInsecureModeError(err error) bool {
 }
 
 // DropUser drops an existing CockroachDB user.
-// Follows the safe cleanup pattern: REASSIGN OWNED BY + DROP OWNED BY before DROP ROLE.
+// Follows the safe cleanup pattern:
+//  1. Revoke all database-level grants (CockroachDB requires this explicitly)
+//  2. REASSIGN OWNED BY + DROP OWNED BY
+//  3. DROP ROLE
+//
 // This ensures all objects owned by the user are transferred to CURRENT_USER
 // and all privileges are revoked before the role is dropped.
 func (a *Adapter) DropUser(ctx context.Context, username string) error {
 	pool, err := a.getPool()
 	if err != nil {
 		return err
+	}
+
+	// First, revoke all database-level grants for this user
+	// CockroachDB's DROP OWNED BY doesn't handle database grants like PostgreSQL does
+	// Get list of all databases and revoke grants from each
+	dbRows, err := pool.Query(ctx, "SELECT name FROM crdb_internal.databases WHERE name NOT IN ('system')")
+	if err == nil {
+		var databases []string
+		for dbRows.Next() {
+			var dbName string
+			if err := dbRows.Scan(&dbName); err == nil {
+				databases = append(databases, dbName)
+			}
+		}
+		dbRows.Close()
+
+		// Revoke grants from each database
+		for _, dbName := range databases {
+			_, _ = pool.Exec(ctx, fmt.Sprintf("REVOKE ALL ON DATABASE %s FROM %s",
+				escapeIdentifier(dbName), escapeIdentifier(username)))
+		}
 	}
 
 	// Reassign owned objects to current user, then drop remaining owned objects

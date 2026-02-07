@@ -76,22 +76,9 @@ func (a *Adapter) DropDatabase(ctx context.Context, name string, opts types.Drop
 		return err
 	}
 
-	if opts.Force {
-		// CockroachDB: cancel active sessions connected to the target database.
-		// We query crdb_internal.cluster_sessions for sessions on this database.
-		rows, err := pool.Query(ctx,
-			"SELECT session_id FROM crdb_internal.cluster_sessions WHERE active_queries != '' AND session_id != crdb_internal.node_id()::STRING",
-		)
-		if err == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var sessionID string
-				if err := rows.Scan(&sessionID); err == nil {
-					_, _ = pool.Exec(ctx, fmt.Sprintf("CANCEL SESSION '%s'", sessionID))
-				}
-			}
-		}
-	}
+	// Note: CockroachDB's DROP DATABASE ... CASCADE handles active connections gracefully.
+	// Unlike PostgreSQL, we don't need to explicitly terminate sessions first.
+	// The Force option is honored by using CASCADE which handles all dependencies.
 
 	query := fmt.Sprintf("DROP DATABASE IF EXISTS %s CASCADE", escapeIdentifier(name))
 	_, err = pool.Exec(ctx, query)

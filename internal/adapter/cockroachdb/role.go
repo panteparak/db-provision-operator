@@ -64,16 +64,9 @@ func (a *Adapter) CreateRole(ctx context.Context, opts types.CreateRoleOptions) 
 		roleOpts = append(roleOpts, "NOCREATEROLE")
 	}
 
-	// Note: CockroachDB does NOT support INHERIT/NOINHERIT
+	// Note: CockroachDB does NOT support INHERIT/NOINHERIT or IN ROLE in CREATE ROLE
 	// The Inherit field is silently ignored for CockroachDB compatibility
-
-	if len(opts.InRoles) > 0 {
-		var roles []string
-		for _, r := range opts.InRoles {
-			roles = append(roles, escapeIdentifier(r))
-		}
-		roleOpts = append(roleOpts, fmt.Sprintf("IN ROLE %s", strings.Join(roles, ", ")))
-	}
+	// Role membership is handled via GRANT after role creation
 
 	if len(roleOpts) > 0 {
 		sb.WriteString(" WITH ")
@@ -83,6 +76,14 @@ func (a *Adapter) CreateRole(ctx context.Context, opts types.CreateRoleOptions) 
 	_, err = pool.Exec(ctx, sb.String())
 	if err != nil {
 		return fmt.Errorf("failed to create role %s: %w", opts.RoleName, err)
+	}
+
+	// Grant role memberships (CockroachDB doesn't support IN ROLE in CREATE ROLE)
+	for _, role := range opts.InRoles {
+		grantQuery := fmt.Sprintf("GRANT %s TO %s", escapeIdentifier(role), escapeIdentifier(opts.RoleName))
+		if _, err := pool.Exec(ctx, grantQuery); err != nil {
+			return fmt.Errorf("failed to grant role %s to role %s: %w", role, opts.RoleName, err)
+		}
 	}
 
 	// Apply grants if specified
