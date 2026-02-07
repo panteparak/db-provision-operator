@@ -89,6 +89,8 @@ func getEngineType(database string) dbopsv1alpha1.EngineType {
 		return dbopsv1alpha1.EngineTypeMySQL
 	case "mariadb":
 		return dbopsv1alpha1.EngineTypeMariaDB
+	case "cockroachdb":
+		return dbopsv1alpha1.EngineTypeCockroachDB
 	default:
 		return dbopsv1alpha1.EngineTypePostgres
 	}
@@ -122,6 +124,11 @@ var _ = BeforeSuite(func() {
 	superPassword := "superuser_password123"
 	if engine == "mysql" || engine == "mariadb" {
 		superUser = "root"
+	} else if engine == "cockroachdb" {
+		// CockroachDB: use root user in insecure mode (no password)
+		// This avoids TLS certificate complexity in tests
+		superUser = "root"
+		superPassword = ""
 	}
 
 	dbContainer, err = testutil.StartDatabaseContainer(ctx, testutil.DatabaseContainerConfig{
@@ -139,10 +146,18 @@ var _ = BeforeSuite(func() {
 		Password: "admin_password123",
 	}
 
+	// In CockroachDB insecure mode, passwords are not supported
+	if engine == "cockroachdb" {
+		adminCfg.Password = ""
+	}
+
 	GinkgoWriter.Printf("Creating least-privilege admin account for %s...\n", engine)
-	if engine == "postgresql" || engine == "postgres" {
+	switch engine {
+	case "postgresql", "postgres":
 		err = dbContainer.SetupPostgresAdminAccount(ctx, adminCfg)
-	} else {
+	case "cockroachdb":
+		err = dbContainer.SetupCockroachDBAdminAccount(ctx, adminCfg)
+	default:
 		// MySQL and MariaDB use the same setup
 		err = dbContainer.SetupMySQLAdminAccount(ctx, adminCfg)
 	}

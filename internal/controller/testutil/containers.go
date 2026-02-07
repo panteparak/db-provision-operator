@@ -347,6 +347,51 @@ func (dc *DatabaseContainer) SetupPostgresAdminAccount(ctx context.Context, cfg 
 	return nil
 }
 
+// SetupCockroachDBAdminAccount creates a least-privilege admin account for CockroachDB
+// and updates the container's credentials to use this account
+func (dc *DatabaseContainer) SetupCockroachDBAdminAccount(ctx context.Context, cfg AdminAccountConfig) error {
+	dc.mu.Lock()
+	defer dc.mu.Unlock()
+
+	// Wait for database to be ready with retry logic
+	db, err := dc.waitForDatabaseReadyUnlocked(ctx, 30, 500*time.Millisecond)
+	if err != nil {
+		return fmt.Errorf("failed to connect to cockroachdb: %w", err)
+	}
+	defer db.Close()
+
+	// Create least-privilege admin role for CockroachDB
+	// CockroachDB doesn't have pg_signal_backend or pg_read_all_data roles
+	// In insecure mode, passwords are not supported, so we skip PASSWORD if empty
+	var createRoleStmt string
+	if cfg.Password != "" {
+		createRoleStmt = fmt.Sprintf(`CREATE ROLE %s WITH LOGIN CREATEDB CREATEROLE PASSWORD '%s'`,
+			cfg.Username, cfg.Password)
+	} else {
+		// In insecure mode, CockroachDB doesn't support passwords
+		createRoleStmt = fmt.Sprintf(`CREATE ROLE %s WITH LOGIN CREATEDB CREATEROLE`,
+			cfg.Username)
+	}
+
+	statements := []string{
+		createRoleStmt,
+		// Grant admin role to allow managing other users
+		fmt.Sprintf(`GRANT admin TO %s`, cfg.Username),
+	}
+
+	for _, stmt := range statements {
+		if _, err := db.ExecContext(ctx, stmt); err != nil {
+			return fmt.Errorf("failed to execute statement %q: %w", stmt, err)
+		}
+	}
+
+	// Update container credentials to use the new admin account
+	dc.user = cfg.Username
+	dc.password = cfg.Password
+
+	return nil
+}
+
 // SetupMySQLAdminAccount creates a least-privilege admin account for MySQL/MariaDB
 // and updates the container's credentials to use this account
 func (dc *DatabaseContainer) SetupMySQLAdminAccount(ctx context.Context, cfg AdminAccountConfig) error {
