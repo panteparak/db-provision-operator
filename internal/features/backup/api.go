@@ -83,3 +83,25 @@ type Status struct {
 	// CompletedAt is when the backup completed.
 	CompletedAt *time.Time
 }
+
+// RepositoryInterface defines the interface for backup repository operations.
+// This interface enables dependency injection and testing with mocks.
+type RepositoryInterface interface {
+	// ExecuteBackup performs the actual backup operation.
+	ExecuteBackup(ctx context.Context, backup *dbopsv1alpha1.DatabaseBackup) (*BackupExecutionResult, error)
+
+	// DeleteBackup removes a backup file from storage.
+	DeleteBackup(ctx context.Context, backup *dbopsv1alpha1.DatabaseBackup) error
+
+	// GetDatabase retrieves the Database referenced by the backup.
+	GetDatabase(ctx context.Context, backup *dbopsv1alpha1.DatabaseBackup) (*dbopsv1alpha1.Database, error)
+
+	// GetInstance retrieves the DatabaseInstance for a database.
+	GetInstance(ctx context.Context, database *dbopsv1alpha1.Database) (*dbopsv1alpha1.DatabaseInstance, error)
+
+	// GetEngine returns the database engine type for a backup.
+	GetEngine(ctx context.Context, backup *dbopsv1alpha1.DatabaseBackup) (string, error)
+}
+
+// Ensure Repository implements RepositoryInterface.
+var _ RepositoryInterface = (*Repository)(nil)

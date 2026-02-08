@@ -68,6 +68,7 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 	// Instance module (foundation - other modules depend on instances)
 	instanceMod, err := instance.NewModule(instance.Config{
 		Manager:       mgr,
+		Recorder:      mgr.GetEventRecorderFor("databaseinstance-controller"),
 		EventBus:      eventBus,
 		SecretManager: secretManager,
 	})
@@ -91,6 +92,7 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 	userMod, err := user.NewModule(user.ModuleConfig{
 		Client:        mgr.GetClient(),
 		Scheme:        mgr.GetScheme(),
+		Recorder:      mgr.GetEventRecorderFor("databaseuser-controller"),
 		EventBus:      eventBus,
 		SecretManager: secretManager,
 		Logger:        logger,
@@ -104,6 +106,7 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 	roleMod, err := role.NewModule(role.ModuleConfig{
 		Client:        mgr.GetClient(),
 		Scheme:        mgr.GetScheme(),
+		Recorder:      mgr.GetEventRecorderFor("databaserole-controller"),
 		EventBus:      eventBus,
 		SecretManager: secretManager,
 		Logger:        logger,
@@ -117,6 +120,7 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 	grantMod, err := grant.NewModule(grant.ModuleConfig{
 		Client:        mgr.GetClient(),
 		Scheme:        mgr.GetScheme(),
+		Recorder:      mgr.GetEventRecorderFor("databasegrant-controller"),
 		EventBus:      eventBus,
 		SecretManager: secretManager,
 		Logger:        logger,
@@ -130,6 +134,7 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 	backupMod, err := backup.NewModule(backup.ModuleConfig{
 		Client:        mgr.GetClient(),
 		Scheme:        mgr.GetScheme(),
+		Recorder:      mgr.GetEventRecorderFor("databasebackup-controller"),
 		EventBus:      eventBus,
 		SecretManager: secretManager,
 		Logger:        logger,
@@ -143,6 +148,7 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 	backupScheduleMod, err := backupschedule.NewModule(backupschedule.ModuleConfig{
 		Client:        mgr.GetClient(),
 		Scheme:        mgr.GetScheme(),
+		Recorder:      mgr.GetEventRecorderFor("databasebackupschedule-controller"),
 		EventBus:      eventBus,
 		SecretManager: secretManager,
 		Logger:        logger,
@@ -156,6 +162,7 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 	restoreMod, err := restore.NewModule(restore.ModuleConfig{
 		Client:        mgr.GetClient(),
 		Scheme:        mgr.GetScheme(),
+		Recorder:      mgr.GetEventRecorderFor("databaserestore-controller"),
 		EventBus:      eventBus,
 		SecretManager: secretManager,
 		Logger:        logger,

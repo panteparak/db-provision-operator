@@ -57,6 +57,10 @@ type DatabaseInstanceSpec struct {
 	// MySQL-specific options (only valid when engine is "mysql")
 	// +optional
 	MySQL *MySQLInstanceConfig `json:"mysql,omitempty"`
+
+	// DeletionProtection prevents accidental deletion
+	// +optional
+	DeletionProtection bool `json:"deletionProtection,omitempty"`
 }
 
 // ConnectionConfig defines the database connection settings

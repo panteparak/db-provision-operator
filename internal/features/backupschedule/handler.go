@@ -33,7 +33,7 @@ import (
 
 // Handler contains the business logic for backup schedule operations.
 type Handler struct {
-	repo       *Repository
+	repo       RepositoryInterface
 	eventBus   eventbus.Bus
 	logger     logr.Logger
 	cronParser cron.Parser
@@ -41,7 +41,7 @@ type Handler struct {
 
 // HandlerConfig holds dependencies for the handler.
 type HandlerConfig struct {
-	Repository *Repository
+	Repository RepositoryInterface
 	EventBus   eventbus.Bus
 	Logger     logr.Logger
 }
@@ -415,6 +415,12 @@ func (h *Handler) UpdateInfoMetric(schedule *dbopsv1alpha1.DatabaseBackupSchedul
 // CleanupInfoMetric removes the info metric for a deleted schedule.
 func (h *Handler) CleanupInfoMetric(schedule *dbopsv1alpha1.DatabaseBackupSchedule) {
 	metrics.DeleteScheduleInfo(schedule.Name, schedule.Namespace)
+}
+
+// ListBackupsForSchedule lists all backups created by this schedule.
+// This method is a wrapper around the repository method for use by the controller.
+func (h *Handler) ListBackupsForSchedule(ctx context.Context, schedule *dbopsv1alpha1.DatabaseBackupSchedule) ([]dbopsv1alpha1.DatabaseBackup, error) {
+	return h.repo.ListBackupsForSchedule(ctx, schedule)
 }
 
 // Ensure Handler implements API interface.

@@ -36,7 +36,7 @@ import (
 
 // Handler contains the business logic for restore operations.
 type Handler struct {
-	repo          *Repository
+	repo          RepositoryInterface
 	secretManager *secret.Manager
 	eventBus      eventbus.Bus
 	logger        logr.Logger
@@ -45,7 +45,7 @@ type Handler struct {
 
 // HandlerConfig holds dependencies for the handler.
 type HandlerConfig struct {
-	Repository    *Repository
+	Repository    RepositoryInterface
 	SecretManager *secret.Manager
 	EventBus      eventbus.Bus
 	Logger        logr.Logger
@@ -484,6 +484,12 @@ func (h *Handler) UpdateInfoMetric(restore *dbopsv1alpha1.DatabaseRestore) {
 // CleanupInfoMetric removes the info metric for a deleted restore.
 func (h *Handler) CleanupInfoMetric(restore *dbopsv1alpha1.DatabaseRestore) {
 	metrics.DeleteRestoreInfo(restore.Name, restore.Namespace)
+}
+
+// GetBackup retrieves the referenced DatabaseBackup.
+// This method is a wrapper around the repository method for use by the controller.
+func (h *Handler) GetBackup(ctx context.Context, namespace string, backupRef *dbopsv1alpha1.BackupReference) (*dbopsv1alpha1.DatabaseBackup, error) {
+	return h.repo.GetBackup(ctx, namespace, backupRef)
 }
 
 // Ensure Handler implements API interface.

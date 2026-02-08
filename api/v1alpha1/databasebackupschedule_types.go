@@ -57,6 +57,10 @@ type DatabaseBackupScheduleSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=3
 	FailedBackupsHistoryLimit int32 `json:"failedBackupsHistoryLimit,omitempty"`
+
+	// DeletionProtection prevents accidental deletion
+	// +optional
+	DeletionProtection bool `json:"deletionProtection,omitempty"`
 }
 
 // BackupTemplateSpec defines the template for created backups

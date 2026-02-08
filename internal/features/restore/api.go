@@ -19,9 +19,12 @@ package restore
 
 import (
 	"context"
+	"io"
 	"time"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	adapterpkg "github.com/db-provision-operator/internal/adapter/types"
+	"github.com/db-provision-operator/internal/storage"
 )
 
 // API defines the public interface for the restore module.
@@ -69,3 +72,28 @@ type ValidationError struct {
 func (e *ValidationError) Error() string {
 	return e.Field + ": " + e.Message
 }
+
+// RepositoryInterface defines the repository operations for restore.
+// This interface allows for mock implementations in tests.
+type RepositoryInterface interface {
+	// GetBackup retrieves the referenced DatabaseBackup.
+	GetBackup(ctx context.Context, namespace string, backupRef *dbopsv1alpha1.BackupReference) (*dbopsv1alpha1.DatabaseBackup, error)
+
+	// GetDatabase retrieves the referenced Database.
+	GetDatabase(ctx context.Context, namespace string, dbRef *dbopsv1alpha1.DatabaseReference) (*dbopsv1alpha1.Database, error)
+
+	// GetInstance retrieves the referenced DatabaseInstance.
+	GetInstance(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference) (*dbopsv1alpha1.DatabaseInstance, error)
+
+	// CreateRestoreReader creates a reader for the backup data.
+	CreateRestoreReader(ctx context.Context, cfg *storage.RestoreReaderConfig) (io.ReadCloser, error)
+
+	// ExecuteRestore performs the actual database restore operation.
+	ExecuteRestore(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error)
+
+	// GetEngine returns the database engine type for a given instance.
+	GetEngine(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference) (string, error)
+}
+
+// Ensure Repository implements RepositoryInterface.
+var _ RepositoryInterface = (*Repository)(nil)

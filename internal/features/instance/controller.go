@@ -18,11 +18,14 @@ package instance
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -45,26 +48,29 @@ const (
 // Controller handles K8s reconciliation for DatabaseInstance resources.
 type Controller struct {
 	client.Client
-	Scheme  *runtime.Scheme
-	handler *Handler
-	logger  logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+	handler  *Handler
+	logger   logr.Logger
 }
 
 // ControllerConfig holds dependencies for the controller.
 type ControllerConfig struct {
-	Client  client.Client
-	Scheme  *runtime.Scheme
-	Handler *Handler
-	Logger  logr.Logger
+	Client   client.Client
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+	Handler  *Handler
+	Logger   logr.Logger
 }
 
 // NewController creates a new instance controller.
 func NewController(cfg ControllerConfig) *Controller {
 	return &Controller{
-		Client:  cfg.Client,
-		Scheme:  cfg.Scheme,
-		handler: cfg.Handler,
-		logger:  cfg.Logger,
+		Client:   cfg.Client,
+		Scheme:   cfg.Scheme,
+		Recorder: cfg.Recorder,
+		handler:  cfg.Handler,
+		logger:   cfg.Logger,
 	}
 }
 
@@ -113,6 +119,7 @@ func (c *Controller) reconcile(ctx context.Context, instance *dbopsv1alpha1.Data
 	result, err := c.handler.Connect(ctx, instance.Name, instance.Namespace)
 	if err != nil {
 		c.handler.HandleDisconnect(ctx, instance, err.Error())
+		c.Recorder.Eventf(instance, corev1.EventTypeWarning, "ConnectionFailed", "Failed to connect to database: %v", err)
 		return c.handleError(ctx, instance, err, "connect")
 	}
 
@@ -142,6 +149,12 @@ func (c *Controller) reconcile(ctx context.Context, instance *dbopsv1alpha1.Data
 	// Update info metric for Grafana table views
 	c.handler.UpdateInfoMetric(instance)
 
+	// Only record event on initial connection or version change
+	if instance.Status.ObservedGeneration != instance.Generation {
+		c.Recorder.Eventf(instance, corev1.EventTypeNormal, "Connected", "Successfully connected to %s %s", instance.Spec.Engine, result.Version)
+		instance.Status.ObservedGeneration = instance.Generation
+	}
+
 	log.Info("Successfully reconciled DatabaseInstance",
 		"engine", instance.Spec.Engine,
 		"version", result.Version)
@@ -165,6 +178,19 @@ func (c *Controller) handleDeletion(ctx context.Context, instance *dbopsv1alpha1
 
 	log.Info("Handling deletion of DatabaseInstance")
 
+	// Check deletion protection
+	if c.hasDeletionProtection(instance) && !util.HasForceDeleteAnnotation(instance) {
+		c.Recorder.Eventf(instance, corev1.EventTypeWarning, "DeletionBlocked", "Deletion blocked by deletion protection")
+		instance.Status.Phase = dbopsv1alpha1.PhaseFailed
+		instance.Status.Message = "Deletion blocked by deletion protection"
+		util.SetReadyCondition(&instance.Status.Conditions, metav1.ConditionFalse,
+			util.ReasonDeletionProtected, "Deletion protection is enabled")
+		if err := c.Status().Update(ctx, instance); err != nil {
+			log.Error(err, "Failed to update status")
+		}
+		return ctrl.Result{}, fmt.Errorf("deletion protection enabled")
+	}
+
 	// Clean up metrics
 	c.handler.CleanupMetrics(instance)
 
@@ -183,6 +209,7 @@ func (c *Controller) handleError(ctx context.Context, instance *dbopsv1alpha1.Da
 	log := logf.FromContext(ctx).WithValues("instance", instance.Name, "namespace", instance.Namespace)
 
 	log.Error(err, "Reconciliation failed", "operation", operation)
+	c.Recorder.Eventf(instance, corev1.EventTypeWarning, "ReconcileFailed", "Failed to %s: %v", operation, err)
 
 	instance.Status.Phase = dbopsv1alpha1.PhaseFailed
 	instance.Status.Message = err.Error()
@@ -213,4 +240,9 @@ func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
 		For(&dbopsv1alpha1.DatabaseInstance{}).
 		Named("databaseinstance").
 		Complete(c)
+}
+
+// hasDeletionProtection checks if the instance has deletion protection enabled.
+func (c *Controller) hasDeletionProtection(instance *dbopsv1alpha1.DatabaseInstance) bool {
+	return instance.Spec.DeletionProtection
 }

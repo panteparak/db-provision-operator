@@ -22,9 +22,11 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -44,26 +46,29 @@ const (
 // Controller handles K8s reconciliation for DatabaseBackup resources.
 type Controller struct {
 	client.Client
-	Scheme  *runtime.Scheme
-	handler *Handler
-	logger  logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+	handler  *Handler
+	logger   logr.Logger
 }
 
 // ControllerConfig holds dependencies for the controller.
 type ControllerConfig struct {
-	Client  client.Client
-	Scheme  *runtime.Scheme
-	Handler *Handler
-	Logger  logr.Logger
+	Client   client.Client
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+	Handler  *Handler
+	Logger   logr.Logger
 }
 
 // NewController creates a new backup controller.
 func NewController(cfg ControllerConfig) *Controller {
 	return &Controller{
-		Client:  cfg.Client,
-		Scheme:  cfg.Scheme,
-		handler: cfg.Handler,
-		logger:  cfg.Logger,
+		Client:   cfg.Client,
+		Scheme:   cfg.Scheme,
+		Recorder: cfg.Recorder,
+		handler:  cfg.Handler,
+		logger:   cfg.Logger,
 	}
 }
 
@@ -133,7 +138,7 @@ func (c *Controller) reconcile(ctx context.Context, backup *dbopsv1alpha1.Databa
 	}
 
 	// Check if database exists and is ready
-	database, err := c.handler.repo.GetDatabase(ctx, backup)
+	database, err := c.handler.GetDatabase(ctx, backup)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return c.handleError(ctx, backup, fmt.Errorf("database %s not found", backup.Spec.DatabaseRef.Name), "DatabaseNotFound")
@@ -146,7 +151,7 @@ func (c *Controller) reconcile(ctx context.Context, backup *dbopsv1alpha1.Databa
 	}
 
 	// Check if instance is ready
-	instance, err := c.handler.repo.GetInstance(ctx, database)
+	instance, err := c.handler.GetInstance(ctx, database)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return c.handleError(ctx, backup, fmt.Errorf("instance %s not found", database.Spec.InstanceRef.Name), "InstanceNotFound")
@@ -168,6 +173,7 @@ func (c *Controller) reconcile(ctx context.Context, backup *dbopsv1alpha1.Databa
 	backup.Status.Phase = dbopsv1alpha1.PhaseRunning
 	backup.Status.Message = "Backup in progress"
 	backup.Status.StartedAt = &now
+	c.Recorder.Eventf(backup, corev1.EventTypeNormal, "Started", "Backup started for database %s", database.Spec.Name)
 	backup.Status.Source = &dbopsv1alpha1.BackupSourceInfo{
 		Instance:  instance.Name,
 		Database:  database.Spec.Name,
@@ -219,6 +225,8 @@ func (c *Controller) reconcile(ctx context.Context, backup *dbopsv1alpha1.Databa
 
 	// Update info metric for Grafana table views
 	c.handler.UpdateInfoMetric(backup)
+
+	c.Recorder.Eventf(backup, corev1.EventTypeNormal, "Completed", "Backup completed successfully, size: %d bytes", result.SizeBytes)
 
 	log.Info("DatabaseBackup completed successfully",
 		"path", result.Path,
@@ -296,6 +304,7 @@ func (c *Controller) handleError(ctx context.Context, backup *dbopsv1alpha1.Data
 	log := logf.FromContext(ctx).WithValues("backup", backup.Name, "namespace", backup.Namespace)
 
 	log.Error(err, "Reconciliation failed", "operation", operation)
+	c.Recorder.Eventf(backup, corev1.EventTypeWarning, "Failed", "Backup failed to %s: %v", operation, err)
 
 	backup.Status.Phase = dbopsv1alpha1.PhaseFailed
 	backup.Status.Message = fmt.Sprintf("Failed to %s: %v", operation, err)

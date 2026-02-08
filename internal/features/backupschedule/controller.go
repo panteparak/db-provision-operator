@@ -22,9 +22,11 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -50,26 +52,29 @@ const (
 // Controller handles K8s reconciliation for DatabaseBackupSchedule resources.
 type Controller struct {
 	client.Client
-	Scheme  *runtime.Scheme
-	handler *Handler
-	logger  logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+	handler  *Handler
+	logger   logr.Logger
 }
 
 // ControllerConfig holds dependencies for the controller.
 type ControllerConfig struct {
-	Client  client.Client
-	Scheme  *runtime.Scheme
-	Handler *Handler
-	Logger  logr.Logger
+	Client   client.Client
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+	Handler  *Handler
+	Logger   logr.Logger
 }
 
 // NewController creates a new backupschedule controller.
 func NewController(cfg ControllerConfig) *Controller {
 	return &Controller{
-		Client:  cfg.Client,
-		Scheme:  cfg.Scheme,
-		handler: cfg.Handler,
-		logger:  cfg.Logger,
+		Client:   cfg.Client,
+		Scheme:   cfg.Scheme,
+		Recorder: cfg.Recorder,
+		handler:  cfg.Handler,
+		logger:   cfg.Logger,
 	}
 }
 
@@ -174,12 +179,13 @@ func (c *Controller) reconcile(ctx context.Context, schedule *dbopsv1alpha1.Data
 			}
 			schedule.Status.Statistics.TotalBackups++
 
+			c.Recorder.Eventf(schedule, corev1.EventTypeNormal, "BackupTriggered", "Scheduled backup %s triggered", result.BackupName)
 			log.Info("Triggered scheduled backup", "backup", result.BackupName)
 		}
 	}
 
 	// Get all backups for this schedule
-	backups, err := c.handler.repo.ListBackupsForSchedule(ctx, schedule)
+	backups, err := c.handler.ListBackupsForSchedule(ctx, schedule)
 	if err != nil {
 		log.Error(err, "Failed to list backups for schedule")
 	} else {
@@ -232,6 +238,11 @@ func (c *Controller) reconcile(ctx context.Context, schedule *dbopsv1alpha1.Data
 func (c *Controller) handlePaused(ctx context.Context, schedule *dbopsv1alpha1.DatabaseBackupSchedule) (ctrl.Result, error) {
 	log := logf.FromContext(ctx).WithValues("schedule", schedule.Name, "namespace", schedule.Namespace)
 
+	// Only record event when transitioning to paused
+	if schedule.Status.Phase != dbopsv1alpha1.PhasePaused {
+		c.Recorder.Eventf(schedule, corev1.EventTypeNormal, "Paused", "Backup schedule paused")
+	}
+
 	schedule.Status.Phase = dbopsv1alpha1.PhasePaused
 	schedule.Status.NextBackupTime = nil
 	util.SetReadyCondition(&schedule.Status.Conditions, metav1.ConditionTrue, "Paused", "Schedule is paused")
@@ -257,6 +268,18 @@ func (c *Controller) handleDeletion(ctx context.Context, schedule *dbopsv1alpha1
 
 	log.Info("Handling deletion of DatabaseBackupSchedule")
 
+	// Check deletion protection
+	if c.hasDeletionProtection(schedule) && !util.HasForceDeleteAnnotation(schedule) {
+		c.Recorder.Eventf(schedule, corev1.EventTypeWarning, "DeletionBlocked", "Deletion blocked by deletion protection")
+		schedule.Status.Phase = dbopsv1alpha1.PhaseFailed
+		util.SetReadyCondition(&schedule.Status.Conditions, metav1.ConditionFalse,
+			util.ReasonDeletionProtected, "Deletion protection is enabled")
+		if err := c.Status().Update(ctx, schedule); err != nil {
+			log.Error(err, "Failed to update status")
+		}
+		return ctrl.Result{}, fmt.Errorf("deletion protection enabled")
+	}
+
 	// Clean up schedule metrics
 	databaseName := schedule.Spec.Template.Spec.DatabaseRef.Name
 	metrics.DeleteScheduleMetrics(databaseName, schedule.Namespace)
@@ -278,6 +301,7 @@ func (c *Controller) handleError(ctx context.Context, schedule *dbopsv1alpha1.Da
 	log := logf.FromContext(ctx).WithValues("schedule", schedule.Name, "namespace", schedule.Namespace)
 
 	log.Error(err, "Reconciliation failed", "operation", operation)
+	c.Recorder.Eventf(schedule, corev1.EventTypeWarning, "ReconcileFailed", "Failed to %s: %v", operation, err)
 
 	schedule.Status.Phase = dbopsv1alpha1.PhaseActive // Keep Active but set error condition
 	util.SetReadyCondition(&schedule.Status.Conditions, metav1.ConditionFalse, "Error",
@@ -300,4 +324,9 @@ func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&dbopsv1alpha1.DatabaseBackup{}).
 		Named("databasebackupschedule").
 		Complete(c)
+}
+
+// hasDeletionProtection checks if the schedule has deletion protection enabled.
+func (c *Controller) hasDeletionProtection(schedule *dbopsv1alpha1.DatabaseBackupSchedule) bool {
+	return schedule.Spec.DeletionProtection
 }

@@ -22,9 +22,11 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -51,26 +53,29 @@ const (
 // Controller handles K8s reconciliation for DatabaseRole resources.
 type Controller struct {
 	client.Client
-	Scheme  *runtime.Scheme
-	handler *Handler
-	logger  logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+	handler  *Handler
+	logger   logr.Logger
 }
 
 // ControllerConfig holds dependencies for the controller.
 type ControllerConfig struct {
-	Client  client.Client
-	Scheme  *runtime.Scheme
-	Handler *Handler
-	Logger  logr.Logger
+	Client   client.Client
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+	Handler  *Handler
+	Logger   logr.Logger
 }
 
 // NewController creates a new role controller.
 func NewController(cfg ControllerConfig) *Controller {
 	return &Controller{
-		Client:  cfg.Client,
-		Scheme:  cfg.Scheme,
-		handler: cfg.Handler,
-		logger:  cfg.Logger,
+		Client:   cfg.Client,
+		Scheme:   cfg.Scheme,
+		Recorder: cfg.Recorder,
+		handler:  cfg.Handler,
+		logger:   cfg.Logger,
 	}
 }
 
@@ -121,12 +126,23 @@ func (c *Controller) reconcile(ctx context.Context, role *dbopsv1alpha1.Database
 		if err != nil {
 			return c.handleError(ctx, role, err, "create role")
 		}
+		c.Recorder.Eventf(role, corev1.EventTypeNormal, "Created", "Role %s created successfully", role.Spec.RoleName)
 	} else {
 		// Update role settings if role already exists
 		if _, err := c.handler.Update(ctx, role.Spec.RoleName, &role.Spec, role.Namespace); err != nil {
 			log.Error(err, "Failed to update role settings")
 		}
 	}
+
+	// Get instance for drift detection
+	instance, err := c.handler.GetInstance(ctx, &role.Spec, role.Namespace)
+	if err != nil {
+		log.Error(err, "Failed to get instance for drift detection")
+		// Continue anyway, drift detection will use defaults
+	}
+
+	// Perform drift detection
+	c.performDriftDetection(ctx, role, instance)
 
 	// Update status
 	role.Status.Phase = dbopsv1alpha1.PhaseReady
@@ -173,6 +189,7 @@ func (c *Controller) handleDeletion(ctx context.Context, role *dbopsv1alpha1.Dat
 
 	// Check deletion protection
 	if c.hasDeletionProtection(role) && !util.HasForceDeleteAnnotation(role) {
+		c.Recorder.Eventf(role, corev1.EventTypeWarning, "DeletionBlocked", "Deletion blocked by deletion protection annotation")
 		role.Status.Phase = dbopsv1alpha1.PhaseFailed
 		role.Status.Message = "Deletion blocked by deletion protection"
 		util.SetReadyCondition(&role.Status.Conditions, metav1.ConditionFalse,
@@ -189,9 +206,12 @@ func (c *Controller) handleDeletion(ctx context.Context, role *dbopsv1alpha1.Dat
 			// Log the error but continue with finalizer removal
 			// This prevents the CR from being stuck if the database is unreachable
 			log.Error(err, "Failed to delete role from database")
+			c.Recorder.Eventf(role, corev1.EventTypeWarning, "DeleteFailed", "Failed to delete role: %v", err)
 			if !errors.IsNotFound(err) && !force {
 				return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 			}
+		} else {
+			c.Recorder.Eventf(role, corev1.EventTypeNormal, "Deleted", "Role %s deleted successfully", role.Spec.RoleName)
 		}
 	}
 
@@ -211,6 +231,7 @@ func (c *Controller) handleError(ctx context.Context, role *dbopsv1alpha1.Databa
 	log := logf.FromContext(ctx).WithValues("role", role.Name, "namespace", role.Namespace)
 
 	log.Error(err, "Reconciliation failed", "operation", operation)
+	c.Recorder.Eventf(role, corev1.EventTypeWarning, "ReconcileFailed", "Failed to %s: %v", operation, err)
 
 	role.Status.Phase = dbopsv1alpha1.PhaseFailed
 	role.Status.Message = fmt.Sprintf("Failed to %s: %v", operation, err)
@@ -263,4 +284,140 @@ func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
 		For(&dbopsv1alpha1.DatabaseRole{}).
 		Named("databaserole-feature").
 		Complete(c)
+}
+
+// performDriftDetection detects and optionally corrects drift for the role.
+// It uses the drift policy from the role spec or falls back to the instance's default policy.
+func (c *Controller) performDriftDetection(ctx context.Context, role *dbopsv1alpha1.DatabaseRole, instance *dbopsv1alpha1.DatabaseInstance) {
+	log := logf.FromContext(ctx).WithValues("role", role.Name, "namespace", role.Namespace)
+
+	// 1. Get effective drift policy
+	policy := c.getEffectiveDriftPolicy(role, instance)
+	if policy.Mode == dbopsv1alpha1.DriftModeIgnore {
+		log.V(1).Info("Drift detection disabled (mode=ignore)")
+		return
+	}
+
+	// 2. Check if destructive drift corrections are allowed via annotation
+	allowDestructive := c.hasDestructiveDriftAnnotation(role)
+
+	// 3. Detect drift
+	driftResult, err := c.handler.DetectDrift(ctx, &role.Spec, role.Namespace, allowDestructive)
+	if err != nil {
+		log.Error(err, "Failed to detect drift")
+		return
+	}
+
+	// 4. Update drift status
+	if driftResult != nil {
+		role.Status.Drift = driftResult.ToAPIStatus()
+
+		// 5. Record event if drift detected
+		if driftResult.HasDrift() {
+			var driftFields []string
+			for _, d := range driftResult.Diffs {
+				driftFields = append(driftFields, d.Field)
+			}
+			c.Recorder.Eventf(role, corev1.EventTypeWarning, "DriftDetected",
+				"Configuration drift detected in fields: %v", driftFields)
+			log.Info("Drift detected", "fields", driftFields)
+
+			// 6. Correct drift if mode is "correct"
+			if policy.Mode == dbopsv1alpha1.DriftModeCorrect {
+				c.correctDrift(ctx, role, driftResult, allowDestructive)
+			}
+		}
+	}
+}
+
+// correctDrift attempts to correct detected drift.
+func (c *Controller) correctDrift(ctx context.Context, role *dbopsv1alpha1.DatabaseRole, driftResult interface{}, allowDestructive bool) {
+	log := logf.FromContext(ctx).WithValues("role", role.Name, "namespace", role.Namespace)
+
+	// Get the drift result - we need to use the concrete type from the handler
+	driftResultTyped, ok := driftResult.(interface {
+		ToAPIStatus() *dbopsv1alpha1.DriftStatus
+	})
+	if !ok {
+		log.Error(nil, "Invalid drift result type")
+		return
+	}
+
+	// Get the actual drift.Result from the handler
+	handlerDriftResult, err := c.handler.DetectDrift(ctx, &role.Spec, role.Namespace, allowDestructive)
+	if err != nil {
+		log.Error(err, "Failed to re-detect drift for correction")
+		return
+	}
+
+	// Skip if no drift to correct (could have been corrected elsewhere)
+	if handlerDriftResult == nil || !handlerDriftResult.HasDrift() {
+		log.V(1).Info("No drift to correct")
+		return
+	}
+
+	correctionResult, err := c.handler.CorrectDrift(ctx, &role.Spec, role.Namespace, handlerDriftResult, allowDestructive)
+	if err != nil {
+		log.Error(err, "Failed to correct drift")
+		c.Recorder.Eventf(role, corev1.EventTypeWarning, "DriftCorrectionFailed",
+			"Failed to correct drift: %v", err)
+		return
+	}
+
+	if correctionResult != nil && correctionResult.HasCorrections() {
+		var correctedFields []string
+		for _, corr := range correctionResult.Corrected {
+			correctedFields = append(correctedFields, corr.Diff.Field)
+		}
+		c.Recorder.Eventf(role, corev1.EventTypeNormal, "DriftCorrected",
+			"Drift corrected for fields: %v", correctedFields)
+		log.Info("Drift corrected", "fields", correctedFields)
+
+		// Clear drift status after successful correction
+		role.Status.Drift = driftResultTyped.ToAPIStatus()
+		role.Status.Drift.Detected = false
+		role.Status.Drift.Diffs = nil
+	}
+
+	// Log skipped corrections
+	if correctionResult != nil && len(correctionResult.Skipped) > 0 {
+		for _, s := range correctionResult.Skipped {
+			log.V(1).Info("Drift correction skipped", "field", s.Diff.Field, "reason", s.Reason)
+		}
+	}
+
+	// Log failed corrections
+	if correctionResult != nil && correctionResult.HasFailures() {
+		for _, f := range correctionResult.Failed {
+			log.Error(f.Error, "Drift correction failed", "field", f.Diff.Field)
+		}
+	}
+}
+
+// getEffectiveDriftPolicy returns the effective drift policy for a role.
+// It uses the role's drift policy if set, otherwise falls back to the instance's default.
+func (c *Controller) getEffectiveDriftPolicy(role *dbopsv1alpha1.DatabaseRole, instance *dbopsv1alpha1.DatabaseInstance) dbopsv1alpha1.DriftPolicy {
+	// Use role-level policy if set
+	if role.Spec.DriftPolicy != nil {
+		return *role.Spec.DriftPolicy
+	}
+
+	// Fall back to instance-level policy if available
+	if instance != nil && instance.Spec.DriftPolicy != nil {
+		return *instance.Spec.DriftPolicy
+	}
+
+	// Default policy: detect mode, 5 minute interval
+	return dbopsv1alpha1.DriftPolicy{
+		Mode:     dbopsv1alpha1.DriftModeDetect,
+		Interval: "5m",
+	}
+}
+
+// hasDestructiveDriftAnnotation checks if the role has the allow-destructive-drift annotation.
+func (c *Controller) hasDestructiveDriftAnnotation(role *dbopsv1alpha1.DatabaseRole) bool {
+	if role.Annotations == nil {
+		return false
+	}
+	return role.Annotations[dbopsv1alpha1.AnnotationAllowDestructiveDrift] == "true"
 }

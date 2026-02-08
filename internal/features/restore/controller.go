@@ -22,9 +22,11 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -43,26 +45,29 @@ const (
 // Controller handles K8s reconciliation for DatabaseRestore resources.
 type Controller struct {
 	client.Client
-	Scheme  *runtime.Scheme
-	handler *Handler
-	logger  logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+	handler  *Handler
+	logger   logr.Logger
 }
 
 // ControllerConfig holds dependencies for the controller.
 type ControllerConfig struct {
-	Client  client.Client
-	Scheme  *runtime.Scheme
-	Handler *Handler
-	Logger  logr.Logger
+	Client   client.Client
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+	Handler  *Handler
+	Logger   logr.Logger
 }
 
 // NewController creates a new restore controller.
 func NewController(cfg ControllerConfig) *Controller {
 	return &Controller{
-		Client:  cfg.Client,
-		Scheme:  cfg.Scheme,
-		handler: cfg.Handler,
-		logger:  cfg.Logger,
+		Client:   cfg.Client,
+		Scheme:   cfg.Scheme,
+		Recorder: cfg.Recorder,
+		handler:  cfg.Handler,
+		logger:   cfg.Logger,
 	}
 }
 
@@ -138,7 +143,7 @@ func (c *Controller) reconcile(ctx context.Context, restore *dbopsv1alpha1.Datab
 
 	// Check if backup is ready (if using BackupRef)
 	if restore.Spec.BackupRef != nil {
-		backup, err := c.handler.repo.GetBackup(ctx, restore.Namespace, restore.Spec.BackupRef)
+		backup, err := c.handler.GetBackup(ctx, restore.Namespace, restore.Spec.BackupRef)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return c.handlePending(ctx, restore, fmt.Sprintf("Waiting for DatabaseBackup %s", restore.Spec.BackupRef.Name))
@@ -180,6 +185,8 @@ func (c *Controller) reconcile(ctx context.Context, restore *dbopsv1alpha1.Datab
 		log.Error(err, "Failed to update status to Running")
 	}
 
+	c.Recorder.Eventf(restore, corev1.EventTypeNormal, "Started", "Restore started for target %s", targetInstance.Name)
+
 	// Execute restore
 	log.Info("Executing restore")
 	result, err := c.handler.Execute(ctx, restore)
@@ -217,6 +224,7 @@ func (c *Controller) handleDeadlineExceeded(ctx context.Context, restore *dbopsv
 	log := logf.FromContext(ctx).WithValues("restore", restore.Name, "namespace", restore.Namespace)
 
 	log.Info("Restore deadline exceeded", "message", message)
+	c.Recorder.Eventf(restore, corev1.EventTypeWarning, "DeadlineExceeded", "Restore deadline exceeded: %s", message)
 
 	restore.Status.Phase = dbopsv1alpha1.PhaseFailed
 	restore.Status.Message = message
@@ -236,6 +244,7 @@ func (c *Controller) handleValidationError(ctx context.Context, restore *dbopsv1
 	log := logf.FromContext(ctx).WithValues("restore", restore.Name, "namespace", restore.Namespace)
 
 	log.Info("Restore validation failed", "error", err.Error())
+	c.Recorder.Eventf(restore, corev1.EventTypeWarning, "ValidationFailed", "Restore validation failed: %v", err)
 
 	restore.Status.Phase = dbopsv1alpha1.PhaseFailed
 	restore.Status.Message = err.Error()
@@ -255,6 +264,7 @@ func (c *Controller) handleError(ctx context.Context, restore *dbopsv1alpha1.Dat
 	log := logf.FromContext(ctx).WithValues("restore", restore.Name, "namespace", restore.Namespace)
 
 	log.Error(err, "Reconciliation failed", "operation", operation)
+	c.Recorder.Eventf(restore, corev1.EventTypeWarning, "Failed", "Restore failed to %s: %v", operation, err)
 
 	restore.Status.Phase = dbopsv1alpha1.PhaseFailed
 	restore.Status.Message = fmt.Sprintf("Failed to %s: %v", operation, err)
@@ -319,6 +329,8 @@ func (c *Controller) handleCompleted(ctx context.Context, restore *dbopsv1alpha1
 
 	// Update info metric for Grafana table views
 	c.handler.UpdateInfoMetric(restore)
+
+	c.Recorder.Eventf(restore, corev1.EventTypeNormal, "Completed", "Restore completed successfully, %d tables restored", result.TablesRestored)
 
 	log.Info("Successfully completed DatabaseRestore",
 		"targetDatabase", result.TargetDatabase,

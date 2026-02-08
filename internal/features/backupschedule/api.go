@@ -72,3 +72,30 @@ type ConcurrencyResult struct {
 	CancelledNames []string
 	Message        string
 }
+
+// RepositoryInterface defines the repository operations for backup schedule.
+type RepositoryInterface interface {
+	// ListBackupsForSchedule lists all backups created by this schedule.
+	ListBackupsForSchedule(ctx context.Context, schedule *dbopsv1alpha1.DatabaseBackupSchedule) ([]dbopsv1alpha1.DatabaseBackup, error)
+
+	// FilterBackupsByPhase filters backups by their phase.
+	FilterBackupsByPhase(backups []dbopsv1alpha1.DatabaseBackup, phase dbopsv1alpha1.Phase) []dbopsv1alpha1.DatabaseBackup
+
+	// CreateBackupFromTemplate creates a DatabaseBackup from the schedule template.
+	CreateBackupFromTemplate(ctx context.Context, schedule *dbopsv1alpha1.DatabaseBackupSchedule) (*dbopsv1alpha1.DatabaseBackup, error)
+
+	// DeleteBackups deletes multiple backups.
+	DeleteBackups(ctx context.Context, backups []dbopsv1alpha1.DatabaseBackup) ([]string, error)
+
+	// GetCompletedBackupsSortedByTime returns completed backups sorted by creation time (newest first).
+	GetCompletedBackupsSortedByTime(backups []dbopsv1alpha1.DatabaseBackup) []dbopsv1alpha1.DatabaseBackup
+
+	// GetBackupsSortedByTime returns all backups sorted by creation time (newest first).
+	GetBackupsSortedByTime(backups []dbopsv1alpha1.DatabaseBackup) []dbopsv1alpha1.DatabaseBackup
+
+	// GetLatestBackup returns the most recent backup.
+	GetLatestBackup(backups []dbopsv1alpha1.DatabaseBackup) *dbopsv1alpha1.DatabaseBackup
+}
+
+// Ensure Repository implements RepositoryInterface.
+var _ RepositoryInterface = (*Repository)(nil)

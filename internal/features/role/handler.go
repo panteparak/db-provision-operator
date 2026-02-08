@@ -26,19 +26,20 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/metrics"
+	"github.com/db-provision-operator/internal/service/drift"
 	"github.com/db-provision-operator/internal/shared/eventbus"
 )
 
 // Handler contains the business logic for role operations.
 type Handler struct {
-	repo     *Repository
+	repo     RepositoryInterface
 	eventBus eventbus.Bus
 	logger   logr.Logger
 }
 
 // HandlerConfig holds dependencies for the handler.
 type HandlerConfig struct {
-	Repository *Repository
+	Repository RepositoryInterface
 	EventBus   eventbus.Bus
 	Logger     logr.Logger
 }
@@ -205,6 +206,47 @@ func (h *Handler) UpdateInfoMetric(role *dbopsv1alpha1.DatabaseRole) {
 // CleanupInfoMetric removes the info metric for a deleted role.
 func (h *Handler) CleanupInfoMetric(role *dbopsv1alpha1.DatabaseRole) {
 	metrics.DeleteRoleInfo(role.Name, role.Namespace)
+}
+
+// GetInstance returns the DatabaseInstance for the given spec.
+func (h *Handler) GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+	return h.repo.GetInstance(ctx, spec, namespace)
+}
+
+// DetectDrift compares the CR spec to the actual role state and returns any differences.
+func (h *Handler) DetectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
+	log := logf.FromContext(ctx).WithValues("role", spec.RoleName, "namespace", namespace)
+	log.V(1).Info("Detecting role drift")
+
+	result, err := h.repo.DetectDrift(ctx, spec, namespace, allowDestructive)
+	if err != nil {
+		return nil, fmt.Errorf("detect drift: %w", err)
+	}
+
+	if result.HasDrift() {
+		log.Info("Drift detected", "diffs", len(result.Diffs))
+	} else {
+		log.V(1).Info("No drift detected")
+	}
+
+	return result, nil
+}
+
+// CorrectDrift attempts to correct detected drift by applying necessary changes.
+func (h *Handler) CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+	log := logf.FromContext(ctx).WithValues("role", spec.RoleName, "namespace", namespace)
+	log.Info("Correcting role drift", "diffs", len(driftResult.Diffs))
+
+	correctionResult, err := h.repo.CorrectDrift(ctx, spec, namespace, driftResult, allowDestructive)
+	if err != nil {
+		return nil, fmt.Errorf("correct drift: %w", err)
+	}
+
+	if correctionResult.HasCorrections() {
+		log.Info("Drift corrected", "corrected", len(correctionResult.Corrected))
+	}
+
+	return correctionResult, nil
 }
 
 // Ensure Handler implements API interface.

@@ -26,19 +26,20 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/metrics"
+	"github.com/db-provision-operator/internal/service/drift"
 	"github.com/db-provision-operator/internal/shared/eventbus"
 )
 
 // Handler contains the business logic for grant operations.
 type Handler struct {
-	repo     *Repository
+	repo     RepositoryInterface
 	eventBus eventbus.Bus
 	logger   logr.Logger
 }
 
 // HandlerConfig holds dependencies for the handler.
 type HandlerConfig struct {
-	Repository *Repository
+	Repository RepositoryInterface
 	EventBus   eventbus.Bus
 	Logger     logr.Logger
 }
@@ -236,6 +237,47 @@ func (h *Handler) UpdateInfoMetric(grant *dbopsv1alpha1.DatabaseGrant) {
 // CleanupInfoMetric removes the info metric for a deleted grant.
 func (h *Handler) CleanupInfoMetric(grant *dbopsv1alpha1.DatabaseGrant) {
 	metrics.DeleteGrantInfo(grant.Name, grant.Namespace)
+}
+
+// GetInstance returns the DatabaseInstance for the given spec.
+func (h *Handler) GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+	return h.repo.GetInstance(ctx, spec, namespace)
+}
+
+// DetectDrift compares the CR spec to the actual grant state and returns any differences.
+func (h *Handler) DetectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
+	log := logf.FromContext(ctx).WithValues("userRef", spec.UserRef.Name, "namespace", namespace)
+	log.V(1).Info("Detecting grant drift")
+
+	result, err := h.repo.DetectDrift(ctx, spec, namespace, allowDestructive)
+	if err != nil {
+		return nil, fmt.Errorf("detect drift: %w", err)
+	}
+
+	if result.HasDrift() {
+		log.Info("Drift detected", "diffs", len(result.Diffs))
+	} else {
+		log.V(1).Info("No drift detected")
+	}
+
+	return result, nil
+}
+
+// CorrectDrift attempts to correct detected drift by applying necessary changes.
+func (h *Handler) CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+	log := logf.FromContext(ctx).WithValues("userRef", spec.UserRef.Name, "namespace", namespace)
+	log.Info("Correcting grant drift", "diffs", len(driftResult.Diffs))
+
+	correctionResult, err := h.repo.CorrectDrift(ctx, spec, namespace, driftResult, allowDestructive)
+	if err != nil {
+		return nil, fmt.Errorf("correct drift: %w", err)
+	}
+
+	if correctionResult.HasCorrections() {
+		log.Info("Drift corrected", "corrected", len(correctionResult.Corrected))
+	}
+
+	return correctionResult, nil
 }
 
 // Ensure Handler implements API interface.

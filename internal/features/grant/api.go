@@ -21,6 +21,7 @@ import (
 	"context"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/service/drift"
 )
 
 // API defines the public interface for the grant module.
@@ -33,6 +34,15 @@ type API interface {
 
 	// Exists checks if grants have been applied.
 	Exists(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (bool, error)
+
+	// GetInstance returns the DatabaseInstance for a given spec.
+	GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error)
+
+	// DetectDrift compares the CR spec to the actual grant state and returns any differences.
+	DetectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, allowDestructive bool) (*drift.Result, error)
+
+	// CorrectDrift attempts to correct detected drift by applying necessary changes.
+	CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error)
 }
 
 // Result represents the result of a grant operation.
@@ -43,3 +53,34 @@ type Result struct {
 	DefaultPrivileges int32
 	Message           string
 }
+
+// RepositoryInterface defines the interface for grant repository operations.
+// This interface enables dependency injection and testing with mocks.
+type RepositoryInterface interface {
+	// Apply applies grants to a database user.
+	Apply(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*Result, error)
+
+	// Revoke revokes grants from a database user.
+	Revoke(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) error
+
+	// Exists checks if grants have been applied.
+	Exists(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (bool, error)
+
+	// GetUser returns the DatabaseUser for a given spec.
+	GetUser(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*dbopsv1alpha1.DatabaseUser, error)
+
+	// GetInstance returns the DatabaseInstance for a given spec.
+	GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error)
+
+	// GetEngine returns the database engine type for a given spec.
+	GetEngine(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (string, error)
+
+	// DetectDrift compares the CR spec to the actual grant state and returns any differences.
+	DetectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, allowDestructive bool) (*drift.Result, error)
+
+	// CorrectDrift attempts to correct detected drift by applying necessary changes.
+	CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error)
+}
+
+// Ensure Repository implements RepositoryInterface.
+var _ RepositoryInterface = (*Repository)(nil)

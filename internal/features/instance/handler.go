@@ -31,14 +31,14 @@ import (
 
 // Handler contains the business logic for instance operations.
 type Handler struct {
-	repo     *Repository
+	repo     RepositoryInterface
 	eventBus eventbus.Bus
 	logger   logr.Logger
 }
 
 // HandlerConfig holds dependencies for the handler.
 type HandlerConfig struct {
-	Repository *Repository
+	Repository RepositoryInterface
 	EventBus   eventbus.Bus
 	Logger     logr.Logger
 }

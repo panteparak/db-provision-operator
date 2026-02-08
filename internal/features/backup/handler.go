@@ -31,7 +31,7 @@ import (
 
 // Handler contains the business logic for backup operations.
 type Handler struct {
-	repo              *Repository
+	repo              RepositoryInterface
 	eventBus          eventbus.Bus
 	logger            logr.Logger
 	instanceConnected map[string]bool // tracks instance connectivity status
@@ -39,7 +39,7 @@ type Handler struct {
 
 // HandlerConfig holds dependencies for the handler.
 type HandlerConfig struct {
-	Repository *Repository
+	Repository RepositoryInterface
 	EventBus   eventbus.Bus
 	Logger     logr.Logger
 }
@@ -269,6 +269,16 @@ func (h *Handler) UpdateInfoMetric(backup *dbopsv1alpha1.DatabaseBackup) {
 // CleanupInfoMetric removes the info metric for a deleted backup.
 func (h *Handler) CleanupInfoMetric(backup *dbopsv1alpha1.DatabaseBackup) {
 	metrics.DeleteBackupInfo(backup.Name, backup.Namespace)
+}
+
+// GetDatabase returns the database referenced by the backup.
+func (h *Handler) GetDatabase(ctx context.Context, backup *dbopsv1alpha1.DatabaseBackup) (*dbopsv1alpha1.Database, error) {
+	return h.repo.GetDatabase(ctx, backup)
+}
+
+// GetInstance returns the instance for a database.
+func (h *Handler) GetInstance(ctx context.Context, database *dbopsv1alpha1.Database) (*dbopsv1alpha1.DatabaseInstance, error) {
+	return h.repo.GetInstance(ctx, database)
 }
 
 // Ensure Handler implements API interface.

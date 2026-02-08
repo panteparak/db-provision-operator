@@ -89,6 +89,11 @@ func (s *GrantService) Close() error {
 	return nil
 }
 
+// Adapter returns the underlying database adapter for drift detection.
+func (s *GrantService) Adapter() adapter.DatabaseAdapter {
+	return s.adapter
+}
+
 // ApplyGrantServiceOptions contains options for applying grants.
 type ApplyGrantServiceOptions struct {
 	Username string

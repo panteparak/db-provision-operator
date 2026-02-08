@@ -18,6 +18,7 @@ package instance
 
 import (
 	"github.com/go-logr/logr"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/db-provision-operator/internal/secret"
@@ -37,6 +38,7 @@ type Module struct {
 // Config holds dependencies for the instance module.
 type Config struct {
 	Manager       ctrl.Manager
+	Recorder      record.EventRecorder
 	EventBus      eventbus.Bus
 	SecretManager *secret.Manager
 }
@@ -67,10 +69,11 @@ func NewModule(cfg Config) (*Module, error) {
 
 	// Create controller (K8s reconciliation)
 	controller := NewController(ControllerConfig{
-		Client:  cfg.Manager.GetClient(),
-		Scheme:  cfg.Manager.GetScheme(),
-		Handler: handler,
-		Logger:  logger.WithName("controller"),
+		Client:   cfg.Manager.GetClient(),
+		Scheme:   cfg.Manager.GetScheme(),
+		Recorder: cfg.Recorder,
+		Handler:  handler,
+		Logger:   logger.WithName("controller"),
 	})
 
 	return &Module{

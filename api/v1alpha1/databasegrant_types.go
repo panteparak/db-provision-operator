@@ -42,6 +42,10 @@ type DatabaseGrantSpec struct {
 	// If not specified, the instance's drift policy is used.
 	// +optional
 	DriftPolicy *DriftPolicy `json:"driftPolicy,omitempty"`
+
+	// DeletionProtection prevents accidental deletion
+	// +optional
+	DeletionProtection bool `json:"deletionProtection,omitempty"`
 }
 
 // DatabaseGrantStatus defines the observed state of DatabaseGrant.

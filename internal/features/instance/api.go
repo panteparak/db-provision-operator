@@ -20,6 +20,8 @@ package instance
 
 import (
 	"context"
+
+	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 )
 
 // API defines the public interface for the instance module.
@@ -76,3 +78,21 @@ type InstanceInfo struct {
 	// Healthy indicates if health check passed.
 	Healthy bool
 }
+
+// RepositoryInterface defines the repository operations for instance.
+type RepositoryInterface interface {
+	// GetInstance retrieves a DatabaseInstance by name and namespace.
+	GetInstance(ctx context.Context, name, namespace string) (*dbopsv1alpha1.DatabaseInstance, error)
+
+	// Connect establishes a connection and verifies it with a ping.
+	Connect(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance) (*ConnectResult, error)
+
+	// Ping verifies the connection is still active.
+	Ping(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance) error
+
+	// GetVersion returns the database version.
+	GetVersion(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance) (string, error)
+}
+
+// Ensure Repository implements RepositoryInterface.
+var _ RepositoryInterface = (*Repository)(nil)
