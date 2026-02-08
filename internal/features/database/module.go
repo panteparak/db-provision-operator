@@ -69,10 +69,11 @@ func NewModule(cfg Config) (*Module, error) {
 
 	// Create controller (K8s reconciliation)
 	controller := NewController(ControllerConfig{
-		Client:  cfg.Manager.GetClient(),
-		Scheme:  cfg.Manager.GetScheme(),
-		Handler: handler,
-		Logger:  logger.WithName("controller"),
+		Client:   cfg.Manager.GetClient(),
+		Scheme:   cfg.Manager.GetScheme(),
+		Recorder: cfg.Manager.GetEventRecorderFor("database-controller"),
+		Handler:  handler,
+		Logger:   logger.WithName("controller"),
 	})
 
 	// Subscribe to events from other modules

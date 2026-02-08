@@ -22,8 +22,10 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -53,26 +55,29 @@ const (
 // It is a thin wrapper that delegates business logic to the Handler.
 type Controller struct {
 	client.Client
-	Scheme  *runtime.Scheme
-	handler *Handler
-	logger  logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+	handler  *Handler
+	logger   logr.Logger
 }
 
 // ControllerConfig holds dependencies for the controller.
 type ControllerConfig struct {
-	Client  client.Client
-	Scheme  *runtime.Scheme
-	Handler *Handler
-	Logger  logr.Logger
+	Client   client.Client
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+	Handler  *Handler
+	Logger   logr.Logger
 }
 
 // NewController creates a new database controller.
 func NewController(cfg ControllerConfig) *Controller {
 	return &Controller{
-		Client:  cfg.Client,
-		Scheme:  cfg.Scheme,
-		handler: cfg.Handler,
-		logger:  cfg.Logger,
+		Client:   cfg.Client,
+		Scheme:   cfg.Scheme,
+		Recorder: cfg.Recorder,
+		handler:  cfg.Handler,
+		logger:   cfg.Logger,
 	}
 }
 
@@ -165,7 +170,17 @@ func (c *Controller) reconcile(ctx context.Context, database *dbopsv1alpha1.Data
 		log.Error(err, "Failed to get database info")
 	}
 
-	// 7. Update status to Ready
+	// 7. Get instance for drift detection
+	instance, err := c.handler.GetInstance(ctx, &database.Spec, database.Namespace)
+	if err != nil {
+		log.Error(err, "Failed to get instance for drift detection")
+		// Continue anyway, drift detection will use defaults
+	}
+
+	// 8. Perform drift detection
+	c.performDriftDetection(ctx, database, instance)
+
+	// 9. Update status to Ready
 	database.Status.Phase = dbopsv1alpha1.PhaseReady
 	database.Status.Message = "Database is ready"
 
@@ -287,4 +302,140 @@ func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
 		For(&dbopsv1alpha1.Database{}).
 		Named("database").
 		Complete(c)
+}
+
+// performDriftDetection detects and optionally corrects drift for the database.
+// It uses the drift policy from the database spec or falls back to the instance's default policy.
+func (c *Controller) performDriftDetection(ctx context.Context, database *dbopsv1alpha1.Database, instance *dbopsv1alpha1.DatabaseInstance) {
+	log := logf.FromContext(ctx).WithValues("database", database.Name, "namespace", database.Namespace)
+
+	// 1. Get effective drift policy
+	policy := c.getEffectiveDriftPolicy(database, instance)
+	if policy.Mode == dbopsv1alpha1.DriftModeIgnore {
+		log.V(1).Info("Drift detection disabled (mode=ignore)")
+		return
+	}
+
+	// 2. Check if destructive drift corrections are allowed via annotation
+	allowDestructive := c.hasDestructiveDriftAnnotation(database)
+
+	// 3. Detect drift
+	driftResult, err := c.handler.DetectDrift(ctx, &database.Spec, database.Namespace, allowDestructive)
+	if err != nil {
+		log.Error(err, "Failed to detect drift")
+		return
+	}
+
+	// 4. Update drift status
+	if driftResult != nil {
+		database.Status.Drift = driftResult.ToAPIStatus()
+
+		// 5. Record event if drift detected
+		if driftResult.HasDrift() {
+			var driftFields []string
+			for _, d := range driftResult.Diffs {
+				driftFields = append(driftFields, d.Field)
+			}
+			c.Recorder.Eventf(database, corev1.EventTypeWarning, "DriftDetected",
+				"Configuration drift detected in fields: %v", driftFields)
+			log.Info("Drift detected", "fields", driftFields)
+
+			// 6. Correct drift if mode is "correct"
+			if policy.Mode == dbopsv1alpha1.DriftModeCorrect {
+				c.correctDrift(ctx, database, driftResult, allowDestructive)
+			}
+		}
+	}
+}
+
+// correctDrift attempts to correct detected drift.
+func (c *Controller) correctDrift(ctx context.Context, database *dbopsv1alpha1.Database, driftResult interface{}, allowDestructive bool) {
+	log := logf.FromContext(ctx).WithValues("database", database.Name, "namespace", database.Namespace)
+
+	// Get the drift result - we need to use the concrete type from the handler
+	driftResultTyped, ok := driftResult.(interface {
+		ToAPIStatus() *dbopsv1alpha1.DriftStatus
+	})
+	if !ok {
+		log.Error(nil, "Invalid drift result type")
+		return
+	}
+
+	// Get the actual drift.Result from the handler
+	handlerDriftResult, err := c.handler.DetectDrift(ctx, &database.Spec, database.Namespace, allowDestructive)
+	if err != nil {
+		log.Error(err, "Failed to re-detect drift for correction")
+		return
+	}
+
+	// Skip if no drift to correct (could have been corrected elsewhere)
+	if handlerDriftResult == nil || !handlerDriftResult.HasDrift() {
+		log.V(1).Info("No drift to correct")
+		return
+	}
+
+	correctionResult, err := c.handler.CorrectDrift(ctx, &database.Spec, database.Namespace, handlerDriftResult, allowDestructive)
+	if err != nil {
+		log.Error(err, "Failed to correct drift")
+		c.Recorder.Eventf(database, corev1.EventTypeWarning, "DriftCorrectionFailed",
+			"Failed to correct drift: %v", err)
+		return
+	}
+
+	if correctionResult != nil && correctionResult.HasCorrections() {
+		var correctedFields []string
+		for _, c := range correctionResult.Corrected {
+			correctedFields = append(correctedFields, c.Diff.Field)
+		}
+		c.Recorder.Eventf(database, corev1.EventTypeNormal, "DriftCorrected",
+			"Drift corrected for fields: %v", correctedFields)
+		log.Info("Drift corrected", "fields", correctedFields)
+
+		// Clear drift status after successful correction
+		database.Status.Drift = driftResultTyped.ToAPIStatus()
+		database.Status.Drift.Detected = false
+		database.Status.Drift.Diffs = nil
+	}
+
+	// Log skipped corrections
+	if correctionResult != nil && len(correctionResult.Skipped) > 0 {
+		for _, s := range correctionResult.Skipped {
+			log.V(1).Info("Drift correction skipped", "field", s.Diff.Field, "reason", s.Reason)
+		}
+	}
+
+	// Log failed corrections
+	if correctionResult != nil && correctionResult.HasFailures() {
+		for _, f := range correctionResult.Failed {
+			log.Error(f.Error, "Drift correction failed", "field", f.Diff.Field)
+		}
+	}
+}
+
+// getEffectiveDriftPolicy returns the effective drift policy for a database.
+// It uses the database's drift policy if set, otherwise falls back to the instance's default.
+func (c *Controller) getEffectiveDriftPolicy(database *dbopsv1alpha1.Database, instance *dbopsv1alpha1.DatabaseInstance) dbopsv1alpha1.DriftPolicy {
+	// Use database-level policy if set
+	if database.Spec.DriftPolicy != nil {
+		return *database.Spec.DriftPolicy
+	}
+
+	// Fall back to instance-level policy if available
+	if instance != nil && instance.Spec.DriftPolicy != nil {
+		return *instance.Spec.DriftPolicy
+	}
+
+	// Default policy: detect mode, 5 minute interval
+	return dbopsv1alpha1.DriftPolicy{
+		Mode:     dbopsv1alpha1.DriftModeDetect,
+		Interval: "5m",
+	}
+}
+
+// hasDestructiveDriftAnnotation checks if the database has the allow-destructive-drift annotation.
+func (c *Controller) hasDestructiveDriftAnnotation(database *dbopsv1alpha1.Database) bool {
+	if database.Annotations == nil {
+		return false
+	}
+	return database.Annotations[dbopsv1alpha1.AnnotationAllowDestructiveDrift] == "true"
 }

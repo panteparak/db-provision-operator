@@ -28,6 +28,7 @@ import (
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/secret"
 	"github.com/db-provision-operator/internal/service"
+	"github.com/db-provision-operator/internal/service/drift"
 )
 
 // Repository handles database operations via the service layer.
@@ -236,4 +237,46 @@ func (r *Repository) GetEngine(ctx context.Context, spec *dbopsv1alpha1.Database
 		return "", err
 	}
 	return string(instance.Spec.Engine), nil
+}
+
+// DetectDrift detects configuration drift between the CR spec and actual database state.
+// This compares PostgreSQL settings (encoding, extensions, schemas) or MySQL settings
+// (charset, collation) against the actual database and returns any differences found.
+func (r *Repository) DetectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
+	var result *drift.Result
+
+	err := r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstance) error {
+		driftCfg := &drift.Config{
+			AllowDestructive: allowDestructive,
+			Logger:           logf.FromContext(ctx),
+		}
+		driftSvc := drift.NewService(svc.Adapter(), driftCfg)
+
+		var err error
+		result, err = driftSvc.DetectDatabaseDrift(ctx, spec)
+		return err
+	})
+
+	return result, err
+}
+
+// CorrectDrift attempts to correct detected drift by applying necessary changes.
+// Only non-destructive corrections are applied unless allowDestructive is true.
+// Returns a CorrectionResult showing what was corrected, skipped, or failed.
+func (r *Repository) CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+	var correctionResult *drift.CorrectionResult
+
+	err := r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstance) error {
+		driftCfg := &drift.Config{
+			AllowDestructive: allowDestructive,
+			Logger:           logf.FromContext(ctx),
+		}
+		driftSvc := drift.NewService(svc.Adapter(), driftCfg)
+
+		var err error
+		correctionResult, err = driftSvc.CorrectDatabaseDrift(ctx, spec, driftResult)
+		return err
+	})
+
+	return correctionResult, err
 }

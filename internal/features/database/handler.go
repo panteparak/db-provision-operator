@@ -26,20 +26,21 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/metrics"
+	"github.com/db-provision-operator/internal/service/drift"
 	"github.com/db-provision-operator/internal/shared/eventbus"
 )
 
 // Handler contains the business logic for database operations.
 // It coordinates between the repository and the event bus.
 type Handler struct {
-	repo     *Repository
+	repo     RepositoryInterface
 	eventBus eventbus.Bus
 	logger   logr.Logger
 }
 
 // HandlerConfig holds dependencies for the handler.
 type HandlerConfig struct {
-	Repository *Repository
+	Repository RepositoryInterface
 	EventBus   eventbus.Bus
 	Logger     logr.Logger
 }
@@ -276,6 +277,65 @@ func (h *Handler) UpdateInfoMetric(database *dbopsv1alpha1.Database) {
 // CleanupInfoMetric removes the info metric for a deleted database.
 func (h *Handler) CleanupInfoMetric(database *dbopsv1alpha1.Database) {
 	metrics.DeleteDatabaseInfo(database.Name, database.Namespace)
+}
+
+// GetInstance returns the DatabaseInstance for the given spec.
+// Implements API.GetInstance
+func (h *Handler) GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+	return h.repo.GetInstance(ctx, spec, namespace)
+}
+
+// DetectDrift compares the CR spec to the actual database state and returns any differences.
+// Implements API.DetectDrift
+func (h *Handler) DetectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
+	log := logf.FromContext(ctx).WithValues("database", spec.Name, "namespace", namespace)
+	log.V(1).Info("Detecting drift for database")
+
+	result, err := h.repo.DetectDrift(ctx, spec, namespace, allowDestructive)
+	if err != nil {
+		return nil, fmt.Errorf("detect drift: %w", err)
+	}
+
+	if result != nil && result.HasDrift() {
+		log.Info("Drift detected", "diffs", len(result.Diffs))
+
+		// Record drift metric
+		engine, _ := h.repo.GetEngine(ctx, spec, namespace)
+		metrics.RecordDatabaseOperation(metrics.OperationDriftDetection, engine, namespace, metrics.StatusSuccess)
+	}
+
+	return result, nil
+}
+
+// CorrectDrift attempts to correct detected drift by applying necessary changes.
+// Implements API.CorrectDrift
+func (h *Handler) CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+	log := logf.FromContext(ctx).WithValues("database", spec.Name, "namespace", namespace)
+	log.Info("Correcting drift for database", "diffs", len(driftResult.Diffs))
+
+	correctionResult, err := h.repo.CorrectDrift(ctx, spec, namespace, driftResult, allowDestructive)
+	if err != nil {
+		return nil, fmt.Errorf("correct drift: %w", err)
+	}
+
+	// Log correction summary
+	if correctionResult != nil {
+		log.Info("Drift correction complete",
+			"corrected", len(correctionResult.Corrected),
+			"skipped", len(correctionResult.Skipped),
+			"failed", len(correctionResult.Failed))
+
+		// Record correction metric
+		engine, _ := h.repo.GetEngine(ctx, spec, namespace)
+		if len(correctionResult.Corrected) > 0 {
+			metrics.RecordDatabaseOperation(metrics.OperationDriftCorrection, engine, namespace, metrics.StatusSuccess)
+		}
+		if len(correctionResult.Failed) > 0 {
+			metrics.RecordDatabaseOperation(metrics.OperationDriftCorrection, engine, namespace, metrics.StatusFailure)
+		}
+	}
+
+	return correctionResult, nil
 }
 
 // Ensure Handler implements API interface.

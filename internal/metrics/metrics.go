@@ -43,12 +43,14 @@ const (
 
 // Operation values
 const (
-	OperationCreate  = "create"
-	OperationUpdate  = "update"
-	OperationDelete  = "delete"
-	OperationConnect = "connect"
-	OperationBackup  = "backup"
-	OperationRestore = "restore"
+	OperationCreate          = "create"
+	OperationUpdate          = "update"
+	OperationDelete          = "delete"
+	OperationConnect         = "connect"
+	OperationBackup          = "backup"
+	OperationRestore         = "restore"
+	OperationDriftDetection  = "drift_detection"
+	OperationDriftCorrection = "drift_correction"
 )
 
 var (
