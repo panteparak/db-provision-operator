@@ -74,6 +74,9 @@ spec:
                 default: Forbid
                 description: ConcurrencyPolicy defines how to handle concurrent backups
                 type: string
+              deletionProtection:
+                description: DeletionProtection prevents accidental deletion
+                type: boolean
               failedBackupsHistoryLimit:
                 default: 3
                 description: FailedBackupsHistoryLimit is the number of failed backups

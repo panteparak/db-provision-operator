@@ -67,6 +67,9 @@ spec:
                 required:
                 - name
                 type: object
+              deletionProtection:
+                description: DeletionProtection prevents accidental deletion
+                type: boolean
               driftPolicy:
                 description: |-
                   DriftPolicy overrides the instance-level drift policy for this grant.

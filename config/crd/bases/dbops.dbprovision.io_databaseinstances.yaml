@@ -133,6 +133,9 @@ spec:
                 - host
                 - port
                 type: object
+              deletionProtection:
+                description: DeletionProtection prevents accidental deletion
+                type: boolean
               discovery:
                 description: |-
                   Discovery enables scanning for database resources not managed by Kubernetes CRs.
