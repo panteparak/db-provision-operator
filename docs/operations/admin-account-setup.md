@@ -12,7 +12,7 @@ The operator needs an admin account with sufficient privileges to:
 - Terminate connections (for force-drop operations)
 - Perform backup operations (SELECT access)
 
-Each database engine has a different privilege model. This guide provides complete SQL scripts for PostgreSQL, MySQL, and MariaDB.
+Each database engine has a different privilege model. This guide provides complete SQL scripts for PostgreSQL, MySQL, MariaDB, and CockroachDB.
 
 !!! warning "Do Not Use Superuser/Root"
     While superuser accounts work, they pose unnecessary security risks. A compromised operator could affect all databases on the server. Always use a dedicated least-privilege account.
@@ -310,6 +310,122 @@ DROP ROLE IF EXISTS test_role_check;
 
 ---
 
+## CockroachDB
+
+CockroachDB uses PostgreSQL wire protocol but has a simpler privilege model without true superuser accounts.
+
+### Insecure Mode vs Secure Mode
+
+| Mode | When to Use | Password Support |
+|------|-------------|------------------|
+| **Insecure** | Development, testing only | No passwords |
+| **Secure** | Production | Passwords required |
+
+!!! danger "Never Use Insecure Mode in Production"
+    CockroachDB's `--insecure` flag disables TLS and password authentication. This is only for local development and testing.
+
+### Required Privileges
+
+| Privilege | Purpose |
+|-----------|---------|
+| `CREATEDB` | Create and drop databases |
+| `CREATEROLE` | Create and manage users/roles |
+| `admin` role membership | Full management capabilities, grant delegation |
+
+### SQL Script (Insecure Mode)
+
+For development environments with `--insecure`:
+
+```sql
+-- ============================================
+-- CockroachDB Admin Account (Insecure Mode)
+-- ============================================
+
+-- Step 1: Create the operator admin user (no password in insecure mode)
+CREATE USER IF NOT EXISTS dbprovision_admin;
+
+-- Step 2: Grant database creation privilege
+ALTER USER dbprovision_admin WITH CREATEDB;
+
+-- Step 3: Grant role creation privilege
+ALTER USER dbprovision_admin WITH CREATEROLE;
+
+-- Step 4: Grant admin role for full management capabilities
+GRANT admin TO dbprovision_admin;
+
+-- Verify the setup
+SELECT username FROM system.users WHERE username = 'dbprovision_admin';
+SHOW GRANTS FOR dbprovision_admin;
+```
+
+### SQL Script (Secure Mode)
+
+For production environments with TLS certificates:
+
+```sql
+-- ============================================
+-- CockroachDB Admin Account (Secure Mode)
+-- ============================================
+
+-- Step 1: Create the operator admin user with password
+CREATE USER dbprovision_admin WITH PASSWORD 'your-secure-password-here';
+
+-- Step 2: Grant database creation privilege
+ALTER USER dbprovision_admin WITH CREATEDB;
+
+-- Step 3: Grant role creation privilege
+ALTER USER dbprovision_admin WITH CREATEROLE;
+
+-- Step 4: Grant admin role for full management capabilities
+-- Note: admin role is required for granting privileges to other users
+GRANT admin TO dbprovision_admin;
+
+-- Verify the setup
+SELECT username FROM system.users WHERE username = 'dbprovision_admin';
+SHOW GRANTS FOR dbprovision_admin;
+SHOW GRANTS ON ROLE FOR dbprovision_admin;
+```
+
+### Differences from PostgreSQL
+
+CockroachDB does not support these PostgreSQL features:
+
+| PostgreSQL | CockroachDB |
+|------------|-------------|
+| `SUPERUSER` | Not available (use `admin` role) |
+| `REPLICATION` | Not available |
+| `BYPASSRLS` | Not available (no RLS support) |
+| `INHERIT`/`NOINHERIT` | Not available |
+| `pg_signal_backend` | Not available |
+| `pg_read_all_data` | Use explicit grants |
+
+### Verification
+
+```sql
+-- Check user exists
+SELECT username FROM system.users WHERE username = 'dbprovision_admin';
+
+-- Check user options
+SHOW USERS;
+
+-- Check role memberships
+SHOW GRANTS ON ROLE FOR dbprovision_admin;
+
+-- Test database creation
+CREATE DATABASE IF NOT EXISTS test_db_creation;
+DROP DATABASE IF EXISTS test_db_creation;
+
+-- Test user creation
+CREATE USER IF NOT EXISTS test_user_creation;
+DROP USER IF EXISTS test_user_creation;
+```
+
+### TLS Configuration
+
+For secure mode, you need TLS certificates. See the [CockroachDB guide](../engines/cockroachdb.md#secure-mode-with-tls) for complete TLS configuration.
+
+---
+
 ## Kubernetes Secret
 
 After creating the admin account, create a Kubernetes Secret:
@@ -512,4 +628,5 @@ GRANT CONNECTION_ADMIN ON *.* TO 'dbprovision_admin'@'%';
 - [PostgreSQL Guide](../engines/postgresql.md) - PostgreSQL-specific features
 - [MySQL Guide](../engines/mysql.md) - MySQL-specific features
 - [MariaDB Guide](../engines/mariadb.md) - MariaDB-specific features
+- [CockroachDB Guide](../engines/cockroachdb.md) - CockroachDB-specific features
 - [Monitoring](monitoring.md) - Set up monitoring and alerting

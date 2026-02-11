@@ -528,6 +528,23 @@ docs-build: docs-deps ## Build documentation
 docs-deploy: docs-deps ## Deploy docs to gh-pages (manual)
 	mkdocs gh-deploy --force
 
+CRD_REF_DOCS ?= $(LOCALBIN)/crd-ref-docs
+CRD_REF_DOCS_VERSION ?= v0.3.0
+
+.PHONY: crd-ref-docs
+crd-ref-docs: $(CRD_REF_DOCS) ## Download crd-ref-docs locally if necessary.
+$(CRD_REF_DOCS): $(LOCALBIN)
+	$(call go-install-tool,$(CRD_REF_DOCS),github.com/elastic/crd-ref-docs,$(CRD_REF_DOCS_VERSION))
+
+.PHONY: generate-api-docs
+generate-api-docs: crd-ref-docs ## Generate API reference documentation from CRD types.
+	$(CRD_REF_DOCS) \
+		--source-path=./api/v1alpha1 \
+		--config=./docs/api/config.yaml \
+		--output-path=./docs/api/reference.md \
+		--renderer=markdown
+	@echo "API documentation generated at docs/api/reference.md"
+
 ##@ Build
 
 .PHONY: build

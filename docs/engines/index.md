@@ -9,17 +9,20 @@ DB Provision Operator supports multiple database engines with a unified API.
 | [PostgreSQL](postgresql.md) | ✅ Stable | 12, 13, 14, 15, 16 |
 | [MySQL](mysql.md) | ✅ Stable | 5.7, 8.0, 8.4 |
 | [MariaDB](mariadb.md) | ✅ Stable | 10.5, 10.6, 10.11, 11.x |
+| [CockroachDB](cockroachdb.md) | ✅ Stable | 22.x, 23.x, 24.x |
 
 ## Engine Comparison
 
-| Feature | PostgreSQL | MySQL | MariaDB |
-|---------|------------|-------|---------|
-| Roles | ✅ Native | ✅ 8.0+ | ✅ 10.0.5+ |
-| Row-Level Security | ✅ | ❌ | ❌ |
-| Extensions | ✅ | ❌ | ❌ |
-| Schemas | ✅ | ❌ | ❌ |
-| Default Privileges | ✅ | ❌ | ❌ |
-| Backup | pg_dump | mysqldump | mariadb-dump |
+| Feature | PostgreSQL | MySQL | MariaDB | CockroachDB |
+|---------|------------|-------|---------|-------------|
+| Roles | ✅ Native | ✅ 8.0+ | ✅ 10.0.5+ | ✅ Native |
+| Row-Level Security | ✅ | ❌ | ❌ | ❌ |
+| Extensions | ✅ | ❌ | ❌ | ❌ |
+| Schemas | ✅ | ❌ | ❌ | ❌ |
+| Default Privileges | ✅ | ❌ | ❌ | ❌ |
+| Backup | pg_dump | mysqldump | mariadb-dump | Native BACKUP |
+| Multi-Region | ❌ | ❌ | ❌ | ✅ Built-in |
+| Distributed | ❌ | ❌ | ❌ | ✅ Built-in |
 
 ## Choosing an Engine
 
@@ -51,6 +54,16 @@ Best for:
 - Additional storage engines
 - Galera cluster support
 
+### CockroachDB
+
+Best for:
+
+- Distributed SQL requirements
+- Multi-region deployments
+- Horizontal scalability
+- PostgreSQL wire compatibility
+- Strong consistency guarantees
+
 ## Engine-Specific Features
 
 ### PostgreSQL Only
@@ -81,6 +94,23 @@ spec:
       - "10.0.0.%"
 ```
 
+### CockroachDB
+
+CockroachDB uses PostgreSQL wire protocol but has a simpler configuration:
+
+```yaml
+spec:
+  engine: cockroachdb
+  connection:
+    host: cockroachdb.example.com
+    port: 26257
+    database: defaultdb
+    sslMode: verify-full  # or disable for insecure mode
+```
+
+!!! note "No Extensions or Schemas"
+    CockroachDB does not support PostgreSQL extensions or custom schemas. Use it for distributed SQL without PostgreSQL-specific features.
+
 ## Connection Configuration
 
 All engines use the same `DatabaseInstance` structure:
@@ -91,11 +121,11 @@ kind: DatabaseInstance
 metadata:
   name: my-database
 spec:
-  engine: postgres  # or mysql, mariadb
+  engine: postgres  # or mysql, mariadb, cockroachdb
   connection:
     host: database.example.com
-    port: 5432  # 3306 for MySQL/MariaDB
-    database: postgres  # mysql for MySQL/MariaDB
+    port: 5432  # 3306 for MySQL/MariaDB, 26257 for CockroachDB
+    database: postgres  # mysql for MySQL/MariaDB, defaultdb for CockroachDB
     secretRef:
       name: admin-credentials
 ```
@@ -105,3 +135,4 @@ spec:
 - [PostgreSQL Guide](postgresql.md) - PostgreSQL-specific features
 - [MySQL Guide](mysql.md) - MySQL-specific features
 - [MariaDB Guide](mariadb.md) - MariaDB-specific features
+- [CockroachDB Guide](cockroachdb.md) - CockroachDB-specific features

@@ -6,6 +6,8 @@ Ready-to-use examples for common scenarios.
 
 - [PostgreSQL Examples](postgresql.md) - Complete PostgreSQL setup
 - [MySQL Examples](mysql.md) - Complete MySQL setup
+- [CockroachDB Examples](cockroachdb.md) - Complete CockroachDB setup
+- [Drift Detection Examples](drift-detection.md) - Drift detection and correction patterns
 - [Advanced Examples](advanced.md) - Cross-namespace, TLS, cloud backups
 
 ## Sample Manifests
@@ -42,10 +44,18 @@ DOCS/examples/
 │   ├── 01-credentials.yaml
 │   ├── 02-instance.yaml
 │   └── 03-database.yaml
+├── cockroachdb/
+│   ├── 01-credentials.yaml
+│   ├── 02-instance.yaml
+│   ├── 03-database.yaml
+│   ├── 04-user.yaml
+│   ├── 05-role.yaml
+│   └── 06-grant.yaml
 └── advanced/
     ├── cross-namespace.yaml
     ├── tls-connection.yaml
-    └── backup-to-s3.yaml
+    ├── backup-to-s3.yaml
+    └── drift-detection.yaml
 ```
 
 ## Common Patterns
@@ -161,4 +171,6 @@ kubectl delete -f DOCS/examples/postgresql/01-credentials.yaml
 
 - [PostgreSQL Examples](postgresql.md) - Detailed PostgreSQL setup
 - [MySQL Examples](mysql.md) - Detailed MySQL setup
+- [CockroachDB Examples](cockroachdb.md) - Distributed SQL setup
+- [Drift Detection Examples](drift-detection.md) - Configuration drift management
 - [Advanced Examples](advanced.md) - Production patterns

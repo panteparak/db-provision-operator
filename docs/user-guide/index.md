@@ -111,6 +111,11 @@ status:
       lastTransitionTime: "2024-01-01T00:00:00Z"
 ```
 
+## Advanced Features
+
+- [Drift Detection](drift-detection.md) - Detect and correct configuration drift
+- [Deletion Protection](deletion-protection.md) - Prevent accidental resource deletion
+
 ## Next Steps
 
 - [DatabaseInstance](database-instances.md) - Start by connecting to your database server

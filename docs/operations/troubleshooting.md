@@ -231,6 +231,239 @@ kubectl logs job/myapp-restore-job
 | `backup not found` | Verify backup exists and path is correct |
 | `permission denied` | Check storage credentials |
 
+### Drift Detection Issues
+
+#### Drift Not Detected
+
+**Check drift mode:**
+```bash
+kubectl get database myapp -o jsonpath='{.spec.driftPolicy.mode}'
+# Must be "detect" or "correct", not "ignore"
+```
+
+**Check last drift check time:**
+```bash
+kubectl get database myapp -o jsonpath='{.status.drift.lastChecked}'
+```
+
+**Verify interval has passed:**
+```bash
+# Default is 5m, check configured interval
+kubectl get database myapp -o jsonpath='{.spec.driftPolicy.interval}'
+```
+
+**Check operator logs:**
+```bash
+kubectl logs -n db-provision-operator-system deployment/db-provision-operator | grep -i drift
+```
+
+#### Drift Detected But Not Corrected
+
+**Check drift mode:**
+```bash
+# Mode must be "correct", not "detect"
+kubectl get database myapp -o jsonpath='{.spec.driftPolicy.mode}'
+```
+
+**Check if field is immutable:**
+```bash
+kubectl get database myapp -o jsonpath='{.status.drift.diffs}' | jq '.[] | select(.immutable==true)'
+```
+
+**Check if correction is destructive:**
+```bash
+kubectl get database myapp -o jsonpath='{.status.drift.diffs}' | jq '.[] | select(.destructive==true)'
+```
+
+**Allow destructive corrections (use with caution):**
+```bash
+kubectl annotate database myapp dbops.dbprovision.io/allow-destructive-drift="true"
+```
+
+#### Drift Correction Failed
+
+**Check events:**
+```bash
+kubectl get events --field-selector reason=DriftCorrectionFailed,involvedObject.name=myapp
+```
+
+**Common causes:**
+
+| Cause | Solution |
+|-------|----------|
+| Insufficient privileges | Check admin account permissions |
+| Field is immutable | Cannot auto-correct, update spec to match |
+| Database object locked | Check for active transactions or locks |
+
+#### Drift Keeps Reappearing
+
+**Possible causes:**
+
+1. **External processes making changes:**
+   - Check for migration scripts, other operators, or manual changes
+
+2. **Application creating/modifying objects:**
+   - Review application database connection and permissions
+
+3. **Spec doesn't match intended state:**
+   - Update CR spec to match desired configuration
+
+### Deletion Protection Issues
+
+#### Cannot Delete Protected Resource
+
+**Check if deletion protection is enabled:**
+```bash
+kubectl get database myapp -o jsonpath='{.spec.deletionProtection}'
+```
+
+**Method 1: Disable protection in spec:**
+```bash
+kubectl patch database myapp -p '{"spec":{"deletionProtection":false}}'
+kubectl delete database myapp
+```
+
+**Method 2: Force delete annotation:**
+```bash
+kubectl annotate database myapp dbops.dbprovision.io/force-delete="true"
+# Resource will be deleted on next reconciliation
+```
+
+**Method 3: One-liner:**
+```bash
+kubectl patch database myapp -p '{"spec":{"deletionProtection":false}}' && kubectl delete database myapp
+```
+
+#### Resource Stuck in Terminating
+
+**Check for DeletionBlocked events:**
+```bash
+kubectl describe database myapp | grep -A5 "Events:"
+```
+
+**Check finalizers:**
+```bash
+kubectl get database myapp -o jsonpath='{.metadata.finalizers}'
+```
+
+**If operator is running, disable protection:**
+```bash
+kubectl patch database myapp -p '{"spec":{"deletionProtection":false}}'
+```
+
+**If operator is down (emergency only):**
+```bash
+# WARNING: Bypasses cleanup logic, may leave orphaned database objects
+kubectl patch database myapp -p '{"metadata":{"finalizers":null}}' --type=merge
+```
+
+#### Namespace Stuck Deleting
+
+**Find protected resources blocking deletion:**
+```bash
+kubectl get databases,databaseusers,databaseroles,databasegrants -n my-namespace \
+  -o jsonpath='{range .items[?(@.spec.deletionProtection==true)]}{.kind}/{.metadata.name}{"\n"}{end}'
+```
+
+**Force delete all protected resources:**
+```bash
+for kind in database databaseuser databaserole databasegrant databasebackupschedule; do
+  for name in $(kubectl get $kind -n my-namespace -o name 2>/dev/null); do
+    kubectl annotate $name -n my-namespace dbops.dbprovision.io/force-delete="true" --overwrite
+  done
+done
+```
+
+### CockroachDB Issues
+
+#### Connection Failed in Insecure Mode
+
+**Error:** `password authentication failed`
+
+**Cause:** CockroachDB insecure mode doesn't support passwords.
+
+**Solution:** Use empty password in secret:
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cockroach-admin-credentials
+type: Opaque
+stringData:
+  username: dbprovision_admin
+  password: ""  # Must be empty
+```
+
+**Verify insecure mode:**
+```bash
+kubectl exec -it cockroachdb-0 -- cockroach sql --insecure -e "SHOW CLUSTER SETTING server.host_based_authentication.enabled;"
+```
+
+#### Cannot Create User with Password
+
+**Error:** `password is not supported in insecure mode`
+
+**Cause:** Attempting to create user with password on insecure cluster.
+
+**Solution:** The operator automatically handles this. Users are created without passwords in insecure mode.
+
+#### Permission Denied for Grants
+
+**Error:** `must be admin or owner`
+
+**Cause:** Admin user doesn't have `admin` role membership.
+
+**Solution:**
+```sql
+-- Connect to CockroachDB as root
+GRANT admin TO dbprovision_admin;
+```
+
+#### Cannot Create Database
+
+**Error:** `user does not have CREATEDB privilege`
+
+**Solution:**
+```sql
+ALTER USER dbprovision_admin WITH CREATEDB;
+```
+
+#### TLS Certificate Errors
+
+**Error:** `certificate signed by unknown authority`
+
+**Check TLS configuration:**
+```bash
+kubectl get databaseinstance cockroach-cluster -o jsonpath='{.spec.tls}'
+```
+
+**Verify certificates:**
+```bash
+# Check secret contains required keys
+kubectl get secret cockroach-tls -o jsonpath='{.data}' | jq -r 'keys'
+# Should include: ca.crt, tls.crt, tls.key
+```
+
+**Test connection manually:**
+```bash
+kubectl run cockroach-test --rm -it --image=cockroachdb/cockroach:v24.1.0 -- \
+  sql --url="postgresql://user:pass@cockroachdb:26257/defaultdb?sslmode=verify-full&sslrootcert=/certs/ca.crt"
+```
+
+#### Backup Failed
+
+**Error:** `BACKUP requires admin role`
+
+**Solution:**
+```sql
+GRANT admin TO dbprovision_admin;
+```
+
+**Check backup job in CockroachDB:**
+```sql
+SELECT * FROM [SHOW JOBS] WHERE job_type = 'BACKUP' ORDER BY created DESC LIMIT 5;
+```
+
 ## Operator Issues
 
 ### Operator Not Starting

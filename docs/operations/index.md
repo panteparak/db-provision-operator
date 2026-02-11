@@ -8,6 +8,7 @@ This section covers:
 
 - [Admin Account Setup](admin-account-setup.md) - Set up least-privilege database admin accounts
 - [Monitoring](monitoring.md) - Prometheus metrics, Grafana dashboards, alerting
+- [Events](events.md) - Event reference and alerting integration
 - [Troubleshooting](troubleshooting.md) - Common issues and solutions
 
 ## Operational Tasks

@@ -2,6 +2,9 @@
 
 Complete API reference for all DB Provision Operator Custom Resource Definitions.
 
+!!! tip "Auto-Generated Reference"
+    For the complete auto-generated API reference with all fields and validation rules, see [API Reference (Full)](reference.md).
+
 ## API Group
 
 All resources belong to the `dbops.dbprovision.io` API group.
@@ -14,14 +17,14 @@ apiVersion: dbops.dbprovision.io/v1alpha1
 
 | Kind | Description | Scope |
 |------|-------------|-------|
-| `DatabaseInstance` | Database server connection | Namespaced |
-| `Database` | Logical database | Namespaced |
-| `DatabaseUser` | Database user | Namespaced |
-| `DatabaseRole` | Permission group | Namespaced |
-| `DatabaseGrant` | Fine-grained permissions | Namespaced |
-| `DatabaseBackup` | One-time backup | Namespaced |
-| `DatabaseBackupSchedule` | Scheduled backups | Namespaced |
-| `DatabaseRestore` | Restore operation | Namespaced |
+| [`DatabaseInstance`](#databaseinstance) | Database server connection | Namespaced |
+| [`Database`](#database) | Logical database | Namespaced |
+| [`DatabaseUser`](#databaseuser) | Database user | Namespaced |
+| [`DatabaseRole`](#databaserole) | Permission group | Namespaced |
+| [`DatabaseGrant`](#databasegrant) | Fine-grained permissions | Namespaced |
+| [`DatabaseBackup`](#databasebackup) | One-time backup | Namespaced |
+| [`DatabaseBackupSchedule`](#databasebackupschedule) | Scheduled backups | Namespaced |
+| [`DatabaseRestore`](#databaserestore) | Restore operation | Namespaced |
 
 ---
 
@@ -33,7 +36,7 @@ Represents a connection to a database server.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `engine` | string | Yes | Database engine: `postgres`, `mysql`, `mariadb` |
+| `engine` | string | Yes | Database engine: `postgres`, `mysql`, `mariadb`, `cockroachdb` |
 | `connection` | object | Yes | Connection configuration |
 | `healthCheck` | object | No | Health check configuration |
 
