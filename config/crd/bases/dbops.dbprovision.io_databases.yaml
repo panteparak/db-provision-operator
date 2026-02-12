@@ -153,6 +153,14 @@ spec:
                 x-kubernetes-validations:
                 - message: database name is immutable
                   rule: self == oldSelf
+              owner:
+                description: |-
+                  Owner specifies the database owner (role name). For role-based ownership patterns,
+                  set this to a service role rather than a user to enable safe credential rotation.
+                  If not specified, the database is owned by the connection user.
+                maxLength: 63
+                pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+                type: string
               postgres:
                 description: PostgreSQL-specific configuration (required when instance
                   engine is "postgres")
@@ -390,6 +398,10 @@ spec:
                     format: date-time
                     type: string
                 type: object
+              lastReconcileTime:
+                description: LastReconcileTime is when the last reconciliation occurred
+                format: date-time
+                type: string
               message:
                 description: Message provides additional information about the current
                   state
@@ -450,6 +462,11 @@ spec:
                       type: string
                     type: array
                 type: object
+              reconcileID:
+                description: |-
+                  ReconcileID is the unique identifier for the last reconciliation.
+                  Used for end-to-end tracing across logs, events, and status updates.
+                type: string
             type: object
         type: object
     served: true

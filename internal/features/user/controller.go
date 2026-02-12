@@ -36,6 +36,7 @@ import (
 	"github.com/db-provision-operator/internal/logging"
 	"github.com/db-provision-operator/internal/reconcileutil"
 	"github.com/db-provision-operator/internal/secret"
+	reconcilecontext "github.com/db-provision-operator/internal/shared/reconcile"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -79,13 +80,20 @@ func NewController(cfg ControllerConfig) *Controller {
 
 // Reconcile implements the reconciliation loop for DatabaseUser resources.
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := logf.FromContext(ctx).WithValues("user", req.NamespacedName)
+	// Generate reconcileID for end-to-end tracing
+	ctx, log, reconcileID := reconcilecontext.WithReconcileID(ctx)
+	log = log.WithValues("user", req.NamespacedName)
+	// Inject the enriched logger back into context for downstream functions
+	ctx = logf.IntoContext(ctx, log)
 
 	// Fetch the DatabaseUser resource
 	user := &dbopsv1alpha1.DatabaseUser{}
 	if err := c.Get(ctx, req.NamespacedName, user); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+
+	// Update reconcileID in status at the start of reconciliation
+	c.updateReconcileID(ctx, user, reconcileID)
 
 	if util.ShouldSkipReconcile(user) {
 		log.Info("Skipping reconciliation due to annotation")
@@ -103,10 +111,10 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 	}
 
-	return c.reconcile(ctx, user)
+	return c.reconcile(ctx, user, reconcileID)
 }
 
-func (c *Controller) reconcile(ctx context.Context, user *dbopsv1alpha1.DatabaseUser) (ctrl.Result, error) {
+func (c *Controller) reconcile(ctx context.Context, user *dbopsv1alpha1.DatabaseUser, reconcileID string) (ctrl.Result, error) {
 	log := logf.FromContext(ctx).WithValues("user", user.Name, "namespace", user.Namespace)
 
 	// Check if user exists
@@ -182,6 +190,11 @@ func (c *Controller) reconcile(ctx context.Context, user *dbopsv1alpha1.Database
 	util.SetReadyCondition(&user.Status.Conditions, metav1.ConditionTrue,
 		util.ReasonReconcileSuccess, "User is ready")
 
+	// Set reconcileID for end-to-end tracing
+	now := metav1.Now()
+	user.Status.ReconcileID = reconcileID
+	user.Status.LastReconcileTime = &now
+
 	if err := c.Status().Update(ctx, user); err != nil {
 		log.Error(err, "Failed to update status")
 		return ctrl.Result{}, err
@@ -201,16 +214,46 @@ func (c *Controller) ensureCredentialsSecret(ctx context.Context, user *dbopsv1a
 		return err
 	}
 
+	// Build base labels
+	labels := map[string]string{
+		"app.kubernetes.io/managed-by": "db-provision-operator",
+		"dbops.dbprovision.io/user":    user.Name,
+	}
+
+	// Build base annotations
+	annotations := map[string]string{}
+
+	// Determine secret type
+	secretType := corev1.SecretTypeOpaque
+
+	// Merge custom labels, annotations, and type from SecretTemplate
+	if user.Spec.PasswordSecret != nil && user.Spec.PasswordSecret.SecretTemplate != nil {
+		template := user.Spec.PasswordSecret.SecretTemplate
+
+		// Merge custom labels (custom labels override defaults)
+		for k, v := range template.Labels {
+			labels[k] = v
+		}
+
+		// Merge custom annotations
+		for k, v := range template.Annotations {
+			annotations[k] = v
+		}
+
+		// Use custom secret type if specified
+		if template.Type != "" {
+			secretType = template.Type
+		}
+	}
+
 	credSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: user.Namespace,
-			Labels: map[string]string{
-				"app.kubernetes.io/managed-by": "db-provision-operator",
-				"dbops.dbprovision.io/user":    user.Name,
-			},
+			Name:        secretName,
+			Namespace:   user.Namespace,
+			Labels:      labels,
+			Annotations: annotations,
 		},
-		Type: corev1.SecretTypeOpaque,
+		Type: secretType,
 		StringData: map[string]string{
 			"username": user.Spec.Username,
 			"password": password,
@@ -232,9 +275,11 @@ func (c *Controller) ensureCredentialsSecret(ctx context.Context, user *dbopsv1a
 		return err
 	}
 
-	// Update if exists
+	// Update if exists - update StringData, Labels, Annotations, and Type
 	existing.StringData = credSecret.StringData
 	existing.Labels = credSecret.Labels
+	existing.Annotations = credSecret.Annotations
+	existing.Type = credSecret.Type
 	return c.Update(ctx, existing)
 }
 
@@ -269,6 +314,19 @@ func (c *Controller) handleDeletion(ctx context.Context, user *dbopsv1alpha1.Dat
 
 	if deletionPolicy == dbopsv1alpha1.DeletionPolicyDelete {
 		force := util.HasForceDeleteAnnotation(user)
+
+		// Pre-deletion ownership check (skip if force-delete is set)
+		if !force {
+			blocked, err := c.checkOwnershipBeforeDelete(ctx, user)
+			if err != nil {
+				log.Error(err, "Failed to check ownership")
+				// Don't block deletion on check failure, proceed with deletion
+			} else if blocked {
+				// Ownership blocks deletion - status already updated by checkOwnershipBeforeDelete
+				return ctrl.Result{RequeueAfter: RequeueAfterError}, fmt.Errorf("deletion blocked: user owns database objects")
+			}
+		}
+
 		if err := c.handler.Delete(ctx, user.Spec.Username, &user.Spec, user.Namespace, force); err != nil {
 			log.Error(err, "Failed to delete user")
 			c.Recorder.Eventf(user, corev1.EventTypeWarning, "DeleteFailed", "Failed to delete user: %v", err)
@@ -277,6 +335,8 @@ func (c *Controller) handleDeletion(ctx context.Context, user *dbopsv1alpha1.Dat
 			}
 		} else {
 			c.Recorder.Eventf(user, corev1.EventTypeNormal, "Deleted", "User %s deleted successfully", user.Spec.Username)
+			// Clear ownership block status on successful deletion
+			user.Status.OwnershipBlock = nil
 		}
 	}
 
@@ -292,12 +352,75 @@ func (c *Controller) handleDeletion(ctx context.Context, user *dbopsv1alpha1.Dat
 	return ctrl.Result{}, nil
 }
 
+// checkOwnershipBeforeDelete checks if the user owns any database objects.
+// Returns true if deletion should be blocked, false if deletion can proceed.
+func (c *Controller) checkOwnershipBeforeDelete(ctx context.Context, user *dbopsv1alpha1.DatabaseUser) (bool, error) {
+	log := logf.FromContext(ctx).WithValues("user", user.Name, "namespace", user.Namespace)
+
+	ownershipResult, err := c.handler.GetOwnedObjects(ctx, user.Spec.Username, &user.Spec, user.Namespace)
+	if err != nil {
+		return false, fmt.Errorf("check owned objects: %w", err)
+	}
+
+	if !ownershipResult.BlocksDeletion {
+		// No owned objects, clear any previous ownership block status
+		if user.Status.OwnershipBlock != nil {
+			user.Status.OwnershipBlock = nil
+			if err := c.Status().Update(ctx, user); err != nil {
+				log.Error(err, "Failed to clear ownership block status")
+			}
+		}
+		return false, nil
+	}
+
+	// User owns objects - block deletion and update status
+	log.Info("Deletion blocked: user owns database objects",
+		"objectCount", len(ownershipResult.OwnedObjects),
+		"resolution", ownershipResult.Resolution)
+
+	now := metav1.Now()
+
+	// Convert handler's OwnedObject to API OwnedObject
+	apiOwnedObjects := make([]dbopsv1alpha1.OwnedObject, len(ownershipResult.OwnedObjects))
+	for i, obj := range ownershipResult.OwnedObjects {
+		apiOwnedObjects[i] = dbopsv1alpha1.OwnedObject{
+			Schema: obj.Schema,
+			Name:   obj.Name,
+			Type:   obj.Type,
+		}
+	}
+
+	user.Status.OwnershipBlock = &dbopsv1alpha1.OwnershipBlockStatus{
+		Blocked:       true,
+		LastCheckedAt: &now,
+		OwnedObjects:  apiOwnedObjects,
+		Resolution:    ownershipResult.Resolution,
+		Message:       fmt.Sprintf("User owns %d database objects. Run the resolution command before deleting.", len(ownershipResult.OwnedObjects)),
+	}
+	user.Status.Phase = dbopsv1alpha1.PhaseFailed
+	user.Status.Message = fmt.Sprintf("Deletion blocked: user owns %d database objects", len(ownershipResult.OwnedObjects))
+
+	util.SetReadyCondition(&user.Status.Conditions, metav1.ConditionFalse,
+		"OwnershipBlocks", fmt.Sprintf("User owns %d objects, cannot delete", len(ownershipResult.OwnedObjects)))
+
+	if err := c.Status().Update(ctx, user); err != nil {
+		log.Error(err, "Failed to update ownership block status")
+	}
+
+	c.Recorder.Event(user, corev1.EventTypeWarning, "DeletionBlocked",
+		reconcilecontext.EventMessage(ctx, fmt.Sprintf("Deletion blocked: user owns %d database objects. Resolution: %s",
+			len(ownershipResult.OwnedObjects), ownershipResult.Resolution)))
+
+	return true, nil
+}
+
 func (c *Controller) handleError(ctx context.Context, user *dbopsv1alpha1.DatabaseUser, err error, operation string) (ctrl.Result, error) {
 	log := logf.FromContext(ctx).WithValues("user", user.Name, "namespace", user.Namespace)
 
 	log.Error(err, "Reconciliation failed", "operation", operation)
 
-	c.Recorder.Eventf(user, corev1.EventTypeWarning, "ReconcileFailed", "Failed to %s: %v", operation, err)
+	c.Recorder.Event(user, corev1.EventTypeWarning, "ReconcileFailed",
+		reconcilecontext.EventMessage(ctx, fmt.Sprintf("Failed to %s: %v", operation, err)))
 
 	user.Status.Phase = dbopsv1alpha1.PhaseFailed
 	user.Status.Message = fmt.Sprintf("Failed to %s: %v", operation, err)
@@ -320,6 +443,17 @@ func (c *Controller) updatePhase(ctx context.Context, user *dbopsv1alpha1.Databa
 	if err := c.Status().Update(ctx, user); err != nil {
 		logf.FromContext(ctx).Error(err, "Failed to update phase", "phase", phase)
 	}
+}
+
+// updateReconcileID updates the reconcileID and lastReconcileTime in the status.
+// This enables end-to-end tracing across logs, events, and status updates.
+func (c *Controller) updateReconcileID(ctx context.Context, user *dbopsv1alpha1.DatabaseUser, reconcileID string) {
+	now := metav1.Now()
+	user.Status.ReconcileID = reconcileID
+	user.Status.LastReconcileTime = &now
+
+	// Note: We don't update the status here to avoid a separate API call.
+	// The reconcileID will be persisted when the status is updated at the end of reconciliation.
 }
 
 // SetupWithManager registers the controller with the manager.

@@ -329,3 +329,27 @@ func (s *UserService) Exists(ctx context.Context, username string) (bool, error)
 	op.Debug("existence check complete", "exists", exists)
 	return exists, nil
 }
+
+// GetOwnedObjects retrieves all database objects owned by the specified user.
+// This is used for pre-deletion safety checks to prevent dropping users
+// that own database objects.
+func (s *UserService) GetOwnedObjects(ctx context.Context, username string) ([]types.OwnedObject, error) {
+	if username == "" {
+		return nil, &ValidationError{Field: "username", Message: "username is required"}
+	}
+
+	op := s.startOp("GetOwnedObjects", username)
+
+	// Apply query timeout
+	ctx, cancel := s.config.Timeouts.WithQueryTimeout(ctx)
+	defer cancel()
+
+	objects, err := s.adapter.GetOwnedObjects(ctx, username)
+	if err != nil {
+		op.Error(err, "failed to get owned objects")
+		return nil, s.wrapError(ctx, s.config, "get owned objects", username, err)
+	}
+
+	op.Debug("owned objects retrieved", "count", len(objects))
+	return objects, nil
+}

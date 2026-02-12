@@ -26,15 +26,16 @@ import (
 
 // MockRepository is a mock implementation of user repository operations for testing.
 type MockRepository struct {
-	CreateFunc       func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error)
-	ExistsFunc       func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error)
-	UpdateFunc       func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error)
-	DeleteFunc       func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, force bool) error
-	SetPasswordFunc  func(ctx context.Context, username, password string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error
-	GetInstanceFunc  func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error)
-	GetEngineFunc    func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error)
-	DetectDriftFunc  func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, allowDestructive bool) (*drift.Result, error)
-	CorrectDriftFunc func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error)
+	CreateFunc          func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error)
+	ExistsFunc          func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error)
+	UpdateFunc          func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error)
+	DeleteFunc          func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, force bool) error
+	SetPasswordFunc     func(ctx context.Context, username, password string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error
+	GetInstanceFunc     func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error)
+	GetEngineFunc       func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error)
+	GetOwnedObjectsFunc func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) ([]OwnedObject, error)
+	DetectDriftFunc     func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, allowDestructive bool) (*drift.Result, error)
+	CorrectDriftFunc    func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error)
 
 	// Call tracking
 	Calls []MockCall
@@ -77,6 +78,9 @@ func NewMockRepository() *MockRepository {
 	}
 	m.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
 		return "postgres", nil
+	}
+	m.GetOwnedObjectsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) ([]OwnedObject, error) {
+		return []OwnedObject{}, nil
 	}
 	m.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
 		return &drift.Result{}, nil
@@ -133,6 +137,12 @@ func (m *MockRepository) GetInstance(ctx context.Context, spec *dbopsv1alpha1.Da
 func (m *MockRepository) GetEngine(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
 	m.recordCall("GetEngine", spec, namespace)
 	return m.GetEngineFunc(ctx, spec, namespace)
+}
+
+// GetOwnedObjects implements the get owned objects operation.
+func (m *MockRepository) GetOwnedObjects(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) ([]OwnedObject, error) {
+	m.recordCall("GetOwnedObjects", username, spec, namespace)
+	return m.GetOwnedObjectsFunc(ctx, username, spec, namespace)
 }
 
 // DetectDrift implements drift detection.

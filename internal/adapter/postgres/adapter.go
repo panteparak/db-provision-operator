@@ -299,3 +299,91 @@ func escapeLiteral(s string) string {
 	escaped := strings.ReplaceAll(s, `'`, `''`)
 	return `'` + escaped + `'`
 }
+
+// SetResourceComment sets a tracking comment on a database resource using COMMENT ON.
+// Implements the ResourceTracker interface.
+// resourceType: "database", "role", "user", "schema"
+// resourceName: The name of the resource
+// comment: The tracking metadata string
+func (a *Adapter) SetResourceComment(ctx context.Context, resourceType, resourceName, comment string) error {
+	pool, err := a.getPool()
+	if err != nil {
+		return err
+	}
+
+	var query string
+	switch resourceType {
+	case "database":
+		query = fmt.Sprintf("COMMENT ON DATABASE %s IS %s",
+			escapeIdentifier(resourceName), escapeLiteral(comment))
+	case "role", "user":
+		query = fmt.Sprintf("COMMENT ON ROLE %s IS %s",
+			escapeIdentifier(resourceName), escapeLiteral(comment))
+	case "schema":
+		query = fmt.Sprintf("COMMENT ON SCHEMA %s IS %s",
+			escapeIdentifier(resourceName), escapeLiteral(comment))
+	default:
+		return fmt.Errorf("unsupported resource type for comment: %s", resourceType)
+	}
+
+	_, err = pool.Exec(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to set comment on %s %s: %w", resourceType, resourceName, err)
+	}
+
+	return nil
+}
+
+// GetResourceComment retrieves the tracking comment from a database resource.
+// Implements the ResourceTracker interface.
+// Returns empty string if no comment is set.
+func (a *Adapter) GetResourceComment(ctx context.Context, resourceType, resourceName string) (string, error) {
+	pool, err := a.getPool()
+	if err != nil {
+		return "", err
+	}
+
+	var query string
+	switch resourceType {
+	case "database":
+		query = `SELECT COALESCE(description, '') FROM pg_shdescription
+			JOIN pg_database ON objoid = pg_database.oid
+			WHERE datname = $1`
+	case "role", "user":
+		query = `SELECT COALESCE(description, '') FROM pg_shdescription
+			JOIN pg_roles ON objoid = pg_roles.oid
+			WHERE rolname = $1`
+	case "schema":
+		query = `SELECT COALESCE(obj_description($1::regnamespace, 'pg_namespace'), '')`
+	default:
+		return "", fmt.Errorf("unsupported resource type for comment: %s", resourceType)
+	}
+
+	var comment string
+	err = pool.QueryRow(ctx, query, resourceName).Scan(&comment)
+	if err != nil {
+		// No rows means no comment set
+		if strings.Contains(err.Error(), "no rows") {
+			return "", nil
+		}
+		return "", fmt.Errorf("failed to get comment for %s %s: %w", resourceType, resourceName, err)
+	}
+
+	return comment, nil
+}
+
+// SetUserAttribute is a no-op for PostgreSQL as it doesn't support user attributes.
+// PostgreSQL uses COMMENT ON ROLE instead.
+func (a *Adapter) SetUserAttribute(ctx context.Context, username, key, value string) error {
+	// PostgreSQL doesn't have MySQL-style user attributes
+	// Use SetResourceComment with type="role" instead
+	return nil
+}
+
+// GetUserAttribute is a no-op for PostgreSQL as it doesn't support user attributes.
+// PostgreSQL uses COMMENT ON ROLE instead.
+func (a *Adapter) GetUserAttribute(ctx context.Context, username, key string) (string, error) {
+	// PostgreSQL doesn't have MySQL-style user attributes
+	// Use GetResourceComment with type="role" instead
+	return "", nil
+}

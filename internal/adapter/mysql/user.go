@@ -356,3 +356,120 @@ func (a *Adapter) GetUserInfo(ctx context.Context, username string) (*types.User
 
 	return &info, nil
 }
+
+// GetOwnedObjects returns database objects where the user is the DEFINER.
+// In MySQL, objects don't have traditional "owners" like PostgreSQL, but
+// views, routines, triggers, and events have a DEFINER attribute.
+func (a *Adapter) GetOwnedObjects(ctx context.Context, username string) ([]types.OwnedObject, error) {
+	db, err := a.getDB()
+	if err != nil {
+		return nil, err
+	}
+
+	var objects []types.OwnedObject
+
+	// MySQL stores DEFINER as 'username@host', so we need to match the username part
+	// For simplicity, we match any host variant of the username
+
+	// Query views where user is DEFINER
+	viewQuery := `
+		SELECT TABLE_SCHEMA, TABLE_NAME, 'view'
+		FROM information_schema.VIEWS
+		WHERE DEFINER LIKE CONCAT(?, '@%')
+		  AND TABLE_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys')`
+
+	rows, err := db.QueryContext(ctx, viewQuery, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query views: %w", err)
+	}
+
+	for rows.Next() {
+		var obj types.OwnedObject
+		if err := rows.Scan(&obj.Schema, &obj.Name, &obj.Type); err != nil {
+			_ = rows.Close()
+			return nil, fmt.Errorf("failed to scan view: %w", err)
+		}
+		objects = append(objects, obj)
+	}
+	_ = rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating views: %w", err)
+	}
+
+	// Query routines (procedures and functions) where user is DEFINER
+	routineQuery := `
+		SELECT ROUTINE_SCHEMA, ROUTINE_NAME,
+		       CASE ROUTINE_TYPE
+		         WHEN 'PROCEDURE' THEN 'procedure'
+		         WHEN 'FUNCTION' THEN 'function'
+		       END
+		FROM information_schema.ROUTINES
+		WHERE DEFINER LIKE CONCAT(?, '@%')
+		  AND ROUTINE_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys')`
+
+	rows, err = db.QueryContext(ctx, routineQuery, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query routines: %w", err)
+	}
+
+	for rows.Next() {
+		var obj types.OwnedObject
+		if err := rows.Scan(&obj.Schema, &obj.Name, &obj.Type); err != nil {
+			_ = rows.Close()
+			return nil, fmt.Errorf("failed to scan routine: %w", err)
+		}
+		objects = append(objects, obj)
+	}
+	_ = rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating routines: %w", err)
+	}
+
+	// Query triggers where user is DEFINER
+	triggerQuery := `
+		SELECT TRIGGER_SCHEMA, TRIGGER_NAME, 'trigger'
+		FROM information_schema.TRIGGERS
+		WHERE DEFINER LIKE CONCAT(?, '@%')
+		  AND TRIGGER_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys')`
+
+	rows, err = db.QueryContext(ctx, triggerQuery, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query triggers: %w", err)
+	}
+
+	for rows.Next() {
+		var obj types.OwnedObject
+		if err := rows.Scan(&obj.Schema, &obj.Name, &obj.Type); err != nil {
+			_ = rows.Close()
+			return nil, fmt.Errorf("failed to scan trigger: %w", err)
+		}
+		objects = append(objects, obj)
+	}
+	_ = rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating triggers: %w", err)
+	}
+
+	// Query events where user is DEFINER
+	eventQuery := `
+		SELECT EVENT_SCHEMA, EVENT_NAME, 'event'
+		FROM information_schema.EVENTS
+		WHERE DEFINER LIKE CONCAT(?, '@%')
+		  AND EVENT_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys')`
+
+	rows, err = db.QueryContext(ctx, eventQuery, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query events: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var obj types.OwnedObject
+		if err := rows.Scan(&obj.Schema, &obj.Name, &obj.Type); err != nil {
+			return nil, fmt.Errorf("failed to scan event: %w", err)
+		}
+		objects = append(objects, obj)
+	}
+
+	return objects, rows.Err()
+}

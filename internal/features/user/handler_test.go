@@ -612,3 +612,173 @@ func TestHandler_EventPublishing(t *testing.T) {
 		assert.Len(t, mockEventBus.PublishedEvents, 1)
 	})
 }
+
+func TestHandler_GetOwnedObjects(t *testing.T) {
+	tests := []struct {
+		name            string
+		username        string
+		spec            *dbopsv1alpha1.DatabaseUserSpec
+		namespace       string
+		setupMock       func(*MockRepository)
+		wantErr         bool
+		errContains     string
+		wantOwnsObjects bool
+		wantObjectCount int
+		wantBlocked     bool
+	}{
+		{
+			name:     "user owns no objects",
+			username: "testuser",
+			spec: &dbopsv1alpha1.DatabaseUserSpec{
+				Username: "testuser",
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
+					Name: "test-instance",
+				},
+			},
+			namespace: "default",
+			setupMock: func(m *MockRepository) {
+				m.GetOwnedObjectsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) ([]OwnedObject, error) {
+					return []OwnedObject{}, nil
+				}
+			},
+			wantErr:         false,
+			wantOwnsObjects: false,
+			wantObjectCount: 0,
+			wantBlocked:     false,
+		},
+		{
+			name:     "user owns tables - blocks deletion",
+			username: "testuser",
+			spec: &dbopsv1alpha1.DatabaseUserSpec{
+				Username: "testuser",
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
+					Name: "test-instance",
+				},
+			},
+			namespace: "default",
+			setupMock: func(m *MockRepository) {
+				m.GetOwnedObjectsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) ([]OwnedObject, error) {
+					return []OwnedObject{
+						{Schema: "public", Name: "users", Type: "table"},
+						{Schema: "public", Name: "orders", Type: "table"},
+					}, nil
+				}
+			},
+			wantErr:         false,
+			wantOwnsObjects: true,
+			wantObjectCount: 2,
+			wantBlocked:     true,
+		},
+		{
+			name:     "user owns mixed objects",
+			username: "appuser",
+			spec: &dbopsv1alpha1.DatabaseUserSpec{
+				Username: "appuser",
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
+					Name: "test-instance",
+				},
+			},
+			namespace: "default",
+			setupMock: func(m *MockRepository) {
+				m.GetOwnedObjectsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) ([]OwnedObject, error) {
+					return []OwnedObject{
+						{Schema: "public", Name: "mytable", Type: "table"},
+						{Schema: "public", Name: "myseq", Type: "sequence"},
+						{Schema: "app", Name: "myfunc", Type: "function"},
+					}, nil
+				}
+			},
+			wantErr:         false,
+			wantOwnsObjects: true,
+			wantObjectCount: 3,
+			wantBlocked:     true,
+		},
+		{
+			name:     "repository error",
+			username: "testuser",
+			spec: &dbopsv1alpha1.DatabaseUserSpec{
+				Username: "testuser",
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
+					Name: "test-instance",
+				},
+			},
+			namespace: "default",
+			setupMock: func(m *MockRepository) {
+				m.GetOwnedObjectsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) ([]OwnedObject, error) {
+					return nil, errors.New("connection failed")
+				}
+			},
+			wantErr:     true,
+			errContains: "get owned objects",
+		},
+		{
+			name:     "uses custom service role in resolution",
+			username: "testuser",
+			spec: &dbopsv1alpha1.DatabaseUserSpec{
+				Username: "testuser",
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
+					Name: "test-instance",
+				},
+				PasswordRotation: &dbopsv1alpha1.PasswordRotationConfig{
+					ServiceRole: &dbopsv1alpha1.ServiceRoleConfig{
+						Name: "custom_service_role",
+					},
+				},
+			},
+			namespace: "default",
+			setupMock: func(m *MockRepository) {
+				m.GetOwnedObjectsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) ([]OwnedObject, error) {
+					return []OwnedObject{
+						{Schema: "public", Name: "mytable", Type: "table"},
+					}, nil
+				}
+			},
+			wantErr:         false,
+			wantOwnsObjects: true,
+			wantObjectCount: 1,
+			wantBlocked:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := NewMockRepository()
+			if tt.setupMock != nil {
+				tt.setupMock(mockRepo)
+			}
+
+			handler := &Handler{
+				repo:   mockRepo,
+				logger: logr.Discard(),
+			}
+
+			result, err := handler.GetOwnedObjects(context.Background(), tt.username, tt.spec, tt.namespace)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			assert.Equal(t, tt.wantOwnsObjects, result.OwnsObjects)
+			assert.Equal(t, tt.wantObjectCount, len(result.OwnedObjects))
+			assert.Equal(t, tt.wantBlocked, result.BlocksDeletion)
+
+			// Verify resolution message contains correct role
+			if tt.wantOwnsObjects {
+				assert.NotEmpty(t, result.Resolution)
+				assert.Contains(t, result.Resolution, "REASSIGN OWNED BY")
+				assert.Contains(t, result.Resolution, tt.username)
+
+				// Check custom service role if specified
+				if tt.spec.PasswordRotation != nil && tt.spec.PasswordRotation.ServiceRole != nil && tt.spec.PasswordRotation.ServiceRole.Name != "" {
+					assert.Contains(t, result.Resolution, tt.spec.PasswordRotation.ServiceRole.Name)
+				}
+			}
+		})
+	}
+}

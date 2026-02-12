@@ -253,3 +253,37 @@ func (r *Repository) CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.Datab
 
 	return correctionResult, err
 }
+
+// OwnedObject represents a database object owned by a user.
+// This mirrors the adapter types.OwnedObject for use in the handler layer.
+type OwnedObject struct {
+	Schema string
+	Name   string
+	Type   string
+}
+
+// GetOwnedObjects retrieves all database objects owned by the specified user.
+// This is used for pre-deletion safety checks to prevent dropping users
+// that own database objects.
+func (r *Repository) GetOwnedObjects(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) ([]OwnedObject, error) {
+	var objects []OwnedObject
+
+	err := r.withService(ctx, spec, namespace, func(svc *service.UserService, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
+		adapterObjects, err := svc.GetOwnedObjects(ctx, username)
+		if err != nil {
+			return fmt.Errorf("get owned objects: %w", err)
+		}
+
+		// Convert from adapter types to repository types
+		for _, obj := range adapterObjects {
+			objects = append(objects, OwnedObject{
+				Schema: obj.Schema,
+				Name:   obj.Name,
+				Type:   obj.Type,
+			})
+		}
+		return nil
+	})
+
+	return objects, err
+}

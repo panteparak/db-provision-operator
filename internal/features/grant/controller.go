@@ -36,6 +36,7 @@ import (
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/logging"
 	"github.com/db-provision-operator/internal/reconcileutil"
+	reconcilecontext "github.com/db-provision-operator/internal/shared/reconcile"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -76,7 +77,11 @@ func NewController(cfg ControllerConfig) *Controller {
 
 // Reconcile implements the reconciliation loop for DatabaseGrant resources.
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := logf.FromContext(ctx).WithValues("grant", req.NamespacedName)
+	// Generate reconcileID for end-to-end tracing
+	ctx, log, reconcileID := reconcilecontext.WithReconcileID(ctx)
+	log = log.WithValues("grant", req.NamespacedName)
+	// Inject the enriched logger back into context for downstream functions
+	ctx = logf.IntoContext(ctx, log)
 
 	// Fetch the DatabaseGrant resource
 	grant := &dbopsv1alpha1.DatabaseGrant{}
@@ -100,10 +105,10 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 	}
 
-	return c.reconcile(ctx, grant)
+	return c.reconcile(ctx, grant, reconcileID)
 }
 
-func (c *Controller) reconcile(ctx context.Context, grant *dbopsv1alpha1.DatabaseGrant) (ctrl.Result, error) {
+func (c *Controller) reconcile(ctx context.Context, grant *dbopsv1alpha1.DatabaseGrant, reconcileID string) (ctrl.Result, error) {
 	log := logf.FromContext(ctx).WithValues("grant", grant.Name, "namespace", grant.Namespace)
 
 	// Check if the referenced user exists and is ready
@@ -159,6 +164,11 @@ func (c *Controller) reconcile(ctx context.Context, grant *dbopsv1alpha1.Databas
 		util.ReasonReconcileSuccess, "Grants are synced")
 	util.SetReadyCondition(&grant.Status.Conditions, metav1.ConditionTrue,
 		util.ReasonReconcileSuccess, "Grants are ready")
+
+	// Set reconcileID for end-to-end tracing
+	now := metav1.Now()
+	grant.Status.ReconcileID = reconcileID
+	grant.Status.LastReconcileTime = &now
 
 	if err := c.Status().Update(ctx, grant); err != nil {
 		log.Error(err, "Failed to update status")
@@ -269,7 +279,8 @@ func (c *Controller) handleError(ctx context.Context, grant *dbopsv1alpha1.Datab
 	log := logf.FromContext(ctx).WithValues("grant", grant.Name, "namespace", grant.Namespace)
 
 	log.Error(err, "Reconciliation failed", "operation", operation)
-	c.Recorder.Eventf(grant, corev1.EventTypeWarning, "ReconcileFailed", "Failed to %s: %v", operation, err)
+	c.Recorder.Event(grant, corev1.EventTypeWarning, "ReconcileFailed",
+		reconcilecontext.EventMessage(ctx, fmt.Sprintf("Failed to %s: %v", operation, err)))
 
 	grant.Status.Phase = dbopsv1alpha1.PhaseFailed
 	grant.Status.Message = fmt.Sprintf("Failed to %s: %v", operation, err)

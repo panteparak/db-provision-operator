@@ -461,7 +461,7 @@ func NewDatabaseGrant(name, namespace string) *DatabaseGrantBuilder {
 
 // WithUserRef sets the user reference.
 func (b *DatabaseGrantBuilder) WithUserRef(name string) *DatabaseGrantBuilder {
-	b.grant.Spec.UserRef = dbopsv1alpha1.UserReference{
+	b.grant.Spec.UserRef = &dbopsv1alpha1.UserReference{
 		Name: name,
 	}
 	return b
@@ -469,7 +469,24 @@ func (b *DatabaseGrantBuilder) WithUserRef(name string) *DatabaseGrantBuilder {
 
 // WithUserRefAndNamespace sets the user reference with namespace.
 func (b *DatabaseGrantBuilder) WithUserRefAndNamespace(name, namespace string) *DatabaseGrantBuilder {
-	b.grant.Spec.UserRef = dbopsv1alpha1.UserReference{
+	b.grant.Spec.UserRef = &dbopsv1alpha1.UserReference{
+		Name:      name,
+		Namespace: namespace,
+	}
+	return b
+}
+
+// WithRoleRef sets the role reference.
+func (b *DatabaseGrantBuilder) WithRoleRef(name string) *DatabaseGrantBuilder {
+	b.grant.Spec.RoleRef = &dbopsv1alpha1.RoleReference{
+		Name: name,
+	}
+	return b
+}
+
+// WithRoleRefAndNamespace sets the role reference with namespace.
+func (b *DatabaseGrantBuilder) WithRoleRefAndNamespace(name, namespace string) *DatabaseGrantBuilder {
+	b.grant.Spec.RoleRef = &dbopsv1alpha1.RoleReference{
 		Name:      name,
 		Namespace: namespace,
 	}

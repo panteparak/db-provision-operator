@@ -43,6 +43,9 @@ type API interface {
 	// ResolveInstance resolves the instance reference via the user's instanceRef or clusterInstanceRef.
 	ResolveInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*instanceresolver.ResolvedInstance, error)
 
+	// ResolveTarget resolves the target of the grant (user or role).
+	ResolveTarget(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*TargetInfo, error)
+
 	// DetectDrift compares the CR spec to the actual grant state and returns any differences.
 	DetectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, allowDestructive bool) (*drift.Result, error)
 
@@ -57,6 +60,21 @@ type Result struct {
 	DirectGrants      int32
 	DefaultPrivileges int32
 	Message           string
+}
+
+// TargetInfo contains resolved information about the grant target.
+type TargetInfo struct {
+	// Type is "user" or "role"
+	Type string
+
+	// Name is the K8s resource name
+	Name string
+
+	// Namespace is the K8s resource namespace
+	Namespace string
+
+	// DatabaseName is the actual database username/rolename
+	DatabaseName string
 }
 
 // RepositoryInterface defines the interface for grant repository operations.
@@ -80,6 +98,9 @@ type RepositoryInterface interface {
 
 	// ResolveInstance resolves the instance reference via the user's instanceRef or clusterInstanceRef.
 	ResolveInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*instanceresolver.ResolvedInstance, error)
+
+	// ResolveTarget resolves the target of the grant (user or role).
+	ResolveTarget(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*TargetInfo, error)
 
 	// GetEngine returns the database engine type for a given spec.
 	GetEngine(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (string, error)

@@ -208,6 +208,17 @@ type UserReference struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
+// RoleReference references a DatabaseRole
+type RoleReference struct {
+	// Name of the DatabaseRole resource
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Namespace of the DatabaseRole (defaults to the resource namespace)
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+}
+
 // BackupReference references a DatabaseBackup
 type BackupReference struct {
 	// Name of the DatabaseBackup resource
@@ -484,6 +495,30 @@ type ExistingPasswordSecret struct {
 	Key string `json:"key"`
 }
 
+// RotationStrategy defines the type of rotation strategy
+// +kubebuilder:validation:Enum=role-inheritance;dual-password
+type RotationStrategy string
+
+const (
+	// RotationStrategyRoleInheritance creates new users that inherit from a service role (PostgreSQL)
+	RotationStrategyRoleInheritance RotationStrategy = "role-inheritance"
+	// RotationStrategyDualPassword uses RETAIN CURRENT PASSWORD feature (MySQL 8.0+)
+	RotationStrategyDualPassword RotationStrategy = "dual-password"
+)
+
+// OldUserAction defines what happens to old users after rotation
+// +kubebuilder:validation:Enum=retain;disable;delete
+type OldUserAction string
+
+const (
+	// OldUserActionRetain keeps the old user without changes
+	OldUserActionRetain OldUserAction = "retain"
+	// OldUserActionDisable disables login for the old user
+	OldUserActionDisable OldUserAction = "disable"
+	// OldUserActionDelete removes the old user from the database
+	OldUserActionDelete OldUserAction = "delete"
+)
+
 // PasswordRotationConfig defines password rotation settings
 type PasswordRotationConfig struct {
 	// Enabled enables automatic password rotation
@@ -497,6 +532,74 @@ type PasswordRotationConfig struct {
 	// MaxAge is the maximum age of a password before rotation (e.g., "90d")
 	// +optional
 	MaxAge string `json:"maxAge,omitempty"`
+
+	// Strategy defines the rotation strategy to use
+	// - role-inheritance: Create new users with role membership (PostgreSQL)
+	// - dual-password: Use RETAIN CURRENT PASSWORD (MySQL 8.0+)
+	// +kubebuilder:default=role-inheritance
+	// +optional
+	Strategy RotationStrategy `json:"strategy,omitempty"`
+
+	// ServiceRole defines the service role for PostgreSQL role-inheritance strategy
+	// +optional
+	ServiceRole *ServiceRoleConfig `json:"serviceRole,omitempty"`
+
+	// UserNaming defines the naming pattern for rotated users
+	// Available variables: {{.Username}}, {{.Date}}, {{.Timestamp}}
+	// Example: "{{.Username}}_{{.Date}}" produces "myuser_20240115"
+	// +kubebuilder:default="{{.Username}}_{{.Date}}"
+	// +optional
+	UserNaming string `json:"userNaming,omitempty"`
+
+	// OldUserPolicy defines what happens to old users after rotation
+	// +optional
+	OldUserPolicy *OldUserPolicy `json:"oldUserPolicy,omitempty"`
+
+	// MySQL defines MySQL-specific rotation settings
+	// +optional
+	MySQL *MySQLRotationConfig `json:"mysql,omitempty"`
+}
+
+// ServiceRoleConfig defines the service role for PostgreSQL rotation
+type ServiceRoleConfig struct {
+	// Name is the name of the service role
+	// If not specified, defaults to "{{.Username}}_service"
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// AutoCreate creates the service role if it doesn't exist
+	// +kubebuilder:default=true
+	// +optional
+	AutoCreate bool `json:"autoCreate,omitempty"`
+}
+
+// OldUserPolicy defines the policy for handling old users after rotation
+type OldUserPolicy struct {
+	// Action defines what to do with the old user
+	// +kubebuilder:default=delete
+	// +optional
+	Action OldUserAction `json:"action,omitempty"`
+
+	// GracePeriodDays is the number of days to wait before applying the action
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=7
+	// +optional
+	GracePeriodDays int32 `json:"gracePeriodDays,omitempty"`
+
+	// OwnershipCheck blocks deletion if the user owns database objects
+	// +kubebuilder:default=true
+	// +optional
+	OwnershipCheck bool `json:"ownershipCheck,omitempty"`
+}
+
+// MySQLRotationConfig defines MySQL-specific rotation settings
+type MySQLRotationConfig struct {
+	// DiscardOldPasswordAfterDays is the number of days after which the old password is discarded
+	// Only used with dual-password strategy
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=7
+	// +optional
+	DiscardOldPasswordAfterDays int32 `json:"discardOldPasswordAfterDays,omitempty"`
 }
 
 // RetentionPolicy defines backup retention settings
@@ -597,3 +700,65 @@ const (
 	ReasonRestoreSucceeded     = "RestoreSucceeded"
 	ReasonRestoreFailed        = "RestoreFailed"
 )
+
+// ResourceTrackingConfig defines how managed resources are tagged in the database.
+// This enables identification of operator-managed resources at the database level.
+type ResourceTrackingConfig struct {
+	// Enabled enables resource tracking via database-native metadata
+	// +kubebuilder:default=true
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
+
+	// CommentFormat defines the format for PostgreSQL/CockroachDB COMMENT ON statements.
+	// Available variables: {{.Operator}}, {{.Namespace}}, {{.Name}}, {{.Kind}}, {{.UID}}
+	// Default: "managed-by:{{.Operator}},cr:{{.Namespace}}/{{.Name}}"
+	// +kubebuilder:default="managed-by:{{.Operator}},cr:{{.Namespace}}/{{.Name}}"
+	// +optional
+	CommentFormat string `json:"commentFormat,omitempty"`
+
+	// MySQL defines MySQL-specific tracking configuration
+	// +optional
+	MySQL *MySQLResourceTrackingConfig `json:"mysql,omitempty"`
+}
+
+// MySQLResourceTrackingConfig defines MySQL-specific resource tracking settings
+type MySQLResourceTrackingConfig struct {
+	// UseUserAttributes uses MySQL 8.0.21+ user attributes for tracking (recommended)
+	// When enabled, uses: CREATE USER ... ATTRIBUTE '{"managed_by":"...", ...}'
+	// +kubebuilder:default=true
+	// +optional
+	UseUserAttributes bool `json:"useUserAttributes,omitempty"`
+
+	// MetadataTableName is the table name for tracking when user attributes aren't available
+	// Used for MySQL < 8.0.21 or when useUserAttributes is false
+	// Default: "_dbops_metadata"
+	// +kubebuilder:default="_dbops_metadata"
+	// +optional
+	MetadataTableName string `json:"metadataTableName,omitempty"`
+
+	// MetadataDatabase is the database where the metadata table is created
+	// Default: uses the admin database from connection config
+	// +optional
+	MetadataDatabase string `json:"metadataDatabase,omitempty"`
+}
+
+// ResourceTrackingInfo contains tracking information for a managed resource
+type ResourceTrackingInfo struct {
+	// Operator is the operator name (always "db-provision-operator")
+	Operator string `json:"operator,omitempty"`
+
+	// Kind is the Kubernetes resource kind (e.g., "Database", "DatabaseUser")
+	Kind string `json:"kind,omitempty"`
+
+	// Name is the Kubernetes resource name
+	Name string `json:"name,omitempty"`
+
+	// Namespace is the Kubernetes resource namespace (empty for cluster-scoped)
+	Namespace string `json:"namespace,omitempty"`
+
+	// UID is the Kubernetes resource UID for precise correlation
+	UID string `json:"uid,omitempty"`
+
+	// ManagedSince is when the resource was first tracked
+	ManagedSince *metav1.Time `json:"managedSince,omitempty"`
+}

@@ -336,3 +336,81 @@ func (a *Adapter) GetUserInfo(ctx context.Context, username string) (*types.User
 
 	return &info, rows.Err()
 }
+
+// GetOwnedObjects returns all database objects owned by the specified user.
+// This queries pg_class (for relations: tables, views, sequences, etc.) and
+// pg_proc (for functions) to find objects owned by the user.
+func (a *Adapter) GetOwnedObjects(ctx context.Context, username string) ([]types.OwnedObject, error) {
+	pool, err := a.getPool()
+	if err != nil {
+		return nil, err
+	}
+
+	var objects []types.OwnedObject
+
+	// Query relations (tables, views, sequences, indexes, etc.)
+	relQuery := `
+		SELECT n.nspname, c.relname,
+		       CASE c.relkind
+		         WHEN 'r' THEN 'table'
+		         WHEN 'S' THEN 'sequence'
+		         WHEN 'v' THEN 'view'
+		         WHEN 'm' THEN 'materialized view'
+		         WHEN 'i' THEN 'index'
+		         WHEN 'f' THEN 'foreign table'
+		         WHEN 'p' THEN 'partitioned table'
+		         WHEN 'c' THEN 'composite type'
+		         ELSE c.relkind::text
+		       END as reltype
+		FROM pg_class c
+		JOIN pg_roles r ON c.relowner = r.oid
+		JOIN pg_namespace n ON c.relnamespace = n.oid
+		WHERE r.rolname = $1
+		  AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
+		  AND c.relkind IN ('r', 'S', 'v', 'm', 'f', 'p')
+		ORDER BY n.nspname, c.relname`
+
+	rows, err := pool.Query(ctx, relQuery, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query owned relations: %w", err)
+	}
+
+	for rows.Next() {
+		var obj types.OwnedObject
+		if err := rows.Scan(&obj.Schema, &obj.Name, &obj.Type); err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("failed to scan owned relation: %w", err)
+		}
+		objects = append(objects, obj)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating owned relations: %w", err)
+	}
+
+	// Query functions
+	funcQuery := `
+		SELECT n.nspname, p.proname, 'function'
+		FROM pg_proc p
+		JOIN pg_roles r ON p.proowner = r.oid
+		JOIN pg_namespace n ON p.pronamespace = n.oid
+		WHERE r.rolname = $1
+		  AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+		ORDER BY n.nspname, p.proname`
+
+	rows, err = pool.Query(ctx, funcQuery, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query owned functions: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var obj types.OwnedObject
+		if err := rows.Scan(&obj.Schema, &obj.Name, &obj.Type); err != nil {
+			return nil, fmt.Errorf("failed to scan owned function: %w", err)
+		}
+		objects = append(objects, obj)
+	}
+
+	return objects, rows.Err()
+}

@@ -45,9 +45,18 @@ const (
 	EventRoleDeleted = "RoleDeleted"
 	EventRoleUpdated = "RoleUpdated"
 
+	// Cluster Role events (cluster-scoped)
+	EventClusterRoleCreated = "ClusterRoleCreated"
+	EventClusterRoleDeleted = "ClusterRoleDeleted"
+	EventClusterRoleUpdated = "ClusterRoleUpdated"
+
 	// Grant events
 	EventGrantApplied = "GrantApplied"
 	EventGrantRevoked = "GrantRevoked"
+
+	// Cluster Grant events (cluster-scoped)
+	EventClusterGrantApplied = "ClusterGrantApplied"
+	EventClusterGrantRevoked = "ClusterGrantRevoked"
 
 	// Backup events
 	EventBackupStarted    = "BackupStarted"
@@ -389,6 +398,60 @@ func NewRoleUpdated(roleName, instanceRef, namespace string, changes []string) *
 }
 
 // ============================================================================
+// Cluster Role Events (cluster-scoped)
+// ============================================================================
+
+// ClusterRoleCreated is published when a ClusterDatabaseRole is successfully created.
+type ClusterRoleCreated struct {
+	BaseEvent
+	RoleName           string
+	ClusterInstanceRef string
+}
+
+// NewClusterRoleCreated creates a new ClusterRoleCreated event.
+func NewClusterRoleCreated(roleName, clusterInstanceRef string) *ClusterRoleCreated {
+	return &ClusterRoleCreated{
+		BaseEvent:          NewBaseEvent(EventClusterRoleCreated, roleName, "ClusterDatabaseRole"),
+		RoleName:           roleName,
+		ClusterInstanceRef: clusterInstanceRef,
+	}
+}
+
+// ClusterRoleDeleted is published when a ClusterDatabaseRole is deleted.
+type ClusterRoleDeleted struct {
+	BaseEvent
+	RoleName           string
+	ClusterInstanceRef string
+}
+
+// NewClusterRoleDeleted creates a new ClusterRoleDeleted event.
+func NewClusterRoleDeleted(roleName, clusterInstanceRef string) *ClusterRoleDeleted {
+	return &ClusterRoleDeleted{
+		BaseEvent:          NewBaseEvent(EventClusterRoleDeleted, roleName, "ClusterDatabaseRole"),
+		RoleName:           roleName,
+		ClusterInstanceRef: clusterInstanceRef,
+	}
+}
+
+// ClusterRoleUpdated is published when a ClusterDatabaseRole is modified.
+type ClusterRoleUpdated struct {
+	BaseEvent
+	RoleName           string
+	ClusterInstanceRef string
+	Changes            []string
+}
+
+// NewClusterRoleUpdated creates a new ClusterRoleUpdated event.
+func NewClusterRoleUpdated(roleName, clusterInstanceRef string, changes []string) *ClusterRoleUpdated {
+	return &ClusterRoleUpdated{
+		BaseEvent:          NewBaseEvent(EventClusterRoleUpdated, roleName, "ClusterDatabaseRole"),
+		RoleName:           roleName,
+		ClusterInstanceRef: clusterInstanceRef,
+		Changes:            changes,
+	}
+}
+
+// ============================================================================
 // Grant Events
 // ============================================================================
 
@@ -575,5 +638,57 @@ func NewRestoreFailed(restoreName, backupRef, databaseRef, namespace, errMsg str
 		Namespace:   namespace,
 		Error:       errMsg,
 		FailedAt:    time.Now(),
+	}
+}
+
+// ============================================================================
+// Cluster Grant Events (cluster-scoped)
+// ============================================================================
+
+// ClusterGrantApplied is published when a ClusterDatabaseGrant is successfully applied.
+type ClusterGrantApplied struct {
+	BaseEvent
+	GrantName          string
+	TargetRef          string // User or role name
+	TargetNamespace    string // Namespace of the target (empty for cluster-scoped roles)
+	TargetType         string // "user" or "role"
+	ClusterInstanceRef string
+	Privileges         []string
+}
+
+// NewClusterGrantApplied creates a new ClusterGrantApplied event.
+func NewClusterGrantApplied(grantName, targetRef, targetNamespace, targetType, clusterInstanceRef string, privileges []string) *ClusterGrantApplied {
+	return &ClusterGrantApplied{
+		BaseEvent:          NewBaseEvent(EventClusterGrantApplied, grantName, "ClusterDatabaseGrant"),
+		GrantName:          grantName,
+		TargetRef:          targetRef,
+		TargetNamespace:    targetNamespace,
+		TargetType:         targetType,
+		ClusterInstanceRef: clusterInstanceRef,
+		Privileges:         privileges,
+	}
+}
+
+// ClusterGrantRevoked is published when a ClusterDatabaseGrant is revoked.
+type ClusterGrantRevoked struct {
+	BaseEvent
+	GrantName          string
+	TargetRef          string
+	TargetNamespace    string
+	TargetType         string
+	ClusterInstanceRef string
+	Privileges         []string
+}
+
+// NewClusterGrantRevoked creates a new ClusterGrantRevoked event.
+func NewClusterGrantRevoked(grantName, targetRef, targetNamespace, targetType, clusterInstanceRef string, privileges []string) *ClusterGrantRevoked {
+	return &ClusterGrantRevoked{
+		BaseEvent:          NewBaseEvent(EventClusterGrantRevoked, grantName, "ClusterDatabaseGrant"),
+		GrantName:          grantName,
+		TargetRef:          targetRef,
+		TargetNamespace:    targetNamespace,
+		TargetType:         targetType,
+		ClusterInstanceRef: clusterInstanceRef,
+		Privileges:         privileges,
 	}
 }

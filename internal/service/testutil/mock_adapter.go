@@ -40,12 +40,13 @@ type MockAdapter struct {
 	VerifyDatabaseAccessFunc func(ctx context.Context, name string) error
 
 	// User operations
-	CreateUserFunc     func(ctx context.Context, opts types.CreateUserOptions) error
-	DropUserFunc       func(ctx context.Context, username string) error
-	UserExistsFunc     func(ctx context.Context, username string) (bool, error)
-	UpdateUserFunc     func(ctx context.Context, username string, opts types.UpdateUserOptions) error
-	UpdatePasswordFunc func(ctx context.Context, username, password string) error
-	GetUserInfoFunc    func(ctx context.Context, username string) (*types.UserInfo, error)
+	CreateUserFunc      func(ctx context.Context, opts types.CreateUserOptions) error
+	DropUserFunc        func(ctx context.Context, username string) error
+	UserExistsFunc      func(ctx context.Context, username string) (bool, error)
+	UpdateUserFunc      func(ctx context.Context, username string, opts types.UpdateUserOptions) error
+	UpdatePasswordFunc  func(ctx context.Context, username, password string) error
+	GetUserInfoFunc     func(ctx context.Context, username string) (*types.UserInfo, error)
+	GetOwnedObjectsFunc func(ctx context.Context, username string) ([]types.OwnedObject, error)
 
 	// Role operations
 	CreateRoleFunc  func(ctx context.Context, opts types.CreateRoleOptions) error
@@ -110,6 +111,9 @@ func NewMockAdapter() *MockAdapter {
 	m.UpdatePasswordFunc = func(ctx context.Context, username, password string) error { return nil }
 	m.GetUserInfoFunc = func(ctx context.Context, username string) (*types.UserInfo, error) {
 		return &types.UserInfo{Username: username}, nil
+	}
+	m.GetOwnedObjectsFunc = func(ctx context.Context, username string) ([]types.OwnedObject, error) {
+		return []types.OwnedObject{}, nil
 	}
 
 	m.CreateRoleFunc = func(ctx context.Context, opts types.CreateRoleOptions) error { return nil }
@@ -271,6 +275,11 @@ func (m *MockAdapter) UpdatePassword(ctx context.Context, username, password str
 func (m *MockAdapter) GetUserInfo(ctx context.Context, username string) (*types.UserInfo, error) {
 	m.record("GetUserInfo", username)
 	return m.GetUserInfoFunc(ctx, username)
+}
+
+func (m *MockAdapter) GetOwnedObjects(ctx context.Context, username string) ([]types.OwnedObject, error) {
+	m.record("GetOwnedObjects", username)
+	return m.GetOwnedObjectsFunc(ctx, username)
 }
 
 // Role operations implementations

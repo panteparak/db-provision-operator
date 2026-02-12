@@ -23,7 +23,9 @@ import (
 
 	"github.com/db-provision-operator/internal/features/backup"
 	"github.com/db-provision-operator/internal/features/backupschedule"
+	"github.com/db-provision-operator/internal/features/clustergrant"
 	"github.com/db-provision-operator/internal/features/clusterinstance"
+	"github.com/db-provision-operator/internal/features/clusterrole"
 	"github.com/db-provision-operator/internal/features/database"
 	"github.com/db-provision-operator/internal/features/grant"
 	"github.com/db-provision-operator/internal/features/instance"
@@ -129,6 +131,20 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 	}
 	modules = append(modules, roleMod)
 
+	// ClusterRole module (cluster-scoped roles - depends on ClusterInstance)
+	clusterRoleMod, err := clusterrole.NewModule(clusterrole.ModuleConfig{
+		Client:        mgr.GetClient(),
+		Scheme:        mgr.GetScheme(),
+		Recorder:      mgr.GetEventRecorderFor("clusterdatabaserole-controller"),
+		EventBus:      eventBus,
+		SecretManager: secretManager,
+		Logger:        logger,
+	})
+	if err != nil {
+		return nil, err
+	}
+	modules = append(modules, clusterRoleMod)
+
 	// Grant module (depends on User and Database)
 	grantMod, err := grant.NewModule(grant.ModuleConfig{
 		Client:        mgr.GetClient(),
@@ -142,6 +158,20 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 		return nil, err
 	}
 	modules = append(modules, grantMod)
+
+	// ClusterGrant module (cluster-scoped grants - depends on ClusterInstance, User, and ClusterRole)
+	clusterGrantMod, err := clustergrant.NewModule(clustergrant.ModuleConfig{
+		Client:        mgr.GetClient(),
+		Scheme:        mgr.GetScheme(),
+		Recorder:      mgr.GetEventRecorderFor("clusterdatabasegrant-controller"),
+		EventBus:      eventBus,
+		SecretManager: secretManager,
+		Logger:        logger,
+	})
+	if err != nil {
+		return nil, err
+	}
+	modules = append(modules, clusterGrantMod)
 
 	// Backup module (depends on Database and Instance)
 	backupMod, err := backup.NewModule(backup.ModuleConfig{

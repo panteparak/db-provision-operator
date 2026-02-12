@@ -32,7 +32,8 @@ func NewPostgresSpecBuilder() SpecBuilder {
 // BuildDatabaseCreateOptions builds CreateDatabaseOptions from a DatabaseSpec.
 func (b *postgresSpecBuilder) BuildDatabaseCreateOptions(spec *dbopsv1alpha1.DatabaseSpec) types.CreateDatabaseOptions {
 	opts := types.CreateDatabaseOptions{
-		Name: spec.Name,
+		Name:  spec.Name,
+		Owner: spec.Owner,
 	}
 
 	if spec.Postgres != nil {

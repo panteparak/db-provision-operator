@@ -369,6 +369,10 @@ spec:
                     format: date-time
                     type: string
                 type: object
+              lastReconcileTime:
+                description: LastReconcileTime is when the last reconciliation occurred
+                format: date-time
+                type: string
               message:
                 description: Message provides additional information about the current
                   state
@@ -386,6 +390,11 @@ spec:
                 - Ready
                 - Failed
                 - Deleting
+                type: string
+              reconcileID:
+                description: |-
+                  ReconcileID is the unique identifier for the last reconciliation.
+                  Used for end-to-end tracing across logs, events, and status updates.
                 type: string
               role:
                 description: Role contains role-specific status information

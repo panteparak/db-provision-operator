@@ -54,9 +54,15 @@ func NewHandler(cfg HandlerConfig) *Handler {
 	}
 }
 
-// Apply applies grants to a database user.
+// Apply applies grants to a database user or role.
 func (h *Handler) Apply(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*Result, error) {
-	log := logf.FromContext(ctx).WithValues("userRef", spec.UserRef.Name, "namespace", namespace)
+	// Resolve target for logging
+	target, err := h.repo.ResolveTarget(ctx, spec, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("resolve target: %w", err)
+	}
+
+	log := logf.FromContext(ctx).WithValues("targetType", target.Type, "targetName", target.Name, "namespace", namespace)
 
 	// Get engine for metrics
 	engine, err := h.repo.GetEngine(ctx, spec, namespace)
@@ -90,8 +96,8 @@ func (h *Handler) Apply(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSp
 		}
 		privileges := h.collectPrivileges(spec)
 		h.eventBus.PublishAsync(ctx, eventbus.NewGrantApplied(
-			spec.UserRef.Name,
-			spec.UserRef.Name,
+			target.Name,
+			target.DatabaseName,
 			databaseRef,
 			namespace,
 			privileges,
@@ -101,9 +107,23 @@ func (h *Handler) Apply(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSp
 	return result, nil
 }
 
-// Revoke revokes grants from a database user.
+// Revoke revokes grants from a database user or role.
 func (h *Handler) Revoke(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) error {
-	log := logf.FromContext(ctx).WithValues("userRef", spec.UserRef.Name, "namespace", namespace)
+	// Resolve target for logging
+	target, err := h.repo.ResolveTarget(ctx, spec, namespace)
+	if err != nil {
+		// Log but continue - we want to try revoke even if we can't resolve target
+		h.logger.Error(err, "Failed to resolve target for logging")
+	}
+
+	targetName := ""
+	targetDatabaseName := ""
+	if target != nil {
+		targetName = target.Name
+		targetDatabaseName = target.DatabaseName
+	}
+
+	log := logf.FromContext(ctx).WithValues("targetName", targetName, "namespace", namespace)
 
 	// Get engine for metrics
 	engine, err := h.repo.GetEngine(ctx, spec, namespace)
@@ -126,15 +146,15 @@ func (h *Handler) Revoke(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantS
 	log.Info("Grants revoked successfully", "duration", revokeDuration)
 
 	// Publish event
-	if h.eventBus != nil {
+	if h.eventBus != nil && target != nil {
 		databaseRef := ""
 		if spec.DatabaseRef != nil {
 			databaseRef = spec.DatabaseRef.Name
 		}
 		privileges := h.collectPrivileges(spec)
 		h.eventBus.PublishAsync(ctx, eventbus.NewGrantRevoked(
-			spec.UserRef.Name,
-			spec.UserRef.Name,
+			targetName,
+			targetDatabaseName,
 			databaseRef,
 			namespace,
 			privileges,
@@ -225,10 +245,12 @@ func (h *Handler) UpdateInfoMetric(grant *dbopsv1alpha1.DatabaseGrant) {
 		}
 	}
 
+	targetName := h.getTargetName(&grant.Spec)
+
 	metrics.SetGrantInfo(
 		grant.Name,
 		grant.Namespace,
-		grant.Spec.UserRef.Name,
+		targetName,
 		databaseRef,
 		privilegesStr,
 		phase,
@@ -248,7 +270,8 @@ func (h *Handler) GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseG
 
 // DetectDrift compares the CR spec to the actual grant state and returns any differences.
 func (h *Handler) DetectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
-	log := logf.FromContext(ctx).WithValues("userRef", spec.UserRef.Name, "namespace", namespace)
+	targetName := h.getTargetName(spec)
+	log := logf.FromContext(ctx).WithValues("target", targetName, "namespace", namespace)
 	log.V(1).Info("Detecting grant drift")
 
 	result, err := h.repo.DetectDrift(ctx, spec, namespace, allowDestructive)
@@ -267,7 +290,8 @@ func (h *Handler) DetectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseG
 
 // CorrectDrift attempts to correct detected drift by applying necessary changes.
 func (h *Handler) CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
-	log := logf.FromContext(ctx).WithValues("userRef", spec.UserRef.Name, "namespace", namespace)
+	targetName := h.getTargetName(spec)
+	log := logf.FromContext(ctx).WithValues("target", targetName, "namespace", namespace)
 	log.Info("Correcting grant drift", "diffs", len(driftResult.Diffs))
 
 	correctionResult, err := h.repo.CorrectDrift(ctx, spec, namespace, driftResult, allowDestructive)
@@ -282,9 +306,25 @@ func (h *Handler) CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.Database
 	return correctionResult, nil
 }
 
-// ResolveInstance resolves the instance reference via the user's instanceRef or clusterInstanceRef.
+// getTargetName returns the name of the target (user or role) for logging.
+func (h *Handler) getTargetName(spec *dbopsv1alpha1.DatabaseGrantSpec) string {
+	if spec.UserRef != nil {
+		return spec.UserRef.Name
+	}
+	if spec.RoleRef != nil {
+		return spec.RoleRef.Name
+	}
+	return "unknown"
+}
+
+// ResolveInstance resolves the instance reference via the target's instanceRef or clusterInstanceRef.
 func (h *Handler) ResolveInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*instanceresolver.ResolvedInstance, error) {
 	return h.repo.ResolveInstance(ctx, spec, namespace)
+}
+
+// ResolveTarget resolves the target of the grant (user or role).
+func (h *Handler) ResolveTarget(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*TargetInfo, error) {
+	return h.repo.ResolveTarget(ctx, spec, namespace)
 }
 
 // Ensure Handler implements API interface.

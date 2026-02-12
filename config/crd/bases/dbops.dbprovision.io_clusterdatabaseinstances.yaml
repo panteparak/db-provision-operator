@@ -303,6 +303,47 @@ spec:
                       "30s")
                     type: string
                 type: object
+              resourceTracking:
+                description: |-
+                  ResourceTracking configures how managed resources are tagged in the database.
+                  This enables identifying operator-managed resources at the database level
+                  via COMMENT ON (PostgreSQL/CockroachDB) or user attributes/metadata tables (MySQL).
+                properties:
+                  commentFormat:
+                    default: managed-by:{{.Operator}},cr:{{.Namespace}}/{{.Name}}
+                    description: |-
+                      CommentFormat defines the format for PostgreSQL/CockroachDB COMMENT ON statements.
+                      Available variables: {{.Operator}}, {{.Namespace}}, {{.Name}}, {{.Kind}}, {{.UID}}
+                      Default: "managed-by:{{.Operator}},cr:{{.Namespace}}/{{.Name}}"
+                    type: string
+                  enabled:
+                    default: true
+                    description: Enabled enables resource tracking via database-native
+                      metadata
+                    type: boolean
+                  mysql:
+                    description: MySQL defines MySQL-specific tracking configuration
+                    properties:
+                      metadataDatabase:
+                        description: |-
+                          MetadataDatabase is the database where the metadata table is created
+                          Default: uses the admin database from connection config
+                        type: string
+                      metadataTableName:
+                        default: _dbops_metadata
+                        description: |-
+                          MetadataTableName is the table name for tracking when user attributes aren't available
+                          Used for MySQL < 8.0.21 or when useUserAttributes is false
+                          Default: "_dbops_metadata"
+                        type: string
+                      useUserAttributes:
+                        default: true
+                        description: |-
+                          UseUserAttributes uses MySQL 8.0.21+ user attributes for tracking (recommended)
+                          When enabled, uses: CREATE USER ... ATTRIBUTE '{"managed_by":"...", ...}'
+                        type: boolean
+                    type: object
+                type: object
               tls:
                 description: TLS configuration
                 properties:
@@ -491,6 +532,10 @@ spec:
                 description: LastCheckedAt is the timestamp of the last health check
                 format: date-time
                 type: string
+              lastReconcileTime:
+                description: LastReconcileTime is when the last reconciliation occurred
+                format: date-time
+                type: string
               message:
                 description: Message provides additional information about the current
                   state
@@ -506,6 +551,11 @@ spec:
                 - Pending
                 - Ready
                 - Failed
+                type: string
+              reconcileID:
+                description: |-
+                  ReconcileID is the unique identifier for the last reconciliation.
+                  Used for end-to-end tracing across logs, events, and status updates.
                 type: string
               version:
                 description: Version is the detected database server version

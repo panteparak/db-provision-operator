@@ -381,3 +381,52 @@ func (a *Adapter) GetUserInfo(ctx context.Context, username string) (*types.User
 
 	return &info, rows.Err()
 }
+
+// GetOwnedObjects returns all database objects owned by the specified user.
+// CockroachDB uses PostgreSQL-compatible system catalogs for ownership queries.
+func (a *Adapter) GetOwnedObjects(ctx context.Context, username string) ([]types.OwnedObject, error) {
+	pool, err := a.getPool()
+	if err != nil {
+		return nil, err
+	}
+
+	var objects []types.OwnedObject
+
+	// Query relations (tables, views, sequences) - CockroachDB supports most relkinds
+	relQuery := `
+		SELECT n.nspname, c.relname,
+		       CASE c.relkind
+		         WHEN 'r' THEN 'table'
+		         WHEN 'S' THEN 'sequence'
+		         WHEN 'v' THEN 'view'
+		         WHEN 'm' THEN 'materialized view'
+		         ELSE c.relkind::text
+		       END as reltype
+		FROM pg_catalog.pg_class c
+		JOIN pg_catalog.pg_roles r ON c.relowner = r.oid
+		JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
+		WHERE r.rolname = $1
+		  AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'crdb_internal', 'pg_extension')
+		  AND c.relkind IN ('r', 'S', 'v', 'm')
+		ORDER BY n.nspname, c.relname`
+
+	rows, err := pool.Query(ctx, relQuery, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query owned relations: %w", err)
+	}
+
+	for rows.Next() {
+		var obj types.OwnedObject
+		if err := rows.Scan(&obj.Schema, &obj.Name, &obj.Type); err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("failed to scan owned relation: %w", err)
+		}
+		objects = append(objects, obj)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating owned relations: %w", err)
+	}
+
+	return objects, nil
+}

@@ -35,6 +35,7 @@ import (
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/logging"
 	"github.com/db-provision-operator/internal/reconcileutil"
+	reconcilecontext "github.com/db-provision-operator/internal/shared/reconcile"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -81,7 +82,11 @@ func NewController(cfg ControllerConfig) *Controller {
 
 // Reconcile implements the reconciliation loop for DatabaseRole resources.
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := logf.FromContext(ctx).WithValues("role", req.NamespacedName)
+	// Generate reconcileID for end-to-end tracing
+	ctx, log, reconcileID := reconcilecontext.WithReconcileID(ctx)
+	log = log.WithValues("role", req.NamespacedName)
+	// Inject the enriched logger back into context for downstream functions
+	ctx = logf.IntoContext(ctx, log)
 
 	// Fetch the DatabaseRole resource
 	role := &dbopsv1alpha1.DatabaseRole{}
@@ -105,10 +110,10 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 	}
 
-	return c.reconcile(ctx, role)
+	return c.reconcile(ctx, role, reconcileID)
 }
 
-func (c *Controller) reconcile(ctx context.Context, role *dbopsv1alpha1.DatabaseRole) (ctrl.Result, error) {
+func (c *Controller) reconcile(ctx context.Context, role *dbopsv1alpha1.DatabaseRole, reconcileID string) (ctrl.Result, error) {
 	log := logf.FromContext(ctx).WithValues("role", role.Name, "namespace", role.Namespace)
 
 	// Check if role exists
@@ -162,6 +167,11 @@ func (c *Controller) reconcile(ctx context.Context, role *dbopsv1alpha1.Database
 		util.ReasonReconcileSuccess, "Role is synced")
 	util.SetReadyCondition(&role.Status.Conditions, metav1.ConditionTrue,
 		util.ReasonReconcileSuccess, "Role is ready")
+
+	// Set reconcileID for end-to-end tracing
+	now := metav1.Now()
+	role.Status.ReconcileID = reconcileID
+	role.Status.LastReconcileTime = &now
 
 	if err := c.Status().Update(ctx, role); err != nil {
 		log.Error(err, "Failed to update status")
@@ -231,7 +241,8 @@ func (c *Controller) handleError(ctx context.Context, role *dbopsv1alpha1.Databa
 	log := logf.FromContext(ctx).WithValues("role", role.Name, "namespace", role.Namespace)
 
 	log.Error(err, "Reconciliation failed", "operation", operation)
-	c.Recorder.Eventf(role, corev1.EventTypeWarning, "ReconcileFailed", "Failed to %s: %v", operation, err)
+	c.Recorder.Event(role, corev1.EventTypeWarning, "ReconcileFailed",
+		reconcilecontext.EventMessage(ctx, fmt.Sprintf("Failed to %s: %v", operation, err)))
 
 	role.Status.Phase = dbopsv1alpha1.PhaseFailed
 	role.Status.Message = fmt.Sprintf("Failed to %s: %v", operation, err)

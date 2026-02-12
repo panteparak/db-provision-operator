@@ -34,6 +34,7 @@ import (
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/logging"
 	"github.com/db-provision-operator/internal/reconcileutil"
+	reconcilecontext "github.com/db-provision-operator/internal/shared/reconcile"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -80,7 +81,11 @@ func NewController(cfg ControllerConfig) *Controller {
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseinstances/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := logf.FromContext(ctx).WithValues("instance", req.NamespacedName)
+	// Generate reconcileID for end-to-end tracing
+	ctx, log, reconcileID := reconcilecontext.WithReconcileID(ctx)
+	log = log.WithValues("instance", req.NamespacedName)
+	// Inject the enriched logger back into context for downstream functions
+	ctx = logf.IntoContext(ctx, log)
 
 	// 1. Fetch the DatabaseInstance resource
 	instance := &dbopsv1alpha1.DatabaseInstance{}
@@ -108,11 +113,11 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	// 5. Reconcile the instance
-	return c.reconcile(ctx, instance)
+	return c.reconcile(ctx, instance, reconcileID)
 }
 
 // reconcile handles the main reconciliation logic.
-func (c *Controller) reconcile(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance) (ctrl.Result, error) {
+func (c *Controller) reconcile(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance, reconcileID string) (ctrl.Result, error) {
 	log := logf.FromContext(ctx).WithValues("instance", instance.Name, "namespace", instance.Namespace)
 
 	// Attempt connection
@@ -140,6 +145,10 @@ func (c *Controller) reconcile(ctx context.Context, instance *dbopsv1alpha1.Data
 		util.ReasonHealthCheckPassed, "Database is healthy")
 	util.SetReadyCondition(&instance.Status.Conditions, metav1.ConditionTrue,
 		util.ReasonReconcileSuccess, "Instance is ready")
+
+	// Set reconcileID for end-to-end tracing
+	instance.Status.ReconcileID = reconcileID
+	instance.Status.LastReconcileTime = &now
 
 	if err := c.Status().Update(ctx, instance); err != nil {
 		log.Error(err, "Failed to update status")
@@ -209,7 +218,8 @@ func (c *Controller) handleError(ctx context.Context, instance *dbopsv1alpha1.Da
 	log := logf.FromContext(ctx).WithValues("instance", instance.Name, "namespace", instance.Namespace)
 
 	log.Error(err, "Reconciliation failed", "operation", operation)
-	c.Recorder.Eventf(instance, corev1.EventTypeWarning, "ReconcileFailed", "Failed to %s: %v", operation, err)
+	c.Recorder.Event(instance, corev1.EventTypeWarning, "ReconcileFailed",
+		reconcilecontext.EventMessage(ctx, fmt.Sprintf("Failed to %s: %v", operation, err)))
 
 	instance.Status.Phase = dbopsv1alpha1.PhaseFailed
 	instance.Status.Message = err.Error()

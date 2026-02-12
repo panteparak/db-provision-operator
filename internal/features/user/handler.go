@@ -287,5 +287,36 @@ func (h *Handler) CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.Database
 	return correctionResult, nil
 }
 
+// GetOwnedObjects retrieves all database objects owned by the specified user.
+// This is used for pre-deletion safety checks to prevent dropping users
+// that own database objects.
+func (h *Handler) GetOwnedObjects(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*OwnershipCheckResult, error) {
+	log := logf.FromContext(ctx).WithValues("user", username, "namespace", namespace)
+	log.V(1).Info("Checking owned objects")
+
+	repoObjects, err := h.repo.GetOwnedObjects(ctx, username, spec, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("get owned objects: %w", err)
+	}
+
+	result := &OwnershipCheckResult{
+		OwnsObjects:    len(repoObjects) > 0,
+		OwnedObjects:   repoObjects,
+		BlocksDeletion: len(repoObjects) > 0,
+	}
+
+	if result.OwnsObjects {
+		// Determine the service role for resolution message
+		serviceRole := username + "_service"
+		if spec.PasswordRotation != nil && spec.PasswordRotation.ServiceRole != nil && spec.PasswordRotation.ServiceRole.Name != "" {
+			serviceRole = spec.PasswordRotation.ServiceRole.Name
+		}
+		result.Resolution = fmt.Sprintf("REASSIGN OWNED BY %s TO %s", username, serviceRole)
+		log.Info("User owns objects, deletion blocked", "objectCount", len(repoObjects))
+	}
+
+	return result, nil
+}
+
 // Ensure Handler implements API interface.
 var _ API = (*Handler)(nil)

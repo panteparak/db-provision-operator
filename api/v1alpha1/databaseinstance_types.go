@@ -58,6 +58,12 @@ type DatabaseInstanceSpec struct {
 	// +optional
 	MySQL *MySQLInstanceConfig `json:"mysql,omitempty"`
 
+	// ResourceTracking configures how managed resources are tagged in the database.
+	// This enables identifying operator-managed resources at the database level
+	// via COMMENT ON (PostgreSQL/CockroachDB) or user attributes/metadata tables (MySQL).
+	// +optional
+	ResourceTracking *ResourceTrackingConfig `json:"resourceTracking,omitempty"`
+
 	// DeletionProtection prevents accidental deletion
 	// +optional
 	DeletionProtection bool `json:"deletionProtection,omitempty"`
@@ -106,6 +112,15 @@ type DatabaseInstanceStatus struct {
 
 	// ObservedGeneration is the last observed generation of the resource
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// ReconcileID is the unique identifier for the last reconciliation.
+	// Used for end-to-end tracing across logs, events, and status updates.
+	// +optional
+	ReconcileID string `json:"reconcileID,omitempty"`
+
+	// LastReconcileTime is when the last reconciliation occurred
+	// +optional
+	LastReconcileTime *metav1.Time `json:"lastReconcileTime,omitempty"`
 
 	// DiscoveredResources contains resources found in the database that are not managed by CRs.
 	// Only populated when discovery is enabled.

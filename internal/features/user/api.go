@@ -44,6 +44,11 @@ type API interface {
 	// GetInstance returns the DatabaseInstance for the given spec.
 	GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error)
 
+	// GetOwnedObjects retrieves all database objects owned by the specified user.
+	// This is used for pre-deletion safety checks to prevent dropping users
+	// that own database objects.
+	GetOwnedObjects(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*OwnershipCheckResult, error)
+
 	// DetectDrift compares the CR spec to the actual user state and returns any differences.
 	DetectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, allowDestructive bool) (*drift.Result, error)
 
@@ -57,6 +62,21 @@ type Result struct {
 	Updated    bool
 	SecretName string
 	Message    string
+}
+
+// OwnershipCheckResult represents the result of checking user object ownership.
+type OwnershipCheckResult struct {
+	// OwnsObjects indicates if the user owns any database objects
+	OwnsObjects bool
+
+	// OwnedObjects lists the objects owned by the user
+	OwnedObjects []OwnedObject
+
+	// BlocksDeletion indicates if the ownership should block deletion
+	BlocksDeletion bool
+
+	// Resolution provides a suggested command to resolve ownership issues
+	Resolution string
 }
 
 // RepositoryInterface defines the interface for user repository operations.
@@ -82,6 +102,9 @@ type RepositoryInterface interface {
 
 	// GetEngine returns the database engine type for a given spec.
 	GetEngine(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error)
+
+	// GetOwnedObjects retrieves all database objects owned by the specified user.
+	GetOwnedObjects(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) ([]OwnedObject, error)
 
 	// DetectDrift detects configuration drift between the CR spec and actual user state.
 	DetectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, allowDestructive bool) (*drift.Result, error)

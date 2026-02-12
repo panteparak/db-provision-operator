@@ -41,7 +41,7 @@ func TestHandler_Apply(t *testing.T) {
 		{
 			name: "successful apply",
 			spec: &dbopsv1alpha1.DatabaseGrantSpec{
-				UserRef: dbopsv1alpha1.UserReference{
+				UserRef: &dbopsv1alpha1.UserReference{
 					Name: "testuser",
 				},
 				Postgres: &dbopsv1alpha1.PostgresGrantConfig{
@@ -63,7 +63,7 @@ func TestHandler_Apply(t *testing.T) {
 		{
 			name: "apply with database ref",
 			spec: &dbopsv1alpha1.DatabaseGrantSpec{
-				UserRef: dbopsv1alpha1.UserReference{
+				UserRef: &dbopsv1alpha1.UserReference{
 					Name: "testuser",
 				},
 				DatabaseRef: &dbopsv1alpha1.DatabaseReference{
@@ -95,7 +95,7 @@ func TestHandler_Apply(t *testing.T) {
 		{
 			name: "get engine error",
 			spec: &dbopsv1alpha1.DatabaseGrantSpec{
-				UserRef: dbopsv1alpha1.UserReference{
+				UserRef: &dbopsv1alpha1.UserReference{
 					Name: "testuser",
 				},
 			},
@@ -111,7 +111,7 @@ func TestHandler_Apply(t *testing.T) {
 		{
 			name: "apply error",
 			spec: &dbopsv1alpha1.DatabaseGrantSpec{
-				UserRef: dbopsv1alpha1.UserReference{
+				UserRef: &dbopsv1alpha1.UserReference{
 					Name: "testuser",
 				},
 			},
@@ -169,7 +169,7 @@ func TestHandler_Revoke(t *testing.T) {
 		{
 			name: "successful revoke",
 			spec: &dbopsv1alpha1.DatabaseGrantSpec{
-				UserRef: dbopsv1alpha1.UserReference{
+				UserRef: &dbopsv1alpha1.UserReference{
 					Name: "testuser",
 				},
 				Postgres: &dbopsv1alpha1.PostgresGrantConfig{
@@ -190,7 +190,7 @@ func TestHandler_Revoke(t *testing.T) {
 		{
 			name: "revoke error",
 			spec: &dbopsv1alpha1.DatabaseGrantSpec{
-				UserRef: dbopsv1alpha1.UserReference{
+				UserRef: &dbopsv1alpha1.UserReference{
 					Name: "testuser",
 				},
 			},
@@ -209,7 +209,7 @@ func TestHandler_Revoke(t *testing.T) {
 		{
 			name: "revoke continues on engine error",
 			spec: &dbopsv1alpha1.DatabaseGrantSpec{
-				UserRef: dbopsv1alpha1.UserReference{
+				UserRef: &dbopsv1alpha1.UserReference{
 					Name: "testuser",
 				},
 			},
@@ -264,7 +264,7 @@ func TestHandler_Exists(t *testing.T) {
 		{
 			name: "grants exist",
 			spec: &dbopsv1alpha1.DatabaseGrantSpec{
-				UserRef: dbopsv1alpha1.UserReference{
+				UserRef: &dbopsv1alpha1.UserReference{
 					Name: "testuser",
 				},
 			},
@@ -280,7 +280,7 @@ func TestHandler_Exists(t *testing.T) {
 		{
 			name: "grants do not exist",
 			spec: &dbopsv1alpha1.DatabaseGrantSpec{
-				UserRef: dbopsv1alpha1.UserReference{
+				UserRef: &dbopsv1alpha1.UserReference{
 					Name: "testuser",
 				},
 			},
@@ -296,7 +296,7 @@ func TestHandler_Exists(t *testing.T) {
 		{
 			name: "repository error",
 			spec: &dbopsv1alpha1.DatabaseGrantSpec{
-				UserRef: dbopsv1alpha1.UserReference{
+				UserRef: &dbopsv1alpha1.UserReference{
 					Name: "testuser",
 				},
 			},
@@ -354,7 +354,7 @@ func TestHandler_EventPublishing(t *testing.T) {
 		}
 
 		spec := &dbopsv1alpha1.DatabaseGrantSpec{
-			UserRef: dbopsv1alpha1.UserReference{
+			UserRef: &dbopsv1alpha1.UserReference{
 				Name: "testuser",
 			},
 			Postgres: &dbopsv1alpha1.PostgresGrantConfig{
@@ -386,7 +386,7 @@ func TestHandler_EventPublishing(t *testing.T) {
 		}
 
 		spec := &dbopsv1alpha1.DatabaseGrantSpec{
-			UserRef: dbopsv1alpha1.UserReference{
+			UserRef: &dbopsv1alpha1.UserReference{
 				Name: "testuser",
 			},
 			Postgres: &dbopsv1alpha1.PostgresGrantConfig{

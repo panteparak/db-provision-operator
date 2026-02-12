@@ -208,9 +208,78 @@ spec:
                     description: MaxAge is the maximum age of a password before rotation
                       (e.g., "90d")
                     type: string
+                  mysql:
+                    description: MySQL defines MySQL-specific rotation settings
+                    properties:
+                      discardOldPasswordAfterDays:
+                        default: 7
+                        description: |-
+                          DiscardOldPasswordAfterDays is the number of days after which the old password is discarded
+                          Only used with dual-password strategy
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    type: object
+                  oldUserPolicy:
+                    description: OldUserPolicy defines what happens to old users after
+                      rotation
+                    properties:
+                      action:
+                        default: delete
+                        description: Action defines what to do with the old user
+                        enum:
+                        - retain
+                        - disable
+                        - delete
+                        type: string
+                      gracePeriodDays:
+                        default: 7
+                        description: GracePeriodDays is the number of days to wait
+                          before applying the action
+                        format: int32
+                        minimum: 0
+                        type: integer
+                      ownershipCheck:
+                        default: true
+                        description: OwnershipCheck blocks deletion if the user owns
+                          database objects
+                        type: boolean
+                    type: object
                   schedule:
                     description: Schedule is a cron expression for rotation (e.g.,
                       "0 0 1 * *" for monthly)
+                    type: string
+                  serviceRole:
+                    description: ServiceRole defines the service role for PostgreSQL
+                      role-inheritance strategy
+                    properties:
+                      autoCreate:
+                        default: true
+                        description: AutoCreate creates the service role if it doesn't
+                          exist
+                        type: boolean
+                      name:
+                        description: |-
+                          Name is the name of the service role
+                          If not specified, defaults to "{{.Username}}_service"
+                        type: string
+                    type: object
+                  strategy:
+                    default: role-inheritance
+                    description: |-
+                      Strategy defines the rotation strategy to use
+                      - role-inheritance: Create new users with role membership (PostgreSQL)
+                      - dual-password: Use RETAIN CURRENT PASSWORD (MySQL 8.0+)
+                    enum:
+                    - role-inheritance
+                    - dual-password
+                    type: string
+                  userNaming:
+                    default: '{{.Username}}_{{.Date}}'
+                    description: |-
+                      UserNaming defines the naming pattern for rotated users
+                      Available variables: {{.Username}}, {{.Date}}, {{.Timestamp}}
+                      Example: "{{.Username}}_{{.Date}}" produces "myuser_20240115"
                     type: string
                 type: object
               passwordSecret:
@@ -310,6 +379,12 @@ spec:
                   createRole:
                     description: CreateRole allows the user to create roles
                     type: boolean
+                  defaultRole:
+                    description: |-
+                      DefaultRole sets the role to assume on connection (SET ROLE)
+                      This is used for object ownership during rotation - objects created
+                      by the user will be owned by this role instead of the user
+                    type: string
                   inRoles:
                     description: InRoles lists roles this user should be a member
                       of
@@ -335,6 +410,13 @@ spec:
                       format)
                     type: string
                 type: object
+              roles:
+                description: |-
+                  Roles defines role memberships for this user
+                  The user will be granted membership in these roles
+                items:
+                  type: string
+                type: array
               username:
                 description: Username is the database username (immutable after creation)
                 maxLength: 63
@@ -453,6 +535,10 @@ spec:
                     format: date-time
                     type: string
                 type: object
+              lastReconcileTime:
+                description: LastReconcileTime is when the last reconciliation occurred
+                format: date-time
+                type: string
               message:
                 description: Message provides additional information about the current
                   state
@@ -462,6 +548,50 @@ spec:
                   the resource
                 format: int64
                 type: integer
+              ownershipBlock:
+                description: OwnershipBlock contains information when deletion is
+                  blocked due to object ownership
+                properties:
+                  blocked:
+                    description: Blocked indicates if deletion is currently blocked
+                    type: boolean
+                  lastCheckedAt:
+                    description: LastCheckedAt is when the ownership check was performed
+                    format: date-time
+                    type: string
+                  message:
+                    description: Message provides human-readable context about the
+                      block
+                    type: string
+                  ownedObjects:
+                    description: OwnedObjects lists database objects owned by this
+                      user
+                    items:
+                      description: OwnedObject represents a database object owned
+                        by a user
+                      properties:
+                        name:
+                          description: Name is the object's name
+                          type: string
+                        schema:
+                          description: Schema is the object's schema
+                          type: string
+                        type:
+                          description: Type is the object type (table, sequence, function,
+                            etc.)
+                          type: string
+                      required:
+                      - name
+                      - type
+                      type: object
+                    type: array
+                  resolution:
+                    description: Resolution provides the command to resolve ownership
+                      issues
+                    type: string
+                required:
+                - blocked
+                type: object
               phase:
                 description: Phase represents the current state
                 enum:
@@ -471,6 +601,102 @@ spec:
                 - Failed
                 - Deleting
                 type: string
+              reconcileID:
+                description: |-
+                  ReconcileID is the unique identifier for the last reconciliation.
+                  Used for end-to-end tracing across logs, events, and status updates.
+                type: string
+              rotation:
+                description: Rotation contains rotation status information
+                properties:
+                  activeUser:
+                    description: ActiveUser is the currently active database username
+                    type: string
+                  enabled:
+                    description: Enabled indicates if rotation is enabled
+                    type: boolean
+                  lastRotatedAt:
+                    description: LastRotatedAt is when the last rotation occurred
+                    format: date-time
+                    type: string
+                  nextRotationAt:
+                    description: NextRotationAt is when the next rotation is scheduled
+                    format: date-time
+                    type: string
+                  pendingDeletion:
+                    description: PendingDeletion contains users scheduled for deletion
+                    items:
+                      description: PendingDeletionInfo contains information about
+                        a user pending deletion
+                      properties:
+                        blockedReason:
+                          description: BlockedReason explains why deletion is blocked
+                            (if applicable)
+                          type: string
+                        deleteAfter:
+                          description: DeleteAfter is when the user should be deleted
+                          format: date-time
+                          type: string
+                        deprecatedAt:
+                          description: DeprecatedAt is when the user was marked as
+                            deprecated
+                          format: date-time
+                          type: string
+                        ownedObjects:
+                          description: OwnedObjects lists database objects owned by
+                            this user
+                          items:
+                            description: OwnedObject represents a database object
+                              owned by a user
+                            properties:
+                              name:
+                                description: Name is the object's name
+                                type: string
+                              schema:
+                                description: Schema is the object's schema
+                                type: string
+                              type:
+                                description: Type is the object type (table, sequence,
+                                  function, etc.)
+                                type: string
+                            required:
+                            - name
+                            - type
+                            type: object
+                          type: array
+                        reconcileID:
+                          description: ReconcileID is the reconcile ID when this status
+                            was last updated
+                          type: string
+                        resolution:
+                          description: Resolution provides the command to resolve
+                            ownership issues
+                          type: string
+                        status:
+                          description: Status is the current deletion status
+                          enum:
+                          - pending
+                          - blocked
+                          - deleted
+                          type: string
+                        user:
+                          description: User is the database username pending deletion
+                          type: string
+                      required:
+                      - user
+                      type: object
+                    type: array
+                  serviceRole:
+                    description: ServiceRole is the service role used for PostgreSQL
+                      role-inheritance
+                    type: string
+                  strategy:
+                    description: Strategy is the rotation strategy being used
+                    enum:
+                    - role-inheritance
+                    - dual-password
+                    type: string
+                type: object
               secret:
                 description: Secret contains generated secret information
                 properties:

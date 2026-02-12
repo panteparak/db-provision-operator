@@ -174,6 +174,12 @@ type UserManager interface {
 
 	// GetUserInfo retrieves user information
 	GetUserInfo(ctx context.Context, username string) (*UserInfo, error)
+
+	// GetOwnedObjects returns all database objects owned by the specified user.
+	// This is used for pre-deletion safety checks to prevent dropping users
+	// that own database objects (which would fail or orphan objects).
+	// Returns an empty slice if the user owns no objects.
+	GetOwnedObjects(ctx context.Context, username string) ([]OwnedObject, error)
 }
 
 // CreateUserOptions contains options for creating a user
@@ -250,6 +256,20 @@ type UserInfo struct {
 
 	// MySQL-specific
 	AllowedHosts []string
+}
+
+// OwnedObject represents a database object owned by a user or role.
+// This is used for pre-deletion ownership checks to ensure users
+// are not dropped while they own database objects.
+type OwnedObject struct {
+	// Schema is the object's schema (PostgreSQL) or database (MySQL)
+	Schema string
+
+	// Name is the object's name
+	Name string
+
+	// Type is the object type (table, sequence, function, view, etc.)
+	Type string
 }
 
 // RoleManager defines role CRUD operations.
@@ -512,6 +532,102 @@ type ResourceDiscovery interface {
 	// For engines like MySQL that don't have native roles, this may return
 	// users with ROLE-like characteristics or an empty list.
 	ListRoles(ctx context.Context) ([]string, error)
+}
+
+// ResourceTracker defines methods for tagging database resources with metadata.
+// This is an optional interface that adapters can implement to enable resource tracking
+// at the database level (e.g., COMMENT ON for PostgreSQL, user attributes for MySQL).
+// Use type assertion to check if an adapter implements this interface.
+type ResourceTracker interface {
+	// SetResourceComment sets a tracking comment/metadata on a database resource.
+	// For PostgreSQL/CockroachDB: Uses COMMENT ON statement
+	// For MySQL 8.0.21+: Uses user ATTRIBUTE JSON
+	// For MySQL < 8.0.21: Uses a metadata table
+	//
+	// resourceType: "database", "role", "user", "schema"
+	// resourceName: The name of the resource
+	// comment: The tracking metadata string
+	SetResourceComment(ctx context.Context, resourceType, resourceName, comment string) error
+
+	// GetResourceComment retrieves the tracking comment/metadata for a database resource.
+	// Returns empty string if no comment is set.
+	GetResourceComment(ctx context.Context, resourceType, resourceName string) (string, error)
+
+	// SetUserAttribute sets a JSON attribute on a user (MySQL 8.0.21+ only).
+	// For other engines, this is a no-op.
+	// key: The attribute key
+	// value: The attribute value (will be JSON-encoded)
+	SetUserAttribute(ctx context.Context, username, key, value string) error
+
+	// GetUserAttribute retrieves a JSON attribute from a user (MySQL 8.0.21+ only).
+	// For other engines, returns empty string.
+	GetUserAttribute(ctx context.Context, username, key string) (string, error)
+}
+
+// TrackingMetadata contains the metadata to set on managed resources.
+// This is used by controllers to pass tracking information to adapters.
+type TrackingMetadata struct {
+	// Operator is the operator name (always "db-provision-operator")
+	Operator string
+
+	// Kind is the Kubernetes resource kind (e.g., "Database", "DatabaseUser")
+	Kind string
+
+	// Name is the Kubernetes resource name
+	Name string
+
+	// Namespace is the Kubernetes resource namespace (empty for cluster-scoped)
+	Namespace string
+
+	// UID is the Kubernetes resource UID for precise correlation
+	UID string
+}
+
+// FormatComment formats the tracking metadata as a comment string.
+// Default format: "managed-by:db-provision-operator,cr:namespace/name"
+func (m *TrackingMetadata) FormatComment(format string) string {
+	if format == "" {
+		format = "managed-by:{{.Operator}},cr:{{.Namespace}}/{{.Name}}"
+	}
+	// Simple template replacement
+	result := format
+	result = replaceTemplate(result, "{{.Operator}}", m.Operator)
+	result = replaceTemplate(result, "{{.Kind}}", m.Kind)
+	result = replaceTemplate(result, "{{.Name}}", m.Name)
+	result = replaceTemplate(result, "{{.Namespace}}", m.Namespace)
+	result = replaceTemplate(result, "{{.UID}}", m.UID)
+	return result
+}
+
+// replaceTemplate is a simple helper to replace template variables.
+func replaceTemplate(s, old, new string) string {
+	// Handle empty namespace for cluster-scoped resources
+	if old == "{{.Namespace}}" && new == "" {
+		// Replace "namespace/" with empty for cluster-scoped
+		s = replaceAll(s, "{{.Namespace}}/", "")
+	}
+	return replaceAll(s, old, new)
+}
+
+// replaceAll is a simple string replacement (avoids importing strings package)
+func replaceAll(s, old, new string) string {
+	for {
+		i := indexOf(s, old)
+		if i < 0 {
+			return s
+		}
+		s = s[:i] + new + s[i+len(old):]
+	}
+}
+
+// indexOf returns the index of substr in s, or -1 if not found.
+func indexOf(s, substr string) int {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
 }
 
 // ConnectionConfig contains database connection configuration

@@ -186,6 +186,12 @@ type PostgresUserConfig struct {
 	// +optional
 	InRoles []string `json:"inRoles,omitempty"`
 
+	// DefaultRole sets the role to assume on connection (SET ROLE)
+	// This is used for object ownership during rotation - objects created
+	// by the user will be owned by this role instead of the user
+	// +optional
+	DefaultRole string `json:"defaultRole,omitempty"`
+
 	// ConfigParameters sets session parameters for this user
 	// +optional
 	ConfigParameters map[string]string `json:"configParameters,omitempty"`

@@ -31,6 +31,8 @@ type (
 	BackupManager                = types.BackupManager
 	RestoreManager               = types.RestoreManager
 	ResourceDiscovery            = types.ResourceDiscovery
+	ResourceTracker              = types.ResourceTracker
+	TrackingMetadata             = types.TrackingMetadata
 	ConnectionConfig             = types.ConnectionConfig
 	CreateDatabaseOptions        = types.CreateDatabaseOptions
 	DropDatabaseOptions          = types.DropDatabaseOptions

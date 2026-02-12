@@ -108,6 +108,18 @@ var (
 		Version:  "v1alpha1",
 		Resource: "clusterdatabaseinstances",
 	}
+
+	clusterDatabaseRoleGVR = schema.GroupVersionResource{
+		Group:    "dbops.dbprovision.io",
+		Version:  "v1alpha1",
+		Resource: "clusterdatabaseroles",
+	}
+
+	clusterDatabaseGrantGVR = schema.GroupVersionResource{
+		Group:    "dbops.dbprovision.io",
+		Version:  "v1alpha1",
+		Resource: "clusterdatabasegrants",
+	}
 )
 
 // TestE2E runs the end-to-end (e2e) test suite for the project.

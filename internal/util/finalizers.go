@@ -23,14 +23,17 @@ import (
 
 // Finalizer names
 const (
-	FinalizerDatabaseInstance       = "dbops.dbprovision.io/instance-protection"
-	FinalizerDatabase               = "dbops.dbprovision.io/database-protection"
-	FinalizerDatabaseUser           = "dbops.dbprovision.io/user-protection"
-	FinalizerDatabaseRole           = "dbops.dbprovision.io/role-protection"
-	FinalizerDatabaseGrant          = "dbops.dbprovision.io/grant-protection"
-	FinalizerDatabaseBackup         = "dbops.dbprovision.io/backup-protection"
-	FinalizerDatabaseRestore        = "dbops.dbprovision.io/restore-protection"
-	FinalizerDatabaseBackupSchedule = "dbops.dbprovision.io/schedule-protection"
+	FinalizerDatabaseInstance        = "dbops.dbprovision.io/instance-protection"
+	FinalizerClusterDatabaseInstance = "dbops.dbprovision.io/cluster-instance-protection"
+	FinalizerDatabase                = "dbops.dbprovision.io/database-protection"
+	FinalizerDatabaseUser            = "dbops.dbprovision.io/user-protection"
+	FinalizerDatabaseRole            = "dbops.dbprovision.io/role-protection"
+	FinalizerClusterDatabaseRole     = "dbops.dbprovision.io/cluster-role-protection"
+	FinalizerDatabaseGrant           = "dbops.dbprovision.io/grant-protection"
+	FinalizerClusterDatabaseGrant    = "dbops.dbprovision.io/cluster-grant-protection"
+	FinalizerDatabaseBackup          = "dbops.dbprovision.io/backup-protection"
+	FinalizerDatabaseRestore         = "dbops.dbprovision.io/restore-protection"
+	FinalizerDatabaseBackupSchedule  = "dbops.dbprovision.io/schedule-protection"
 )
 
 // Annotation keys

@@ -52,6 +52,11 @@ type DatabaseUserSpec struct {
 	// +optional
 	PasswordRotation *PasswordRotationConfig `json:"passwordRotation,omitempty"`
 
+	// Roles defines role memberships for this user
+	// The user will be granted membership in these roles
+	// +optional
+	Roles []string `json:"roles,omitempty"`
+
 	// PostgreSQL-specific configuration
 	// +optional
 	Postgres *PostgresUserConfig `json:"postgres,omitempty"`
@@ -75,6 +80,15 @@ type DatabaseUserStatus struct {
 	// ObservedGeneration is the last observed generation of the resource
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// ReconcileID is the unique identifier for the last reconciliation.
+	// Used for end-to-end tracing across logs, events, and status updates.
+	// +optional
+	ReconcileID string `json:"reconcileID,omitempty"`
+
+	// LastReconcileTime is when the last reconciliation occurred
+	// +optional
+	LastReconcileTime *metav1.Time `json:"lastReconcileTime,omitempty"`
+
 	// Message provides additional information about the current state
 	Message string `json:"message,omitempty"`
 
@@ -84,6 +98,14 @@ type DatabaseUserStatus struct {
 	// Secret contains generated secret information
 	Secret *SecretInfo `json:"secret,omitempty"`
 
+	// Rotation contains rotation status information
+	// +optional
+	Rotation *RotationStatus `json:"rotation,omitempty"`
+
+	// OwnershipBlock contains information when deletion is blocked due to object ownership
+	// +optional
+	OwnershipBlock *OwnershipBlockStatus `json:"ownershipBlock,omitempty"`
+
 	// Drift contains drift detection status information
 	// +optional
 	Drift *DriftStatus `json:"drift,omitempty"`
@@ -91,6 +113,90 @@ type DatabaseUserStatus struct {
 	// Conditions represent the latest available observations
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
+// OwnershipBlockStatus contains information about deletion blocking due to object ownership.
+type OwnershipBlockStatus struct {
+	// Blocked indicates if deletion is currently blocked
+	Blocked bool `json:"blocked"`
+
+	// LastCheckedAt is when the ownership check was performed
+	LastCheckedAt *metav1.Time `json:"lastCheckedAt,omitempty"`
+
+	// OwnedObjects lists database objects owned by this user
+	OwnedObjects []OwnedObject `json:"ownedObjects,omitempty"`
+
+	// Resolution provides the command to resolve ownership issues
+	Resolution string `json:"resolution,omitempty"`
+
+	// Message provides human-readable context about the block
+	Message string `json:"message,omitempty"`
+}
+
+// RotationStatus contains the current rotation state
+type RotationStatus struct {
+	// Enabled indicates if rotation is enabled
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Strategy is the rotation strategy being used
+	Strategy RotationStrategy `json:"strategy,omitempty"`
+
+	// LastRotatedAt is when the last rotation occurred
+	LastRotatedAt *metav1.Time `json:"lastRotatedAt,omitempty"`
+
+	// NextRotationAt is when the next rotation is scheduled
+	NextRotationAt *metav1.Time `json:"nextRotationAt,omitempty"`
+
+	// ActiveUser is the currently active database username
+	ActiveUser string `json:"activeUser,omitempty"`
+
+	// ServiceRole is the service role used for PostgreSQL role-inheritance
+	ServiceRole string `json:"serviceRole,omitempty"`
+
+	// PendingDeletion contains users scheduled for deletion
+	// +optional
+	PendingDeletion []PendingDeletionInfo `json:"pendingDeletion,omitempty"`
+}
+
+// PendingDeletionInfo contains information about a user pending deletion
+type PendingDeletionInfo struct {
+	// User is the database username pending deletion
+	User string `json:"user"`
+
+	// DeprecatedAt is when the user was marked as deprecated
+	DeprecatedAt *metav1.Time `json:"deprecatedAt,omitempty"`
+
+	// DeleteAfter is when the user should be deleted
+	DeleteAfter *metav1.Time `json:"deleteAfter,omitempty"`
+
+	// Status is the current deletion status
+	// +kubebuilder:validation:Enum=pending;blocked;deleted
+	Status string `json:"status,omitempty"`
+
+	// BlockedReason explains why deletion is blocked (if applicable)
+	BlockedReason string `json:"blockedReason,omitempty"`
+
+	// OwnedObjects lists database objects owned by this user
+	// +optional
+	OwnedObjects []OwnedObject `json:"ownedObjects,omitempty"`
+
+	// Resolution provides the command to resolve ownership issues
+	Resolution string `json:"resolution,omitempty"`
+
+	// ReconcileID is the reconcile ID when this status was last updated
+	ReconcileID string `json:"reconcileID,omitempty"`
+}
+
+// OwnedObject represents a database object owned by a user
+type OwnedObject struct {
+	// Schema is the object's schema
+	Schema string `json:"schema,omitempty"`
+
+	// Name is the object's name
+	Name string `json:"name"`
+
+	// Type is the object type (table, sequence, function, etc.)
+	Type string `json:"type"`
 }
 
 // UserInfo contains user status information

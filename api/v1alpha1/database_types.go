@@ -47,6 +47,14 @@ type DatabaseSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="database name is immutable"
 	Name string `json:"name"`
 
+	// Owner specifies the database owner (role name). For role-based ownership patterns,
+	// set this to a service role rather than a user to enable safe credential rotation.
+	// If not specified, the database is owned by the connection user.
+	// +optional
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern=`^[a-zA-Z_][a-zA-Z0-9_]*$`
+	Owner string `json:"owner,omitempty"`
+
 	// DeletionPolicy defines what happens on CR deletion
 	// +kubebuilder:validation:Enum=Retain;Delete;Snapshot
 	// +kubebuilder:default=Retain
@@ -78,6 +86,15 @@ type DatabaseStatus struct {
 
 	// ObservedGeneration is the last observed generation of the resource
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// ReconcileID is the unique identifier for the last reconciliation.
+	// Used for end-to-end tracing across logs, events, and status updates.
+	// +optional
+	ReconcileID string `json:"reconcileID,omitempty"`
+
+	// LastReconcileTime is when the last reconciliation occurred
+	// +optional
+	LastReconcileTime *metav1.Time `json:"lastReconcileTime,omitempty"`
 
 	// Message provides additional information about the current state
 	Message string `json:"message,omitempty"`

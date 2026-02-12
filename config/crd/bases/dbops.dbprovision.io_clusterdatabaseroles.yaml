@@ -1,0 +1,407 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: clusterdatabaseroles.dbops.dbprovision.io
+spec:
+  group: dbops.dbprovision.io
+  names:
+    kind: ClusterDatabaseRole
+    listKind: ClusterDatabaseRoleList
+    plural: clusterdatabaseroles
+    shortNames:
+    - cdbr
+    singular: clusterdatabaserole
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.clusterInstanceRef.name
+      name: Instance
+      type: string
+    - jsonPath: .spec.roleName
+      name: Role
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          ClusterDatabaseRole is the Schema for the clusterdatabaseroles API.
+          It represents a cluster-scoped database role for shared service accounts
+          and cross-namespace access patterns.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              ClusterDatabaseRoleSpec defines the desired state of ClusterDatabaseRole.
+              This is a cluster-scoped role for shared service accounts and cross-namespace access.
+            properties:
+              clusterInstanceRef:
+                description: ClusterInstanceRef references a cluster-scoped ClusterDatabaseInstance
+                properties:
+                  name:
+                    description: Name of the ClusterDatabaseInstance
+                    type: string
+                required:
+                - name
+                type: object
+              driftPolicy:
+                description: |-
+                  DriftPolicy overrides the instance-level drift policy for this role.
+                  If not specified, the instance's drift policy is used.
+                properties:
+                  interval:
+                    default: 5m
+                    description: |-
+                      Interval specifies how often to check for drift (Go duration string)
+                      This is only meaningful when mode is "detect" or "correct"
+                    type: string
+                  mode:
+                    allOf:
+                    - enum:
+                      - ignore
+                      - detect
+                      - correct
+                    - enum:
+                      - ignore
+                      - detect
+                      - correct
+                    default: detect
+                    description: Mode determines how drift is handled
+                    type: string
+                type: object
+              managedResourceComment:
+                description: |-
+                  ManagedResourceComment is an informational comment applied to the role in the database.
+                  This helps identify operator-managed resources at the database level.
+                  Example: "managed-by:db-provision-operator,cr:orders-service"
+                type: string
+              mysql:
+                description: MySQL-specific configuration
+                properties:
+                  grants:
+                    description: Grants defines the permissions this role grants
+                    items:
+                      description: MySQLGrant defines a MySQL privilege grant
+                      properties:
+                        columns:
+                          description: Columns lists target columns (for column level)
+                          items:
+                            type: string
+                          type: array
+                        database:
+                          description: Database is the target database (for database/table/column/procedure/function
+                            levels)
+                          type: string
+                        function:
+                          description: Function is the target function (for function
+                            level)
+                          type: string
+                        level:
+                          allOf:
+                          - enum:
+                            - global
+                            - database
+                            - table
+                            - column
+                            - procedure
+                            - function
+                          - enum:
+                            - global
+                            - database
+                            - table
+                            - column
+                            - procedure
+                            - function
+                          description: Level is the grant level
+                          type: string
+                        privileges:
+                          description: Privileges to grant (SELECT, INSERT, UPDATE,
+                            DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER, etc.)
+                          items:
+                            type: string
+                          minItems: 1
+                          type: array
+                        procedure:
+                          description: Procedure is the target procedure (for procedure
+                            level)
+                          type: string
+                        table:
+                          description: Table is the target table (for table/column
+                            levels)
+                          type: string
+                        withGrantOption:
+                          description: WithGrantOption allows the grantee to grant
+                            these privileges to others
+                          type: boolean
+                      required:
+                      - level
+                      - privileges
+                      type: object
+                    type: array
+                  useNativeRoles:
+                    default: true
+                    description: UseNativeRoles enables MySQL 8.0+ native roles
+                    type: boolean
+                type: object
+              postgres:
+                description: PostgreSQL-specific configuration
+                properties:
+                  bypassRLS:
+                    description: BypassRLS allows bypassing row-level security
+                    type: boolean
+                  createDB:
+                    description: CreateDB allows the role to create databases
+                    type: boolean
+                  createRole:
+                    description: CreateRole allows the role to create other roles
+                    type: boolean
+                  grants:
+                    description: Grants defines the permissions this role grants
+                    items:
+                      description: PostgresGrant defines a PostgreSQL privilege grant
+                      properties:
+                        database:
+                          description: Database is the target database
+                          type: string
+                        functions:
+                          description: Functions lists specific functions or "*" for
+                            all functions
+                          items:
+                            type: string
+                          type: array
+                        privileges:
+                          description: Privileges to grant (SELECT, INSERT, UPDATE,
+                            DELETE, TRUNCATE, REFERENCES, TRIGGER, CREATE, CONNECT,
+                            TEMPORARY, EXECUTE, USAGE)
+                          items:
+                            type: string
+                          minItems: 1
+                          type: array
+                        schema:
+                          description: Schema is the target schema (optional, for
+                            schema-level grants)
+                          type: string
+                        sequences:
+                          description: Sequences lists specific sequences or "*" for
+                            all sequences
+                          items:
+                            type: string
+                          type: array
+                        tables:
+                          description: Tables lists specific tables or "*" for all
+                            tables
+                          items:
+                            type: string
+                          type: array
+                        withGrantOption:
+                          description: WithGrantOption allows the grantee to grant
+                            these privileges to others
+                          type: boolean
+                      required:
+                      - database
+                      - privileges
+                      type: object
+                    type: array
+                  inRoles:
+                    description: InRoles lists roles this role should inherit from
+                    items:
+                      type: string
+                    type: array
+                  inherit:
+                    default: true
+                    description: Inherit enables privilege inheritance
+                    type: boolean
+                  login:
+                    description: Login enables login capability (usually false for
+                      group roles)
+                    type: boolean
+                  replication:
+                    description: Replication enables replication privileges
+                    type: boolean
+                  superuser:
+                    description: Superuser grants superuser privileges
+                    type: boolean
+                type: object
+              roleName:
+                description: RoleName is the role name in the database (immutable
+                  after creation)
+                maxLength: 63
+                minLength: 1
+                pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+                type: string
+                x-kubernetes-validations:
+                - message: roleName is immutable
+                  rule: self == oldSelf
+            required:
+            - clusterInstanceRef
+            - roleName
+            type: object
+          status:
+            description: ClusterDatabaseRoleStatus defines the observed state of ClusterDatabaseRole.
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              drift:
+                description: Drift contains drift detection status information
+                properties:
+                  detected:
+                    description: Detected indicates if drift was detected
+                    type: boolean
+                  diffs:
+                    description: Diffs contains the specific differences found
+                    items:
+                      description: DriftDiff represents a single difference between
+                        desired and actual state.
+                      properties:
+                        actual:
+                          description: Actual is the actual value in the database
+                          type: string
+                        destructive:
+                          description: Destructive indicates if correcting this drift
+                            would be destructive
+                          type: boolean
+                        expected:
+                          description: Expected is the expected value from the CR
+                            spec
+                          type: string
+                        field:
+                          description: Field is the name of the field that differs
+                          type: string
+                        immutable:
+                          description: Immutable indicates if this field cannot be
+                            changed after creation
+                          type: boolean
+                      required:
+                      - actual
+                      - expected
+                      - field
+                      type: object
+                    type: array
+                  lastChecked:
+                    description: LastChecked is when drift was last checked
+                    format: date-time
+                    type: string
+                type: object
+              lastReconcileTime:
+                description: LastReconcileTime is the timestamp of the last reconciliation
+                format: date-time
+                type: string
+              message:
+                description: Message provides additional information about the current
+                  state
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the last observed generation of
+                  the resource
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current state
+                enum:
+                - Pending
+                - Creating
+                - Ready
+                - Failed
+                - Deleting
+                type: string
+              reconcileID:
+                description: |-
+                  ReconcileID is a unique identifier for the current reconciliation cycle.
+                  Used for tracing through logs, events, and APM systems.
+                type: string
+              role:
+                description: Role contains role-specific status information
+                properties:
+                  createdAt:
+                    description: CreatedAt is the role creation timestamp
+                    format: date-time
+                    type: string
+                  name:
+                    description: Name is the actual role name
+                    type: string
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

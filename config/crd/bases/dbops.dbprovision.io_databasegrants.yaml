@@ -259,9 +259,23 @@ spec:
                       type: string
                     type: array
                 type: object
+              roleRef:
+                description: RoleRef references a DatabaseRole to grant permissions
+                  to (mutually exclusive with UserRef)
+                properties:
+                  name:
+                    description: Name of the DatabaseRole resource
+                    type: string
+                  namespace:
+                    description: Namespace of the DatabaseRole (defaults to the resource
+                      namespace)
+                    type: string
+                required:
+                - name
+                type: object
               userRef:
                 description: UserRef references the DatabaseUser to grant permissions
-                  to
+                  to (mutually exclusive with RoleRef)
                 properties:
                   name:
                     description: Name of the DatabaseUser resource
@@ -273,9 +287,12 @@ spec:
                 required:
                 - name
                 type: object
-            required:
-            - userRef
             type: object
+            x-kubernetes-validations:
+            - message: either userRef or roleRef must be specified
+              rule: has(self.userRef) || has(self.roleRef)
+            - message: userRef and roleRef are mutually exclusive
+              rule: '!(has(self.userRef) && has(self.roleRef))'
           status:
             description: DatabaseGrantStatus defines the observed state of DatabaseGrant.
             properties:
@@ -395,6 +412,10 @@ spec:
                     format: date-time
                     type: string
                 type: object
+              lastReconcileTime:
+                description: LastReconcileTime is when the last reconciliation occurred
+                format: date-time
+                type: string
               message:
                 description: Message provides additional information about the current
                   state
@@ -412,6 +433,11 @@ spec:
                 - Ready
                 - Failed
                 - Deleting
+                type: string
+              reconcileID:
+                description: |-
+                  ReconcileID is the unique identifier for the last reconciliation.
+                  Used for end-to-end tracing across logs, events, and status updates.
                 type: string
             type: object
         type: object

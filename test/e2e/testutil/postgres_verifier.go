@@ -108,6 +108,74 @@ func (v *PostgresVerifier) RoleExists(ctx context.Context, roleName string) (boo
 	return v.UserExists(ctx, roleName)
 }
 
+// RoleCanLogin checks if a PostgreSQL role has LOGIN privilege
+func (v *PostgresVerifier) RoleCanLogin(ctx context.Context, roleName string) (bool, error) {
+	if v.pool == nil {
+		return false, fmt.Errorf("not connected to database")
+	}
+
+	var canLogin bool
+	err := v.pool.QueryRow(ctx,
+		"SELECT rolcanlogin FROM pg_roles WHERE rolname = $1",
+		roleName).Scan(&canLogin)
+	if err != nil {
+		return false, fmt.Errorf("failed to check role login privilege: %w", err)
+	}
+
+	return canLogin, nil
+}
+
+// RoleHasCreateDb checks if a PostgreSQL role has CREATEDB privilege
+func (v *PostgresVerifier) RoleHasCreateDb(ctx context.Context, roleName string) (bool, error) {
+	if v.pool == nil {
+		return false, fmt.Errorf("not connected to database")
+	}
+
+	var canCreateDb bool
+	err := v.pool.QueryRow(ctx,
+		"SELECT rolcreatedb FROM pg_roles WHERE rolname = $1",
+		roleName).Scan(&canCreateDb)
+	if err != nil {
+		return false, fmt.Errorf("failed to check role CREATEDB privilege: %w", err)
+	}
+
+	return canCreateDb, nil
+}
+
+// RoleHasCreateRole checks if a PostgreSQL role has CREATEROLE privilege
+func (v *PostgresVerifier) RoleHasCreateRole(ctx context.Context, roleName string) (bool, error) {
+	if v.pool == nil {
+		return false, fmt.Errorf("not connected to database")
+	}
+
+	var canCreateRole bool
+	err := v.pool.QueryRow(ctx,
+		"SELECT rolcreaterole FROM pg_roles WHERE rolname = $1",
+		roleName).Scan(&canCreateRole)
+	if err != nil {
+		return false, fmt.Errorf("failed to check role CREATEROLE privilege: %w", err)
+	}
+
+	return canCreateRole, nil
+}
+
+// RoleHasSuperuser checks if a PostgreSQL role has SUPERUSER privilege
+func (v *PostgresVerifier) RoleHasSuperuser(ctx context.Context, roleName string) (bool, error) {
+	if v.pool == nil {
+		return false, fmt.Errorf("not connected to database")
+	}
+
+	var isSuperuser bool
+	err := v.pool.QueryRow(ctx,
+		"SELECT rolsuper FROM pg_roles WHERE rolname = $1",
+		roleName).Scan(&isSuperuser)
+	if err != nil {
+		return false, fmt.Errorf("failed to check role SUPERUSER privilege: %w", err)
+	}
+
+	return isSuperuser, nil
+}
+
 // HasPrivilege checks if a grantee has a specific privilege on an object
 func (v *PostgresVerifier) HasPrivilege(ctx context.Context, grantee, privilege, objectType, objectName string) (bool, error) {
 	if v.pool == nil {

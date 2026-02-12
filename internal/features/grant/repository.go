@@ -57,29 +57,111 @@ func NewRepository(cfg RepositoryConfig) *Repository {
 	}
 }
 
-// withService creates a grant service connection and executes the given function.
-// Supports both namespaced DatabaseInstance and cluster-scoped ClusterDatabaseInstance via the user's instance reference.
-func (r *Repository) withService(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, fn func(svc *service.GrantService, user *dbopsv1alpha1.DatabaseUser, instanceSpec *dbopsv1alpha1.DatabaseInstanceSpec) error) error {
-	// Get the DatabaseUser
-	user := &dbopsv1alpha1.DatabaseUser{}
-	userNamespace := namespace
-	if spec.UserRef.Namespace != "" {
-		userNamespace = spec.UserRef.Namespace
+// ResolveTarget resolves the target of the grant (user or role).
+func (r *Repository) ResolveTarget(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*TargetInfo, error) {
+	// Exactly one of userRef or roleRef must be specified
+	if spec.UserRef == nil && spec.RoleRef == nil {
+		return nil, fmt.Errorf("either userRef or roleRef must be specified")
+	}
+	if spec.UserRef != nil && spec.RoleRef != nil {
+		return nil, fmt.Errorf("only one of userRef or roleRef can be specified")
+	}
+
+	if spec.UserRef != nil {
+		// Target is a DatabaseUser
+		user := &dbopsv1alpha1.DatabaseUser{}
+		userNamespace := namespace
+		if spec.UserRef.Namespace != "" {
+			userNamespace = spec.UserRef.Namespace
+		}
+
+		if err := r.client.Get(ctx, types.NamespacedName{
+			Namespace: userNamespace,
+			Name:      spec.UserRef.Name,
+		}, user); err != nil {
+			return nil, fmt.Errorf("get user: %w", err)
+		}
+
+		if user.Status.Phase != dbopsv1alpha1.PhaseReady {
+			return nil, fmt.Errorf("user not ready: phase is %s", user.Status.Phase)
+		}
+
+		return &TargetInfo{
+			Type:         "user",
+			Name:         user.Name,
+			Namespace:    user.Namespace,
+			DatabaseName: user.Spec.Username,
+		}, nil
+	}
+
+	// Target is a DatabaseRole
+	role := &dbopsv1alpha1.DatabaseRole{}
+	roleNamespace := namespace
+	if spec.RoleRef.Namespace != "" {
+		roleNamespace = spec.RoleRef.Namespace
 	}
 
 	if err := r.client.Get(ctx, types.NamespacedName{
-		Namespace: userNamespace,
-		Name:      spec.UserRef.Name,
-	}, user); err != nil {
-		return fmt.Errorf("get user: %w", err)
+		Namespace: roleNamespace,
+		Name:      spec.RoleRef.Name,
+	}, role); err != nil {
+		return nil, fmt.Errorf("get role: %w", err)
 	}
 
-	if user.Status.Phase != dbopsv1alpha1.PhaseReady {
-		return fmt.Errorf("user not ready: phase is %s", user.Status.Phase)
+	if role.Status.Phase != dbopsv1alpha1.PhaseReady {
+		return nil, fmt.Errorf("role not ready: phase is %s", role.Status.Phase)
 	}
 
-	// Resolve the instance from the user's instanceRef or clusterInstanceRef
-	resolved, err := r.instanceResolver.Resolve(ctx, user.Spec.InstanceRef, user.Spec.ClusterInstanceRef, user.Namespace)
+	return &TargetInfo{
+		Type:         "role",
+		Name:         role.Name,
+		Namespace:    role.Namespace,
+		DatabaseName: role.Spec.RoleName,
+	}, nil
+}
+
+// withService creates a grant service connection and executes the given function.
+// Supports both namespaced DatabaseInstance and cluster-scoped ClusterDatabaseInstance.
+// Works with both user and role targets.
+func (r *Repository) withService(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, fn func(svc *service.GrantService, targetName string, instanceSpec *dbopsv1alpha1.DatabaseInstanceSpec) error) error {
+	// Resolve the target (user or role)
+	target, err := r.ResolveTarget(ctx, spec, namespace)
+	if err != nil {
+		return fmt.Errorf("resolve target: %w", err)
+	}
+
+	// Resolve the instance based on target type
+	var resolved *instanceresolver.ResolvedInstance
+	if spec.UserRef != nil {
+		// Get instance from user
+		user := &dbopsv1alpha1.DatabaseUser{}
+		userNamespace := namespace
+		if spec.UserRef.Namespace != "" {
+			userNamespace = spec.UserRef.Namespace
+		}
+		if err := r.client.Get(ctx, types.NamespacedName{
+			Namespace: userNamespace,
+			Name:      spec.UserRef.Name,
+		}, user); err != nil {
+			return fmt.Errorf("get user: %w", err)
+		}
+		resolved, err = r.instanceResolver.Resolve(ctx, user.Spec.InstanceRef, user.Spec.ClusterInstanceRef, user.Namespace)
+	} else {
+		// Get instance from role
+		role := &dbopsv1alpha1.DatabaseRole{}
+		roleNamespace := namespace
+		if spec.RoleRef.Namespace != "" {
+			roleNamespace = spec.RoleRef.Namespace
+		}
+		if err := r.client.Get(ctx, types.NamespacedName{
+			Namespace: roleNamespace,
+			Name:      spec.RoleRef.Name,
+		}, role); err != nil {
+			return fmt.Errorf("get role: %w", err)
+		}
+		resolved, err = r.instanceResolver.Resolve(ctx, role.Spec.InstanceRef, role.Spec.ClusterInstanceRef, role.Namespace)
+	}
+
 	if err != nil {
 		return fmt.Errorf("resolve instance: %w", err)
 	}
@@ -120,16 +202,16 @@ func (r *Repository) withService(ctx context.Context, spec *dbopsv1alpha1.Databa
 		return fmt.Errorf("connect: %w", err)
 	}
 
-	return fn(svc, user, resolved.Spec)
+	return fn(svc, target.DatabaseName, resolved.Spec)
 }
 
-// Apply applies grants to a database user.
+// Apply applies grants to a database user or role.
 func (r *Repository) Apply(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*Result, error) {
 	var result *Result
 
-	err := r.withService(ctx, spec, namespace, func(svc *service.GrantService, user *dbopsv1alpha1.DatabaseUser, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
+	err := r.withService(ctx, spec, namespace, func(svc *service.GrantService, targetName string, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
 		svcResult, err := svc.Apply(ctx, service.ApplyGrantServiceOptions{
-			Username: user.Spec.Username,
+			Username: targetName,
 			Spec:     spec,
 		})
 		if err != nil {
@@ -149,24 +231,24 @@ func (r *Repository) Apply(ctx context.Context, spec *dbopsv1alpha1.DatabaseGran
 	return result, err
 }
 
-// Revoke revokes grants from a database user.
+// Revoke revokes grants from a database user or role.
 func (r *Repository) Revoke(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) error {
-	return r.withService(ctx, spec, namespace, func(svc *service.GrantService, user *dbopsv1alpha1.DatabaseUser, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
+	return r.withService(ctx, spec, namespace, func(svc *service.GrantService, targetName string, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
 		_, err := svc.Revoke(ctx, service.ApplyGrantServiceOptions{
-			Username: user.Spec.Username,
+			Username: targetName,
 			Spec:     spec,
 		})
 		return err
 	})
 }
 
-// Exists checks if grants have been applied by verifying the user has the expected grants.
+// Exists checks if grants have been applied by verifying the target has the expected grants.
 func (r *Repository) Exists(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (bool, error) {
 	var exists bool
 
-	err := r.withService(ctx, spec, namespace, func(svc *service.GrantService, user *dbopsv1alpha1.DatabaseUser, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
-		// Check if user has any grants
-		grants, err := svc.GetGrants(ctx, user.Spec.Username)
+	err := r.withService(ctx, spec, namespace, func(svc *service.GrantService, targetName string, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
+		// Check if target has any grants
+		grants, err := svc.GetGrants(ctx, targetName)
 		if err != nil {
 			return err
 		}
@@ -178,7 +260,12 @@ func (r *Repository) Exists(ctx context.Context, spec *dbopsv1alpha1.DatabaseGra
 }
 
 // GetUser returns the DatabaseUser for a given spec.
+// Returns an error if userRef is not specified.
 func (r *Repository) GetUser(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*dbopsv1alpha1.DatabaseUser, error) {
+	if spec.UserRef == nil {
+		return nil, fmt.Errorf("userRef is not specified")
+	}
+
 	user := &dbopsv1alpha1.DatabaseUser{}
 	userNamespace := namespace
 	if spec.UserRef.Namespace != "" {
@@ -195,44 +282,111 @@ func (r *Repository) GetUser(ctx context.Context, spec *dbopsv1alpha1.DatabaseGr
 	return user, nil
 }
 
-// GetInstance returns the DatabaseInstance for a given spec (via the user's instanceRef).
-// Deprecated: Use ResolveInstance instead, which supports both DatabaseInstance and ClusterDatabaseInstance.
-// This method only works with namespaced DatabaseInstance references.
-func (r *Repository) GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
-	user, err := r.GetUser(ctx, spec, namespace)
-	if err != nil {
-		return nil, err
+// GetRole returns the DatabaseRole for a given spec.
+// Returns an error if roleRef is not specified.
+func (r *Repository) GetRole(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*dbopsv1alpha1.DatabaseRole, error) {
+	if spec.RoleRef == nil {
+		return nil, fmt.Errorf("roleRef is not specified")
 	}
 
-	// Only works with namespaced instances
-	if user.Spec.InstanceRef == nil {
-		return nil, fmt.Errorf("user uses clusterInstanceRef, use ResolveInstance instead")
-	}
-
-	instance := &dbopsv1alpha1.DatabaseInstance{}
-	instanceNamespace := user.Namespace
-	if user.Spec.InstanceRef.Namespace != "" {
-		instanceNamespace = user.Spec.InstanceRef.Namespace
+	role := &dbopsv1alpha1.DatabaseRole{}
+	roleNamespace := namespace
+	if spec.RoleRef.Namespace != "" {
+		roleNamespace = spec.RoleRef.Namespace
 	}
 
 	if err := r.client.Get(ctx, types.NamespacedName{
-		Namespace: instanceNamespace,
-		Name:      user.Spec.InstanceRef.Name,
-	}, instance); err != nil {
+		Namespace: roleNamespace,
+		Name:      spec.RoleRef.Name,
+	}, role); err != nil {
 		return nil, err
 	}
 
-	return instance, nil
+	return role, nil
 }
 
-// ResolveInstance resolves the instance reference via the user's instanceRef or clusterInstanceRef.
-func (r *Repository) ResolveInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*instanceresolver.ResolvedInstance, error) {
-	user, err := r.GetUser(ctx, spec, namespace)
-	if err != nil {
-		return nil, err
+// GetInstance returns the DatabaseInstance for a given spec (via the target's instanceRef).
+// Deprecated: Use ResolveInstance instead, which supports both DatabaseInstance and ClusterDatabaseInstance.
+// This method only works with namespaced DatabaseInstance references.
+func (r *Repository) GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+	// Try user first, then role
+	if spec.UserRef != nil {
+		user, err := r.GetUser(ctx, spec, namespace)
+		if err != nil {
+			return nil, err
+		}
+
+		// Only works with namespaced instances
+		if user.Spec.InstanceRef == nil {
+			return nil, fmt.Errorf("user uses clusterInstanceRef, use ResolveInstance instead")
+		}
+
+		instance := &dbopsv1alpha1.DatabaseInstance{}
+		instanceNamespace := user.Namespace
+		if user.Spec.InstanceRef.Namespace != "" {
+			instanceNamespace = user.Spec.InstanceRef.Namespace
+		}
+
+		if err := r.client.Get(ctx, types.NamespacedName{
+			Namespace: instanceNamespace,
+			Name:      user.Spec.InstanceRef.Name,
+		}, instance); err != nil {
+			return nil, err
+		}
+
+		return instance, nil
 	}
 
-	return r.instanceResolver.Resolve(ctx, user.Spec.InstanceRef, user.Spec.ClusterInstanceRef, user.Namespace)
+	if spec.RoleRef != nil {
+		role, err := r.GetRole(ctx, spec, namespace)
+		if err != nil {
+			return nil, err
+		}
+
+		// Only works with namespaced instances
+		if role.Spec.InstanceRef == nil {
+			return nil, fmt.Errorf("role uses clusterInstanceRef, use ResolveInstance instead")
+		}
+
+		instance := &dbopsv1alpha1.DatabaseInstance{}
+		instanceNamespace := role.Namespace
+		if role.Spec.InstanceRef.Namespace != "" {
+			instanceNamespace = role.Spec.InstanceRef.Namespace
+		}
+
+		if err := r.client.Get(ctx, types.NamespacedName{
+			Namespace: instanceNamespace,
+			Name:      role.Spec.InstanceRef.Name,
+		}, instance); err != nil {
+			return nil, err
+		}
+
+		return instance, nil
+	}
+
+	return nil, fmt.Errorf("neither userRef nor roleRef is specified")
+}
+
+// ResolveInstance resolves the instance reference via the target's instanceRef or clusterInstanceRef.
+func (r *Repository) ResolveInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*instanceresolver.ResolvedInstance, error) {
+	// Try user first, then role
+	if spec.UserRef != nil {
+		user, err := r.GetUser(ctx, spec, namespace)
+		if err != nil {
+			return nil, err
+		}
+		return r.instanceResolver.Resolve(ctx, user.Spec.InstanceRef, user.Spec.ClusterInstanceRef, user.Namespace)
+	}
+
+	if spec.RoleRef != nil {
+		role, err := r.GetRole(ctx, spec, namespace)
+		if err != nil {
+			return nil, err
+		}
+		return r.instanceResolver.Resolve(ctx, role.Spec.InstanceRef, role.Spec.ClusterInstanceRef, role.Namespace)
+	}
+
+	return nil, fmt.Errorf("neither userRef nor roleRef is specified")
 }
 
 // GetEngine returns the database engine type for a given spec.
@@ -248,7 +402,7 @@ func (r *Repository) GetEngine(ctx context.Context, spec *dbopsv1alpha1.Database
 func (r *Repository) DetectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
 	var result *drift.Result
 
-	err := r.withService(ctx, spec, namespace, func(svc *service.GrantService, user *dbopsv1alpha1.DatabaseUser, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
+	err := r.withService(ctx, spec, namespace, func(svc *service.GrantService, targetName string, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
 		driftCfg := &drift.Config{
 			AllowDestructive: allowDestructive,
 			Logger:           logf.FromContext(ctx),
@@ -256,7 +410,7 @@ func (r *Repository) DetectDrift(ctx context.Context, spec *dbopsv1alpha1.Databa
 		driftSvc := drift.NewService(svc.Adapter(), driftCfg)
 
 		var err error
-		result, err = driftSvc.DetectGrantDrift(ctx, spec, user.Spec.Username)
+		result, err = driftSvc.DetectGrantDrift(ctx, spec, targetName)
 		return err
 	})
 
@@ -267,7 +421,7 @@ func (r *Repository) DetectDrift(ctx context.Context, spec *dbopsv1alpha1.Databa
 func (r *Repository) CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
 	var correctionResult *drift.CorrectionResult
 
-	err := r.withService(ctx, spec, namespace, func(svc *service.GrantService, user *dbopsv1alpha1.DatabaseUser, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
+	err := r.withService(ctx, spec, namespace, func(svc *service.GrantService, targetName string, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
 		driftCfg := &drift.Config{
 			AllowDestructive: allowDestructive,
 			Logger:           logf.FromContext(ctx),
@@ -275,7 +429,7 @@ func (r *Repository) CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.Datab
 		driftSvc := drift.NewService(svc.Adapter(), driftCfg)
 
 		var err error
-		correctionResult, err = driftSvc.CorrectGrantDrift(ctx, spec, user.Spec.Username, driftResult)
+		correctionResult, err = driftSvc.CorrectGrantDrift(ctx, spec, targetName, driftResult)
 		return err
 	})
 

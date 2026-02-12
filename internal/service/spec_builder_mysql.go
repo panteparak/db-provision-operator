@@ -32,7 +32,8 @@ func NewMySQLSpecBuilder() SpecBuilder {
 // BuildDatabaseCreateOptions builds CreateDatabaseOptions from a DatabaseSpec.
 func (b *mysqlSpecBuilder) BuildDatabaseCreateOptions(spec *dbopsv1alpha1.DatabaseSpec) types.CreateDatabaseOptions {
 	opts := types.CreateDatabaseOptions{
-		Name: spec.Name,
+		Name:  spec.Name,
+		Owner: spec.Owner, // MySQL doesn't have native ownership, but tracked for metadata
 	}
 
 	if spec.MySQL != nil {

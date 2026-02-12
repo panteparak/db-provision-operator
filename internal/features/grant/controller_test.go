@@ -49,7 +49,7 @@ func newTestGrant(name, namespace string) *dbopsv1alpha1.DatabaseGrant {
 			Namespace: namespace,
 		},
 		Spec: dbopsv1alpha1.DatabaseGrantSpec{
-			UserRef: dbopsv1alpha1.UserReference{
+			UserRef: &dbopsv1alpha1.UserReference{
 				Name: "test-user",
 			},
 			Postgres: &dbopsv1alpha1.PostgresGrantConfig{
