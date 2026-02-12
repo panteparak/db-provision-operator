@@ -83,7 +83,7 @@ func TestDatabaseValidation(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: DatabaseSpec{
-					InstanceRef: InstanceReference{Name: "test-instance"},
+					InstanceRef: &InstanceReference{Name: "test-instance"},
 					Name:        "valid_db",
 				},
 			},
@@ -97,7 +97,7 @@ func TestDatabaseValidation(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: DatabaseSpec{
-					InstanceRef: InstanceReference{Name: "test-instance"},
+					InstanceRef: &InstanceReference{Name: "test-instance"},
 					Name:        "",
 				},
 			},
@@ -112,7 +112,7 @@ func TestDatabaseValidation(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: DatabaseSpec{
-					InstanceRef: InstanceReference{Name: "test-instance"},
+					InstanceRef: &InstanceReference{Name: "test-instance"},
 					Name:        "this_name_is_way_too_long_and_exceeds_the_maximum_length_of_sixty_three_characters_allowed",
 				},
 			},
@@ -127,7 +127,7 @@ func TestDatabaseValidation(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: DatabaseSpec{
-					InstanceRef: InstanceReference{Name: "test-instance"},
+					InstanceRef: &InstanceReference{Name: "test-instance"},
 					Name:        "123invalid",
 				},
 			},
@@ -142,7 +142,7 @@ func TestDatabaseValidation(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: DatabaseSpec{
-					InstanceRef: InstanceReference{Name: "test-instance"},
+					InstanceRef: &InstanceReference{Name: "test-instance"},
 					Name:        "invalid-name",
 				},
 			},
@@ -189,7 +189,7 @@ func TestDatabaseValidation(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: DatabaseSpec{
-					InstanceRef: InstanceReference{Name: ""}, // Empty name allowed by CRD
+					InstanceRef: &InstanceReference{Name: ""}, // Empty name allowed by CRD
 					Name:        "valid_db",
 				},
 			},
@@ -236,7 +236,7 @@ func TestDatabaseUserValidation(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: DatabaseUserSpec{
-					InstanceRef: InstanceReference{Name: "test-instance"},
+					InstanceRef: &InstanceReference{Name: "test-instance"},
 					Username:    "valid_user",
 				},
 			},
@@ -250,7 +250,7 @@ func TestDatabaseUserValidation(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: DatabaseUserSpec{
-					InstanceRef: InstanceReference{Name: "test-instance"},
+					InstanceRef: &InstanceReference{Name: "test-instance"},
 					Username:    "",
 				},
 			},
@@ -265,7 +265,7 @@ func TestDatabaseUserValidation(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: DatabaseUserSpec{
-					InstanceRef: InstanceReference{Name: "test-instance"},
+					InstanceRef: &InstanceReference{Name: "test-instance"},
 					Username:    "this_username_is_way_too_long_and_exceeds_maximum_length_allowed",
 				},
 			},
@@ -280,7 +280,7 @@ func TestDatabaseUserValidation(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: DatabaseUserSpec{
-					InstanceRef: InstanceReference{Name: "test-instance"},
+					InstanceRef: &InstanceReference{Name: "test-instance"},
 					Username:    "123invalid",
 				},
 			},
@@ -467,7 +467,7 @@ func TestDatabaseRoleValidation(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: DatabaseRoleSpec{
-					InstanceRef: InstanceReference{Name: "test-instance"},
+					InstanceRef: &InstanceReference{Name: "test-instance"},
 					RoleName:    "valid_role",
 				},
 			},
@@ -481,7 +481,7 @@ func TestDatabaseRoleValidation(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: DatabaseRoleSpec{
-					InstanceRef: InstanceReference{Name: "test-instance"},
+					InstanceRef: &InstanceReference{Name: "test-instance"},
 					RoleName:    "",
 				},
 			},
@@ -496,7 +496,7 @@ func TestDatabaseRoleValidation(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: DatabaseRoleSpec{
-					InstanceRef: InstanceReference{Name: "test-instance"},
+					InstanceRef: &InstanceReference{Name: "test-instance"},
 					RoleName:    "123-invalid",
 				},
 			},
