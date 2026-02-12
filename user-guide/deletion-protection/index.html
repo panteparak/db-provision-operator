@@ -12,13 +12,13 @@
         <meta name="author" content="panteparak">
       
       
-        <link rel="canonical" href="https://panteparak.github.io/db-provision-operator/user-guide/users/">
+        <link rel="canonical" href="https://panteparak.github.io/db-provision-operator/user-guide/deletion-protection/">
       
       
-        <link rel="prev" href="../databases/">
+        <link rel="prev" href="../drift-detection/">
       
       
-        <link rel="next" href="../roles/">
+        <link rel="next" href="../../engines/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Users - DB Provision Operator</title>
+        <title>Deletion Protection - DB Provision Operator</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#databaseuser" class="md-skip">
+        <a href="#deletion-protection" class="md-skip">
           Skip to content
         </a>
       
@@ -114,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Users
+              Deletion Protection
             
           </span>
         </div>
@@ -764,37 +764,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Users
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../users/" class="md-nav__link">
         
   
   
@@ -810,275 +783,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Overview
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#spec-fields" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Spec Fields
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Spec Fields">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#instanceref-required" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        instanceRef (required)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#username-required" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        username (required)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#passwordsecret-optional" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        passwordSecret (optional)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#existingpasswordsecret-optional" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        existingPasswordSecret (optional)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#postgres-optional" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        postgres (optional)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mysql-optional" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        mysql (optional)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#status" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Status
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Examples
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Examples">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#basic-user-with-generated-password" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Basic User with Generated Password
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#user-with-custom-secret-template" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        User with Custom Secret Template
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#user-with-existing-password" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        User with Existing Password
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#postgresql-user-with-role-membership" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        PostgreSQL User with Role Membership
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mysql-user-with-host-restrictions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        MySQL User with Host Restrictions
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#generated-secret-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Generated Secret Structure
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#password-rotation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Password Rotation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Troubleshooting">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#user-stuck-in-pending" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        User stuck in Pending
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#password-not-generated" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Password not generated
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#cannot-connect-with-generated-password" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cannot connect with generated password
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1200,10 +904,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../deletion-protection/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deletion Protection
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1219,6 +950,292 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enabling-deletion-protection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling Deletion Protection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported Resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#behavior-when-protected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behavior When Protected
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#viewing-protected-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Viewing Protected Resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disabling-deletion-protection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disabling Deletion Protection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Disabling Deletion Protection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#method-1-update-the-spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method 1: Update the Spec
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#method-2-force-delete-annotation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method 2: Force Delete Annotation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#method-3-edit-and-delete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method 3: Edit and Delete
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deletion-policies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deletion Policies
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Deletion Policies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#combined-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combined Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Events
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#production-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Production Resources
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gitops-workflows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitOps Workflows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-environment-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Environment Strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#namespace-deletion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Namespace Deletion
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#force-delete-script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Force Delete Script
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#resource-stuck-in-terminating" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resource Stuck in Terminating
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#protection-not-working" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protection Not Working
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operator-not-running" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operator Not Running
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2419,22 +2436,66 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#spec-fields" class="md-nav__link">
+  <a href="#enabling-deletion-protection" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Spec Fields
+        Enabling Deletion Protection
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Spec Fields">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported Resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#behavior-when-protected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behavior When Protected
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#viewing-protected-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Viewing Protected Resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disabling-deletion-protection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disabling Deletion Protection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Disabling Deletion Protection">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#instanceref-required" class="md-nav__link">
+  <a href="#method-1-update-the-spec" class="md-nav__link">
     <span class="md-ellipsis">
       
-        instanceRef (required)
+        Method 1: Update the Spec
       
     </span>
   </a>
@@ -2442,10 +2503,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#username-required" class="md-nav__link">
+  <a href="#method-2-force-delete-annotation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        username (required)
+        Method 2: Force Delete Annotation
       
     </span>
   </a>
@@ -2453,43 +2514,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#passwordsecret-optional" class="md-nav__link">
+  <a href="#method-3-edit-and-delete" class="md-nav__link">
     <span class="md-ellipsis">
       
-        passwordSecret (optional)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#existingpasswordsecret-optional" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        existingPasswordSecret (optional)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#postgres-optional" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        postgres (optional)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mysql-optional" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        mysql (optional)
+        Method 3: Edit and Delete
       
     </span>
   </a>
@@ -2502,77 +2530,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#status" class="md-nav__link">
+  <a href="#deletion-policies" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status
+        Deletion Policies
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Examples
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Examples">
+    <nav class="md-nav" aria-label="Deletion Policies">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#basic-user-with-generated-password" class="md-nav__link">
+  <a href="#combined-example" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Basic User with Generated Password
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#user-with-custom-secret-template" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        User with Custom Secret Template
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#user-with-existing-password" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        User with Existing Password
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#postgresql-user-with-role-membership" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        PostgreSQL User with Role Membership
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mysql-user-with-host-restrictions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        MySQL User with Host Restrictions
+        Combined Example
       
     </span>
   </a>
@@ -2585,10 +2558,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#generated-secret-structure" class="md-nav__link">
+  <a href="#events" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Generated Secret Structure
+        Events
       
     </span>
   </a>
@@ -2596,10 +2569,71 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#password-rotation" class="md-nav__link">
+  <a href="#best-practices" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Password Rotation
+        Best Practices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#production-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Production Resources
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gitops-workflows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitOps Workflows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-environment-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Environment Strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#namespace-deletion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Namespace Deletion
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#force-delete-script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Force Delete Script
       
     </span>
   </a>
@@ -2619,10 +2653,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#user-stuck-in-pending" class="md-nav__link">
+  <a href="#resource-stuck-in-terminating" class="md-nav__link">
     <span class="md-ellipsis">
       
-        User stuck in Pending
+        Resource Stuck in Terminating
       
     </span>
   </a>
@@ -2630,10 +2664,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#password-not-generated" class="md-nav__link">
+  <a href="#protection-not-working" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Password not generated
+        Protection Not Working
       
     </span>
   </a>
@@ -2641,10 +2675,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#cannot-connect-with-generated-password" class="md-nav__link">
+  <a href="#operator-not-running" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Cannot connect with generated password
+        Operator Not Running
       
     </span>
   </a>
@@ -2676,400 +2710,316 @@
   
 
 
-<h1 id="databaseuser">DatabaseUser<a class="headerlink" href="#databaseuser" title="Permanent link">&para;</a></h1>
-<p>A <code>DatabaseUser</code> creates and manages database users with automatic credential management.</p>
+<h1 id="deletion-protection">Deletion Protection<a class="headerlink" href="#deletion-protection" title="Permanent link">&para;</a></h1>
+<p>Deletion protection prevents accidental deletion of critical database resources. When enabled, attempting to delete the Kubernetes resource will fail until protection is explicitly disabled or a force-delete annotation is added.</p>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>Production databases and their associated users, roles, and grants are critical infrastructure. Accidental deletion can cause:</p>
+<ul>
+<li>Application downtime</li>
+<li>Data loss (depending on deletion policy)</li>
+<li>Service disruptions</li>
+<li>Compliance violations</li>
+</ul>
+<p>Deletion protection provides a safety net against:</p>
+<ul>
+<li>Accidental <code>kubectl delete</code> commands</li>
+<li>GitOps automation errors</li>
+<li>Misconfigured cleanup jobs</li>
+<li>Namespace deletion cascades</li>
+</ul>
+<h2 id="enabling-deletion-protection">Enabling Deletion Protection<a class="headerlink" href="#enabling-deletion-protection" title="Permanent link">&para;</a></h2>
+<p>Add <code>deletionProtection: true</code> to any supported resource:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dbops.dbprovision.io/v1alpha1</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DatabaseUser</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Database</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nt">metadata</span><span class="p">:</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp-user</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production-db</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="nt">spec</span><span class="p">:</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">instanceRef</span><span class="p">:</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres-primary</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp_user</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">passwordSecret</span><span class="p">:</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="nt">generate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="nt">secretName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp-user-credentials</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">deletionProtection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">  </span><span class="c1"># Prevents accidental deletion</span>
 </span></code></pre></div>
-<h2 id="spec-fields">Spec Fields<a class="headerlink" href="#spec-fields" title="Permanent link">&para;</a></h2>
-<h3 id="instanceref-required">instanceRef (required)<a class="headerlink" href="#instanceref-required" title="Permanent link">&para;</a></h3>
-<p>Reference to the parent <code>DatabaseInstance</code>.</p>
-<h3 id="username-required">username (required)<a class="headerlink" href="#username-required" title="Permanent link">&para;</a></h3>
-<p>The username in the database. Immutable after creation.</p>
-<h3 id="passwordsecret-optional">passwordSecret (optional)<a class="headerlink" href="#passwordsecret-optional" title="Permanent link">&para;</a></h3>
-<p>Configuration for password management.</p>
+<h2 id="supported-resources">Supported Resources<a class="headerlink" href="#supported-resources" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Field</th>
-<th>Type</th>
-<th>Description</th>
+<th>Resource</th>
+<th>deletionProtection</th>
+<th>Notes</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>generate</code></td>
-<td>bool</td>
-<td>Auto-generate a secure password</td>
+<td>DatabaseInstance</td>
+<td>Yes</td>
+<td>Blocks deletion of the instance connection</td>
 </tr>
 <tr>
-<td><code>length</code></td>
-<td>int</td>
-<td>Password length (default: 24)</td>
+<td>Database</td>
+<td>Yes</td>
+<td>Blocks deletion of the logical database</td>
 </tr>
 <tr>
-<td><code>includeSpecialChars</code></td>
-<td>bool</td>
-<td>Include special characters (default: true)</td>
+<td>DatabaseUser</td>
+<td>Yes</td>
+<td>Blocks deletion of the database user</td>
 </tr>
 <tr>
-<td><code>excludeChars</code></td>
-<td>string</td>
-<td>Characters to exclude</td>
+<td>DatabaseRole</td>
+<td>Yes</td>
+<td>Blocks deletion of the database role</td>
 </tr>
 <tr>
-<td><code>secretName</code></td>
-<td>string</td>
-<td>Name for the generated Secret</td>
+<td>DatabaseGrant</td>
+<td>Yes</td>
+<td>Blocks deletion of permission grants</td>
 </tr>
 <tr>
-<td><code>secretTemplate</code></td>
-<td>object</td>
-<td>Custom Secret template</td>
+<td>DatabaseBackupSchedule</td>
+<td>Yes</td>
+<td>Blocks deletion of the backup schedule</td>
+</tr>
+<tr>
+<td>DatabaseBackup</td>
+<td>No</td>
+<td>Backups are typically transient</td>
+</tr>
+<tr>
+<td>DatabaseRestore</td>
+<td>No</td>
+<td>Restores are one-time operations</td>
 </tr>
 </tbody>
 </table>
-<h4 id="secrettemplate">secretTemplate<a class="headerlink" href="#secrettemplate" title="Permanent link">&para;</a></h4>
-<p>Customize the generated Secret:</p>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>labels</code></td>
-<td>map</td>
-<td>Additional labels</td>
-</tr>
-<tr>
-<td><code>annotations</code></td>
-<td>map</td>
-<td>Additional annotations</td>
-</tr>
-<tr>
-<td><code>data</code></td>
-<td>map</td>
-<td>Additional data fields with templates</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Template variables:</strong></p>
-<ul>
-<li><code>{{ .Username }}</code> - The username</li>
-<li><code>{{ .Password }}</code> - The password</li>
-<li><code>{{ .Host }}</code> - Database host</li>
-<li><code>{{ .Port }}</code> - Database port</li>
-<li><code>{{ .Database }}</code> - Database name</li>
-<li><code>{{ .SSLMode }}</code> - SSL mode (PostgreSQL)</li>
-</ul>
-<h3 id="existingpasswordsecret-optional">existingPasswordSecret (optional)<a class="headerlink" href="#existingpasswordsecret-optional" title="Permanent link">&para;</a></h3>
-<p>Use an existing password instead of generating one.</p>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>name</code></td>
-<td>string</td>
-<td>Secret name</td>
-</tr>
-<tr>
-<td><code>key</code></td>
-<td>string</td>
-<td>Key containing the password</td>
-</tr>
-</tbody>
-</table>
-<h3 id="postgres-optional">postgres (optional)<a class="headerlink" href="#postgres-optional" title="Permanent link">&para;</a></h3>
-<p>PostgreSQL-specific user configuration.</p>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>connectionLimit</code></td>
-<td>int</td>
-<td>Max concurrent connections</td>
-</tr>
-<tr>
-<td><code>inherit</code></td>
-<td>bool</td>
-<td>Inherit role privileges (default: true)</td>
-</tr>
-<tr>
-<td><code>login</code></td>
-<td>bool</td>
-<td>Can login (default: true)</td>
-</tr>
-<tr>
-<td><code>createDB</code></td>
-<td>bool</td>
-<td>Can create databases</td>
-</tr>
-<tr>
-<td><code>createRole</code></td>
-<td>bool</td>
-<td>Can create roles</td>
-</tr>
-<tr>
-<td><code>superuser</code></td>
-<td>bool</td>
-<td>Is superuser</td>
-</tr>
-<tr>
-<td><code>replication</code></td>
-<td>bool</td>
-<td>Can replicate</td>
-</tr>
-<tr>
-<td><code>bypassRLS</code></td>
-<td>bool</td>
-<td>Bypass row-level security</td>
-</tr>
-<tr>
-<td><code>inRoles</code></td>
-<td>array</td>
-<td>Roles to inherit from</td>
-</tr>
-<tr>
-<td><code>configParameters</code></td>
-<td>map</td>
-<td>Session parameters</td>
-</tr>
-</tbody>
-</table>
-<h3 id="mysql-optional">mysql (optional)<a class="headerlink" href="#mysql-optional" title="Permanent link">&para;</a></h3>
-<p>MySQL-specific user configuration.</p>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>maxQueriesPerHour</code></td>
-<td>int</td>
-<td>Query limit (0 = unlimited)</td>
-</tr>
-<tr>
-<td><code>maxUpdatesPerHour</code></td>
-<td>int</td>
-<td>Update limit</td>
-</tr>
-<tr>
-<td><code>maxConnectionsPerHour</code></td>
-<td>int</td>
-<td>Connection limit per hour</td>
-</tr>
-<tr>
-<td><code>maxUserConnections</code></td>
-<td>int</td>
-<td>Max concurrent connections</td>
-</tr>
-<tr>
-<td><code>authPlugin</code></td>
-<td>string</td>
-<td>Authentication plugin</td>
-</tr>
-<tr>
-<td><code>requireSSL</code></td>
-<td>bool</td>
-<td>Require SSL connections</td>
-</tr>
-<tr>
-<td><code>allowedHosts</code></td>
-<td>array</td>
-<td>Allowed connection hosts</td>
-</tr>
-<tr>
-<td><code>accountLocked</code></td>
-<td>bool</td>
-<td>Lock the account</td>
-</tr>
-</tbody>
-</table>
-<h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>phase</code></td>
-<td>Current phase</td>
-</tr>
-<tr>
-<td><code>conditions</code></td>
-<td>Detailed conditions</td>
-</tr>
-<tr>
-<td><code>credentialsSecretRef</code></td>
-<td>Reference to the credentials Secret</td>
-</tr>
-</tbody>
-</table>
-<h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
-<h3 id="basic-user-with-generated-password">Basic User with Generated Password<a class="headerlink" href="#basic-user-with-generated-password" title="Permanent link">&para;</a></h3>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dbops.dbprovision.io/v1alpha1</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DatabaseUser</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">metadata</span><span class="p">:</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp-user</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nt">spec</span><span class="p">:</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">instanceRef</span><span class="p">:</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres-primary</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp_user</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="nt">passwordSecret</span><span class="p">:</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="nt">generate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nt">secretName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp-user-credentials</span>
-</span></code></pre></div>
-<h3 id="user-with-custom-secret-template">User with Custom Secret Template<a class="headerlink" href="#user-with-custom-secret-template" title="Permanent link">&para;</a></h3>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dbops.dbprovision.io/v1alpha1</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DatabaseUser</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">metadata</span><span class="p">:</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp-user</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="nt">spec</span><span class="p">:</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">instanceRef</span><span class="p">:</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres-primary</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp_user</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">  </span><span class="nt">passwordSecret</span><span class="p">:</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="nt">generate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="nt">length</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">    </span><span class="nt">secretName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp-user-credentials</span>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">    </span><span class="nt">secretTemplate</span><span class="p">:</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">      </span><span class="nt">labels</span><span class="p">:</span>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">        </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp</span>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">      </span><span class="nt">data</span><span class="p">:</span>
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">        </span><span class="nt">DATABASE_URL</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;postgresql://{{</span><span class="nv"> </span><span class="s">.Username</span><span class="nv"> </span><span class="s">}}:{{</span><span class="nv"> </span><span class="s">.Password</span><span class="nv"> </span><span class="s">}}@{{</span><span class="nv"> </span><span class="s">.Host</span><span class="nv"> </span><span class="s">}}:{{</span><span class="nv"> </span><span class="s">.Port</span><span class="nv"> </span><span class="s">}}/myapp?sslmode={{</span><span class="nv"> </span><span class="s">.SSLMode</span><span class="nv"> </span><span class="s">}}&quot;</span>
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">        </span><span class="nt">JDBC_URL</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;jdbc:postgresql://{{</span><span class="nv"> </span><span class="s">.Host</span><span class="nv"> </span><span class="s">}}:{{</span><span class="nv"> </span><span class="s">.Port</span><span class="nv"> </span><span class="s">}}/myapp?user={{</span><span class="nv"> </span><span class="s">.Username</span><span class="nv"> </span><span class="s">}}&amp;password={{</span><span class="nv"> </span><span class="s">.Password</span><span class="nv"> </span><span class="s">}}&quot;</span>
-</span></code></pre></div>
-<h3 id="user-with-existing-password">User with Existing Password<a class="headerlink" href="#user-with-existing-password" title="Permanent link">&para;</a></h3>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dbops.dbprovision.io/v1alpha1</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DatabaseUser</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">metadata</span><span class="p">:</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp-user</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="nt">spec</span><span class="p">:</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="nt">instanceRef</span><span class="p">:</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres-primary</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp_user</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="nt">existingPasswordSecret</span><span class="p">:</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-existing-password</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">    </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">password</span>
-</span></code></pre></div>
-<h3 id="postgresql-user-with-role-membership">PostgreSQL User with Role Membership<a class="headerlink" href="#postgresql-user-with-role-membership" title="Permanent link">&para;</a></h3>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dbops.dbprovision.io/v1alpha1</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DatabaseUser</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nt">metadata</span><span class="p">:</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp-user</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="nt">spec</span><span class="p">:</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">instanceRef</span><span class="p">:</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres-primary</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp_user</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">  </span><span class="nt">passwordSecret</span><span class="p">:</span>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">    </span><span class="nt">generate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">    </span><span class="nt">secretName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp-user-credentials</span>
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">  </span><span class="nt">postgres</span><span class="p">:</span>
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">    </span><span class="nt">connectionLimit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20</span>
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">    </span><span class="nt">inRoles</span><span class="p">:</span>
-</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">readonly_role</span>
-</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">analytics_role</span>
-</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="w">    </span><span class="nt">configParameters</span><span class="p">:</span>
-</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="w">      </span><span class="nt">search_path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;app,public&quot;</span>
-</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="w">      </span><span class="nt">statement_timeout</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;30000&quot;</span>
-</span></code></pre></div>
-<h3 id="mysql-user-with-host-restrictions">MySQL User with Host Restrictions<a class="headerlink" href="#mysql-user-with-host-restrictions" title="Permanent link">&para;</a></h3>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dbops.dbprovision.io/v1alpha1</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DatabaseUser</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nt">metadata</span><span class="p">:</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp-mysql-user</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="nt">spec</span><span class="p">:</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="nt">instanceRef</span><span class="p">:</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mysql-primary</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp_user</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">  </span><span class="nt">passwordSecret</span><span class="p">:</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">    </span><span class="nt">generate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">    </span><span class="nt">secretName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp-mysql-credentials</span>
-</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">  </span><span class="nt">mysql</span><span class="p">:</span>
-</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">    </span><span class="nt">maxUserConnections</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50</span>
-</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">    </span><span class="nt">authPlugin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">caching_sha2_password</span>
-</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="w">    </span><span class="nt">allowedHosts</span><span class="p">:</span>
-</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;10.0.0.%&quot;</span>
-</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;192.168.1.%&quot;</span>
-</span></code></pre></div>
-<h2 id="generated-secret-structure">Generated Secret Structure<a class="headerlink" href="#generated-secret-structure" title="Permanent link">&para;</a></h2>
-<p>When <code>passwordSecret.generate: true</code>, the operator creates a Secret:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Secret</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="nt">metadata</span><span class="p">:</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp-user-credentials</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="nt">ownerReferences</span><span class="p">:</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dbops.dbprovision.io/v1alpha1</span>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">      </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DatabaseUser</span>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp-user</span>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Opaque</span>
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="nt">data</span><span class="p">:</span>
-</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;base64&gt;</span>
-</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;base64&gt;</span>
-</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="w">  </span><span class="c1"># Plus any custom fields from secretTemplate</span>
-</span></code></pre></div>
-<h2 id="password-rotation">Password Rotation<a class="headerlink" href="#password-rotation" title="Permanent link">&para;</a></h2>
-<p>To rotate a password:</p>
+<h2 id="behavior-when-protected">Behavior When Protected<a class="headerlink" href="#behavior-when-protected" title="Permanent link">&para;</a></h2>
+<p>When you attempt to delete a protected resource:</p>
 <ol>
-<li>Delete the existing credentials Secret</li>
-<li>The operator will detect the missing Secret and regenerate</li>
+<li>The Kubernetes API accepts the delete request</li>
+<li>The resource is marked for deletion (finalizer prevents immediate removal)</li>
+<li>The operator detects deletion and checks for protection</li>
+<li>Deletion is blocked with a <code>DeletionBlocked</code> event</li>
+<li>Resource remains in <code>Failed</code> phase with protection message</li>
 </ol>
-<p>Or use the annotation:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">metadata</span><span class="p">:</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">annotations</span><span class="p">:</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nt">dbops.dbprovision.io/rotate-password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>$<span class="w"> </span>kubectl<span class="w"> </span>delete<span class="w"> </span>database<span class="w"> </span>production-db
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>database.dbops.dbprovision.io<span class="w"> </span><span class="s2">&quot;production-db&quot;</span><span class="w"> </span>deleted
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>$<span class="w"> </span>kubectl<span class="w"> </span>get<span class="w"> </span>database<span class="w"> </span>production-db
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>NAME<span class="w">            </span>PHASE<span class="w">   </span>MESSAGE
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>production-db<span class="w">   </span>Failed<span class="w">  </span>Deletion<span class="w"> </span>blocked<span class="w"> </span>by<span class="w"> </span>deletion<span class="w"> </span>protection
 </span></code></pre></div>
+<h2 id="viewing-protected-resources">Viewing Protected Resources<a class="headerlink" href="#viewing-protected-resources" title="Permanent link">&para;</a></h2>
+<p>Check which resources have deletion protection:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># All databases with deletion protection</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>kubectl<span class="w"> </span>get<span class="w"> </span>databases<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{range .items[?(@.spec.deletionProtection==true)]}{.metadata.name}{&quot;\n&quot;}{end}&#39;</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Using labels (if you label protected resources)</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>kubectl<span class="w"> </span>get<span class="w"> </span>databases<span class="w"> </span>-l<span class="w"> </span><span class="nv">protected</span><span class="o">=</span><span class="nb">true</span>
+</span></code></pre></div>
+<h2 id="disabling-deletion-protection">Disabling Deletion Protection<a class="headerlink" href="#disabling-deletion-protection" title="Permanent link">&para;</a></h2>
+<h3 id="method-1-update-the-spec">Method 1: Update the Spec<a class="headerlink" href="#method-1-update-the-spec" title="Permanent link">&para;</a></h3>
+<p>Remove or disable the protection:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">spec</span><span class="p">:</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">deletionProtection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</span></code></pre></div>
+<p>Then delete normally:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>database.yaml
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>kubectl<span class="w"> </span>delete<span class="w"> </span>database<span class="w"> </span>production-db
+</span></code></pre></div>
+<h3 id="method-2-force-delete-annotation">Method 2: Force Delete Annotation<a class="headerlink" href="#method-2-force-delete-annotation" title="Permanent link">&para;</a></h3>
+<p>For emergency situations, add the force-delete annotation:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>kubectl<span class="w"> </span>annotate<span class="w"> </span>database<span class="w"> </span>production-db<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>dbops.dbprovision.io/force-delete<span class="o">=</span><span class="s2">&quot;true&quot;</span>
+</span></code></pre></div>
+<p>The resource will be deleted on the next reconciliation loop.</p>
+<div class="admonition danger">
+<p class="admonition-title">Force Delete is Immediate</p>
+<p>The force-delete annotation bypasses all safety checks. Use only when you're certain the deletion is intentional.</p>
+</div>
+<h3 id="method-3-edit-and-delete">Method 3: Edit and Delete<a class="headerlink" href="#method-3-edit-and-delete" title="Permanent link">&para;</a></h3>
+<p>Quick one-liner to disable and delete:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>kubectl<span class="w"> </span>patch<span class="w"> </span>database<span class="w"> </span>production-db<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;{&quot;spec&quot;:{&quot;deletionProtection&quot;:false}}&#39;</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>kubectl<span class="w"> </span>delete<span class="w"> </span>database<span class="w"> </span>production-db
+</span></code></pre></div>
+<h2 id="deletion-policies">Deletion Policies<a class="headerlink" href="#deletion-policies" title="Permanent link">&para;</a></h2>
+<p>Deletion protection is separate from deletion policy. The deletion policy controls <strong>what happens</strong> when a resource is deleted; deletion protection controls <strong>whether</strong> it can be deleted.</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>deletionProtection: true</code></td>
+<td>Cannot delete the CR</td>
+</tr>
+<tr>
+<td><code>deletionPolicy: Retain</code></td>
+<td>CR deleted, database object kept</td>
+</tr>
+<tr>
+<td><code>deletionPolicy: Delete</code></td>
+<td>CR deleted, database object deleted</td>
+</tr>
+<tr>
+<td><code>deletionPolicy: Snapshot</code></td>
+<td>CR deleted after backup created</td>
+</tr>
+</tbody>
+</table>
+<h3 id="combined-example">Combined Example<a class="headerlink" href="#combined-example" title="Permanent link">&para;</a></h3>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dbops.dbprovision.io/v1alpha1</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Database</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="nt">metadata</span><span class="p">:</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production-db</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="nt">spec</span><span class="p">:</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="nt">instanceRef</span><span class="p">:</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres-primary</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">  </span><span class="nt">deletionProtection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">   </span><span class="c1"># Can&#39;t delete CR accidentally</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">  </span><span class="nt">deletionPolicy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Retain</span><span class="w">     </span><span class="c1"># Even if deleted, keep the actual database</span>
+</span></code></pre></div>
+<h2 id="events">Events<a class="headerlink" href="#events" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DeletionBlocked</code></td>
+<td>Warning</td>
+<td>Deletion was attempted but blocked by protection</td>
+</tr>
+</tbody>
+</table>
+<p>View events:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>kubectl<span class="w"> </span>describe<span class="w"> </span>database<span class="w"> </span>production-db
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="c1"># Look for Events section</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>kubectl<span class="w"> </span>get<span class="w"> </span>events<span class="w"> </span>--field-selector<span class="w"> </span><span class="nv">reason</span><span class="o">=</span>DeletionBlocked
+</span></code></pre></div>
+<h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
+<h3 id="production-resources">Production Resources<a class="headerlink" href="#production-resources" title="Permanent link">&para;</a></h3>
+<p>Always enable deletion protection for production databases:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">spec</span><span class="p">:</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">deletionProtection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">deletionPolicy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Snapshot</span><span class="w">  </span><span class="c1"># Additional safety: backup before delete</span>
+</span></code></pre></div>
+<h3 id="gitops-workflows">GitOps Workflows<a class="headerlink" href="#gitops-workflows" title="Permanent link">&para;</a></h3>
+<p>In GitOps (ArgoCD, Flux), deletion protection prevents drift corrections from accidentally deleting resources:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># argocd Application</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nt">spec</span><span class="p">:</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nt">syncPolicy</span><span class="p">:</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">automated</span><span class="p">:</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">      </span><span class="nt">prune</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">  </span><span class="c1"># Would delete resources not in Git</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">    </span><span class="c1"># But deletion protection prevents actual deletion</span>
+</span></code></pre></div>
+<h3 id="multi-environment-strategy">Multi-Environment Strategy<a class="headerlink" href="#multi-environment-strategy" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Environment</th>
+<th>deletionProtection</th>
+<th>deletionPolicy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Development</td>
+<td><code>false</code></td>
+<td><code>Delete</code></td>
+</tr>
+<tr>
+<td>Staging</td>
+<td><code>true</code></td>
+<td><code>Delete</code></td>
+</tr>
+<tr>
+<td>Production</td>
+<td><code>true</code></td>
+<td><code>Retain</code> or <code>Snapshot</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="namespace-deletion">Namespace Deletion<a class="headerlink" href="#namespace-deletion" title="Permanent link">&para;</a></h3>
+<p>When a namespace is deleted, all resources in it are deleted. Deletion protection <strong>still applies</strong>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># This will hang waiting for protected resources</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>kubectl<span class="w"> </span>delete<span class="w"> </span>namespace<span class="w"> </span>production
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1"># Check which resources are blocking</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>kubectl<span class="w"> </span>get<span class="w"> </span>databases,users,roles<span class="w"> </span>-n<span class="w"> </span>production<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">  </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{range .items[?(@.spec.deletionProtection==true)]}{.kind}/{.metadata.name}{&quot;\n&quot;}{end}&#39;</span>
+</span></code></pre></div>
+<p>To delete the namespace, first remove protection or force-delete each resource.</p>
+<h2 id="force-delete-script">Force Delete Script<a class="headerlink" href="#force-delete-script" title="Permanent link">&para;</a></h2>
+<p>For emergency cleanup of multiple protected resources:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="ch">#!/bin/bash</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="c1"># force-delete-all.sh - USE WITH EXTREME CAUTION</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="nv">NAMESPACE</span><span class="o">=</span><span class="si">${</span><span class="nv">1</span><span class="k">:-</span><span class="nv">default</span><span class="si">}</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="k">for</span><span class="w"> </span>kind<span class="w"> </span><span class="k">in</span><span class="w"> </span>database<span class="w"> </span>databaseuser<span class="w"> </span>databaserole<span class="w"> </span>databasegrant<span class="w"> </span>databasebackupschedule<span class="p">;</span><span class="w"> </span><span class="k">do</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">  </span><span class="k">for</span><span class="w"> </span>name<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="k">$(</span>kubectl<span class="w"> </span>get<span class="w"> </span><span class="nv">$kind</span><span class="w"> </span>-n<span class="w"> </span><span class="nv">$NAMESPACE</span><span class="w"> </span>-o<span class="w"> </span>name<span class="k">)</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">    </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Force deleting </span><span class="nv">$name</span><span class="s2">...&quot;</span>
+</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="w">    </span>kubectl<span class="w"> </span>annotate<span class="w"> </span><span class="nv">$name</span><span class="w"> </span>-n<span class="w"> </span><span class="nv">$NAMESPACE</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="w">      </span>dbops.dbprovision.io/force-delete<span class="o">=</span><span class="s2">&quot;true&quot;</span><span class="w"> </span>--overwrite
+</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="w">  </span><span class="k">done</span>
+</span><span id="__span-12-12"><a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a><span class="k">done</span>
+</span><span id="__span-12-13"><a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>
+</span><span id="__span-12-14"><a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Resources will be deleted on next reconciliation&quot;</span>
+</span></code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Audit Force Deletes</p>
+<p>Always document why force-delete was used. Consider alerting on force-delete annotations:</p>
+<div class="language-promql highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Alert when force-delete annotation is added</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="nv">kube_resource_annotations</span><span class="p">{</span><span class="nl">annotation_dbops_dbprovision_io_force_delete</span><span class="o">=</span><span class="p">&quot;</span><span class="s">true</span><span class="p">&quot;}</span>
+</span></code></pre></div>
+</div>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
-<h3 id="user-stuck-in-pending">User stuck in Pending<a class="headerlink" href="#user-stuck-in-pending" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Verify the DatabaseInstance is Ready</li>
-<li>Check the credentials Secret exists (if using existing)</li>
-</ul>
-<h3 id="password-not-generated">Password not generated<a class="headerlink" href="#password-not-generated" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Check if <code>passwordSecret.generate: true</code> is set</li>
-<li>Verify <code>secretName</code> is specified</li>
-<li>Check for errors in operator logs</li>
-</ul>
-<h3 id="cannot-connect-with-generated-password">Cannot connect with generated password<a class="headerlink" href="#cannot-connect-with-generated-password" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Verify the Secret contains the correct password</li>
-<li>Check the user was created in the database</li>
-<li>For PostgreSQL, verify pg_hba.conf allows the connection</li>
-</ul>
+<h3 id="resource-stuck-in-terminating">Resource Stuck in Terminating<a class="headerlink" href="#resource-stuck-in-terminating" title="Permanent link">&para;</a></h3>
+<p>If a protected resource shows <code>Terminating</code>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Check events for DeletionBlocked</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>kubectl<span class="w"> </span>describe<span class="w"> </span>database<span class="w"> </span>my-db
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1"># Check if finalizer is still present</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>kubectl<span class="w"> </span>get<span class="w"> </span>database<span class="w"> </span>my-db<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.metadata.finalizers}&#39;</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="c1"># Option 1: Disable protection via spec</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>kubectl<span class="w"> </span>patch<span class="w"> </span>database<span class="w"> </span>my-db<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;{&quot;spec&quot;:{&quot;deletionProtection&quot;:false}}&#39;</span>
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="c1"># Option 2: Force delete</span>
+</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>kubectl<span class="w"> </span>annotate<span class="w"> </span>database<span class="w"> </span>my-db<span class="w"> </span>dbops.dbprovision.io/force-delete<span class="o">=</span><span class="s2">&quot;true&quot;</span>
+</span></code></pre></div>
+<h3 id="protection-not-working">Protection Not Working<a class="headerlink" href="#protection-not-working" title="Permanent link">&para;</a></h3>
+<p>If resources are deleted despite protection:</p>
+<ol>
+<li>Verify <code>deletionProtection: true</code> is in the spec</li>
+<li>Check operator logs for errors</li>
+<li>Ensure the operator has proper RBAC permissions</li>
+<li>Verify the finalizer is being added</li>
+</ol>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># Check finalizer</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>kubectl<span class="w"> </span>get<span class="w"> </span>database<span class="w"> </span>my-db<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.metadata.finalizers}&#39;</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="c1"># Should include: dbops.dbprovision.io/database</span>
+</span></code></pre></div>
+<h3 id="operator-not-running">Operator Not Running<a class="headerlink" href="#operator-not-running" title="Permanent link">&para;</a></h3>
+<p>If the operator is down, protected resources cannot be deleted (finalizers block deletion). To recover:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Option 1: Restart the operator</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>kubectl<span class="w"> </span>rollout<span class="w"> </span>restart<span class="w"> </span>deployment<span class="w"> </span>db-provision-operator-controller-manager<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span>-n<span class="w"> </span>db-provision-operator-system
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="c1"># Option 2: Emergency - remove finalizer directly (DANGEROUS)</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>kubectl<span class="w"> </span>patch<span class="w"> </span>database<span class="w"> </span>my-db<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;{&quot;metadata&quot;:{&quot;finalizers&quot;:null}}&#39;</span><span class="w"> </span>--type<span class="o">=</span>merge
+</span></code></pre></div>
+<div class="admonition danger">
+<p class="admonition-title">Removing Finalizers</p>
+<p>Removing finalizers bypasses all cleanup logic. The database object in the actual database will NOT be deleted, potentially leaving orphaned resources.</p>
+</div>
 
 
 
@@ -3107,7 +3057,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../databases/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Databases">
+          <a href="../drift-detection/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Drift Detection">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -3117,20 +3067,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Databases
+                Drift Detection
               </div>
             </div>
           </a>
         
         
           
-          <a href="../roles/" class="md-footer__link md-footer__link--next" aria-label="Next: Roles">
+          <a href="../../engines/" class="md-footer__link md-footer__link--next" aria-label="Next: Overview">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Roles
+                Overview
               </div>
             </div>
             <div class="md-footer__button md-icon">

@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://panteparak.github.io/db-provision-operator/operations/troubleshooting/">
       
       
-        <link rel="prev" href="../monitoring/">
+        <link rel="prev" href="../events/">
       
       
         <link rel="next" href="../../development/">
@@ -869,6 +869,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/drift-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/deletion-protection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deletion Protection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1029,6 +1085,34 @@
     
   
     MariaDB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../engines/cockroachdb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CockroachDB
   
 
     
@@ -1263,6 +1347,62 @@
     
   
     MySQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/cockroachdb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CockroachDB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/drift-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Detection
   
 
     
@@ -1629,6 +1769,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -1802,6 +1970,39 @@
     <span class="md-ellipsis">
       
         Restore Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#drift-detection-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drift Detection Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deletion-protection-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deletion Protection Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cockroachdb-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CockroachDB Issues
       
     </span>
   </a>
@@ -2152,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/e2e-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E2E Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/ci-cd/" class="md-nav__link">
         
   
@@ -2373,6 +2602,39 @@
     <span class="md-ellipsis">
       
         Restore Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#drift-detection-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drift Detection Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deletion-protection-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deletion Protection Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cockroachdb-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CockroachDB Issues
       
     </span>
   </a>
@@ -2788,28 +3050,200 @@
 </tr>
 </tbody>
 </table>
+<h3 id="drift-detection-issues">Drift Detection Issues<a class="headerlink" href="#drift-detection-issues" title="Permanent link">&para;</a></h3>
+<h4 id="drift-not-detected">Drift Not Detected<a class="headerlink" href="#drift-not-detected" title="Permanent link">&para;</a></h4>
+<p><strong>Check drift mode:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>database<span class="w"> </span>myapp<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.spec.driftPolicy.mode}&#39;</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="c1"># Must be &quot;detect&quot; or &quot;correct&quot;, not &quot;ignore&quot;</span>
+</span></code></pre></div></p>
+<p><strong>Check last drift check time:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>database<span class="w"> </span>myapp<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.status.drift.lastChecked}&#39;</span>
+</span></code></pre></div></p>
+<p><strong>Verify interval has passed:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># Default is 5m, check configured interval</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>kubectl<span class="w"> </span>get<span class="w"> </span>database<span class="w"> </span>myapp<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.spec.driftPolicy.interval}&#39;</span>
+</span></code></pre></div></p>
+<p><strong>Check operator logs:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system<span class="w"> </span>deployment/db-provision-operator<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-i<span class="w"> </span>drift
+</span></code></pre></div></p>
+<h4 id="drift-detected-but-not-corrected">Drift Detected But Not Corrected<a class="headerlink" href="#drift-detected-but-not-corrected" title="Permanent link">&para;</a></h4>
+<p><strong>Check drift mode:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="c1"># Mode must be &quot;correct&quot;, not &quot;detect&quot;</span>
+</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>kubectl<span class="w"> </span>get<span class="w"> </span>database<span class="w"> </span>myapp<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.spec.driftPolicy.mode}&#39;</span>
+</span></code></pre></div></p>
+<p><strong>Check if field is immutable:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>database<span class="w"> </span>myapp<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.status.drift.diffs}&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.[] | select(.immutable==true)&#39;</span>
+</span></code></pre></div></p>
+<p><strong>Check if correction is destructive:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>database<span class="w"> </span>myapp<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.status.drift.diffs}&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.[] | select(.destructive==true)&#39;</span>
+</span></code></pre></div></p>
+<p><strong>Allow destructive corrections (use with caution):</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>kubectl<span class="w"> </span>annotate<span class="w"> </span>database<span class="w"> </span>myapp<span class="w"> </span>dbops.dbprovision.io/allow-destructive-drift<span class="o">=</span><span class="s2">&quot;true&quot;</span>
+</span></code></pre></div></p>
+<h4 id="drift-correction-failed">Drift Correction Failed<a class="headerlink" href="#drift-correction-failed" title="Permanent link">&para;</a></h4>
+<p><strong>Check events:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>events<span class="w"> </span>--field-selector<span class="w"> </span><span class="nv">reason</span><span class="o">=</span>DriftCorrectionFailed,involvedObject.name<span class="o">=</span>myapp
+</span></code></pre></div></p>
+<p><strong>Common causes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Cause</th>
+<th>Solution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Insufficient privileges</td>
+<td>Check admin account permissions</td>
+</tr>
+<tr>
+<td>Field is immutable</td>
+<td>Cannot auto-correct, update spec to match</td>
+</tr>
+<tr>
+<td>Database object locked</td>
+<td>Check for active transactions or locks</td>
+</tr>
+</tbody>
+</table>
+<h4 id="drift-keeps-reappearing">Drift Keeps Reappearing<a class="headerlink" href="#drift-keeps-reappearing" title="Permanent link">&para;</a></h4>
+<p><strong>Possible causes:</strong></p>
+<ol>
+<li><strong>External processes making changes:</strong></li>
+<li>
+<p>Check for migration scripts, other operators, or manual changes</p>
+</li>
+<li>
+<p><strong>Application creating/modifying objects:</strong></p>
+</li>
+<li>
+<p>Review application database connection and permissions</p>
+</li>
+<li>
+<p><strong>Spec doesn't match intended state:</strong></p>
+</li>
+<li>Update CR spec to match desired configuration</li>
+</ol>
+<h3 id="deletion-protection-issues">Deletion Protection Issues<a class="headerlink" href="#deletion-protection-issues" title="Permanent link">&para;</a></h3>
+<h4 id="cannot-delete-protected-resource">Cannot Delete Protected Resource<a class="headerlink" href="#cannot-delete-protected-resource" title="Permanent link">&para;</a></h4>
+<p><strong>Check if deletion protection is enabled:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>database<span class="w"> </span>myapp<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.spec.deletionProtection}&#39;</span>
+</span></code></pre></div></p>
+<p><strong>Method 1: Disable protection in spec:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>kubectl<span class="w"> </span>patch<span class="w"> </span>database<span class="w"> </span>myapp<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;{&quot;spec&quot;:{&quot;deletionProtection&quot;:false}}&#39;</span>
+</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>kubectl<span class="w"> </span>delete<span class="w"> </span>database<span class="w"> </span>myapp
+</span></code></pre></div></p>
+<p><strong>Method 2: Force delete annotation:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>kubectl<span class="w"> </span>annotate<span class="w"> </span>database<span class="w"> </span>myapp<span class="w"> </span>dbops.dbprovision.io/force-delete<span class="o">=</span><span class="s2">&quot;true&quot;</span>
+</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a><span class="c1"># Resource will be deleted on next reconciliation</span>
+</span></code></pre></div></p>
+<p><strong>Method 3: One-liner:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>kubectl<span class="w"> </span>patch<span class="w"> </span>database<span class="w"> </span>myapp<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;{&quot;spec&quot;:{&quot;deletionProtection&quot;:false}}&#39;</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>kubectl<span class="w"> </span>delete<span class="w"> </span>database<span class="w"> </span>myapp
+</span></code></pre></div></p>
+<h4 id="resource-stuck-in-terminating">Resource Stuck in Terminating<a class="headerlink" href="#resource-stuck-in-terminating" title="Permanent link">&para;</a></h4>
+<p><strong>Check for DeletionBlocked events:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>kubectl<span class="w"> </span>describe<span class="w"> </span>database<span class="w"> </span>myapp<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-A5<span class="w"> </span><span class="s2">&quot;Events:&quot;</span>
+</span></code></pre></div></p>
+<p><strong>Check finalizers:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>database<span class="w"> </span>myapp<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.metadata.finalizers}&#39;</span>
+</span></code></pre></div></p>
+<p><strong>If operator is running, disable protection:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-37-1"><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a>kubectl<span class="w"> </span>patch<span class="w"> </span>database<span class="w"> </span>myapp<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;{&quot;spec&quot;:{&quot;deletionProtection&quot;:false}}&#39;</span>
+</span></code></pre></div></p>
+<p><strong>If operator is down (emergency only):</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-38-1"><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a><span class="c1"># WARNING: Bypasses cleanup logic, may leave orphaned database objects</span>
+</span><span id="__span-38-2"><a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a>kubectl<span class="w"> </span>patch<span class="w"> </span>database<span class="w"> </span>myapp<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;{&quot;metadata&quot;:{&quot;finalizers&quot;:null}}&#39;</span><span class="w"> </span>--type<span class="o">=</span>merge
+</span></code></pre></div></p>
+<h4 id="namespace-stuck-deleting">Namespace Stuck Deleting<a class="headerlink" href="#namespace-stuck-deleting" title="Permanent link">&para;</a></h4>
+<p><strong>Find protected resources blocking deletion:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>databases,databaseusers,databaseroles,databasegrants<span class="w"> </span>-n<span class="w"> </span>my-namespace<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="w">  </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{range .items[?(@.spec.deletionProtection==true)]}{.kind}/{.metadata.name}{&quot;\n&quot;}{end}&#39;</span>
+</span></code></pre></div></p>
+<p><strong>Force delete all protected resources:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="k">for</span><span class="w"> </span>kind<span class="w"> </span><span class="k">in</span><span class="w"> </span>database<span class="w"> </span>databaseuser<span class="w"> </span>databaserole<span class="w"> </span>databasegrant<span class="w"> </span>databasebackupschedule<span class="p">;</span><span class="w"> </span><span class="k">do</span>
+</span><span id="__span-40-2"><a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a><span class="w">  </span><span class="k">for</span><span class="w"> </span>name<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="k">$(</span>kubectl<span class="w"> </span>get<span class="w"> </span><span class="nv">$kind</span><span class="w"> </span>-n<span class="w"> </span>my-namespace<span class="w"> </span>-o<span class="w"> </span>name<span class="w"> </span><span class="m">2</span>&gt;/dev/null<span class="k">)</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+</span><span id="__span-40-3"><a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a><span class="w">    </span>kubectl<span class="w"> </span>annotate<span class="w"> </span><span class="nv">$name</span><span class="w"> </span>-n<span class="w"> </span>my-namespace<span class="w"> </span>dbops.dbprovision.io/force-delete<span class="o">=</span><span class="s2">&quot;true&quot;</span><span class="w"> </span>--overwrite
+</span><span id="__span-40-4"><a id="__codelineno-40-4" name="__codelineno-40-4" href="#__codelineno-40-4"></a><span class="w">  </span><span class="k">done</span>
+</span><span id="__span-40-5"><a id="__codelineno-40-5" name="__codelineno-40-5" href="#__codelineno-40-5"></a><span class="k">done</span>
+</span></code></pre></div></p>
+<h3 id="cockroachdb-issues">CockroachDB Issues<a class="headerlink" href="#cockroachdb-issues" title="Permanent link">&para;</a></h3>
+<h4 id="connection-failed-in-insecure-mode">Connection Failed in Insecure Mode<a class="headerlink" href="#connection-failed-in-insecure-mode" title="Permanent link">&para;</a></h4>
+<p><strong>Error:</strong> <code>password authentication failed</code></p>
+<p><strong>Cause:</strong> CockroachDB insecure mode doesn't support passwords.</p>
+<p><strong>Solution:</strong> Use empty password in secret:
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-41-1"><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+</span><span id="__span-41-2"><a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Secret</span>
+</span><span id="__span-41-3"><a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a><span class="nt">metadata</span><span class="p">:</span>
+</span><span id="__span-41-4"><a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cockroach-admin-credentials</span>
+</span><span id="__span-41-5"><a id="__codelineno-41-5" name="__codelineno-41-5" href="#__codelineno-41-5"></a><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Opaque</span>
+</span><span id="__span-41-6"><a id="__codelineno-41-6" name="__codelineno-41-6" href="#__codelineno-41-6"></a><span class="nt">stringData</span><span class="p">:</span>
+</span><span id="__span-41-7"><a id="__codelineno-41-7" name="__codelineno-41-7" href="#__codelineno-41-7"></a><span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dbprovision_admin</span>
+</span><span id="__span-41-8"><a id="__codelineno-41-8" name="__codelineno-41-8" href="#__codelineno-41-8"></a><span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span><span class="w">  </span><span class="c1"># Must be empty</span>
+</span></code></pre></div></p>
+<p><strong>Verify insecure mode:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-42-1"><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a>kubectl<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-it<span class="w"> </span>cockroachdb-0<span class="w"> </span>--<span class="w"> </span>cockroach<span class="w"> </span>sql<span class="w"> </span>--insecure<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;SHOW CLUSTER SETTING server.host_based_authentication.enabled;&quot;</span>
+</span></code></pre></div></p>
+<h4 id="cannot-create-user-with-password">Cannot Create User with Password<a class="headerlink" href="#cannot-create-user-with-password" title="Permanent link">&para;</a></h4>
+<p><strong>Error:</strong> <code>password is not supported in insecure mode</code></p>
+<p><strong>Cause:</strong> Attempting to create user with password on insecure cluster.</p>
+<p><strong>Solution:</strong> The operator automatically handles this. Users are created without passwords in insecure mode.</p>
+<h4 id="permission-denied-for-grants">Permission Denied for Grants<a class="headerlink" href="#permission-denied-for-grants" title="Permanent link">&para;</a></h4>
+<p><strong>Error:</strong> <code>must be admin or owner</code></p>
+<p><strong>Cause:</strong> Admin user doesn't have <code>admin</code> role membership.</p>
+<p><strong>Solution:</strong>
+<div class="language-sql highlight"><pre><span></span><code><span id="__span-43-1"><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a><span class="c1">-- Connect to CockroachDB as root</span>
+</span><span id="__span-43-2"><a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a><span class="k">GRANT</span><span class="w"> </span><span class="k">admin</span><span class="w"> </span><span class="k">TO</span><span class="w"> </span><span class="n">dbprovision_admin</span><span class="p">;</span>
+</span></code></pre></div></p>
+<h4 id="cannot-create-database">Cannot Create Database<a class="headerlink" href="#cannot-create-database" title="Permanent link">&para;</a></h4>
+<p><strong>Error:</strong> <code>user does not have CREATEDB privilege</code></p>
+<p><strong>Solution:</strong>
+<div class="language-sql highlight"><pre><span></span><code><span id="__span-44-1"><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a><span class="k">ALTER</span><span class="w"> </span><span class="k">USER</span><span class="w"> </span><span class="n">dbprovision_admin</span><span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="k">CREATEDB</span><span class="p">;</span>
+</span></code></pre></div></p>
+<h4 id="tls-certificate-errors">TLS Certificate Errors<a class="headerlink" href="#tls-certificate-errors" title="Permanent link">&para;</a></h4>
+<p><strong>Error:</strong> <code>certificate signed by unknown authority</code></p>
+<p><strong>Check TLS configuration:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-45-1"><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>databaseinstance<span class="w"> </span>cockroach-cluster<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.spec.tls}&#39;</span>
+</span></code></pre></div></p>
+<p><strong>Verify certificates:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-46-1"><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a><span class="c1"># Check secret contains required keys</span>
+</span><span id="__span-46-2"><a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a>kubectl<span class="w"> </span>get<span class="w"> </span>secret<span class="w"> </span>cockroach-tls<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.data}&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-r<span class="w"> </span><span class="s1">&#39;keys&#39;</span>
+</span><span id="__span-46-3"><a id="__codelineno-46-3" name="__codelineno-46-3" href="#__codelineno-46-3"></a><span class="c1"># Should include: ca.crt, tls.crt, tls.key</span>
+</span></code></pre></div></p>
+<p><strong>Test connection manually:</strong>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-47-1"><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a>kubectl<span class="w"> </span>run<span class="w"> </span>cockroach-test<span class="w"> </span>--rm<span class="w"> </span>-it<span class="w"> </span>--image<span class="o">=</span>cockroachdb/cockroach:v24.1.0<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-47-2"><a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a><span class="w">  </span>sql<span class="w"> </span>--url<span class="o">=</span><span class="s2">&quot;postgresql://user:pass@cockroachdb:26257/defaultdb?sslmode=verify-full&amp;sslrootcert=/certs/ca.crt&quot;</span>
+</span></code></pre></div></p>
+<h4 id="backup-failed_1">Backup Failed<a class="headerlink" href="#backup-failed_1" title="Permanent link">&para;</a></h4>
+<p><strong>Error:</strong> <code>BACKUP requires admin role</code></p>
+<p><strong>Solution:</strong>
+<div class="language-sql highlight"><pre><span></span><code><span id="__span-48-1"><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a><span class="k">GRANT</span><span class="w"> </span><span class="k">admin</span><span class="w"> </span><span class="k">TO</span><span class="w"> </span><span class="n">dbprovision_admin</span><span class="p">;</span>
+</span></code></pre></div></p>
+<p><strong>Check backup job in CockroachDB:</strong>
+<div class="language-sql highlight"><pre><span></span><code><span id="__span-49-1"><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="p">[</span><span class="k">SHOW</span><span class="w"> </span><span class="n">JOBS</span><span class="p">]</span><span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="n">job_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;BACKUP&#39;</span><span class="w"> </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">created</span><span class="w"> </span><span class="k">DESC</span><span class="w"> </span><span class="k">LIMIT</span><span class="w"> </span><span class="mi">5</span><span class="p">;</span>
+</span></code></pre></div></p>
 <h2 id="operator-issues">Operator Issues<a class="headerlink" href="#operator-issues" title="Permanent link">&para;</a></h2>
 <h3 id="operator-not-starting">Operator Not Starting<a class="headerlink" href="#operator-not-starting" title="Permanent link">&para;</a></h3>
 <p><strong>Check pod status:</strong>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>kubectl<span class="w"> </span>describe<span class="w"> </span>pod<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>db-provision-operator
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-50-1"><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a>kubectl<span class="w"> </span>describe<span class="w"> </span>pod<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>db-provision-operator
 </span></code></pre></div></p>
 <p><strong>Common issues:</strong></p>
 <ol>
 <li>
 <p><strong>Image pull error:</strong>
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>events<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;Failed&quot;</span>
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-51-1"><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>events<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;Failed&quot;</span>
 </span></code></pre></div></p>
 </li>
 <li>
 <p><strong>RBAC issues:</strong>
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>kubectl<span class="w"> </span>auth<span class="w"> </span>can-i<span class="w"> </span>--as<span class="o">=</span>system:serviceaccount:db-provision-operator-system:db-provision-operator<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="w">  </span>create<span class="w"> </span>secrets<span class="w"> </span>-n<span class="w"> </span>default
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-52-1"><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a>kubectl<span class="w"> </span>auth<span class="w"> </span>can-i<span class="w"> </span>--as<span class="o">=</span>system:serviceaccount:db-provision-operator-system:db-provision-operator<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-52-2"><a id="__codelineno-52-2" name="__codelineno-52-2" href="#__codelineno-52-2"></a><span class="w">  </span>create<span class="w"> </span>secrets<span class="w"> </span>-n<span class="w"> </span>default
 </span></code></pre></div></p>
 </li>
 </ol>
 <h3 id="high-memory-usage">High Memory Usage<a class="headerlink" href="#high-memory-usage" title="Permanent link">&para;</a></h3>
 <p><strong>Check resource usage:</strong>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>kubectl<span class="w"> </span>top<span class="w"> </span>pod<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-53-1"><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a>kubectl<span class="w"> </span>top<span class="w"> </span>pod<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system
 </span></code></pre></div></p>
 <p><strong>Solutions:</strong>
 1. Increase memory limits
@@ -2818,8 +3252,8 @@
 <h3 id="reconciliation-loops">Reconciliation Loops<a class="headerlink" href="#reconciliation-loops" title="Permanent link">&para;</a></h3>
 <p><strong>Symptoms:</strong> Constant reconciliation, high CPU</p>
 <p><strong>Debug:</strong>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="c1"># Watch reconciliation</span>
-</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system<span class="w"> </span>deployment/db-provision-operator<span class="w"> </span>-f<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;Reconciling&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-54-1"><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a><span class="c1"># Watch reconciliation</span>
+</span><span id="__span-54-2"><a id="__codelineno-54-2" name="__codelineno-54-2" href="#__codelineno-54-2"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system<span class="w"> </span>deployment/db-provision-operator<span class="w"> </span>-f<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;Reconciling&quot;</span>
 </span></code></pre></div></p>
 <p><strong>Causes:</strong>
 - Status updates triggering reconciles
@@ -2827,53 +3261,53 @@
 - Conflicting controllers</p>
 <h2 id="recovery-procedures">Recovery Procedures<a class="headerlink" href="#recovery-procedures" title="Permanent link">&para;</a></h2>
 <h3 id="force-delete-stuck-resource">Force Delete Stuck Resource<a class="headerlink" href="#force-delete-stuck-resource" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="c1"># Remove finalizers (use with caution!)</span>
-</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>kubectl<span class="w"> </span>patch<span class="w"> </span>database<span class="w"> </span>myapp-database<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;{&quot;metadata&quot;:{&quot;finalizers&quot;:null}}&#39;</span><span class="w"> </span>--type<span class="o">=</span>merge
-</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>kubectl<span class="w"> </span>delete<span class="w"> </span>database<span class="w"> </span>myapp-database
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-55-1"><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a><span class="c1"># Remove finalizers (use with caution!)</span>
+</span><span id="__span-55-2"><a id="__codelineno-55-2" name="__codelineno-55-2" href="#__codelineno-55-2"></a>kubectl<span class="w"> </span>patch<span class="w"> </span>database<span class="w"> </span>myapp-database<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;{&quot;metadata&quot;:{&quot;finalizers&quot;:null}}&#39;</span><span class="w"> </span>--type<span class="o">=</span>merge
+</span><span id="__span-55-3"><a id="__codelineno-55-3" name="__codelineno-55-3" href="#__codelineno-55-3"></a>kubectl<span class="w"> </span>delete<span class="w"> </span>database<span class="w"> </span>myapp-database
 </span></code></pre></div>
 <h3 id="reset-resource-state">Reset Resource State<a class="headerlink" href="#reset-resource-state" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="c1"># Delete and recreate</span>
-</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>kubectl<span class="w"> </span>delete<span class="w"> </span>database<span class="w"> </span>myapp-database
-</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>database.yaml
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-56-1"><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a><span class="c1"># Delete and recreate</span>
+</span><span id="__span-56-2"><a id="__codelineno-56-2" name="__codelineno-56-2" href="#__codelineno-56-2"></a>kubectl<span class="w"> </span>delete<span class="w"> </span>database<span class="w"> </span>myapp-database
+</span><span id="__span-56-3"><a id="__codelineno-56-3" name="__codelineno-56-3" href="#__codelineno-56-3"></a>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>database.yaml
 </span></code></pre></div>
 <h3 id="operator-recovery">Operator Recovery<a class="headerlink" href="#operator-recovery" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="c1"># Restart operator</span>
-</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>kubectl<span class="w"> </span>rollout<span class="w"> </span>restart<span class="w"> </span>deployment/db-provision-operator<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system
-</span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>
-</span><span id="__span-29-4"><a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="c1"># Watch rollout</span>
-</span><span id="__span-29-5"><a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a>kubectl<span class="w"> </span>rollout<span class="w"> </span>status<span class="w"> </span>deployment/db-provision-operator<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-57-1"><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a><span class="c1"># Restart operator</span>
+</span><span id="__span-57-2"><a id="__codelineno-57-2" name="__codelineno-57-2" href="#__codelineno-57-2"></a>kubectl<span class="w"> </span>rollout<span class="w"> </span>restart<span class="w"> </span>deployment/db-provision-operator<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system
+</span><span id="__span-57-3"><a id="__codelineno-57-3" name="__codelineno-57-3" href="#__codelineno-57-3"></a>
+</span><span id="__span-57-4"><a id="__codelineno-57-4" name="__codelineno-57-4" href="#__codelineno-57-4"></a><span class="c1"># Watch rollout</span>
+</span><span id="__span-57-5"><a id="__codelineno-57-5" name="__codelineno-57-5" href="#__codelineno-57-5"></a>kubectl<span class="w"> </span>rollout<span class="w"> </span>status<span class="w"> </span>deployment/db-provision-operator<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system
 </span></code></pre></div>
 <h2 id="debug-mode">Debug Mode<a class="headerlink" href="#debug-mode" title="Permanent link">&para;</a></h2>
 <h3 id="enable-debug-logging">Enable Debug Logging<a class="headerlink" href="#enable-debug-logging" title="Permanent link">&para;</a></h3>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="c1"># Helm values</span>
-</span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="nt">logging</span><span class="p">:</span>
-</span><span id="__span-30-3"><a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="w">  </span><span class="nt">level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">debug</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-58-1"><a id="__codelineno-58-1" name="__codelineno-58-1" href="#__codelineno-58-1"></a><span class="c1"># Helm values</span>
+</span><span id="__span-58-2"><a id="__codelineno-58-2" name="__codelineno-58-2" href="#__codelineno-58-2"></a><span class="nt">logging</span><span class="p">:</span>
+</span><span id="__span-58-3"><a id="__codelineno-58-3" name="__codelineno-58-3" href="#__codelineno-58-3"></a><span class="w">  </span><span class="nt">level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">debug</span>
 </span></code></pre></div>
 <p>Or patch deployment:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>kubectl<span class="w"> </span><span class="nb">set</span><span class="w"> </span>env<span class="w"> </span>deployment/db-provision-operator<span class="w"> </span><span class="nv">LOG_LEVEL</span><span class="o">=</span>debug<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-59-1"><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a>kubectl<span class="w"> </span><span class="nb">set</span><span class="w"> </span>env<span class="w"> </span>deployment/db-provision-operator<span class="w"> </span><span class="nv">LOG_LEVEL</span><span class="o">=</span>debug<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system
 </span></code></pre></div></p>
 <h3 id="trace-specific-resource">Trace Specific Resource<a class="headerlink" href="#trace-specific-resource" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system<span class="w"> </span>deployment/db-provision-operator<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a><span class="w">  </span>grep<span class="w"> </span><span class="s2">&quot;myapp-database&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-60-1"><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system<span class="w"> </span>deployment/db-provision-operator<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-60-2"><a id="__codelineno-60-2" name="__codelineno-60-2" href="#__codelineno-60-2"></a><span class="w">  </span>grep<span class="w"> </span><span class="s2">&quot;myapp-database&quot;</span>
 </span></code></pre></div>
 <h2 id="getting-help">Getting Help<a class="headerlink" href="#getting-help" title="Permanent link">&para;</a></h2>
 <h3 id="collect-debug-information">Collect Debug Information<a class="headerlink" href="#collect-debug-information" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="ch">#!/bin/bash</span>
-</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a><span class="c1"># debug-bundle.sh</span>
-</span><span id="__span-33-3"><a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a>
-</span><span id="__span-33-4"><a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;=== Operator Pods ===&quot;</span><span class="w"> </span>&gt;<span class="w"> </span>debug.txt
-</span><span id="__span-33-5"><a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a>kubectl<span class="w"> </span>get<span class="w"> </span>pods<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system<span class="w"> </span>-o<span class="w"> </span>wide<span class="w"> </span>&gt;&gt;<span class="w"> </span>debug.txt
-</span><span id="__span-33-6"><a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a>
-</span><span id="__span-33-7"><a id="__codelineno-33-7" name="__codelineno-33-7" href="#__codelineno-33-7"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;=== Operator Logs ===&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>debug.txt
-</span><span id="__span-33-8"><a id="__codelineno-33-8" name="__codelineno-33-8" href="#__codelineno-33-8"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system<span class="w"> </span>deployment/db-provision-operator<span class="w"> </span>--tail<span class="o">=</span><span class="m">500</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>debug.txt
-</span><span id="__span-33-9"><a id="__codelineno-33-9" name="__codelineno-33-9" href="#__codelineno-33-9"></a>
-</span><span id="__span-33-10"><a id="__codelineno-33-10" name="__codelineno-33-10" href="#__codelineno-33-10"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;=== All Resources ===&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>debug.txt
-</span><span id="__span-33-11"><a id="__codelineno-33-11" name="__codelineno-33-11" href="#__codelineno-33-11"></a>kubectl<span class="w"> </span>get<span class="w"> </span>databaseinstances,databases,databaseusers,databaseroles,databasegrants,databasebackups<span class="w"> </span>-A<span class="w"> </span>&gt;&gt;<span class="w"> </span>debug.txt
-</span><span id="__span-33-12"><a id="__codelineno-33-12" name="__codelineno-33-12" href="#__codelineno-33-12"></a>
-</span><span id="__span-33-13"><a id="__codelineno-33-13" name="__codelineno-33-13" href="#__codelineno-33-13"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;=== Events ===&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>debug.txt
-</span><span id="__span-33-14"><a id="__codelineno-33-14" name="__codelineno-33-14" href="#__codelineno-33-14"></a>kubectl<span class="w"> </span>get<span class="w"> </span>events<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system<span class="w"> </span>&gt;&gt;<span class="w"> </span>debug.txt
-</span><span id="__span-33-15"><a id="__codelineno-33-15" name="__codelineno-33-15" href="#__codelineno-33-15"></a>
-</span><span id="__span-33-16"><a id="__codelineno-33-16" name="__codelineno-33-16" href="#__codelineno-33-16"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Debug bundle saved to debug.txt&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-61-1"><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a><span class="ch">#!/bin/bash</span>
+</span><span id="__span-61-2"><a id="__codelineno-61-2" name="__codelineno-61-2" href="#__codelineno-61-2"></a><span class="c1"># debug-bundle.sh</span>
+</span><span id="__span-61-3"><a id="__codelineno-61-3" name="__codelineno-61-3" href="#__codelineno-61-3"></a>
+</span><span id="__span-61-4"><a id="__codelineno-61-4" name="__codelineno-61-4" href="#__codelineno-61-4"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;=== Operator Pods ===&quot;</span><span class="w"> </span>&gt;<span class="w"> </span>debug.txt
+</span><span id="__span-61-5"><a id="__codelineno-61-5" name="__codelineno-61-5" href="#__codelineno-61-5"></a>kubectl<span class="w"> </span>get<span class="w"> </span>pods<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system<span class="w"> </span>-o<span class="w"> </span>wide<span class="w"> </span>&gt;&gt;<span class="w"> </span>debug.txt
+</span><span id="__span-61-6"><a id="__codelineno-61-6" name="__codelineno-61-6" href="#__codelineno-61-6"></a>
+</span><span id="__span-61-7"><a id="__codelineno-61-7" name="__codelineno-61-7" href="#__codelineno-61-7"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;=== Operator Logs ===&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>debug.txt
+</span><span id="__span-61-8"><a id="__codelineno-61-8" name="__codelineno-61-8" href="#__codelineno-61-8"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system<span class="w"> </span>deployment/db-provision-operator<span class="w"> </span>--tail<span class="o">=</span><span class="m">500</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>debug.txt
+</span><span id="__span-61-9"><a id="__codelineno-61-9" name="__codelineno-61-9" href="#__codelineno-61-9"></a>
+</span><span id="__span-61-10"><a id="__codelineno-61-10" name="__codelineno-61-10" href="#__codelineno-61-10"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;=== All Resources ===&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>debug.txt
+</span><span id="__span-61-11"><a id="__codelineno-61-11" name="__codelineno-61-11" href="#__codelineno-61-11"></a>kubectl<span class="w"> </span>get<span class="w"> </span>databaseinstances,databases,databaseusers,databaseroles,databasegrants,databasebackups<span class="w"> </span>-A<span class="w"> </span>&gt;&gt;<span class="w"> </span>debug.txt
+</span><span id="__span-61-12"><a id="__codelineno-61-12" name="__codelineno-61-12" href="#__codelineno-61-12"></a>
+</span><span id="__span-61-13"><a id="__codelineno-61-13" name="__codelineno-61-13" href="#__codelineno-61-13"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;=== Events ===&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>debug.txt
+</span><span id="__span-61-14"><a id="__codelineno-61-14" name="__codelineno-61-14" href="#__codelineno-61-14"></a>kubectl<span class="w"> </span>get<span class="w"> </span>events<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system<span class="w"> </span>&gt;&gt;<span class="w"> </span>debug.txt
+</span><span id="__span-61-15"><a id="__codelineno-61-15" name="__codelineno-61-15" href="#__codelineno-61-15"></a>
+</span><span id="__span-61-16"><a id="__codelineno-61-16" name="__codelineno-61-16" href="#__codelineno-61-16"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Debug bundle saved to debug.txt&quot;</span>
 </span></code></pre></div>
 <h3 id="report-issues">Report Issues<a class="headerlink" href="#report-issues" title="Permanent link">&para;</a></h3>
 <p>Open an issue at: <a href="https://github.com/panteparak/db-provision-operator/issues">https://github.com/panteparak/db-provision-operator/issues</a></p>
@@ -2921,7 +3355,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../monitoring/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Monitoring">
+          <a href="../events/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Events">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2931,7 +3365,7 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Monitoring
+                Events
               </div>
             </div>
           </a>

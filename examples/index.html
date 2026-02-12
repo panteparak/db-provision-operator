@@ -869,6 +869,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/drift-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/deletion-protection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deletion Protection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1029,6 +1085,34 @@
     
   
     MariaDB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engines/cockroachdb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CockroachDB
   
 
     
@@ -1472,6 +1556,62 @@
   
   
     <li class="md-nav__item">
+      <a href="cockroachdb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CockroachDB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="drift-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="advanced/" class="md-nav__link">
         
   
@@ -1818,6 +1958,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../operations/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../operations/troubleshooting/" class="md-nav__link">
         
   
@@ -1971,6 +2139,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/e2e-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E2E Testing
   
 
     
@@ -2266,6 +2462,8 @@
 <ul>
 <li><a href="postgresql/">PostgreSQL Examples</a> - Complete PostgreSQL setup</li>
 <li><a href="mysql/">MySQL Examples</a> - Complete MySQL setup</li>
+<li><a href="cockroachdb/">CockroachDB Examples</a> - Complete CockroachDB setup</li>
+<li><a href="drift-detection/">Drift Detection Examples</a> - Drift detection and correction patterns</li>
 <li><a href="advanced/">Advanced Examples</a> - Cross-namespace, TLS, cloud backups</li>
 </ul>
 <h2 id="sample-manifests">Sample Manifests<a class="headerlink" href="#sample-manifests" title="Permanent link">&para;</a></h2>
@@ -2296,10 +2494,18 @@
 </span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>│   ├── 01-credentials.yaml
 </span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>│   ├── 02-instance.yaml
 </span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>│   └── 03-database.yaml
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>└── advanced/
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>    ├── cross-namespace.yaml
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>    ├── tls-connection.yaml
-</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>    └── backup-to-s3.yaml
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>├── cockroachdb/
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>│   ├── 01-credentials.yaml
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>│   ├── 02-instance.yaml
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>│   ├── 03-database.yaml
+</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>│   ├── 04-user.yaml
+</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>│   ├── 05-role.yaml
+</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>│   └── 06-grant.yaml
+</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>└── advanced/
+</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>    ├── cross-namespace.yaml
+</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>    ├── tls-connection.yaml
+</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>    ├── backup-to-s3.yaml
+</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>    └── drift-detection.yaml
 </span></code></pre></div>
 <h2 id="common-patterns">Common Patterns<a class="headerlink" href="#common-patterns" title="Permanent link">&para;</a></h2>
 <h3 id="minimal-setup">Minimal Setup<a class="headerlink" href="#minimal-setup" title="Permanent link">&para;</a></h3>
@@ -2398,6 +2604,8 @@
 <ul>
 <li><a href="postgresql/">PostgreSQL Examples</a> - Detailed PostgreSQL setup</li>
 <li><a href="mysql/">MySQL Examples</a> - Detailed MySQL setup</li>
+<li><a href="cockroachdb/">CockroachDB Examples</a> - Distributed SQL setup</li>
+<li><a href="drift-detection/">Drift Detection Examples</a> - Configuration drift management</li>
 <li><a href="advanced/">Advanced Examples</a> - Production patterns</li>
 </ul>
 

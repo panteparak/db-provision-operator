@@ -1,0 +1,7218 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Kubernetes operator for declarative database provisioning across PostgreSQL, MySQL, and MariaDB">
+      
+      
+        <meta name="author" content="panteparak">
+      
+      
+        <link rel="canonical" href="https://panteparak.github.io/db-provision-operator/api/reference/">
+      
+      
+        <link rel="prev" href="../">
+      
+      
+        <link rel="next" href="../../architecture/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>API Reference - DB Provision Operator</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#api-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DB Provision Operator" class="md-header__button md-logo" aria-label="DB Provision Operator" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DB Provision Operator
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              API Reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/panteparak/db-provision-operator" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    panteparak/db-provision-operator
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user-guide/" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../engines/" class="md-tabs__link">
+          
+  
+  
+  Engine Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../examples/" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../operations/" class="md-tabs__link">
+          
+  
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../development/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DB Provision Operator" class="md-nav__button md-logo" aria-label="DB Provision Operator" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    DB Provision Operator
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/panteparak/db-provision-operator" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    panteparak/db-provision-operator
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/database-instances/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Instances
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/databases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/users/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Users
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/roles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/grants/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Grants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/backups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/drift-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/deletion-protection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deletion Protection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Engine Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../engines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../engines/postgresql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PostgreSQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../engines/mysql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MySQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../engines/mariadb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MariaDB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../engines/cockroachdb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CockroachDB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/postgresql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PostgreSQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/mysql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MySQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/cockroachdb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CockroachDB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/drift-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/advanced/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/admin-account-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin Account Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/monitoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/e2e-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E2E Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/ci-cd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI/CD
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/rbac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Namespace RBAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Packages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dbopsdbprovisioniov1alpha1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dbops.dbprovision.io/v1alpha1
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="dbops.dbprovision.io/v1alpha1">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#resource-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resource Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="api-reference">API Reference<a class="headerlink" href="#api-reference" title="Permanent link">&para;</a></h1>
+<h2 id="packages">Packages<a class="headerlink" href="#packages" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="#dbopsdbprovisioniov1alpha1">dbops.dbprovision.io/v1alpha1</a></li>
+</ul>
+<h2 id="dbopsdbprovisioniov1alpha1">dbops.dbprovision.io/v1alpha1<a class="headerlink" href="#dbopsdbprovisioniov1alpha1" title="Permanent link">&para;</a></h2>
+<p>Package v1alpha1 contains API Schema definitions for the dbops v1alpha1 API group.</p>
+<h3 id="resource-types">Resource Types<a class="headerlink" href="#resource-types" title="Permanent link">&para;</a></h3>
+<ul>
+<li><a href="#database">Database</a></li>
+<li><a href="#databasebackup">DatabaseBackup</a></li>
+<li><a href="#databasebackupschedule">DatabaseBackupSchedule</a></li>
+<li><a href="#databasegrant">DatabaseGrant</a></li>
+<li><a href="#databaseinstance">DatabaseInstance</a></li>
+<li><a href="#databaserestore">DatabaseRestore</a></li>
+<li><a href="#databaserole">DatabaseRole</a></li>
+<li><a href="#databaseuser">DatabaseUser</a></li>
+</ul>
+<h4 id="appliedgrantsinfo">AppliedGrantsInfo<a class="headerlink" href="#appliedgrantsinfo" title="Permanent link">&para;</a></h4>
+<p>AppliedGrantsInfo contains information about applied grants</p>
+<p><em>Appears in:</em>
+- <a href="#databasegrantstatus">DatabaseGrantStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>roles</code> <em>string array</em></td>
+<td>Roles lists assigned roles</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>directGrants</code> <em>integer</em></td>
+<td>DirectGrants is the count of direct grants applied</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>defaultPrivileges</code> <em>integer</em></td>
+<td>DefaultPrivileges is the count of default privileges applied</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="azurestorageconfig">AzureStorageConfig<a class="headerlink" href="#azurestorageconfig" title="Permanent link">&para;</a></h4>
+<p>AzureStorageConfig defines Azure Blob Storage configuration</p>
+<p><em>Appears in:</em>
+- <a href="#storageconfig">StorageConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>container</code> <em>string</em></td>
+<td>Container name</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>storageAccount</code> <em>string</em></td>
+<td>StorageAccount name</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>prefix</code> <em>string</em></td>
+<td>Prefix (path prefix within the container)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>secretRef</code> <em><a href="#secretreference">SecretReference</a></em></td>
+<td>SecretRef references a secret containing Azure credentials</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="backupinfo">BackupInfo<a class="headerlink" href="#backupinfo" title="Permanent link">&para;</a></h4>
+<p>BackupInfo contains backup file information</p>
+<p><em>Appears in:</em>
+- <a href="#databasebackupstatus">DatabaseBackupStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>path</code> <em>string</em></td>
+<td>Path is the full path to the backup file</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>sizeBytes</code> <em>integer</em></td>
+<td>SizeBytes is the backup size in bytes (uncompressed)</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>compressedSizeBytes</code> <em>integer</em></td>
+<td>CompressedSizeBytes is the backup size in bytes (compressed)</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>checksum</code> <em>string</em></td>
+<td>Checksum is the backup file checksum</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>format</code> <em>string</em></td>
+<td>Format is the backup format (e.g., custom, plain, directory)</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="backupreference">BackupReference<a class="headerlink" href="#backupreference" title="Permanent link">&para;</a></h4>
+<p>BackupReference references a DatabaseBackup</p>
+<p><em>Appears in:</em>
+- <a href="#databaserestorespec">DatabaseRestoreSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name of the DatabaseBackup resource</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>namespace</code> <em>string</em></td>
+<td>Namespace of the DatabaseBackup (defaults to the resource namespace)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="backupsourceinfo">BackupSourceInfo<a class="headerlink" href="#backupsourceinfo" title="Permanent link">&para;</a></h4>
+<p>BackupSourceInfo contains information about the backup source</p>
+<p><em>Appears in:</em>
+- <a href="#databasebackupstatus">DatabaseBackupStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>instance</code> <em>string</em></td>
+<td>Instance is the DatabaseInstance name</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>database</code> <em>string</em></td>
+<td>Database is the database name</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>engine</code> <em>string</em></td>
+<td>Engine is the database engine type</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>version</code> <em>string</em></td>
+<td>Version is the database server version</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>timestamp</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#time-v1-meta">Time</a></em></td>
+<td>Timestamp is the point-in-time of the backup</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="backupstatistics">BackupStatistics<a class="headerlink" href="#backupstatistics" title="Permanent link">&para;</a></h4>
+<p>BackupStatistics contains backup statistics</p>
+<p><em>Appears in:</em>
+- <a href="#databasebackupschedulestatus">DatabaseBackupScheduleStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>totalBackups</code> <em>integer</em></td>
+<td>TotalBackups is the total number of backups created</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>successfulBackups</code> <em>integer</em></td>
+<td>SuccessfulBackups is the number of successful backups</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>failedBackups</code> <em>integer</em></td>
+<td>FailedBackups is the number of failed backups</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>averageDurationSeconds</code> <em>integer</em></td>
+<td>AverageDurationSeconds is the average backup duration</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>averageSizeBytes</code> <em>integer</em></td>
+<td>AverageSizeBytes is the average backup size</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>totalStorageBytes</code> <em>integer</em></td>
+<td>TotalStorageBytes is the total storage used by all backups</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="backuptemplatemeta">BackupTemplateMeta<a class="headerlink" href="#backuptemplatemeta" title="Permanent link">&para;</a></h4>
+<p>BackupTemplateMeta defines metadata for created backups</p>
+<p><em>Appears in:</em>
+- <a href="#backuptemplatespec">BackupTemplateSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>labels</code> <em>object (keys:string, values:string)</em></td>
+<td>Labels to add to created backups</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>annotations</code> <em>object (keys:string, values:string)</em></td>
+<td>Annotations to add to created backups</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="backuptemplatespec">BackupTemplateSpec<a class="headerlink" href="#backuptemplatespec" title="Permanent link">&para;</a></h4>
+<p>BackupTemplateSpec defines the template for created backups</p>
+<p><em>Appears in:</em>
+- <a href="#databasebackupschedulespec">DatabaseBackupScheduleSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>metadata</code> <em><a href="#backuptemplatemeta">BackupTemplateMeta</a></em></td>
+<td>Refer to Kubernetes API documentation for fields of <code>metadata</code>.</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>spec</code> <em><a href="#databasebackupspec">DatabaseBackupSpec</a></em></td>
+<td>Spec for the created backup</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="compressionalgorithm">CompressionAlgorithm<a class="headerlink" href="#compressionalgorithm" title="Permanent link">&para;</a></h4>
+<p><em>Underlying type:</em> <em>string</em></p>
+<p>CompressionAlgorithm defines the compression algorithm</p>
+<p><em>Validation:</em>
+- Enum: [gzip lz4 zstd none]</p>
+<p><em>Appears in:</em>
+- <a href="#compressionconfig">CompressionConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gzip</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>lz4</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>zstd</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>none</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="compressionconfig">CompressionConfig<a class="headerlink" href="#compressionconfig" title="Permanent link">&para;</a></h4>
+<p>CompressionConfig defines backup compression settings</p>
+<p><em>Appears in:</em>
+- <a href="#databasebackupspec">DatabaseBackupSpec</a>
+- <a href="#restorefrompath">RestoreFromPath</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code> <em>boolean</em></td>
+<td>Enabled enables compression</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>algorithm</code> <em><a href="#compressionalgorithm">CompressionAlgorithm</a></em></td>
+<td>Algorithm specifies the compression algorithm</td>
+<td>gzip</td>
+<td>Enum: [gzip lz4 zstd] <br /></td>
+</tr>
+<tr>
+<td><code>level</code> <em>integer</em></td>
+<td>Level specifies the compression level (1-9)</td>
+<td>6</td>
+<td>Maximum: 9 <br />Minimum: 1 <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="concurrencypolicy">ConcurrencyPolicy<a class="headerlink" href="#concurrencypolicy" title="Permanent link">&para;</a></h4>
+<p><em>Underlying type:</em> <em>string</em></p>
+<p>ConcurrencyPolicy defines how to handle concurrent backups</p>
+<p><em>Validation:</em>
+- Enum: [Allow Forbid Replace]</p>
+<p><em>Appears in:</em>
+- <a href="#databasebackupschedulespec">DatabaseBackupScheduleSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Allow</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Forbid</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Replace</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="connectionconfig">ConnectionConfig<a class="headerlink" href="#connectionconfig" title="Permanent link">&para;</a></h4>
+<p>ConnectionConfig defines the database connection settings</p>
+<p><em>Appears in:</em>
+- <a href="#databaseinstancespec">DatabaseInstanceSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>host</code> <em>string</em></td>
+<td>Host is the database server hostname or IP</td>
+<td></td>
+<td>MinLength: 1 <br />Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>port</code> <em>integer</em></td>
+<td>Port is the database server port</td>
+<td></td>
+<td>Maximum: 65535 <br />Minimum: 1 <br />Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>database</code> <em>string</em></td>
+<td>Database is the admin database name for initial connection</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>secretRef</code> <em><a href="#credentialsecretref">CredentialSecretRef</a></em></td>
+<td>SecretRef references a secret containing credentials (mutually exclusive with ExistingSecret)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>existingSecret</code> <em><a href="#credentialsecretref">CredentialSecretRef</a></em></td>
+<td>ExistingSecret references an existing secret with custom keys (mutually exclusive with SecretRef)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="credentialkeys">CredentialKeys<a class="headerlink" href="#credentialkeys" title="Permanent link">&para;</a></h4>
+<p>CredentialKeys defines the key names within a credential secret</p>
+<p><em>Appears in:</em>
+- <a href="#credentialsecretref">CredentialSecretRef</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>username</code> <em>string</em></td>
+<td>Username key in the secret (default: "username")</td>
+<td>username</td>
+<td></td>
+</tr>
+<tr>
+<td><code>password</code> <em>string</em></td>
+<td>Password key in the secret (default: "password")</td>
+<td>password</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="credentialsecretref">CredentialSecretRef<a class="headerlink" href="#credentialsecretref" title="Permanent link">&para;</a></h4>
+<p>CredentialSecretRef references credentials in a secret</p>
+<p><em>Appears in:</em>
+- <a href="#connectionconfig">ConnectionConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name of the secret containing credentials</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>namespace</code> <em>string</em></td>
+<td>Namespace of the secret (defaults to the resource's namespace if not specified)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>keys</code> <em><a href="#credentialkeys">CredentialKeys</a></em></td>
+<td>Keys defines the key names for username and password</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="database">Database<a class="headerlink" href="#database" title="Permanent link">&para;</a></h4>
+<p>Database is the Schema for the databases API.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>apiVersion</code> <em>string</em></td>
+<td><code>dbops.dbprovision.io/v1alpha1</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>kind</code> <em>string</em></td>
+<td><code>Database</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>metadata</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectmeta-v1-meta">ObjectMeta</a></em></td>
+<td>Refer to Kubernetes API documentation for fields of <code>metadata</code>.</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>spec</code> <em><a href="#databasespec">DatabaseSpec</a></em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>status</code> <em><a href="#databasestatus">DatabaseStatus</a></em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databasebackup">DatabaseBackup<a class="headerlink" href="#databasebackup" title="Permanent link">&para;</a></h4>
+<p>DatabaseBackup is the Schema for the databasebackups API.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>apiVersion</code> <em>string</em></td>
+<td><code>dbops.dbprovision.io/v1alpha1</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>kind</code> <em>string</em></td>
+<td><code>DatabaseBackup</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>metadata</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectmeta-v1-meta">ObjectMeta</a></em></td>
+<td>Refer to Kubernetes API documentation for fields of <code>metadata</code>.</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>spec</code> <em><a href="#databasebackupspec">DatabaseBackupSpec</a></em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>status</code> <em><a href="#databasebackupstatus">DatabaseBackupStatus</a></em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databasebackupschedule">DatabaseBackupSchedule<a class="headerlink" href="#databasebackupschedule" title="Permanent link">&para;</a></h4>
+<p>DatabaseBackupSchedule is the Schema for the databasebackupschedules API.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>apiVersion</code> <em>string</em></td>
+<td><code>dbops.dbprovision.io/v1alpha1</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>kind</code> <em>string</em></td>
+<td><code>DatabaseBackupSchedule</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>metadata</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectmeta-v1-meta">ObjectMeta</a></em></td>
+<td>Refer to Kubernetes API documentation for fields of <code>metadata</code>.</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>spec</code> <em><a href="#databasebackupschedulespec">DatabaseBackupScheduleSpec</a></em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>status</code> <em><a href="#databasebackupschedulestatus">DatabaseBackupScheduleStatus</a></em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databasebackupschedulespec">DatabaseBackupScheduleSpec<a class="headerlink" href="#databasebackupschedulespec" title="Permanent link">&para;</a></h4>
+<p>DatabaseBackupScheduleSpec defines the desired state of DatabaseBackupSchedule.</p>
+<p><em>Appears in:</em>
+- <a href="#databasebackupschedule">DatabaseBackupSchedule</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>schedule</code> <em>string</em></td>
+<td>Schedule is the cron expression for the backup schedule</td>
+<td></td>
+<td>MinLength: 1 <br />Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>timezone</code> <em>string</em></td>
+<td>Timezone is the timezone for the schedule (e.g., "Asia/Bangkok")</td>
+<td>UTC</td>
+<td></td>
+</tr>
+<tr>
+<td><code>paused</code> <em>boolean</em></td>
+<td>Paused suspends the schedule</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>concurrencyPolicy</code> <em><a href="#concurrencypolicy">ConcurrencyPolicy</a></em></td>
+<td>ConcurrencyPolicy defines how to handle concurrent backups</td>
+<td>Forbid</td>
+<td>Enum: [Allow Forbid Replace] <br /></td>
+</tr>
+<tr>
+<td><code>template</code> <em><a href="#backuptemplatespec">BackupTemplateSpec</a></em></td>
+<td>Template defines the DatabaseBackup to create</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>retention</code> <em><a href="#retentionpolicy">RetentionPolicy</a></em></td>
+<td>Retention defines the backup retention policy</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>successfulBackupsHistoryLimit</code> <em>integer</em></td>
+<td>SuccessfulBackupsHistoryLimit is the number of successful backups to keep in status</td>
+<td>5</td>
+<td>Minimum: 0 <br /></td>
+</tr>
+<tr>
+<td><code>failedBackupsHistoryLimit</code> <em>integer</em></td>
+<td>FailedBackupsHistoryLimit is the number of failed backups to keep in status</td>
+<td>3</td>
+<td>Minimum: 0 <br /></td>
+</tr>
+<tr>
+<td><code>deletionProtection</code> <em>boolean</em></td>
+<td>DeletionProtection prevents accidental deletion</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databasebackupschedulestatus">DatabaseBackupScheduleStatus<a class="headerlink" href="#databasebackupschedulestatus" title="Permanent link">&para;</a></h4>
+<p>DatabaseBackupScheduleStatus defines the observed state of DatabaseBackupSchedule.</p>
+<p><em>Appears in:</em>
+- <a href="#databasebackupschedule">DatabaseBackupSchedule</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>phase</code> <em><a href="#phase">Phase</a></em></td>
+<td>Phase represents the current state</td>
+<td></td>
+<td>Enum: [Active Paused] <br /></td>
+</tr>
+<tr>
+<td><code>lastBackup</code> <em><a href="#scheduledbackupinfo">ScheduledBackupInfo</a></em></td>
+<td>LastBackup contains information about the last backup</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>nextBackupTime</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#time-v1-meta">Time</a></em></td>
+<td>NextBackupTime is the next scheduled backup time</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>statistics</code> <em><a href="#backupstatistics">BackupStatistics</a></em></td>
+<td>Statistics contains backup statistics</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>recentBackups</code> <em><a href="#recentbackupinfo">RecentBackupInfo</a> array</em></td>
+<td>RecentBackups lists recent backup names and statuses</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>conditions</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#condition-v1-meta">Condition</a> array</em></td>
+<td>Conditions represent the latest available observations</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databasebackupspec">DatabaseBackupSpec<a class="headerlink" href="#databasebackupspec" title="Permanent link">&para;</a></h4>
+<p>DatabaseBackupSpec defines the desired state of DatabaseBackup.</p>
+<p><em>Appears in:</em>
+- <a href="#backuptemplatespec">BackupTemplateSpec</a>
+- <a href="#databasebackup">DatabaseBackup</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>databaseRef</code> <em><a href="#databasereference">DatabaseReference</a></em></td>
+<td>DatabaseRef references the Database to backup</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>storage</code> <em><a href="#storageconfig">StorageConfig</a></em></td>
+<td>Storage defines where to store the backup</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>compression</code> <em><a href="#compressionconfig">CompressionConfig</a></em></td>
+<td>Compression configures backup compression</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>encryption</code> <em><a href="#encryptionconfig">EncryptionConfig</a></em></td>
+<td>Encryption configures backup encryption</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>ttl</code> <em>string</em></td>
+<td>TTL is the time-to-live for the backup (e.g., "168h" for 7 days)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>activeDeadlineSeconds</code> <em>integer</em></td>
+<td>ActiveDeadlineSeconds is the timeout for the backup operation</td>
+<td>3600</td>
+<td>Minimum: 1 <br /></td>
+</tr>
+<tr>
+<td><code>postgres</code> <em><a href="#postgresbackupconfig">PostgresBackupConfig</a></em></td>
+<td>PostgreSQL-specific backup configuration</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>mysql</code> <em><a href="#mysqlbackupconfig">MySQLBackupConfig</a></em></td>
+<td>MySQL-specific backup configuration</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databasebackupstatus">DatabaseBackupStatus<a class="headerlink" href="#databasebackupstatus" title="Permanent link">&para;</a></h4>
+<p>DatabaseBackupStatus defines the observed state of DatabaseBackup.</p>
+<p><em>Appears in:</em>
+- <a href="#databasebackup">DatabaseBackup</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>phase</code> <em><a href="#phase">Phase</a></em></td>
+<td>Phase represents the current state</td>
+<td></td>
+<td>Enum: [Pending Running Completed Failed] <br /></td>
+</tr>
+<tr>
+<td><code>startedAt</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#time-v1-meta">Time</a></em></td>
+<td>StartedAt is the backup start time</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>completedAt</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#time-v1-meta">Time</a></em></td>
+<td>CompletedAt is the backup completion time</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>message</code> <em>string</em></td>
+<td>Message provides additional information about the current state</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>backup</code> <em><a href="#backupinfo">BackupInfo</a></em></td>
+<td>Backup contains backup-specific status information</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>source</code> <em><a href="#backupsourceinfo">BackupSourceInfo</a></em></td>
+<td>Source contains information about the backup source</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>expiresAt</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#time-v1-meta">Time</a></em></td>
+<td>ExpiresAt is when the backup will be deleted</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>conditions</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#condition-v1-meta">Condition</a> array</em></td>
+<td>Conditions represent the latest available observations</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databasegrant">DatabaseGrant<a class="headerlink" href="#databasegrant" title="Permanent link">&para;</a></h4>
+<p>DatabaseGrant is the Schema for the databasegrants API.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>apiVersion</code> <em>string</em></td>
+<td><code>dbops.dbprovision.io/v1alpha1</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>kind</code> <em>string</em></td>
+<td><code>DatabaseGrant</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>metadata</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectmeta-v1-meta">ObjectMeta</a></em></td>
+<td>Refer to Kubernetes API documentation for fields of <code>metadata</code>.</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>spec</code> <em><a href="#databasegrantspec">DatabaseGrantSpec</a></em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>status</code> <em><a href="#databasegrantstatus">DatabaseGrantStatus</a></em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databasegrantspec">DatabaseGrantSpec<a class="headerlink" href="#databasegrantspec" title="Permanent link">&para;</a></h4>
+<p>DatabaseGrantSpec defines the desired state of DatabaseGrant.</p>
+<p><em>Appears in:</em>
+- <a href="#databasegrant">DatabaseGrant</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>userRef</code> <em><a href="#userreference">UserReference</a></em></td>
+<td>UserRef references the DatabaseUser to grant permissions to</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>databaseRef</code> <em><a href="#databasereference">DatabaseReference</a></em></td>
+<td>DatabaseRef references the Database for context (optional)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>postgres</code> <em><a href="#postgresgrantconfig">PostgresGrantConfig</a></em></td>
+<td>PostgreSQL-specific grants</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>mysql</code> <em><a href="#mysqlgrantconfig">MySQLGrantConfig</a></em></td>
+<td>MySQL-specific grants</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>driftPolicy</code> <em><a href="#driftpolicy">DriftPolicy</a></em></td>
+<td>DriftPolicy overrides the instance-level drift policy for this grant.<br />If not specified, the instance's drift policy is used.</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>deletionProtection</code> <em>boolean</em></td>
+<td>DeletionProtection prevents accidental deletion</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databasegrantstatus">DatabaseGrantStatus<a class="headerlink" href="#databasegrantstatus" title="Permanent link">&para;</a></h4>
+<p>DatabaseGrantStatus defines the observed state of DatabaseGrant.</p>
+<p><em>Appears in:</em>
+- <a href="#databasegrant">DatabaseGrant</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>phase</code> <em><a href="#phase">Phase</a></em></td>
+<td>Phase represents the current state</td>
+<td></td>
+<td>Enum: [Pending Creating Ready Failed Deleting] <br /></td>
+</tr>
+<tr>
+<td><code>observedGeneration</code> <em>integer</em></td>
+<td>ObservedGeneration is the last observed generation of the resource</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>message</code> <em>string</em></td>
+<td>Message provides additional information about the current state</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>appliedGrants</code> <em><a href="#appliedgrantsinfo">AppliedGrantsInfo</a></em></td>
+<td>AppliedGrants contains information about applied grants</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>drift</code> <em><a href="#driftstatus">DriftStatus</a></em></td>
+<td>Drift contains drift detection status information</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>conditions</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#condition-v1-meta">Condition</a> array</em></td>
+<td>Conditions represent the latest available observations</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databaseinfo">DatabaseInfo<a class="headerlink" href="#databaseinfo" title="Permanent link">&para;</a></h4>
+<p>DatabaseInfo contains general database information</p>
+<p><em>Appears in:</em>
+- <a href="#databasestatus">DatabaseStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name is the actual database name</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>owner</code> <em>string</em></td>
+<td>Owner is the database owner</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>sizeBytes</code> <em>integer</em></td>
+<td>SizeBytes is the database size in bytes</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>createdAt</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#time-v1-meta">Time</a></em></td>
+<td>CreatedAt is the creation timestamp</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databaseinstance">DatabaseInstance<a class="headerlink" href="#databaseinstance" title="Permanent link">&para;</a></h4>
+<p>DatabaseInstance is the Schema for the databaseinstances API.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>apiVersion</code> <em>string</em></td>
+<td><code>dbops.dbprovision.io/v1alpha1</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>kind</code> <em>string</em></td>
+<td><code>DatabaseInstance</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>metadata</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectmeta-v1-meta">ObjectMeta</a></em></td>
+<td>Refer to Kubernetes API documentation for fields of <code>metadata</code>.</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>spec</code> <em><a href="#databaseinstancespec">DatabaseInstanceSpec</a></em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>status</code> <em><a href="#databaseinstancestatus">DatabaseInstanceStatus</a></em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databaseinstancespec">DatabaseInstanceSpec<a class="headerlink" href="#databaseinstancespec" title="Permanent link">&para;</a></h4>
+<p>DatabaseInstanceSpec defines the desired state of DatabaseInstance.</p>
+<p><em>Appears in:</em>
+- <a href="#databaseinstance">DatabaseInstance</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>engine</code> <em><a href="#enginetype">EngineType</a></em></td>
+<td>Engine type (required, immutable)</td>
+<td></td>
+<td>Enum: [postgres mysql mariadb cockroachdb] <br />Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>connection</code> <em><a href="#connectionconfig">ConnectionConfig</a></em></td>
+<td>Connection configuration</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>tls</code> <em><a href="#tlsconfig">TLSConfig</a></em></td>
+<td>TLS configuration</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>healthCheck</code> <em><a href="#healthcheckconfig">HealthCheckConfig</a></em></td>
+<td>Health check configuration</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>driftPolicy</code> <em><a href="#driftpolicy">DriftPolicy</a></em></td>
+<td>DriftPolicy defines the default drift detection policy for resources using this instance.<br />Individual resources can override this policy.</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>discovery</code> <em><a href="#discoveryconfig">DiscoveryConfig</a></em></td>
+<td>Discovery enables scanning for database resources not managed by Kubernetes CRs.<br />Discovered resources can be adopted via annotations.</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>postgres</code> <em><a href="#postgresinstanceconfig">PostgresInstanceConfig</a></em></td>
+<td>PostgreSQL-specific options (only valid when engine is "postgres")</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>mysql</code> <em><a href="#mysqlinstanceconfig">MySQLInstanceConfig</a></em></td>
+<td>MySQL-specific options (only valid when engine is "mysql")</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>deletionProtection</code> <em>boolean</em></td>
+<td>DeletionProtection prevents accidental deletion</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databaseinstancestatus">DatabaseInstanceStatus<a class="headerlink" href="#databaseinstancestatus" title="Permanent link">&para;</a></h4>
+<p>DatabaseInstanceStatus defines the observed state of DatabaseInstance.</p>
+<p><em>Appears in:</em>
+- <a href="#databaseinstance">DatabaseInstance</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>phase</code> <em><a href="#phase">Phase</a></em></td>
+<td>Phase represents the current state of the instance</td>
+<td></td>
+<td>Enum: [Pending Ready Failed] <br /></td>
+</tr>
+<tr>
+<td><code>version</code> <em>string</em></td>
+<td>Version is the detected database server version</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>message</code> <em>string</em></td>
+<td>Message provides additional information about the current state</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>lastCheckedAt</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#time-v1-meta">Time</a></em></td>
+<td>LastCheckedAt is the timestamp of the last health check</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>observedGeneration</code> <em>integer</em></td>
+<td>ObservedGeneration is the last observed generation of the resource</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>discoveredResources</code> <em><a href="#discoveredresourcesstatus">DiscoveredResourcesStatus</a></em></td>
+<td>DiscoveredResources contains resources found in the database that are not managed by CRs.<br />Only populated when discovery is enabled.</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>conditions</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#condition-v1-meta">Condition</a> array</em></td>
+<td>Conditions represent the latest available observations</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databasereference">DatabaseReference<a class="headerlink" href="#databasereference" title="Permanent link">&para;</a></h4>
+<p>DatabaseReference references a Database</p>
+<p><em>Appears in:</em>
+- <a href="#databasebackupspec">DatabaseBackupSpec</a>
+- <a href="#databasegrantspec">DatabaseGrantSpec</a>
+- <a href="#restoretarget">RestoreTarget</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name of the Database resource</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>namespace</code> <em>string</em></td>
+<td>Namespace of the Database (defaults to the resource namespace)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databaserestore">DatabaseRestore<a class="headerlink" href="#databaserestore" title="Permanent link">&para;</a></h4>
+<p>DatabaseRestore is the Schema for the databaserestores API.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>apiVersion</code> <em>string</em></td>
+<td><code>dbops.dbprovision.io/v1alpha1</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>kind</code> <em>string</em></td>
+<td><code>DatabaseRestore</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>metadata</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectmeta-v1-meta">ObjectMeta</a></em></td>
+<td>Refer to Kubernetes API documentation for fields of <code>metadata</code>.</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>spec</code> <em><a href="#databaserestorespec">DatabaseRestoreSpec</a></em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>status</code> <em><a href="#databaserestorestatus">DatabaseRestoreStatus</a></em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databaserestorespec">DatabaseRestoreSpec<a class="headerlink" href="#databaserestorespec" title="Permanent link">&para;</a></h4>
+<p>DatabaseRestoreSpec defines the desired state of DatabaseRestore.</p>
+<p><em>Appears in:</em>
+- <a href="#databaserestore">DatabaseRestore</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>backupRef</code> <em><a href="#backupreference">BackupReference</a></em></td>
+<td>BackupRef references the DatabaseBackup to restore from</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>fromPath</code> <em><a href="#restorefrompath">RestoreFromPath</a></em></td>
+<td>FromPath allows restoring from a direct path instead of a backup reference</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>target</code> <em><a href="#restoretarget">RestoreTarget</a></em></td>
+<td>Target defines where to restore the backup</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>confirmation</code> <em><a href="#restoreconfirmation">RestoreConfirmation</a></em></td>
+<td>Confirmation contains safety confirmations for destructive operations</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>activeDeadlineSeconds</code> <em>integer</em></td>
+<td>ActiveDeadlineSeconds is the timeout for the restore operation</td>
+<td>7200</td>
+<td>Minimum: 1 <br /></td>
+</tr>
+<tr>
+<td><code>postgres</code> <em><a href="#postgresrestoreconfig">PostgresRestoreConfig</a></em></td>
+<td>PostgreSQL-specific restore configuration</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>mysql</code> <em><a href="#mysqlrestoreconfig">MySQLRestoreConfig</a></em></td>
+<td>MySQL-specific restore configuration</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databaserestorestatus">DatabaseRestoreStatus<a class="headerlink" href="#databaserestorestatus" title="Permanent link">&para;</a></h4>
+<p>DatabaseRestoreStatus defines the observed state of DatabaseRestore.</p>
+<p><em>Appears in:</em>
+- <a href="#databaserestore">DatabaseRestore</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>phase</code> <em><a href="#phase">Phase</a></em></td>
+<td>Phase represents the current state</td>
+<td></td>
+<td>Enum: [Pending Running Completed Failed] <br /></td>
+</tr>
+<tr>
+<td><code>startedAt</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#time-v1-meta">Time</a></em></td>
+<td>StartedAt is the restore start time</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>completedAt</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#time-v1-meta">Time</a></em></td>
+<td>CompletedAt is the restore completion time</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>message</code> <em>string</em></td>
+<td>Message provides additional information about the current state</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>restore</code> <em><a href="#restoreinfo">RestoreInfo</a></em></td>
+<td>Restore contains restore-specific status information</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>progress</code> <em><a href="#restoreprogress">RestoreProgress</a></em></td>
+<td>Progress contains restore progress information</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>warnings</code> <em>string array</em></td>
+<td>Warnings contains any warnings encountered during restore</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>conditions</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#condition-v1-meta">Condition</a> array</em></td>
+<td>Conditions represent the latest available observations</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databaserole">DatabaseRole<a class="headerlink" href="#databaserole" title="Permanent link">&para;</a></h4>
+<p>DatabaseRole is the Schema for the databaseroles API.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>apiVersion</code> <em>string</em></td>
+<td><code>dbops.dbprovision.io/v1alpha1</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>kind</code> <em>string</em></td>
+<td><code>DatabaseRole</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>metadata</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectmeta-v1-meta">ObjectMeta</a></em></td>
+<td>Refer to Kubernetes API documentation for fields of <code>metadata</code>.</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>spec</code> <em><a href="#databaserolespec">DatabaseRoleSpec</a></em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>status</code> <em><a href="#databaserolestatus">DatabaseRoleStatus</a></em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databaserolespec">DatabaseRoleSpec<a class="headerlink" href="#databaserolespec" title="Permanent link">&para;</a></h4>
+<p>DatabaseRoleSpec defines the desired state of DatabaseRole.</p>
+<p><em>Appears in:</em>
+- <a href="#databaserole">DatabaseRole</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>instanceRef</code> <em><a href="#instancereference">InstanceReference</a></em></td>
+<td>InstanceRef references the DatabaseInstance to use</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>roleName</code> <em>string</em></td>
+<td>RoleName is the role name in the database (immutable after creation)</td>
+<td></td>
+<td>MaxLength: 63 <br />MinLength: 1 <br />Pattern: <code>^[a-zA-Z_][a-zA-Z0-9_]*$</code> <br />Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>postgres</code> <em><a href="#postgresroleconfig">PostgresRoleConfig</a></em></td>
+<td>PostgreSQL-specific configuration</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>mysql</code> <em><a href="#mysqlroleconfig">MySQLRoleConfig</a></em></td>
+<td>MySQL-specific configuration</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>driftPolicy</code> <em><a href="#driftpolicy">DriftPolicy</a></em></td>
+<td>DriftPolicy overrides the instance-level drift policy for this role.<br />If not specified, the instance's drift policy is used.</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databaserolestatus">DatabaseRoleStatus<a class="headerlink" href="#databaserolestatus" title="Permanent link">&para;</a></h4>
+<p>DatabaseRoleStatus defines the observed state of DatabaseRole.</p>
+<p><em>Appears in:</em>
+- <a href="#databaserole">DatabaseRole</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>phase</code> <em><a href="#phase">Phase</a></em></td>
+<td>Phase represents the current state</td>
+<td></td>
+<td>Enum: [Pending Creating Ready Failed Deleting] <br /></td>
+</tr>
+<tr>
+<td><code>observedGeneration</code> <em>integer</em></td>
+<td>ObservedGeneration is the last observed generation of the resource</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>message</code> <em>string</em></td>
+<td>Message provides additional information about the current state</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>role</code> <em><a href="#roleinfo">RoleInfo</a></em></td>
+<td>Role contains role-specific status information</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>drift</code> <em><a href="#driftstatus">DriftStatus</a></em></td>
+<td>Drift contains drift detection status information</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>conditions</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#condition-v1-meta">Condition</a> array</em></td>
+<td>Conditions represent the latest available observations</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databasespec">DatabaseSpec<a class="headerlink" href="#databasespec" title="Permanent link">&para;</a></h4>
+<p>DatabaseSpec defines the desired state of Database.</p>
+<p><em>Appears in:</em>
+- <a href="#database">Database</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>instanceRef</code> <em><a href="#instancereference">InstanceReference</a></em></td>
+<td>InstanceRef references the DatabaseInstance to use</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name is the database name in the database server (immutable after creation)</td>
+<td></td>
+<td>MaxLength: 63 <br />MinLength: 1 <br />Pattern: <code>^[a-zA-Z_][a-zA-Z0-9_]*$</code> <br />Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>deletionPolicy</code> <em><a href="#deletionpolicy">DeletionPolicy</a></em></td>
+<td>DeletionPolicy defines what happens on CR deletion</td>
+<td>Retain</td>
+<td>Enum: [Retain Delete Snapshot] <br /></td>
+</tr>
+<tr>
+<td><code>deletionProtection</code> <em>boolean</em></td>
+<td>DeletionProtection prevents accidental deletion</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>driftPolicy</code> <em><a href="#driftpolicy">DriftPolicy</a></em></td>
+<td>DriftPolicy overrides the instance-level drift policy for this database.<br />If not specified, the instance's drift policy is used.</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>postgres</code> <em><a href="#postgresdatabaseconfig">PostgresDatabaseConfig</a></em></td>
+<td>PostgreSQL-specific configuration (required when instance engine is "postgres")</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>mysql</code> <em><a href="#mysqldatabaseconfig">MySQLDatabaseConfig</a></em></td>
+<td>MySQL-specific configuration (required when instance engine is "mysql")</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databasestatus">DatabaseStatus<a class="headerlink" href="#databasestatus" title="Permanent link">&para;</a></h4>
+<p>DatabaseStatus defines the observed state of Database.</p>
+<p><em>Appears in:</em>
+- <a href="#database">Database</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>phase</code> <em><a href="#phase">Phase</a></em></td>
+<td>Phase represents the current state of the database</td>
+<td></td>
+<td>Enum: [Pending Creating Ready Failed Deleting] <br /></td>
+</tr>
+<tr>
+<td><code>observedGeneration</code> <em>integer</em></td>
+<td>ObservedGeneration is the last observed generation of the resource</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>message</code> <em>string</em></td>
+<td>Message provides additional information about the current state</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>database</code> <em><a href="#databaseinfo">DatabaseInfo</a></em></td>
+<td>Database contains database-specific status information</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>postgres</code> <em><a href="#postgresdatabasestatus">PostgresDatabaseStatus</a></em></td>
+<td>Postgres contains PostgreSQL-specific status information</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>mysql</code> <em><a href="#mysqldatabasestatus">MySQLDatabaseStatus</a></em></td>
+<td>MySQL contains MySQL-specific status information</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>drift</code> <em><a href="#driftstatus">DriftStatus</a></em></td>
+<td>Drift contains drift detection status information</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>conditions</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#condition-v1-meta">Condition</a> array</em></td>
+<td>Conditions represent the latest available observations</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databaseuser">DatabaseUser<a class="headerlink" href="#databaseuser" title="Permanent link">&para;</a></h4>
+<p>DatabaseUser is the Schema for the databaseusers API.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>apiVersion</code> <em>string</em></td>
+<td><code>dbops.dbprovision.io/v1alpha1</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>kind</code> <em>string</em></td>
+<td><code>DatabaseUser</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>metadata</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectmeta-v1-meta">ObjectMeta</a></em></td>
+<td>Refer to Kubernetes API documentation for fields of <code>metadata</code>.</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>spec</code> <em><a href="#databaseuserspec">DatabaseUserSpec</a></em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>status</code> <em><a href="#databaseuserstatus">DatabaseUserStatus</a></em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databaseuserspec">DatabaseUserSpec<a class="headerlink" href="#databaseuserspec" title="Permanent link">&para;</a></h4>
+<p>DatabaseUserSpec defines the desired state of DatabaseUser.</p>
+<p><em>Appears in:</em>
+- <a href="#databaseuser">DatabaseUser</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>instanceRef</code> <em><a href="#instancereference">InstanceReference</a></em></td>
+<td>InstanceRef references the DatabaseInstance to use</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>username</code> <em>string</em></td>
+<td>Username is the database username (immutable after creation)</td>
+<td></td>
+<td>MaxLength: 63 <br />MinLength: 1 <br />Pattern: <code>^[a-zA-Z_][a-zA-Z0-9_]*$</code> <br />Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>passwordSecret</code> <em><a href="#passwordconfig">PasswordConfig</a></em></td>
+<td>PasswordSecret configures password generation and secret output</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>existingPasswordSecret</code> <em><a href="#existingpasswordsecret">ExistingPasswordSecret</a></em></td>
+<td>ExistingPasswordSecret references an existing secret containing the password</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>passwordRotation</code> <em><a href="#passwordrotationconfig">PasswordRotationConfig</a></em></td>
+<td>PasswordRotation configures automatic password rotation</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>postgres</code> <em><a href="#postgresuserconfig">PostgresUserConfig</a></em></td>
+<td>PostgreSQL-specific configuration</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>mysql</code> <em><a href="#mysqluserconfig">MySQLUserConfig</a></em></td>
+<td>MySQL-specific configuration</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>driftPolicy</code> <em><a href="#driftpolicy">DriftPolicy</a></em></td>
+<td>DriftPolicy overrides the instance-level drift policy for this user.<br />If not specified, the instance's drift policy is used.</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="databaseuserstatus">DatabaseUserStatus<a class="headerlink" href="#databaseuserstatus" title="Permanent link">&para;</a></h4>
+<p>DatabaseUserStatus defines the observed state of DatabaseUser.</p>
+<p><em>Appears in:</em>
+- <a href="#databaseuser">DatabaseUser</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>phase</code> <em><a href="#phase">Phase</a></em></td>
+<td>Phase represents the current state</td>
+<td></td>
+<td>Enum: [Pending Creating Ready Failed Deleting] <br /></td>
+</tr>
+<tr>
+<td><code>observedGeneration</code> <em>integer</em></td>
+<td>ObservedGeneration is the last observed generation of the resource</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>message</code> <em>string</em></td>
+<td>Message provides additional information about the current state</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>user</code> <em><a href="#userinfo">UserInfo</a></em></td>
+<td>User contains user-specific status information</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>secret</code> <em><a href="#secretinfo">SecretInfo</a></em></td>
+<td>Secret contains generated secret information</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>drift</code> <em><a href="#driftstatus">DriftStatus</a></em></td>
+<td>Drift contains drift detection status information</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>conditions</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#condition-v1-meta">Condition</a> array</em></td>
+<td>Conditions represent the latest available observations</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="deletionpolicy">DeletionPolicy<a class="headerlink" href="#deletionpolicy" title="Permanent link">&para;</a></h4>
+<p><em>Underlying type:</em> <em>string</em></p>
+<p>DeletionPolicy defines what happens when a resource is deleted</p>
+<p><em>Validation:</em>
+- Enum: [Retain Delete Snapshot]</p>
+<p><em>Appears in:</em>
+- <a href="#databasespec">DatabaseSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Retain</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Delete</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Snapshot</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="discoveredresource">DiscoveredResource<a class="headerlink" href="#discoveredresource" title="Permanent link">&para;</a></h4>
+<p>DiscoveredResource represents a resource found in the database
+that is not managed by a Kubernetes CR.</p>
+<p><em>Appears in:</em>
+- <a href="#discoveredresourcesstatus">DiscoveredResourcesStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name is the name of the discovered resource</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>discovered</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#time-v1-meta">Time</a></em></td>
+<td>Discovered is when this resource was first discovered</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>adopted</code> <em>boolean</em></td>
+<td>Adopted indicates if this resource has been adopted via annotation</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="discoveredresourcesstatus">DiscoveredResourcesStatus<a class="headerlink" href="#discoveredresourcesstatus" title="Permanent link">&para;</a></h4>
+<p>DiscoveredResourcesStatus contains discovered unmanaged resources.</p>
+<p><em>Appears in:</em>
+- <a href="#databaseinstancestatus">DatabaseInstanceStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>databases</code> <em><a href="#discoveredresource">DiscoveredResource</a> array</em></td>
+<td>Databases contains discovered database resources</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>users</code> <em><a href="#discoveredresource">DiscoveredResource</a> array</em></td>
+<td>Users contains discovered user resources</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>roles</code> <em><a href="#discoveredresource">DiscoveredResource</a> array</em></td>
+<td>Roles contains discovered role resources</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>lastScan</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#time-v1-meta">Time</a></em></td>
+<td>LastScan is when the last discovery scan was performed</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="discoveryconfig">DiscoveryConfig<a class="headerlink" href="#discoveryconfig" title="Permanent link">&para;</a></h4>
+<p>DiscoveryConfig defines configuration for resource discovery.
+When enabled, the operator will scan the database for resources
+that exist but are not managed by Kubernetes CRs.</p>
+<p><em>Appears in:</em>
+- <a href="#databaseinstancespec">DatabaseInstanceSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code> <em>boolean</em></td>
+<td>Enabled enables resource discovery</td>
+<td>false</td>
+<td></td>
+</tr>
+<tr>
+<td><code>interval</code> <em>string</em></td>
+<td>Interval specifies how often to scan for unmanaged resources (Go duration string)</td>
+<td>30m</td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="driftdiff">DriftDiff<a class="headerlink" href="#driftdiff" title="Permanent link">&para;</a></h4>
+<p>DriftDiff represents a single difference between desired and actual state.</p>
+<p><em>Appears in:</em>
+- <a href="#driftstatus">DriftStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>field</code> <em>string</em></td>
+<td>Field is the name of the field that differs</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>expected</code> <em>string</em></td>
+<td>Expected is the expected value from the CR spec</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>actual</code> <em>string</em></td>
+<td>Actual is the actual value in the database</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>destructive</code> <em>boolean</em></td>
+<td>Destructive indicates if correcting this drift would be destructive</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>immutable</code> <em>boolean</em></td>
+<td>Immutable indicates if this field cannot be changed after creation</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="driftmode">DriftMode<a class="headerlink" href="#driftmode" title="Permanent link">&para;</a></h4>
+<p><em>Underlying type:</em> <em>string</em></p>
+<p>DriftMode defines how drift is handled</p>
+<p><em>Validation:</em>
+- Enum: [ignore detect correct]</p>
+<p><em>Appears in:</em>
+- <a href="#driftpolicy">DriftPolicy</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ignore</code></td>
+<td>DriftModeIgnore disables drift detection entirely<br /></td>
+</tr>
+<tr>
+<td><code>detect</code></td>
+<td>DriftModeDetect detects drift and reports in status/events but does not auto-correct<br /></td>
+</tr>
+<tr>
+<td><code>correct</code></td>
+<td>DriftModeCorrect detects drift and automatically corrects it<br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="driftpolicy">DriftPolicy<a class="headerlink" href="#driftpolicy" title="Permanent link">&para;</a></h4>
+<p>DriftPolicy defines how drift detection and correction should be handled.
+This can be set at the instance level (default for all child resources)
+or overridden at the individual resource level.</p>
+<p><em>Appears in:</em>
+- <a href="#databasegrantspec">DatabaseGrantSpec</a>
+- <a href="#databaseinstancespec">DatabaseInstanceSpec</a>
+- <a href="#databaserolespec">DatabaseRoleSpec</a>
+- <a href="#databasespec">DatabaseSpec</a>
+- <a href="#databaseuserspec">DatabaseUserSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mode</code> <em><a href="#driftmode">DriftMode</a></em></td>
+<td>Mode determines how drift is handled</td>
+<td>detect</td>
+<td>Enum: [ignore detect correct] <br /></td>
+</tr>
+<tr>
+<td><code>interval</code> <em>string</em></td>
+<td>Interval specifies how often to check for drift (Go duration string)<br />This is only meaningful when mode is "detect" or "correct"</td>
+<td>5m</td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="driftstatus">DriftStatus<a class="headerlink" href="#driftstatus" title="Permanent link">&para;</a></h4>
+<p>DriftStatus represents the current drift detection status for a resource.</p>
+<p><em>Appears in:</em>
+- <a href="#databasegrantstatus">DatabaseGrantStatus</a>
+- <a href="#databaserolestatus">DatabaseRoleStatus</a>
+- <a href="#databasestatus">DatabaseStatus</a>
+- <a href="#databaseuserstatus">DatabaseUserStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>detected</code> <em>boolean</em></td>
+<td>Detected indicates if drift was detected</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>lastChecked</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#time-v1-meta">Time</a></em></td>
+<td>LastChecked is when drift was last checked</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>diffs</code> <em><a href="#driftdiff">DriftDiff</a> array</em></td>
+<td>Diffs contains the specific differences found</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="encryptionalgorithm">EncryptionAlgorithm<a class="headerlink" href="#encryptionalgorithm" title="Permanent link">&para;</a></h4>
+<p><em>Underlying type:</em> <em>string</em></p>
+<p>EncryptionAlgorithm defines the encryption algorithm</p>
+<p><em>Validation:</em>
+- Enum: [aes-256-gcm aes-256-cbc]</p>
+<p><em>Appears in:</em>
+- <a href="#encryptionconfig">EncryptionConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>aes-256-gcm</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>aes-256-cbc</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="encryptionconfig">EncryptionConfig<a class="headerlink" href="#encryptionconfig" title="Permanent link">&para;</a></h4>
+<p>EncryptionConfig defines backup encryption settings</p>
+<p><em>Appears in:</em>
+- <a href="#databasebackupspec">DatabaseBackupSpec</a>
+- <a href="#restorefrompath">RestoreFromPath</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code> <em>boolean</em></td>
+<td>Enabled enables encryption</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>algorithm</code> <em><a href="#encryptionalgorithm">EncryptionAlgorithm</a></em></td>
+<td>Algorithm specifies the encryption algorithm</td>
+<td>aes-256-gcm</td>
+<td>Enum: [aes-256-gcm aes-256-cbc] <br /></td>
+</tr>
+<tr>
+<td><code>secretRef</code> <em><a href="#secretkeyselector">SecretKeySelector</a></em></td>
+<td>SecretRef references a secret containing the encryption key</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="enginetype">EngineType<a class="headerlink" href="#enginetype" title="Permanent link">&para;</a></h4>
+<p><em>Underlying type:</em> <em>string</em></p>
+<p>EngineType defines the database engine type</p>
+<p><em>Validation:</em>
+- Enum: [postgres mysql mariadb cockroachdb]</p>
+<p><em>Appears in:</em>
+- <a href="#databaseinstancespec">DatabaseInstanceSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>postgres</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>mysql</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>mariadb</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>cockroachdb</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="existingpasswordsecret">ExistingPasswordSecret<a class="headerlink" href="#existingpasswordsecret" title="Permanent link">&para;</a></h4>
+<p>ExistingPasswordSecret references an existing secret containing a password</p>
+<p><em>Appears in:</em>
+- <a href="#databaseuserspec">DatabaseUserSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name of the secret</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>namespace</code> <em>string</em></td>
+<td>Namespace of the secret (defaults to the resource namespace)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>key</code> <em>string</em></td>
+<td>Key within the secret containing the password</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="gcsstorageconfig">GCSStorageConfig<a class="headerlink" href="#gcsstorageconfig" title="Permanent link">&para;</a></h4>
+<p>GCSStorageConfig defines Google Cloud Storage configuration</p>
+<p><em>Appears in:</em>
+- <a href="#storageconfig">StorageConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bucket</code> <em>string</em></td>
+<td>Bucket name</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>prefix</code> <em>string</em></td>
+<td>Prefix (path prefix within the bucket)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>secretRef</code> <em><a href="#secretkeyselector">SecretKeySelector</a></em></td>
+<td>SecretRef references a secret containing GCS credentials</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="healthcheckconfig">HealthCheckConfig<a class="headerlink" href="#healthcheckconfig" title="Permanent link">&para;</a></h4>
+<p>HealthCheckConfig defines health check settings</p>
+<p><em>Appears in:</em>
+- <a href="#databaseinstancespec">DatabaseInstanceSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code> <em>boolean</em></td>
+<td>Enabled enables periodic health checks</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>intervalSeconds</code> <em>integer</em></td>
+<td>IntervalSeconds defines how often to check (default: 30)</td>
+<td>30</td>
+<td>Minimum: 5 <br /></td>
+</tr>
+<tr>
+<td><code>timeoutSeconds</code> <em>integer</em></td>
+<td>TimeoutSeconds defines the health check timeout (default: 5)</td>
+<td>5</td>
+<td>Minimum: 1 <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="instancereference">InstanceReference<a class="headerlink" href="#instancereference" title="Permanent link">&para;</a></h4>
+<p>InstanceReference references a DatabaseInstance</p>
+<p><em>Appears in:</em>
+- <a href="#databaserolespec">DatabaseRoleSpec</a>
+- <a href="#databasespec">DatabaseSpec</a>
+- <a href="#databaseuserspec">DatabaseUserSpec</a>
+- <a href="#restoretarget">RestoreTarget</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name of the DatabaseInstance</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>namespace</code> <em>string</em></td>
+<td>Namespace of the DatabaseInstance (defaults to the resource namespace)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="mysqlauthplugin">MySQLAuthPlugin<a class="headerlink" href="#mysqlauthplugin" title="Permanent link">&para;</a></h4>
+<p><em>Underlying type:</em> <em>string</em></p>
+<p>MySQLAuthPlugin defines MySQL authentication plugins</p>
+<p><em>Validation:</em>
+- Enum: [mysql_native_password caching_sha2_password sha256_password]</p>
+<p><em>Appears in:</em>
+- <a href="#mysqluserconfig">MySQLUserConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mysql_native_password</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>caching_sha2_password</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>sha256_password</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="mysqlbackupconfig">MySQLBackupConfig<a class="headerlink" href="#mysqlbackupconfig" title="Permanent link">&para;</a></h4>
+<p>MySQLBackupConfig defines MySQL-specific backup configuration</p>
+<p><em>Appears in:</em>
+- <a href="#databasebackupspec">DatabaseBackupSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>method</code> <em><a href="#mysqlbackupmethod">MySQLBackupMethod</a></em></td>
+<td>Method specifies the backup method</td>
+<td>mysqldump</td>
+<td>Enum: [mysqldump xtrabackup mysqlpump] <br /></td>
+</tr>
+<tr>
+<td><code>singleTransaction</code> <em>boolean</em></td>
+<td>SingleTransaction uses a single transaction for InnoDB tables</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>quick</code> <em>boolean</em></td>
+<td>Quick retrieves rows one at a time instead of buffering</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>lockTables</code> <em>boolean</em></td>
+<td>LockTables locks all tables before backup</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>routines</code> <em>boolean</em></td>
+<td>Routines includes stored procedures and functions</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>triggers</code> <em>boolean</em></td>
+<td>Triggers includes triggers</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>events</code> <em>boolean</em></td>
+<td>Events includes events</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>extendedInsert</code> <em>boolean</em></td>
+<td>ExtendedInsert uses extended INSERT statements</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>setGtidPurged</code> <em><a href="#mysqlgtidpurged">MySQLGtidPurged</a></em></td>
+<td>SetGtidPurged controls SET @<a class="magiclink magiclink-github magiclink-mention" href="https://github.com/GLOBAL" title="GitHub User: GLOBAL">@GLOBAL</a>.GTID_PURGED</td>
+<td>AUTO</td>
+<td>Enum: [OFF ON AUTO] <br /></td>
+</tr>
+<tr>
+<td><code>databases</code> <em>string array</em></td>
+<td>Databases lists specific databases to backup (empty = all)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>tables</code> <em>string array</em></td>
+<td>Tables lists specific tables to backup (empty = all)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>excludeTables</code> <em>string array</em></td>
+<td>ExcludeTables lists tables to exclude</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="mysqlbackupmethod">MySQLBackupMethod<a class="headerlink" href="#mysqlbackupmethod" title="Permanent link">&para;</a></h4>
+<p><em>Underlying type:</em> <em>string</em></p>
+<p>MySQLBackupMethod defines MySQL backup methods</p>
+<p><em>Validation:</em>
+- Enum: [mysqldump xtrabackup mysqlpump]</p>
+<p><em>Appears in:</em>
+- <a href="#mysqlbackupconfig">MySQLBackupConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mysqldump</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>xtrabackup</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>mysqlpump</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="mysqldatabaseconfig">MySQLDatabaseConfig<a class="headerlink" href="#mysqldatabaseconfig" title="Permanent link">&para;</a></h4>
+<p>MySQLDatabaseConfig defines MySQL-specific database configuration</p>
+<p><em>Appears in:</em>
+- <a href="#databasespec">DatabaseSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>charset</code> <em>string</em></td>
+<td>Charset sets the database character set</td>
+<td>utf8mb4</td>
+<td></td>
+</tr>
+<tr>
+<td><code>collation</code> <em>string</em></td>
+<td>Collation sets the database collation</td>
+<td>utf8mb4_unicode_ci</td>
+<td></td>
+</tr>
+<tr>
+<td><code>sqlMode</code> <em>string</em></td>
+<td>SQLMode sets the SQL mode for the database</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>defaultStorageEngine</code> <em>string</em></td>
+<td>DefaultStorageEngine sets the default storage engine</td>
+<td>InnoDB</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="mysqldatabasestatus">MySQLDatabaseStatus<a class="headerlink" href="#mysqldatabasestatus" title="Permanent link">&para;</a></h4>
+<p>MySQLDatabaseStatus contains MySQL-specific database status</p>
+<p><em>Appears in:</em>
+- <a href="#databasestatus">DatabaseStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>charset</code> <em>string</em></td>
+<td>Charset is the database character set</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>collation</code> <em>string</em></td>
+<td>Collation is the database collation</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="mysqlgrant">MySQLGrant<a class="headerlink" href="#mysqlgrant" title="Permanent link">&para;</a></h4>
+<p>MySQLGrant defines a MySQL privilege grant</p>
+<p><em>Appears in:</em>
+- <a href="#mysqlgrantconfig">MySQLGrantConfig</a>
+- <a href="#mysqlroleconfig">MySQLRoleConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>level</code> <em><a href="#mysqlgrantlevel">MySQLGrantLevel</a></em></td>
+<td>Level is the grant level</td>
+<td></td>
+<td>Enum: [global database table column procedure function] <br /></td>
+</tr>
+<tr>
+<td><code>database</code> <em>string</em></td>
+<td>Database is the target database (for database/table/column/procedure/function levels)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>table</code> <em>string</em></td>
+<td>Table is the target table (for table/column levels)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>columns</code> <em>string array</em></td>
+<td>Columns lists target columns (for column level)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>procedure</code> <em>string</em></td>
+<td>Procedure is the target procedure (for procedure level)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>function</code> <em>string</em></td>
+<td>Function is the target function (for function level)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>privileges</code> <em>string array</em></td>
+<td>Privileges to grant (SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER, etc.)</td>
+<td></td>
+<td>MinItems: 1 <br /></td>
+</tr>
+<tr>
+<td><code>withGrantOption</code> <em>boolean</em></td>
+<td>WithGrantOption allows the grantee to grant these privileges to others</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="mysqlgrantconfig">MySQLGrantConfig<a class="headerlink" href="#mysqlgrantconfig" title="Permanent link">&para;</a></h4>
+<p>MySQLGrantConfig defines MySQL-specific grant configuration</p>
+<p><em>Appears in:</em>
+- <a href="#databasegrantspec">DatabaseGrantSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>roles</code> <em>string array</em></td>
+<td>Roles to assign to the user (MySQL 8.0+)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>grants</code> <em><a href="#mysqlgrant">MySQLGrant</a> array</em></td>
+<td>Grants defines direct privilege grants</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="mysqlgrantlevel">MySQLGrantLevel<a class="headerlink" href="#mysqlgrantlevel" title="Permanent link">&para;</a></h4>
+<p><em>Underlying type:</em> <em>string</em></p>
+<p>MySQLGrantLevel defines the level of a MySQL grant</p>
+<p><em>Validation:</em>
+- Enum: [global database table column procedure function]</p>
+<p><em>Appears in:</em>
+- <a href="#mysqlgrant">MySQLGrant</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>global</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>database</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>table</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>column</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>procedure</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>function</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="mysqlgtidpurged">MySQLGtidPurged<a class="headerlink" href="#mysqlgtidpurged" title="Permanent link">&para;</a></h4>
+<p><em>Underlying type:</em> <em>string</em></p>
+<p>MySQLGtidPurged defines GTID_PURGED setting</p>
+<p><em>Validation:</em>
+- Enum: [OFF ON AUTO]</p>
+<p><em>Appears in:</em>
+- <a href="#mysqlbackupconfig">MySQLBackupConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OFF</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>ON</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>AUTO</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="mysqlinstanceconfig">MySQLInstanceConfig<a class="headerlink" href="#mysqlinstanceconfig" title="Permanent link">&para;</a></h4>
+<p>MySQLInstanceConfig defines MySQL-specific instance configuration</p>
+<p><em>Appears in:</em>
+- <a href="#databaseinstancespec">DatabaseInstanceSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>charset</code> <em>string</em></td>
+<td>Charset sets the default character set</td>
+<td>utf8mb4</td>
+<td></td>
+</tr>
+<tr>
+<td><code>collation</code> <em>string</em></td>
+<td>Collation sets the default collation</td>
+<td>utf8mb4_unicode_ci</td>
+<td></td>
+</tr>
+<tr>
+<td><code>parseTime</code> <em>boolean</em></td>
+<td>ParseTime enables parsing of DATE and DATETIME to time.Time</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>timeout</code> <em>string</em></td>
+<td>Timeout is the connection timeout (e.g., "10s")</td>
+<td>10s</td>
+<td></td>
+</tr>
+<tr>
+<td><code>readTimeout</code> <em>string</em></td>
+<td>ReadTimeout is the read timeout (e.g., "30s")</td>
+<td>30s</td>
+<td></td>
+</tr>
+<tr>
+<td><code>writeTimeout</code> <em>string</em></td>
+<td>WriteTimeout is the write timeout (e.g., "30s")</td>
+<td>30s</td>
+<td></td>
+</tr>
+<tr>
+<td><code>tls</code> <em><a href="#mysqltlsmode">MySQLTLSMode</a></em></td>
+<td>TLS specifies the TLS mode</td>
+<td>preferred</td>
+<td>Enum: [disabled preferred required skip-verify] <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="mysqlrestoreconfig">MySQLRestoreConfig<a class="headerlink" href="#mysqlrestoreconfig" title="Permanent link">&para;</a></h4>
+<p>MySQLRestoreConfig defines MySQL-specific restore configuration</p>
+<p><em>Appears in:</em>
+- <a href="#databaserestorespec">DatabaseRestoreSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dropExisting</code> <em>boolean</em></td>
+<td>DropExisting drops existing database before restore</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>createDatabase</code> <em>boolean</em></td>
+<td>CreateDatabase creates the database if it doesn't exist</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>routines</code> <em>boolean</em></td>
+<td>Routines restores stored procedures and functions</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>triggers</code> <em>boolean</em></td>
+<td>Triggers restores triggers</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>events</code> <em>boolean</em></td>
+<td>Events restores events</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>disableForeignKeyChecks</code> <em>boolean</em></td>
+<td>DisableForeignKeyChecks disables foreign key checks during restore</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>disableBinlog</code> <em>boolean</em></td>
+<td>DisableBinlog disables binary logging during restore</td>
+<td>true</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="mysqlroleconfig">MySQLRoleConfig<a class="headerlink" href="#mysqlroleconfig" title="Permanent link">&para;</a></h4>
+<p>MySQLRoleConfig defines MySQL-specific role configuration</p>
+<p><em>Appears in:</em>
+- <a href="#databaserolespec">DatabaseRoleSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>useNativeRoles</code> <em>boolean</em></td>
+<td>UseNativeRoles enables MySQL 8.0+ native roles</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>grants</code> <em><a href="#mysqlgrant">MySQLGrant</a> array</em></td>
+<td>Grants defines the permissions this role grants</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="mysqltlsmode">MySQLTLSMode<a class="headerlink" href="#mysqltlsmode" title="Permanent link">&para;</a></h4>
+<p><em>Underlying type:</em> <em>string</em></p>
+<p>MySQLTLSMode defines MySQL TLS modes</p>
+<p><em>Validation:</em>
+- Enum: [disabled preferred required skip-verify]</p>
+<p><em>Appears in:</em>
+- <a href="#mysqlinstanceconfig">MySQLInstanceConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>disabled</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>preferred</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>required</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>skip-verify</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="mysqluserconfig">MySQLUserConfig<a class="headerlink" href="#mysqluserconfig" title="Permanent link">&para;</a></h4>
+<p>MySQLUserConfig defines MySQL-specific user configuration</p>
+<p><em>Appears in:</em>
+- <a href="#databaseuserspec">DatabaseUserSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>maxQueriesPerHour</code> <em>integer</em></td>
+<td>MaxQueriesPerHour limits queries per hour (0 = unlimited)</td>
+<td>0</td>
+<td>Minimum: 0 <br /></td>
+</tr>
+<tr>
+<td><code>maxUpdatesPerHour</code> <em>integer</em></td>
+<td>MaxUpdatesPerHour limits updates per hour (0 = unlimited)</td>
+<td>0</td>
+<td>Minimum: 0 <br /></td>
+</tr>
+<tr>
+<td><code>maxConnectionsPerHour</code> <em>integer</em></td>
+<td>MaxConnectionsPerHour limits connections per hour (0 = unlimited)</td>
+<td>0</td>
+<td>Minimum: 0 <br /></td>
+</tr>
+<tr>
+<td><code>maxUserConnections</code> <em>integer</em></td>
+<td>MaxUserConnections limits concurrent connections (0 = unlimited)</td>
+<td>0</td>
+<td>Minimum: 0 <br /></td>
+</tr>
+<tr>
+<td><code>authPlugin</code> <em><a href="#mysqlauthplugin">MySQLAuthPlugin</a></em></td>
+<td>AuthPlugin specifies the authentication plugin</td>
+<td>caching_sha2_password</td>
+<td>Enum: [mysql_native_password caching_sha2_password sha256_password] <br /></td>
+</tr>
+<tr>
+<td><code>requireSSL</code> <em>boolean</em></td>
+<td>RequireSSL requires SSL for connections</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>requireX509</code> <em>boolean</em></td>
+<td>RequireX509 requires X509 certificate for connections</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>allowedHosts</code> <em>string array</em></td>
+<td>AllowedHosts lists allowed host patterns for the user (e.g., "%", "localhost", "192.168.1.%")</td>
+<td>[%]</td>
+<td></td>
+</tr>
+<tr>
+<td><code>accountLocked</code> <em>boolean</em></td>
+<td>AccountLocked locks the account</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>failedLoginAttempts</code> <em>integer</em></td>
+<td>FailedLoginAttempts sets failed login attempts before locking (0 = disabled)</td>
+<td>0</td>
+<td>Minimum: 0 <br /></td>
+</tr>
+<tr>
+<td><code>passwordLockTime</code> <em>integer</em></td>
+<td>PasswordLockTime sets lock time in days after failed attempts (0 = permanent)</td>
+<td>0</td>
+<td>Minimum: 0 <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="pvcstorageconfig">PVCStorageConfig<a class="headerlink" href="#pvcstorageconfig" title="Permanent link">&para;</a></h4>
+<p>PVCStorageConfig defines PVC-based storage configuration</p>
+<p><em>Appears in:</em>
+- <a href="#storageconfig">StorageConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>claimName</code> <em>string</em></td>
+<td>ClaimName is the name of the PersistentVolumeClaim</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>subPath</code> <em>string</em></td>
+<td>SubPath within the PVC</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="passwordconfig">PasswordConfig<a class="headerlink" href="#passwordconfig" title="Permanent link">&para;</a></h4>
+<p>PasswordConfig defines password generation settings</p>
+<p><em>Appears in:</em>
+- <a href="#databaseuserspec">DatabaseUserSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>generate</code> <em>boolean</em></td>
+<td>Generate enables password generation</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>length</code> <em>integer</em></td>
+<td>Length of the generated password (default: 32)</td>
+<td>32</td>
+<td>Maximum: 128 <br />Minimum: 8 <br /></td>
+</tr>
+<tr>
+<td><code>includeSpecialChars</code> <em>boolean</em></td>
+<td>IncludeSpecialChars includes special characters in the password</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>excludeChars</code> <em>string</em></td>
+<td>ExcludeChars specifies characters to exclude from the password</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>secretName</code> <em>string</em></td>
+<td>SecretName is the name of the generated secret</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>secretNamespace</code> <em>string</em></td>
+<td>SecretNamespace is the namespace for the generated secret (defaults to resource namespace)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>format</code> <em><a href="#secretformat">SecretFormat</a></em></td>
+<td>Format specifies the secret format</td>
+<td>kubernetes</td>
+<td>Enum: [kubernetes vault external-secrets] <br /></td>
+</tr>
+<tr>
+<td><code>secretTemplate</code> <em><a href="#secrettemplate">SecretTemplate</a></em></td>
+<td>SecretTemplate defines the secret template</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="passwordrotationconfig">PasswordRotationConfig<a class="headerlink" href="#passwordrotationconfig" title="Permanent link">&para;</a></h4>
+<p>PasswordRotationConfig defines password rotation settings</p>
+<p><em>Appears in:</em>
+- <a href="#databaseuserspec">DatabaseUserSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code> <em>boolean</em></td>
+<td>Enabled enables automatic password rotation</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>schedule</code> <em>string</em></td>
+<td>Schedule is a cron expression for rotation (e.g., "0 0 1 * *" for monthly)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>maxAge</code> <em>string</em></td>
+<td>MaxAge is the maximum age of a password before rotation (e.g., "90d")</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="phase">Phase<a class="headerlink" href="#phase" title="Permanent link">&para;</a></h4>
+<p><em>Underlying type:</em> <em>string</em></p>
+<p>Phase represents the current state of a resource</p>
+<p><em>Appears in:</em>
+- <a href="#databasebackupschedulestatus">DatabaseBackupScheduleStatus</a>
+- <a href="#databasebackupstatus">DatabaseBackupStatus</a>
+- <a href="#databasegrantstatus">DatabaseGrantStatus</a>
+- <a href="#databaseinstancestatus">DatabaseInstanceStatus</a>
+- <a href="#databaserestorestatus">DatabaseRestoreStatus</a>
+- <a href="#databaserolestatus">DatabaseRoleStatus</a>
+- <a href="#databasestatus">DatabaseStatus</a>
+- <a href="#databaseuserstatus">DatabaseUserStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Pending</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Creating</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Ready</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Failed</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Deleting</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Running</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Completed</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Paused</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Active</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="postgresbackupconfig">PostgresBackupConfig<a class="headerlink" href="#postgresbackupconfig" title="Permanent link">&para;</a></h4>
+<p>PostgresBackupConfig defines PostgreSQL-specific backup configuration</p>
+<p><em>Appears in:</em>
+- <a href="#databasebackupspec">DatabaseBackupSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>method</code> <em><a href="#postgresbackupmethod">PostgresBackupMethod</a></em></td>
+<td>Method specifies the backup method</td>
+<td>pg_dump</td>
+<td>Enum: [pg_dump pg_basebackup] <br /></td>
+</tr>
+<tr>
+<td><code>format</code> <em><a href="#postgresdumpformat">PostgresDumpFormat</a></em></td>
+<td>Format specifies the output format (for pg_dump)</td>
+<td>custom</td>
+<td>Enum: [plain custom directory tar] <br /></td>
+</tr>
+<tr>
+<td><code>jobs</code> <em>integer</em></td>
+<td>Jobs sets the number of parallel jobs (for directory format)</td>
+<td>1</td>
+<td>Minimum: 1 <br /></td>
+</tr>
+<tr>
+<td><code>dataOnly</code> <em>boolean</em></td>
+<td>DataOnly backs up only data, not schema</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>schemaOnly</code> <em>boolean</em></td>
+<td>SchemaOnly backs up only schema, not data</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>blobs</code> <em>boolean</em></td>
+<td>Blobs includes large objects in the backup</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>noOwner</code> <em>boolean</em></td>
+<td>NoOwner omits ownership information</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>noPrivileges</code> <em>boolean</em></td>
+<td>NoPrivileges omits privilege (GRANT/REVOKE) information</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>schemas</code> <em>string array</em></td>
+<td>Schemas lists specific schemas to include (empty = all)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>excludeSchemas</code> <em>string array</em></td>
+<td>ExcludeSchemas lists schemas to exclude</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>tables</code> <em>string array</em></td>
+<td>Tables lists specific tables to include (empty = all)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>excludeTables</code> <em>string array</em></td>
+<td>ExcludeTables lists tables to exclude (format: schema.table)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>lockWaitTimeout</code> <em>string</em></td>
+<td>LockWaitTimeout sets the lock wait timeout (e.g., "60s")</td>
+<td>60s</td>
+<td></td>
+</tr>
+<tr>
+<td><code>noSync</code> <em>boolean</em></td>
+<td>NoSync disables fsync after backup</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="postgresbackupmethod">PostgresBackupMethod<a class="headerlink" href="#postgresbackupmethod" title="Permanent link">&para;</a></h4>
+<p><em>Underlying type:</em> <em>string</em></p>
+<p>PostgresBackupMethod defines PostgreSQL backup methods</p>
+<p><em>Validation:</em>
+- Enum: [pg_dump pg_basebackup]</p>
+<p><em>Appears in:</em>
+- <a href="#postgresbackupconfig">PostgresBackupConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pg_dump</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>pg_basebackup</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="postgresdatabaseconfig">PostgresDatabaseConfig<a class="headerlink" href="#postgresdatabaseconfig" title="Permanent link">&para;</a></h4>
+<p>PostgresDatabaseConfig defines PostgreSQL-specific database configuration</p>
+<p><em>Appears in:</em>
+- <a href="#databasespec">DatabaseSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>encoding</code> <em>string</em></td>
+<td>Encoding sets the database encoding (default: UTF8)</td>
+<td>UTF8</td>
+<td></td>
+</tr>
+<tr>
+<td><code>lcCollate</code> <em>string</em></td>
+<td>LCCollate sets the collation order</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>lcCtype</code> <em>string</em></td>
+<td>LCCtype sets the character classification</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>tablespace</code> <em>string</em></td>
+<td>Tablespace sets the default tablespace</td>
+<td>pg_default</td>
+<td></td>
+</tr>
+<tr>
+<td><code>template</code> <em>string</em></td>
+<td>Template is the template database to use</td>
+<td>template0</td>
+<td></td>
+</tr>
+<tr>
+<td><code>connectionLimit</code> <em>integer</em></td>
+<td>ConnectionLimit sets the maximum concurrent connections (-1 = unlimited)</td>
+<td>-1</td>
+<td>Minimum: -1 <br /></td>
+</tr>
+<tr>
+<td><code>isTemplate</code> <em>boolean</em></td>
+<td>IsTemplate marks this as a template database</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>allowConnections</code> <em>boolean</em></td>
+<td>AllowConnections allows/disallows connections to this database</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>extensions</code> <em><a href="#postgresextension">PostgresExtension</a> array</em></td>
+<td>Extensions to install in the database</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>schemas</code> <em><a href="#postgresschema">PostgresSchema</a> array</em></td>
+<td>Schemas to create in the database</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>defaultPrivileges</code> <em><a href="#postgresdefaultprivilege">PostgresDefaultPrivilege</a> array</em></td>
+<td>DefaultPrivileges sets default privileges for new objects</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="postgresdatabasestatus">PostgresDatabaseStatus<a class="headerlink" href="#postgresdatabasestatus" title="Permanent link">&para;</a></h4>
+<p>PostgresDatabaseStatus contains PostgreSQL-specific database status</p>
+<p><em>Appears in:</em>
+- <a href="#databasestatus">DatabaseStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>encoding</code> <em>string</em></td>
+<td>Encoding is the database encoding</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>collation</code> <em>string</em></td>
+<td>Collation is the database collation</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>installedExtensions</code> <em><a href="#postgresextensionstatus">PostgresExtensionStatus</a> array</em></td>
+<td>InstalledExtensions lists installed extensions</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>schemas</code> <em>string array</em></td>
+<td>Schemas lists schemas in the database</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="postgresdefaultprivilege">PostgresDefaultPrivilege<a class="headerlink" href="#postgresdefaultprivilege" title="Permanent link">&para;</a></h4>
+<p>PostgresDefaultPrivilege defines default privileges for new objects</p>
+<p><em>Appears in:</em>
+- <a href="#postgresdatabaseconfig">PostgresDatabaseConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>role</code> <em>string</em></td>
+<td>Role to grant privileges to</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>schema</code> <em>string</em></td>
+<td>Schema where the default applies</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>objectType</code> <em>string</em></td>
+<td>ObjectType is the type of objects (tables, sequences, functions, types)</td>
+<td></td>
+<td>Enum: [tables sequences functions types] <br /></td>
+</tr>
+<tr>
+<td><code>privileges</code> <em>string array</em></td>
+<td>Privileges to grant</td>
+<td></td>
+<td>MinItems: 1 <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="postgresdefaultprivilegegrant">PostgresDefaultPrivilegeGrant<a class="headerlink" href="#postgresdefaultprivilegegrant" title="Permanent link">&para;</a></h4>
+<p>PostgresDefaultPrivilegeGrant defines a default privilege grant</p>
+<p><em>Appears in:</em>
+- <a href="#postgresgrantconfig">PostgresGrantConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>database</code> <em>string</em></td>
+<td>Database is the target database</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>schema</code> <em>string</em></td>
+<td>Schema is the target schema</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>grantedBy</code> <em>string</em></td>
+<td>GrantedBy is the role that creates the objects</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>objectType</code> <em>string</em></td>
+<td>ObjectType is the type of objects (tables, sequences, functions, types)</td>
+<td></td>
+<td>Enum: [tables sequences functions types] <br /></td>
+</tr>
+<tr>
+<td><code>privileges</code> <em>string array</em></td>
+<td>Privileges to grant</td>
+<td></td>
+<td>MinItems: 1 <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="postgresdumpformat">PostgresDumpFormat<a class="headerlink" href="#postgresdumpformat" title="Permanent link">&para;</a></h4>
+<p><em>Underlying type:</em> <em>string</em></p>
+<p>PostgresDumpFormat defines pg_dump output formats</p>
+<p><em>Validation:</em>
+- Enum: [plain custom directory tar]</p>
+<p><em>Appears in:</em>
+- <a href="#postgresbackupconfig">PostgresBackupConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>plain</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>custom</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>directory</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>tar</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="postgresextension">PostgresExtension<a class="headerlink" href="#postgresextension" title="Permanent link">&para;</a></h4>
+<p>PostgresExtension defines a PostgreSQL extension to install</p>
+<p><em>Appears in:</em>
+- <a href="#postgresdatabaseconfig">PostgresDatabaseConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name of the extension</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>schema</code> <em>string</em></td>
+<td>Schema to install the extension in (default: public)</td>
+<td>public</td>
+<td></td>
+</tr>
+<tr>
+<td><code>version</code> <em>string</em></td>
+<td>Version of the extension (optional, uses default if not specified)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="postgresextensionstatus">PostgresExtensionStatus<a class="headerlink" href="#postgresextensionstatus" title="Permanent link">&para;</a></h4>
+<p>PostgresExtensionStatus contains extension status information</p>
+<p><em>Appears in:</em>
+- <a href="#postgresdatabasestatus">PostgresDatabaseStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name of the extension</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>version</code> <em>string</em></td>
+<td>Version of the extension</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="postgresgrant">PostgresGrant<a class="headerlink" href="#postgresgrant" title="Permanent link">&para;</a></h4>
+<p>PostgresGrant defines a PostgreSQL privilege grant</p>
+<p><em>Appears in:</em>
+- <a href="#postgresgrantconfig">PostgresGrantConfig</a>
+- <a href="#postgresroleconfig">PostgresRoleConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>database</code> <em>string</em></td>
+<td>Database is the target database</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>schema</code> <em>string</em></td>
+<td>Schema is the target schema (optional, for schema-level grants)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>tables</code> <em>string array</em></td>
+<td>Tables lists specific tables or "*" for all tables</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>sequences</code> <em>string array</em></td>
+<td>Sequences lists specific sequences or "*" for all sequences</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>functions</code> <em>string array</em></td>
+<td>Functions lists specific functions or "*" for all functions</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>privileges</code> <em>string array</em></td>
+<td>Privileges to grant (SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER, CREATE, CONNECT, TEMPORARY, EXECUTE, USAGE)</td>
+<td></td>
+<td>MinItems: 1 <br /></td>
+</tr>
+<tr>
+<td><code>withGrantOption</code> <em>boolean</em></td>
+<td>WithGrantOption allows the grantee to grant these privileges to others</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="postgresgrantconfig">PostgresGrantConfig<a class="headerlink" href="#postgresgrantconfig" title="Permanent link">&para;</a></h4>
+<p>PostgresGrantConfig defines PostgreSQL-specific grant configuration</p>
+<p><em>Appears in:</em>
+- <a href="#databasegrantspec">DatabaseGrantSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>roles</code> <em>string array</em></td>
+<td>Roles to assign to the user</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>grants</code> <em><a href="#postgresgrant">PostgresGrant</a> array</em></td>
+<td>Grants defines direct privilege grants</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>defaultPrivileges</code> <em><a href="#postgresdefaultprivilegegrant">PostgresDefaultPrivilegeGrant</a> array</em></td>
+<td>DefaultPrivileges sets default privileges for future objects</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="postgresinstanceconfig">PostgresInstanceConfig<a class="headerlink" href="#postgresinstanceconfig" title="Permanent link">&para;</a></h4>
+<p>PostgresInstanceConfig defines PostgreSQL-specific instance configuration</p>
+<p><em>Appears in:</em>
+- <a href="#databaseinstancespec">DatabaseInstanceSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sslMode</code> <em><a href="#postgressslmode">PostgresSSLMode</a></em></td>
+<td>SSLMode specifies the SSL mode for connections</td>
+<td>prefer</td>
+<td>Enum: [disable allow prefer require verify-ca verify-full] <br /></td>
+</tr>
+<tr>
+<td><code>connectTimeout</code> <em>integer</em></td>
+<td>ConnectTimeout is the connection timeout in seconds</td>
+<td>10</td>
+<td>Minimum: 1 <br /></td>
+</tr>
+<tr>
+<td><code>statementTimeout</code> <em>string</em></td>
+<td>StatementTimeout is the statement timeout (e.g., "30s")</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>applicationName</code> <em>string</em></td>
+<td>ApplicationName is the application name for connections</td>
+<td>db-provision-operator</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="postgresrestoreconfig">PostgresRestoreConfig<a class="headerlink" href="#postgresrestoreconfig" title="Permanent link">&para;</a></h4>
+<p>PostgresRestoreConfig defines PostgreSQL-specific restore configuration</p>
+<p><em>Appears in:</em>
+- <a href="#databaserestorespec">DatabaseRestoreSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dropExisting</code> <em>boolean</em></td>
+<td>DropExisting drops existing database before restore</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>createDatabase</code> <em>boolean</em></td>
+<td>CreateDatabase creates the database if it doesn't exist</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>dataOnly</code> <em>boolean</em></td>
+<td>DataOnly restores only data, not schema</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>schemaOnly</code> <em>boolean</em></td>
+<td>SchemaOnly restores only schema, not data</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>noOwner</code> <em>boolean</em></td>
+<td>NoOwner omits ownership restoration</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>noPrivileges</code> <em>boolean</em></td>
+<td>NoPrivileges omits privilege restoration</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>roleMapping</code> <em>object (keys:string, values:string)</em></td>
+<td>RoleMapping maps old role names to new role names</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>schemas</code> <em>string array</em></td>
+<td>Schemas lists specific schemas to restore (empty = all)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>tables</code> <em>string array</em></td>
+<td>Tables lists specific tables to restore (empty = all)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>jobs</code> <em>integer</em></td>
+<td>Jobs sets the number of parallel jobs for restore</td>
+<td>1</td>
+<td>Minimum: 1 <br /></td>
+</tr>
+<tr>
+<td><code>disableTriggers</code> <em>boolean</em></td>
+<td>DisableTriggers disables triggers during restore</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>analyze</code> <em>boolean</em></td>
+<td>Analyze runs ANALYZE after restore</td>
+<td>true</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="postgresroleconfig">PostgresRoleConfig<a class="headerlink" href="#postgresroleconfig" title="Permanent link">&para;</a></h4>
+<p>PostgresRoleConfig defines PostgreSQL-specific role configuration</p>
+<p><em>Appears in:</em>
+- <a href="#databaserolespec">DatabaseRoleSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>login</code> <em>boolean</em></td>
+<td>Login enables login capability (usually false for group roles)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>inherit</code> <em>boolean</em></td>
+<td>Inherit enables privilege inheritance</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>createDB</code> <em>boolean</em></td>
+<td>CreateDB allows the role to create databases</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>createRole</code> <em>boolean</em></td>
+<td>CreateRole allows the role to create other roles</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>superuser</code> <em>boolean</em></td>
+<td>Superuser grants superuser privileges</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>replication</code> <em>boolean</em></td>
+<td>Replication enables replication privileges</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>bypassRLS</code> <em>boolean</em></td>
+<td>BypassRLS allows bypassing row-level security</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>inRoles</code> <em>string array</em></td>
+<td>InRoles lists roles this role should inherit from</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>grants</code> <em><a href="#postgresgrant">PostgresGrant</a> array</em></td>
+<td>Grants defines the permissions this role grants</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="postgressslmode">PostgresSSLMode<a class="headerlink" href="#postgressslmode" title="Permanent link">&para;</a></h4>
+<p><em>Underlying type:</em> <em>string</em></p>
+<p>PostgresSSLMode defines PostgreSQL SSL modes</p>
+<p><em>Validation:</em>
+- Enum: [disable allow prefer require verify-ca verify-full]</p>
+<p><em>Appears in:</em>
+- <a href="#postgresinstanceconfig">PostgresInstanceConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>disable</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>allow</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>prefer</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>require</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>verify-ca</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>verify-full</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="postgresschema">PostgresSchema<a class="headerlink" href="#postgresschema" title="Permanent link">&para;</a></h4>
+<p>PostgresSchema defines a schema to create</p>
+<p><em>Appears in:</em>
+- <a href="#postgresdatabaseconfig">PostgresDatabaseConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name of the schema</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>owner</code> <em>string</em></td>
+<td>Owner of the schema (optional)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="postgresuserconfig">PostgresUserConfig<a class="headerlink" href="#postgresuserconfig" title="Permanent link">&para;</a></h4>
+<p>PostgresUserConfig defines PostgreSQL-specific user configuration</p>
+<p><em>Appears in:</em>
+- <a href="#databaseuserspec">DatabaseUserSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>connectionLimit</code> <em>integer</em></td>
+<td>ConnectionLimit sets the maximum concurrent connections (-1 = unlimited)</td>
+<td>-1</td>
+<td>Minimum: -1 <br /></td>
+</tr>
+<tr>
+<td><code>validUntil</code> <em>string</em></td>
+<td>ValidUntil sets the password expiration time (RFC3339 format)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>superuser</code> <em>boolean</em></td>
+<td>Superuser grants superuser privileges</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>createDB</code> <em>boolean</em></td>
+<td>CreateDB allows the user to create databases</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>createRole</code> <em>boolean</em></td>
+<td>CreateRole allows the user to create roles</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>inherit</code> <em>boolean</em></td>
+<td>Inherit enables privilege inheritance</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>login</code> <em>boolean</em></td>
+<td>Login enables login capability</td>
+<td>true</td>
+<td></td>
+</tr>
+<tr>
+<td><code>replication</code> <em>boolean</em></td>
+<td>Replication enables replication privileges</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>bypassRLS</code> <em>boolean</em></td>
+<td>BypassRLS allows bypassing row-level security</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>inRoles</code> <em>string array</em></td>
+<td>InRoles lists roles this user should be a member of</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>configParameters</code> <em>object (keys:string, values:string)</em></td>
+<td>ConfigParameters sets session parameters for this user</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="recentbackupinfo">RecentBackupInfo<a class="headerlink" href="#recentbackupinfo" title="Permanent link">&para;</a></h4>
+<p>RecentBackupInfo contains information about a recent backup</p>
+<p><em>Appears in:</em>
+- <a href="#databasebackupschedulestatus">DatabaseBackupScheduleStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name of the backup</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>status</code> <em>string</em></td>
+<td>Status of the backup</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="restoreconfirmation">RestoreConfirmation<a class="headerlink" href="#restoreconfirmation" title="Permanent link">&para;</a></h4>
+<p>RestoreConfirmation contains safety confirmations</p>
+<p><em>Appears in:</em>
+- <a href="#databaserestorespec">DatabaseRestoreSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>acknowledgeDataLoss</code> <em>string</em></td>
+<td>AcknowledgeDataLoss must be set to "I-UNDERSTAND-DATA-LOSS" for destructive operations</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="restorefrompath">RestoreFromPath<a class="headerlink" href="#restorefrompath" title="Permanent link">&para;</a></h4>
+<p>RestoreFromPath defines restoring from a direct path</p>
+<p><em>Appears in:</em>
+- <a href="#databaserestorespec">DatabaseRestoreSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>storage</code> <em><a href="#storageconfig">StorageConfig</a></em></td>
+<td>Storage defines where the backup is stored</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>backupPath</code> <em>string</em></td>
+<td>BackupPath is the path to the backup file within the storage</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>compression</code> <em><a href="#compressionconfig">CompressionConfig</a></em></td>
+<td>Compression settings used for the backup</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>encryption</code> <em><a href="#encryptionconfig">EncryptionConfig</a></em></td>
+<td>Encryption settings used for the backup</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="restoreinfo">RestoreInfo<a class="headerlink" href="#restoreinfo" title="Permanent link">&para;</a></h4>
+<p>RestoreInfo contains restore-specific information</p>
+<p><em>Appears in:</em>
+- <a href="#databaserestorestatus">DatabaseRestoreStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sourceBackup</code> <em>string</em></td>
+<td>SourceBackup is the source backup name</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>targetInstance</code> <em>string</em></td>
+<td>TargetInstance is the target instance name</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>targetDatabase</code> <em>string</em></td>
+<td>TargetDatabase is the target database name</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="restoreprogress">RestoreProgress<a class="headerlink" href="#restoreprogress" title="Permanent link">&para;</a></h4>
+<p>RestoreProgress contains restore progress information</p>
+<p><em>Appears in:</em>
+- <a href="#databaserestorestatus">DatabaseRestoreStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>percentage</code> <em>integer</em></td>
+<td>Percentage is the restore progress percentage (0-100)</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>currentPhase</code> <em>string</em></td>
+<td>CurrentPhase is the current restore phase</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>tablesRestored</code> <em>integer</em></td>
+<td>TablesRestored is the number of tables restored</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>tablesTotal</code> <em>integer</em></td>
+<td>TablesTotal is the total number of tables to restore</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="restoretarget">RestoreTarget<a class="headerlink" href="#restoretarget" title="Permanent link">&para;</a></h4>
+<p>RestoreTarget defines where to restore the backup</p>
+<p><em>Appears in:</em>
+- <a href="#databaserestorespec">DatabaseRestoreSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>instanceRef</code> <em><a href="#instancereference">InstanceReference</a></em></td>
+<td>InstanceRef references the target DatabaseInstance</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>databaseName</code> <em>string</em></td>
+<td>DatabaseName is the target database name (for restore to new database)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>inPlace</code> <em>boolean</em></td>
+<td>InPlace enables in-place restore (destructive!)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>databaseRef</code> <em><a href="#databasereference">DatabaseReference</a></em></td>
+<td>DatabaseRef references the target Database for in-place restore</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="retentionpolicy">RetentionPolicy<a class="headerlink" href="#retentionpolicy" title="Permanent link">&para;</a></h4>
+<p>RetentionPolicy defines backup retention settings</p>
+<p><em>Appears in:</em>
+- <a href="#databasebackupschedulespec">DatabaseBackupScheduleSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>keepLast</code> <em>integer</em></td>
+<td>KeepLast keeps the N most recent backups</td>
+<td></td>
+<td>Minimum: 0 <br />Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>keepHourly</code> <em>integer</em></td>
+<td>KeepHourly keeps N hourly backups</td>
+<td></td>
+<td>Minimum: 0 <br />Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>keepDaily</code> <em>integer</em></td>
+<td>KeepDaily keeps N daily backups</td>
+<td></td>
+<td>Minimum: 0 <br />Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>keepWeekly</code> <em>integer</em></td>
+<td>KeepWeekly keeps N weekly backups</td>
+<td></td>
+<td>Minimum: 0 <br />Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>keepMonthly</code> <em>integer</em></td>
+<td>KeepMonthly keeps N monthly backups</td>
+<td></td>
+<td>Minimum: 0 <br />Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>keepYearly</code> <em>integer</em></td>
+<td>KeepYearly keeps N yearly backups</td>
+<td></td>
+<td>Minimum: 0 <br />Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>minAge</code> <em>string</em></td>
+<td>MinAge is the minimum age before a backup can be deleted</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="roleinfo">RoleInfo<a class="headerlink" href="#roleinfo" title="Permanent link">&para;</a></h4>
+<p>RoleInfo contains role status information</p>
+<p><em>Appears in:</em>
+- <a href="#databaserolestatus">DatabaseRoleStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name is the actual role name</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>createdAt</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#time-v1-meta">Time</a></em></td>
+<td>CreatedAt is the role creation timestamp</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="s3secretkeys">S3SecretKeys<a class="headerlink" href="#s3secretkeys" title="Permanent link">&para;</a></h4>
+<p>S3SecretKeys defines the key names within an S3 secret</p>
+<p><em>Appears in:</em>
+- <a href="#s3secretref">S3SecretRef</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>accessKey</code> <em>string</em></td>
+<td>Access key ID (default: "AWS_ACCESS_KEY_ID")</td>
+<td>AWS_ACCESS_KEY_ID</td>
+<td></td>
+</tr>
+<tr>
+<td><code>secretKey</code> <em>string</em></td>
+<td>Secret access key (default: "AWS_SECRET_ACCESS_KEY")</td>
+<td>AWS_SECRET_ACCESS_KEY</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="s3secretref">S3SecretRef<a class="headerlink" href="#s3secretref" title="Permanent link">&para;</a></h4>
+<p>S3SecretRef references S3 credentials in a secret</p>
+<p><em>Appears in:</em>
+- <a href="#s3storageconfig">S3StorageConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name of the secret</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>keys</code> <em><a href="#s3secretkeys">S3SecretKeys</a></em></td>
+<td>Keys defines the key names for S3 credentials</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="s3storageconfig">S3StorageConfig<a class="headerlink" href="#s3storageconfig" title="Permanent link">&para;</a></h4>
+<p>S3StorageConfig defines S3-compatible storage configuration</p>
+<p><em>Appears in:</em>
+- <a href="#storageconfig">StorageConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bucket</code> <em>string</em></td>
+<td>Bucket name</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>region</code> <em>string</em></td>
+<td>Region of the S3 bucket</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>prefix</code> <em>string</em></td>
+<td>Prefix (path prefix within the bucket)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>endpoint</code> <em>string</em></td>
+<td>Endpoint for S3-compatible storage (e.g., MinIO)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>secretRef</code> <em><a href="#s3secretref">S3SecretRef</a></em></td>
+<td>SecretRef references a secret containing S3 credentials</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>forcePathStyle</code> <em>boolean</em></td>
+<td>ForcePathStyle enables path-style addressing (required for MinIO)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="scheduledbackupinfo">ScheduledBackupInfo<a class="headerlink" href="#scheduledbackupinfo" title="Permanent link">&para;</a></h4>
+<p>ScheduledBackupInfo contains information about a scheduled backup</p>
+<p><em>Appears in:</em>
+- <a href="#databasebackupschedulestatus">DatabaseBackupScheduleStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name of the backup</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>status</code> <em>string</em></td>
+<td>Status of the backup</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>startedAt</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#time-v1-meta">Time</a></em></td>
+<td>StartedAt is when the backup started</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>completedAt</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#time-v1-meta">Time</a></em></td>
+<td>CompletedAt is when the backup completed</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="secretformat">SecretFormat<a class="headerlink" href="#secretformat" title="Permanent link">&para;</a></h4>
+<p><em>Underlying type:</em> <em>string</em></p>
+<p>SecretFormat defines the output secret format</p>
+<p><em>Validation:</em>
+- Enum: [kubernetes vault external-secrets]</p>
+<p><em>Appears in:</em>
+- <a href="#passwordconfig">PasswordConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>kubernetes</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>vault</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>external-secrets</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="secretinfo">SecretInfo<a class="headerlink" href="#secretinfo" title="Permanent link">&para;</a></h4>
+<p>SecretInfo contains generated secret information</p>
+<p><em>Appears in:</em>
+- <a href="#databaseuserstatus">DatabaseUserStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name is the secret name</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>namespace</code> <em>string</em></td>
+<td>Namespace is the secret namespace</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>lastRotatedAt</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#time-v1-meta">Time</a></em></td>
+<td>LastRotatedAt is the last password rotation timestamp</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="secretkeyselector">SecretKeySelector<a class="headerlink" href="#secretkeyselector" title="Permanent link">&para;</a></h4>
+<p>SecretKeySelector contains a reference to a secret key</p>
+<p><em>Appears in:</em>
+- <a href="#encryptionconfig">EncryptionConfig</a>
+- <a href="#gcsstorageconfig">GCSStorageConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name of the secret</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>namespace</code> <em>string</em></td>
+<td>Namespace of the secret (defaults to the resource namespace)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>key</code> <em>string</em></td>
+<td>Key within the secret</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="secretreference">SecretReference<a class="headerlink" href="#secretreference" title="Permanent link">&para;</a></h4>
+<p>SecretReference contains a reference to a secret with multiple keys</p>
+<p><em>Appears in:</em>
+- <a href="#azurestorageconfig">AzureStorageConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name of the secret</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>namespace</code> <em>string</em></td>
+<td>Namespace of the secret (defaults to the resource namespace)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="secrettemplate">SecretTemplate<a class="headerlink" href="#secrettemplate" title="Permanent link">&para;</a></h4>
+<p>SecretTemplate defines the template for generated secrets</p>
+<p><em>Appears in:</em>
+- <a href="#passwordconfig">PasswordConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#secrettype-v1-core">SecretType</a></em></td>
+<td>Type is the secret type (default: Opaque)</td>
+<td>Opaque</td>
+<td></td>
+</tr>
+<tr>
+<td><code>labels</code> <em>object (keys:string, values:string)</em></td>
+<td>Labels to add to the secret</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>annotations</code> <em>object (keys:string, values:string)</em></td>
+<td>Annotations to add to the secret</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>data</code> <em>object (keys:string, values:string)</em></td>
+<td>Data defines templated data keys<br />Available variables: .Username, .Password, .Host, .Port, .Database, .SSLMode</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="storageconfig">StorageConfig<a class="headerlink" href="#storageconfig" title="Permanent link">&para;</a></h4>
+<p>StorageConfig defines backup storage configuration</p>
+<p><em>Appears in:</em>
+- <a href="#databasebackupspec">DatabaseBackupSpec</a>
+- <a href="#restorefrompath">RestoreFromPath</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code> <em><a href="#storagetype">StorageType</a></em></td>
+<td>Type of storage backend</td>
+<td></td>
+<td>Enum: [gcs s3 azure pvc] <br />Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>gcs</code> <em><a href="#gcsstorageconfig">GCSStorageConfig</a></em></td>
+<td>GCS configuration (required when type is "gcs")</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>s3</code> <em><a href="#s3storageconfig">S3StorageConfig</a></em></td>
+<td>S3 configuration (required when type is "s3")</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>azure</code> <em><a href="#azurestorageconfig">AzureStorageConfig</a></em></td>
+<td>Azure configuration (required when type is "azure")</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>pvc</code> <em><a href="#pvcstorageconfig">PVCStorageConfig</a></em></td>
+<td>PVC configuration (required when type is "pvc")</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="storagetype">StorageType<a class="headerlink" href="#storagetype" title="Permanent link">&para;</a></h4>
+<p><em>Underlying type:</em> <em>string</em></p>
+<p>StorageType defines the backup storage type</p>
+<p><em>Validation:</em>
+- Enum: [gcs s3 azure pvc]</p>
+<p><em>Appears in:</em>
+- <a href="#storageconfig">StorageConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gcs</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>s3</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>azure</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>pvc</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="tlsconfig">TLSConfig<a class="headerlink" href="#tlsconfig" title="Permanent link">&para;</a></h4>
+<p>TLSConfig defines TLS configuration for database connections</p>
+<p><em>Appears in:</em>
+- <a href="#databaseinstancespec">DatabaseInstanceSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code> <em>boolean</em></td>
+<td>Enabled enables TLS for connections</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>mode</code> <em>string</em></td>
+<td>Mode specifies the TLS verification mode</td>
+<td>disable</td>
+<td>Enum: [disable require verify-ca verify-full] <br /></td>
+</tr>
+<tr>
+<td><code>secretRef</code> <em><a href="#tlssecretref">TLSSecretRef</a></em></td>
+<td>SecretRef references a secret containing TLS certificates</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="tlskeys">TLSKeys<a class="headerlink" href="#tlskeys" title="Permanent link">&para;</a></h4>
+<p>TLSKeys defines the key names within a TLS secret</p>
+<p><em>Appears in:</em>
+- <a href="#tlssecretref">TLSSecretRef</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ca</code> <em>string</em></td>
+<td>CA certificate key (default: "ca.crt")</td>
+<td>ca.crt</td>
+<td></td>
+</tr>
+<tr>
+<td><code>cert</code> <em>string</em></td>
+<td>Client certificate key for mTLS (optional)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+<tr>
+<td><code>key</code> <em>string</em></td>
+<td>Client key for mTLS (optional)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="tlssecretref">TLSSecretRef<a class="headerlink" href="#tlssecretref" title="Permanent link">&para;</a></h4>
+<p>TLSSecretRef references TLS certificates in a secret</p>
+<p><em>Appears in:</em>
+- <a href="#tlsconfig">TLSConfig</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name of the secret containing TLS certificates</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>keys</code> <em><a href="#tlskeys">TLSKeys</a></em></td>
+<td>Keys defines the key names for TLS certificates</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+<h4 id="userinfo">UserInfo<a class="headerlink" href="#userinfo" title="Permanent link">&para;</a></h4>
+<p>UserInfo contains user status information</p>
+<p><em>Appears in:</em>
+- <a href="#databaseuserstatus">DatabaseUserStatus</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>username</code> <em>string</em></td>
+<td>Username is the actual database username</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>createdAt</code> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#time-v1-meta">Time</a></em></td>
+<td>CreatedAt is the user creation timestamp</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="userreference">UserReference<a class="headerlink" href="#userreference" title="Permanent link">&para;</a></h4>
+<p>UserReference references a DatabaseUser</p>
+<p><em>Appears in:</em>
+- <a href="#databasegrantspec">DatabaseGrantSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td>Name of the DatabaseUser resource</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>namespace</code> <em>string</em></td>
+<td>Namespace of the DatabaseUser (defaults to the resource namespace)</td>
+<td></td>
+<td>Optional: {} <br /></td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../" class="md-footer__link md-footer__link--prev" aria-label="Previous: API Reference">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                API Reference
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../../architecture/" class="md-footer__link md-footer__link--next" aria-label="Next: Overview">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Overview
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 panteparak
+    </div>
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/panteparak/db-provision-operator" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.code.annotate", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

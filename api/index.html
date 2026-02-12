@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://panteparak.github.io/db-provision-operator/api/">
       
       
-        <link rel="prev" href="../engines/mariadb/">
+        <link rel="prev" href="../engines/cockroachdb/">
       
       
         <link rel="next" href="../examples/">
@@ -869,6 +869,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/drift-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/deletion-protection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deletion Protection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1029,6 +1085,34 @@
     
   
     MariaDB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engines/cockroachdb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CockroachDB
   
 
     
@@ -1728,6 +1812,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../examples/cockroachdb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CockroachDB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/drift-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../examples/advanced/" class="md-nav__link">
         
   
@@ -2074,6 +2214,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../operations/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../operations/troubleshooting/" class="md-nav__link">
         
   
@@ -2227,6 +2395,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/e2e-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E2E Testing
   
 
     
@@ -2774,6 +2970,10 @@
 
 <h1 id="api-reference">API Reference<a class="headerlink" href="#api-reference" title="Permanent link">&para;</a></h1>
 <p>Complete API reference for all DB Provision Operator Custom Resource Definitions.</p>
+<div class="admonition tip">
+<p class="admonition-title">Auto-Generated Reference</p>
+<p>For the complete auto-generated API reference with all fields and validation rules, see <a href="reference/">API Reference (Full)</a>.</p>
+</div>
 <h2 id="api-group">API Group<a class="headerlink" href="#api-group" title="Permanent link">&para;</a></h2>
 <p>All resources belong to the <code>dbops.dbprovision.io</code> API group.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dbops.dbprovision.io/v1alpha1</span>
@@ -2789,42 +2989,42 @@
 </thead>
 <tbody>
 <tr>
-<td><code>DatabaseInstance</code></td>
+<td><a href="#databaseinstance"><code>DatabaseInstance</code></a></td>
 <td>Database server connection</td>
 <td>Namespaced</td>
 </tr>
 <tr>
-<td><code>Database</code></td>
+<td><a href="#database"><code>Database</code></a></td>
 <td>Logical database</td>
 <td>Namespaced</td>
 </tr>
 <tr>
-<td><code>DatabaseUser</code></td>
+<td><a href="#databaseuser"><code>DatabaseUser</code></a></td>
 <td>Database user</td>
 <td>Namespaced</td>
 </tr>
 <tr>
-<td><code>DatabaseRole</code></td>
+<td><a href="#databaserole"><code>DatabaseRole</code></a></td>
 <td>Permission group</td>
 <td>Namespaced</td>
 </tr>
 <tr>
-<td><code>DatabaseGrant</code></td>
+<td><a href="#databasegrant"><code>DatabaseGrant</code></a></td>
 <td>Fine-grained permissions</td>
 <td>Namespaced</td>
 </tr>
 <tr>
-<td><code>DatabaseBackup</code></td>
+<td><a href="#databasebackup"><code>DatabaseBackup</code></a></td>
 <td>One-time backup</td>
 <td>Namespaced</td>
 </tr>
 <tr>
-<td><code>DatabaseBackupSchedule</code></td>
+<td><a href="#databasebackupschedule"><code>DatabaseBackupSchedule</code></a></td>
 <td>Scheduled backups</td>
 <td>Namespaced</td>
 </tr>
 <tr>
-<td><code>DatabaseRestore</code></td>
+<td><a href="#databaserestore"><code>DatabaseRestore</code></a></td>
 <td>Restore operation</td>
 <td>Namespaced</td>
 </tr>
@@ -2848,7 +3048,7 @@
 <td><code>engine</code></td>
 <td>string</td>
 <td>Yes</td>
-<td>Database engine: <code>postgres</code>, <code>mysql</code>, <code>mariadb</code></td>
+<td>Database engine: <code>postgres</code>, <code>mysql</code>, <code>mariadb</code>, <code>cockroachdb</code></td>
 </tr>
 <tr>
 <td><code>connection</code></td>
@@ -4125,7 +4325,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../engines/mariadb/" class="md-footer__link md-footer__link--prev" aria-label="Previous: MariaDB">
+          <a href="../engines/cockroachdb/" class="md-footer__link md-footer__link--prev" aria-label="Previous: CockroachDB">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -4135,7 +4335,7 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                MariaDB
+                CockroachDB
               </div>
             </div>
           </a>

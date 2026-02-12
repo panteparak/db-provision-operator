@@ -12,13 +12,13 @@
         <meta name="author" content="panteparak">
       
       
-        <link rel="canonical" href="https://panteparak.github.io/db-provision-operator/development/contributing/">
+        <link rel="canonical" href="https://panteparak.github.io/db-provision-operator/development/e2e-testing/">
       
       
-        <link rel="prev" href="../">
+        <link rel="prev" href="../testing/">
       
       
-        <link rel="next" href="../testing/">
+        <link rel="next" href="../ci-cd/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Contributing - DB Provision Operator</title>
+        <title>E2E Testing - DB Provision Operator</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#contributing" class="md-skip">
+        <a href="#running-e2e-tests-locally" class="md-skip">
           Skip to content
         </a>
       
@@ -114,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Contributing
+              E2E Testing
             
           </span>
         </div>
@@ -1914,37 +1914,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Contributing
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
         
   
   
@@ -1960,437 +1933,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#getting-started" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Getting Started
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Getting Started">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Prerequisites
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#setup" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Setup
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#development-workflow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Development Workflow
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Development Workflow">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-create-branch" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Create Branch
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-make-changes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Make Changes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-test-changes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Test Changes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-submit-pr" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Submit PR
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#code-style" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Code Style
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Code Style">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#go-guidelines" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Go Guidelines
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#naming-conventions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Naming Conventions
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#error-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Error Handling
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#logging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Logging
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#commit-messages" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Commit Messages
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Commit Messages">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#types" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Types
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Examples
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pull-requests" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pull Requests
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Pull Requests">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#pr-title" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        PR Title
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pr-description" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        PR Description
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#review-process" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Review Process
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#adding-new-features" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Adding New Features
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Adding New Features">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#adding-a-new-crd" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Adding a New CRD
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#adding-database-engine-support" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Adding Database Engine Support
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#testing-guidelines" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Testing Guidelines
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Testing Guidelines">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#unit-tests" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Unit Tests
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#integration-tests" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Integration Tests
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#e2e-tests" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        E2E Tests
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Documentation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#code-documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Code Documentation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#user-documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        User Documentation
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#release-process" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Release Process
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#getting-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Getting Help
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#code-of-conduct" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Code of Conduct
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2428,10 +1970,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../e2e-testing/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E2E Testing
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2447,6 +2016,353 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick Start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#one-command-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One Command (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-by-step-for-debugging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step-by-Step (For Debugging)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#port-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Port Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operator-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operator Image
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#k3d-cluster-name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        k3d Cluster Name
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#available-makefile-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Makefile Targets
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Available Makefile Targets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#micro-steps-called-by-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Micro-Steps (called by CI)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unified-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unified Targets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#debugging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Debugging
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Debugging">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#view-operator-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        View Operator Logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check-database-health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Database Health
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#connect-to-database-directly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connect to Database Directly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inspect-crs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspect CRs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verify-k3d-to-docker-host-connectivity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify k3d to Docker Host Connectivity
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cleanup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ci-consistency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI Consistency
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hostk3dinternal-not-resolving" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "host.k3d.internal" not resolving
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-connection-refused" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database connection refused
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operator-not-starting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operator not starting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests-timing-out" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tests timing out
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#port-already-in-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Port already in use
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2570,18 +2486,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#getting-started" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Getting Started
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Getting Started">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2591,40 +2495,35 @@
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#setup" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Setup
+        Architecture
       
     </span>
   </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#development-workflow" class="md-nav__link">
+  <a href="#quick-start" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Development Workflow
+        Quick Start
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Development Workflow">
+    <nav class="md-nav" aria-label="Quick Start">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-create-branch" class="md-nav__link">
+  <a href="#one-command-recommended" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Create Branch
+        One Command (Recommended)
       
     </span>
   </a>
@@ -2632,32 +2531,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-make-changes" class="md-nav__link">
+  <a href="#step-by-step-for-debugging" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Make Changes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-test-changes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Test Changes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-submit-pr" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Submit PR
+        Step-by-Step (For Debugging)
       
     </span>
   </a>
@@ -2670,22 +2547,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#code-style" class="md-nav__link">
+  <a href="#configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Code Style
+        Configuration
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Code Style">
+    <nav class="md-nav" aria-label="Configuration">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#go-guidelines" class="md-nav__link">
+  <a href="#port-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Go Guidelines
+        Port Configuration
       
     </span>
   </a>
@@ -2693,10 +2570,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#naming-conventions" class="md-nav__link">
+  <a href="#operator-image" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Naming Conventions
+        Operator Image
       
     </span>
   </a>
@@ -2704,21 +2581,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#error-handling" class="md-nav__link">
+  <a href="#k3d-cluster-name" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Error Handling
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#logging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Logging
+        k3d Cluster Name
       
     </span>
   </a>
@@ -2731,22 +2597,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commit-messages" class="md-nav__link">
+  <a href="#available-makefile-targets" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Commit Messages
+        Available Makefile Targets
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Commit Messages">
+    <nav class="md-nav" aria-label="Available Makefile Targets">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#types" class="md-nav__link">
+  <a href="#micro-steps-called-by-ci" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Types
+        Micro-Steps (called by CI)
       
     </span>
   </a>
@@ -2754,10 +2620,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
+  <a href="#unified-targets" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Examples
+        Unified Targets
       
     </span>
   </a>
@@ -2770,22 +2636,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pull-requests" class="md-nav__link">
+  <a href="#debugging" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Pull Requests
+        Debugging
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Pull Requests">
+    <nav class="md-nav" aria-label="Debugging">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#pr-title" class="md-nav__link">
+  <a href="#view-operator-logs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        PR Title
+        View Operator Logs
       
     </span>
   </a>
@@ -2793,10 +2659,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pr-description" class="md-nav__link">
+  <a href="#check-database-health" class="md-nav__link">
     <span class="md-ellipsis">
       
-        PR Description
+        Check Database Health
       
     </span>
   </a>
@@ -2804,10 +2670,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#review-process" class="md-nav__link">
+  <a href="#connect-to-database-directly" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Review Process
+        Connect to Database Directly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inspect-crs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspect CRs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verify-k3d-to-docker-host-connectivity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify k3d to Docker Host Connectivity
       
     </span>
   </a>
@@ -2820,22 +2708,44 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#adding-new-features" class="md-nav__link">
+  <a href="#cleanup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Adding New Features
+        Cleanup
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Adding New Features">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ci-consistency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI Consistency
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#adding-a-new-crd" class="md-nav__link">
+  <a href="#hostk3dinternal-not-resolving" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Adding a New CRD
+        "host.k3d.internal" not resolving
       
     </span>
   </a>
@@ -2843,10 +2753,43 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#adding-database-engine-support" class="md-nav__link">
+  <a href="#database-connection-refused" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Adding Database Engine Support
+        Database connection refused
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operator-not-starting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operator not starting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests-timing-out" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tests timing out
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#port-already-in-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Port already in use
       
     </span>
   </a>
@@ -2859,121 +2802,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#testing-guidelines" class="md-nav__link">
+  <a href="#file-structure" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Testing Guidelines
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Testing Guidelines">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#unit-tests" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Unit Tests
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#integration-tests" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Integration Tests
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#e2e-tests" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        E2E Tests
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Documentation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#code-documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Code Documentation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#user-documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        User Documentation
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#release-process" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Release Process
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#getting-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Getting Help
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#code-of-conduct" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Code of Conduct
+        File Structure
       
     </span>
   </a>
@@ -3000,333 +2832,340 @@
   
 
 
-<h1 id="contributing">Contributing<a class="headerlink" href="#contributing" title="Permanent link">&para;</a></h1>
-<p>Guidelines for contributing to DB Provision Operator.</p>
-<h2 id="getting-started">Getting Started<a class="headerlink" href="#getting-started" title="Permanent link">&para;</a></h2>
-<h3 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h3>
+<h1 id="running-e2e-tests-locally">Running E2E Tests Locally<a class="headerlink" href="#running-e2e-tests-locally" title="Permanent link">&para;</a></h1>
+<p>This guide explains how to run end-to-end tests locally using the same infrastructure as CI.</p>
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Go 1.21+</li>
-<li>Docker</li>
+<li>Docker and Docker Compose</li>
+<li>k3d (<code>curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash</code>)</li>
 <li>kubectl</li>
-<li>kind or minikube</li>
-<li>Make</li>
+<li>Go 1.24+</li>
 </ul>
-<h3 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Fork and clone</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/YOUR_USERNAME/db-provision-operator.git
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nb">cd</span><span class="w"> </span>db-provision-operator
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># Add upstream remote</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>git<span class="w"> </span>remote<span class="w"> </span>add<span class="w"> </span>upstream<span class="w"> </span>https://github.com/panteparak/db-provision-operator.git
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="c1"># Install tools</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>make<span class="w"> </span>install-tools
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="c1"># Verify setup</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>make<span class="w"> </span><span class="nb">test</span>
+<h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>┌──────────────────────────────────────────────────────────────┐
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>│                     Local Machine                             │
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│                                                              │
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│  ┌─────────────────┐     ┌─────────────────────────────────┐ │
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│  │  Docker Compose │     │         k3d Cluster             │ │
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│  │                 │     │                                 │ │
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│  │  ┌───────────┐  │     │  ┌─────────────────────────┐   │ │
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│  │  │ PostgreSQL│◄─┼─────┼──│  Operator Pod           │   │ │
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>│  │  │ :5432     │  │     │  │  (db-provision-operator)│   │ │
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>│  │  └───────────┘  │     │  └─────────────────────────┘   │ │
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>│  │  ┌───────────┐  │     │                                 │ │
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>│  │  │ MySQL     │◄─┼─────┼── host.k3d.internal             │ │
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>│  │  │ :3306     │  │     │                                 │ │
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│  │  └───────────┘  │     │  ┌─────────────────────────┐   │ │
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>│  │  ┌───────────┐  │     │  │  DatabaseInstance CRs   │   │ │
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>│  │  │ MariaDB   │  │     │  │  → host.k3d.internal    │   │ │
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>│  │  │ :3307     │  │     │  └─────────────────────────┘   │ │
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>│  │  └───────────┘  │     │                                 │ │
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>│  └─────────────────┘     └─────────────────────────────────┘ │
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>│          │                                                    │
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>│          ▼                                                    │
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>│  ┌─────────────────┐                                         │
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>│  │  E2E Tests      │  (go test connects to 127.0.0.1)        │
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>│  └─────────────────┘                                         │
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>└──────────────────────────────────────────────────────────────┘
 </span></code></pre></div>
-<h2 id="development-workflow">Development Workflow<a class="headerlink" href="#development-workflow" title="Permanent link">&para;</a></h2>
-<h3 id="1-create-branch">1. Create Branch<a class="headerlink" href="#1-create-branch" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Update main</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>git<span class="w"> </span>checkout<span class="w"> </span>main
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>git<span class="w"> </span>pull<span class="w"> </span>upstream<span class="w"> </span>main
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1"># Create feature branch</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>feature/my-feature
-</span></code></pre></div>
-<h3 id="2-make-changes">2. Make Changes<a class="headerlink" href="#2-make-changes" title="Permanent link">&para;</a></h3>
-<p>Follow these guidelines:</p>
+<p><strong>Key Design Points:</strong></p>
 <ul>
-<li><strong>Code style:</strong> Follow Go conventions</li>
-<li><strong>Comments:</strong> Document exported functions</li>
-<li><strong>Tests:</strong> Add tests for new code</li>
-<li><strong>Commits:</strong> Use conventional commits</li>
+<li><strong>Databases run on Docker Compose</strong> (outside k3d) for faster iteration and easier debugging</li>
+<li><strong>Operator runs inside k3d</strong> cluster</li>
+<li><strong>k3d uses <code>host.k3d.internal</code></strong> to reach databases on Docker host</li>
+<li><strong>Same Makefile targets</strong> are used by both local and CI for consistency</li>
 </ul>
-<h3 id="3-test-changes">3. Test Changes<a class="headerlink" href="#3-test-changes" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Run all tests</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>make<span class="w"> </span><span class="nb">test</span>
+<h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
+<h3 id="one-command-recommended">One Command (Recommended)<a class="headerlink" href="#one-command-recommended" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Run PostgreSQL E2E tests (sets up everything)</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>make<span class="w"> </span>e2e-local-postgresql
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Run MySQL E2E tests</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>make<span class="w"> </span>e2e-local-mysql
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Run MariaDB E2E tests</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>make<span class="w"> </span>e2e-local-mariadb
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># Run all databases</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>make<span class="w"> </span>e2e-local-all
+</span></code></pre></div>
+<h3 id="step-by-step-for-debugging">Step-by-Step (For Debugging)<a class="headerlink" href="#step-by-step-for-debugging" title="Permanent link">&para;</a></h3>
+<p>Each step is a separate Makefile target—the same targets CI uses:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># 1. Start databases (Docker Compose with health checks)</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>make<span class="w"> </span>e2e-db-up
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Run linters</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>make<span class="w"> </span>lint
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># 2. Create k3d cluster</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>make<span class="w"> </span>e2e-cluster-create
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># Run E2E tests (requires cluster)</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>make<span class="w"> </span>test-e2e
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># 3. Build operator Docker image</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>make<span class="w"> </span>e2e-docker-build
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="c1"># 4. Load image into k3d</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>make<span class="w"> </span>e2e-image-load
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="c1"># 5. Install CRDs</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>make<span class="w"> </span>e2e-install-crds
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="c1"># 6. Deploy operator</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>make<span class="w"> </span>e2e-deploy-operator
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="c1"># 7. Create DatabaseInstance (points to host.k3d.internal)</span>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>make<span class="w"> </span>e2e-create-db-instance<span class="w"> </span><span class="nv">E2E_DATABASE</span><span class="o">=</span>postgresql
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>
+</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="c1"># 8. Run tests</span>
+</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>make<span class="w"> </span>e2e-local-run-tests<span class="w"> </span><span class="nv">E2E_DATABASE</span><span class="o">=</span>postgresql
 </span></code></pre></div>
-<h3 id="4-submit-pr">4. Submit PR<a class="headerlink" href="#4-submit-pr" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Push branch</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>feature/my-feature
-</span></code></pre></div>
-<p>Open PR against <code>main</code> branch.</p>
-<h2 id="code-style">Code Style<a class="headerlink" href="#code-style" title="Permanent link">&para;</a></h2>
-<h3 id="go-guidelines">Go Guidelines<a class="headerlink" href="#go-guidelines" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Follow <a href="https://go.dev/doc/effective_go">Effective Go</a></li>
-<li>Run <code>gofmt</code> and <code>goimports</code></li>
-<li>Use meaningful variable names</li>
-<li>Keep functions focused and small</li>
-</ul>
-<h3 id="naming-conventions">Naming Conventions<a class="headerlink" href="#naming-conventions" title="Permanent link">&para;</a></h3>
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
+<h3 id="port-configuration">Port Configuration<a class="headerlink" href="#port-configuration" title="Permanent link">&para;</a></h3>
+<p>Override ports via environment variables:</p>
 <table>
 <thead>
 <tr>
-<th>Type</th>
-<th>Convention</th>
-<th>Example</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Files</td>
-<td><code>snake_case.go</code></td>
-<td><code>database_controller.go</code></td>
-</tr>
-<tr>
-<td>Packages</td>
-<td><code>lowercase</code></td>
-<td><code>database</code></td>
-</tr>
-<tr>
-<td>Types</td>
-<td><code>PascalCase</code></td>
-<td><code>DatabaseInstance</code></td>
-</tr>
-<tr>
-<td>Functions</td>
-<td><code>PascalCase</code> (exported)</td>
-<td><code>CreateDatabase</code></td>
-</tr>
-<tr>
-<td>Variables</td>
-<td><code>camelCase</code></td>
-<td><code>dbInstance</code></td>
-</tr>
-<tr>
-<td>Constants</td>
-<td><code>PascalCase</code> or <code>UPPER_SNAKE</code></td>
-<td><code>DefaultPort</code></td>
-</tr>
-</tbody>
-</table>
-<h3 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h3>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1">// Good</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Errorf</span><span class="p">(</span><span class="s">&quot;failed to create database: %w&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="p">}</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="c1">// Bad</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">err</span><span class="w">  </span><span class="c1">// No context</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="p">}</span>
-</span></code></pre></div>
-<h3 id="logging">Logging<a class="headerlink" href="#logging" title="Permanent link">&para;</a></h3>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1">// Use structured logging</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nx">log</span><span class="p">.</span><span class="nx">Info</span><span class="p">(</span><span class="s">&quot;Reconciling database&quot;</span><span class="p">,</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="s">&quot;namespace&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">db</span><span class="p">.</span><span class="nx">Namespace</span><span class="p">,</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="s">&quot;name&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">db</span><span class="p">.</span><span class="nx">Name</span><span class="p">)</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1">// Error logging</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="nx">log</span><span class="p">.</span><span class="nx">Error</span><span class="p">(</span><span class="nx">err</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Failed to create database&quot;</span><span class="p">,</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">    </span><span class="s">&quot;namespace&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">db</span><span class="p">.</span><span class="nx">Namespace</span><span class="p">,</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">    </span><span class="s">&quot;name&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">db</span><span class="p">.</span><span class="nx">Name</span><span class="p">)</span>
-</span></code></pre></div>
-<h2 id="commit-messages">Commit Messages<a class="headerlink" href="#commit-messages" title="Permanent link">&para;</a></h2>
-<p>Use <a href="https://www.conventionalcommits.org/">Conventional Commits</a>:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>&lt;type&gt;(&lt;scope&gt;): &lt;description&gt;
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>[optional body]
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>[optional footer]
-</span></code></pre></div>
-<h3 id="types">Types<a class="headerlink" href="#types" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Type</th>
+<th>Variable</th>
+<th>Default</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>feat</code></td>
-<td>New feature</td>
+<td><code>E2E_POSTGRES_PORT</code></td>
+<td>5432</td>
+<td>PostgreSQL host port</td>
 </tr>
 <tr>
-<td><code>fix</code></td>
-<td>Bug fix</td>
+<td><code>E2E_MYSQL_PORT</code></td>
+<td>3306</td>
+<td>MySQL host port</td>
 </tr>
 <tr>
-<td><code>docs</code></td>
-<td>Documentation</td>
-</tr>
-<tr>
-<td><code>style</code></td>
-<td>Formatting (no code change)</td>
-</tr>
-<tr>
-<td><code>refactor</code></td>
-<td>Code refactoring</td>
-</tr>
-<tr>
-<td><code>test</code></td>
-<td>Tests</td>
-</tr>
-<tr>
-<td><code>chore</code></td>
-<td>Maintenance</td>
+<td><code>E2E_MARIADB_PORT</code></td>
+<td>3307</td>
+<td>MariaDB host port</td>
 </tr>
 </tbody>
 </table>
-<h3 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>feat(database): add support for PostgreSQL extensions
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>fix(user): handle special characters in password generation
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>docs: update installation guide
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>test(e2e): add backup/restore tests
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Use custom ports (e.g., if default ports are in use)</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nv">E2E_POSTGRES_PORT</span><span class="o">=</span><span class="m">15432</span><span class="w"> </span>make<span class="w"> </span>e2e-local-postgresql
 </span></code></pre></div>
-<h2 id="pull-requests">Pull Requests<a class="headerlink" href="#pull-requests" title="Permanent link">&para;</a></h2>
-<h3 id="pr-title">PR Title<a class="headerlink" href="#pr-title" title="Permanent link">&para;</a></h3>
-<p>Follow conventional commit format:
-<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>feat(database): add support for schemas
-</span></code></pre></div></p>
-<h3 id="pr-description">PR Description<a class="headerlink" href="#pr-description" title="Permanent link">&para;</a></h3>
-<p>Use the template:</p>
-<div class="language-markdown highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="gu">## Description</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>Brief description of changes.
+<h3 id="operator-image">Operator Image<a class="headerlink" href="#operator-image" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Use different image name/tag</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nv">E2E_IMG</span><span class="o">=</span>my-operator:dev<span class="w"> </span>make<span class="w"> </span>e2e-local-postgresql
+</span></code></pre></div>
+<h3 id="k3d-cluster-name">k3d Cluster Name<a class="headerlink" href="#k3d-cluster-name" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Use different cluster name</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nv">E2E_K3D_CLUSTER</span><span class="o">=</span>my-cluster<span class="w"> </span>make<span class="w"> </span>e2e-local-postgresql
+</span></code></pre></div>
+<h2 id="available-makefile-targets">Available Makefile Targets<a class="headerlink" href="#available-makefile-targets" title="Permanent link">&para;</a></h2>
+<h3 id="micro-steps-called-by-ci">Micro-Steps (called by CI)<a class="headerlink" href="#micro-steps-called-by-ci" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Target</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>e2e-db-up</code></td>
+<td>Start databases via Docker Compose (with health checks, 180s timeout)</td>
+</tr>
+<tr>
+<td><code>e2e-db-down</code></td>
+<td>Stop databases and remove volumes</td>
+</tr>
+<tr>
+<td><code>e2e-cluster-create</code></td>
+<td>Create k3d cluster (idempotent)</td>
+</tr>
+<tr>
+<td><code>e2e-cluster-delete</code></td>
+<td>Delete k3d cluster</td>
+</tr>
+<tr>
+<td><code>e2e-docker-build</code></td>
+<td>Build operator Docker image</td>
+</tr>
+<tr>
+<td><code>e2e-image-load</code></td>
+<td>Load image into k3d</td>
+</tr>
+<tr>
+<td><code>e2e-install-crds</code></td>
+<td>Install CRDs</td>
+</tr>
+<tr>
+<td><code>e2e-deploy-operator</code></td>
+<td>Deploy operator</td>
+</tr>
+<tr>
+<td><code>e2e-create-db-instance</code></td>
+<td>Create DatabaseInstance CR</td>
+</tr>
+<tr>
+<td><code>e2e-local-run-tests</code></td>
+<td>Run E2E tests</td>
+</tr>
+</tbody>
+</table>
+<h3 id="unified-targets">Unified Targets<a class="headerlink" href="#unified-targets" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Target</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>e2e-local-setup</code></td>
+<td>Full setup (DBs + k3d + operator)</td>
+</tr>
+<tr>
+<td><code>e2e-local-postgresql</code></td>
+<td>Setup + PostgreSQL tests</td>
+</tr>
+<tr>
+<td><code>e2e-local-mysql</code></td>
+<td>Setup + MySQL tests</td>
+</tr>
+<tr>
+<td><code>e2e-local-mariadb</code></td>
+<td>Setup + MariaDB tests</td>
+</tr>
+<tr>
+<td><code>e2e-local-all</code></td>
+<td>Setup + all database tests</td>
+</tr>
+<tr>
+<td><code>e2e-local-cleanup</code></td>
+<td>Clean up everything</td>
+</tr>
+</tbody>
+</table>
+<h2 id="debugging">Debugging<a class="headerlink" href="#debugging" title="Permanent link">&para;</a></h2>
+<h3 id="view-operator-logs">View Operator Logs<a class="headerlink" href="#view-operator-logs" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system<span class="w"> </span>-l<span class="w"> </span>control-plane<span class="o">=</span>controller-manager<span class="w"> </span>-f
+</span></code></pre></div>
+<h3 id="check-database-health">Check Database Health<a class="headerlink" href="#check-database-health" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># View Docker Compose service status</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.e2e.yml<span class="w"> </span>ps
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># View logs for a specific database</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.e2e.yml<span class="w"> </span>logs<span class="w"> </span>postgres
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.e2e.yml<span class="w"> </span>logs<span class="w"> </span>mysql
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.e2e.yml<span class="w"> </span>logs<span class="w"> </span>mariadb
+</span></code></pre></div>
+<h3 id="connect-to-database-directly">Connect to Database Directly<a class="headerlink" href="#connect-to-database-directly" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># PostgreSQL</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>psql<span class="w"> </span>-h<span class="w"> </span>localhost<span class="w"> </span>-p<span class="w"> </span><span class="si">${</span><span class="nv">E2E_POSTGRES_PORT</span><span class="k">:-</span><span class="nv">5432</span><span class="si">}</span><span class="w"> </span>-U<span class="w"> </span>dbprovision_admin<span class="w"> </span>-d<span class="w"> </span>postgres
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># MySQL</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>mysql<span class="w"> </span>-h<span class="w"> </span><span class="m">127</span>.0.0.1<span class="w"> </span>-P<span class="w"> </span><span class="si">${</span><span class="nv">E2E_MYSQL_PORT</span><span class="k">:-</span><span class="nv">3306</span><span class="si">}</span><span class="w"> </span>-u<span class="w"> </span>root<span class="w"> </span>-prootpassword123
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># MariaDB</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>mysql<span class="w"> </span>-h<span class="w"> </span><span class="m">127</span>.0.0.1<span class="w"> </span>-P<span class="w"> </span><span class="si">${</span><span class="nv">E2E_MARIADB_PORT</span><span class="k">:-</span><span class="nv">3307</span><span class="si">}</span><span class="w"> </span>-u<span class="w"> </span>root<span class="w"> </span>-prootpassword123
+</span></code></pre></div>
+<h3 id="inspect-crs">Inspect CRs<a class="headerlink" href="#inspect-crs" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># List all database-related CRs</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>kubectl<span class="w"> </span>get<span class="w"> </span>databaseinstances,databases,databaseusers<span class="w"> </span>-A
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="gu">## Type of Change</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="k">- [ ]</span> Bug fix
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="k">- [ ]</span> New feature
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="k">- [ ]</span> Breaking change
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="k">- [ ]</span> Documentation update
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>
-</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="gu">## Testing</span>
-</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="k">- [ ]</span> Unit tests added/updated
-</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="k">- [ ]</span> E2E tests added/updated
-</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="k">- [ ]</span> Manual testing performed
-</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>
-</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="gu">## Checklist</span>
-</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="k">- [ ]</span> Code follows style guidelines
-</span><span id="__span-9-17"><a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="k">- [ ]</span> Self-review completed
-</span><span id="__span-9-18"><a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="k">- [ ]</span> Documentation updated
-</span><span id="__span-9-19"><a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="k">- [ ]</span> Tests pass
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># Describe a specific DatabaseInstance</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>kubectl<span class="w"> </span>describe<span class="w"> </span>databaseinstance<span class="w"> </span>postgres-instance<span class="w"> </span>-n<span class="w"> </span>postgresql
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="c1"># Check events</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>kubectl<span class="w"> </span>get<span class="w"> </span>events<span class="w"> </span>-n<span class="w"> </span>postgresql<span class="w"> </span>--sort-by<span class="o">=</span><span class="s1">&#39;.lastTimestamp&#39;</span>
 </span></code></pre></div>
-<h3 id="review-process">Review Process<a class="headerlink" href="#review-process" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Automated checks must pass</li>
-<li>At least one maintainer approval</li>
-<li>All conversations resolved</li>
-<li>Squash and merge</li>
-</ol>
-<h2 id="adding-new-features">Adding New Features<a class="headerlink" href="#adding-new-features" title="Permanent link">&para;</a></h2>
-<h3 id="adding-a-new-crd">Adding a New CRD<a class="headerlink" href="#adding-a-new-crd" title="Permanent link">&para;</a></h3>
-<ol>
-<li>
-<p>Define API in <code>api/v1alpha1/</code>:
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>kubebuilder<span class="w"> </span>create<span class="w"> </span>api<span class="w"> </span>--group<span class="w"> </span>dbops<span class="w"> </span>--version<span class="w"> </span>v1alpha1<span class="w"> </span>--kind<span class="w"> </span>NewResource
-</span></code></pre></div></p>
-</li>
-<li>
-<p>Implement types in <code>*_types.go</code></p>
-</li>
-<li>
-<p>Generate manifests:
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>make<span class="w"> </span>generate
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>make<span class="w"> </span>manifests
-</span></code></pre></div></p>
-</li>
-<li>
-<p>Implement controller in <code>internal/controller/</code></p>
-</li>
-<li>
-<p>Add tests</p>
-</li>
-<li>
-<p>Update documentation</p>
-</li>
-</ol>
-<h3 id="adding-database-engine-support">Adding Database Engine Support<a class="headerlink" href="#adding-database-engine-support" title="Permanent link">&para;</a></h3>
-<ol>
-<li>
-<p>Implement <code>DatabaseEngine</code> interface in <code>internal/database/</code></p>
-</li>
-<li>
-<p>Add engine-specific options to API types</p>
-</li>
-<li>
-<p>Register engine in factory</p>
-</li>
-<li>
-<p>Add tests for new engine</p>
-</li>
-<li>
-<p>Add documentation</p>
-</li>
-</ol>
-<h2 id="testing-guidelines">Testing Guidelines<a class="headerlink" href="#testing-guidelines" title="Permanent link">&para;</a></h2>
-<h3 id="unit-tests">Unit Tests<a class="headerlink" href="#unit-tests" title="Permanent link">&para;</a></h3>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kd">func</span><span class="w"> </span><span class="nx">TestCreateDatabase</span><span class="p">(</span><span class="nx">t</span><span class="w"> </span><span class="o">*</span><span class="nx">testing</span><span class="p">.</span><span class="nx">T</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">    </span><span class="c1">// Setup</span>
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">    </span><span class="nx">db</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">Database</span><span class="p">{</span><span class="o">...</span><span class="p">}</span>
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">    </span><span class="c1">// Execute</span>
-</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">    </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">createDatabase</span><span class="p">(</span><span class="nx">db</span><span class="p">)</span>
-</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>
-</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">    </span><span class="c1">// Assert</span>
-</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="w">    </span><span class="nx">assert</span><span class="p">.</span><span class="nx">NoError</span><span class="p">(</span><span class="nx">t</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
-</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="p">}</span>
+<h3 id="verify-k3d-to-docker-host-connectivity">Verify k3d to Docker Host Connectivity<a class="headerlink" href="#verify-k3d-to-docker-host-connectivity" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Run a test pod to verify host.k3d.internal resolves correctly</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>kubectl<span class="w"> </span>run<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--rm<span class="w"> </span>-it<span class="w"> </span>--image<span class="o">=</span>busybox<span class="w"> </span>--<span class="w"> </span>nslookup<span class="w"> </span>host.k3d.internal
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="c1"># Test TCP connectivity to PostgreSQL</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>kubectl<span class="w"> </span>run<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--rm<span class="w"> </span>-it<span class="w"> </span>--image<span class="o">=</span>busybox<span class="w"> </span>--<span class="w"> </span>nc<span class="w"> </span>-zv<span class="w"> </span>host.k3d.internal<span class="w"> </span><span class="m">5432</span>
 </span></code></pre></div>
-<h3 id="integration-tests">Integration Tests<a class="headerlink" href="#integration-tests" title="Permanent link">&para;</a></h3>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kd">var</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">Describe</span><span class="p">(</span><span class="s">&quot;Database Controller&quot;</span><span class="p">,</span><span class="w"> </span><span class="kd">func</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span><span class="nx">Context</span><span class="p">(</span><span class="s">&quot;When creating Database&quot;</span><span class="p">,</span><span class="w"> </span><span class="kd">func</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">        </span><span class="nx">It</span><span class="p">(</span><span class="s">&quot;Should create database in instance&quot;</span><span class="p">,</span><span class="w"> </span><span class="kd">func</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">            </span><span class="c1">// Test code</span>
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">        </span><span class="p">})</span>
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">    </span><span class="p">})</span>
-</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="p">})</span>
+<h2 id="cleanup">Cleanup<a class="headerlink" href="#cleanup" title="Permanent link">&para;</a></h2>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Full cleanup (cluster + databases)</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>make<span class="w"> </span>e2e-local-cleanup
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1"># Or individually</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>make<span class="w"> </span>e2e-cluster-delete<span class="w">  </span><span class="c1"># Delete k3d cluster only</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>make<span class="w"> </span>e2e-db-down<span class="w">         </span><span class="c1"># Stop databases only</span>
 </span></code></pre></div>
-<h3 id="e2e-tests">E2E Tests<a class="headerlink" href="#e2e-tests" title="Permanent link">&para;</a></h3>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kd">var</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">Describe</span><span class="p">(</span><span class="s">&quot;Database E2E&quot;</span><span class="p">,</span><span class="w"> </span><span class="kd">func</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">    </span><span class="nx">It</span><span class="p">(</span><span class="s">&quot;Should create and delete database&quot;</span><span class="p">,</span><span class="w"> </span><span class="kd">func</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">        </span><span class="c1">// Create instance</span>
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">        </span><span class="c1">// Create database</span>
-</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">        </span><span class="c1">// Verify database exists</span>
-</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">        </span><span class="c1">// Delete database</span>
-</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">        </span><span class="c1">// Verify database removed</span>
-</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="w">    </span><span class="p">})</span>
-</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="p">})</span>
+<h2 id="ci-consistency">CI Consistency<a class="headerlink" href="#ci-consistency" title="Permanent link">&para;</a></h2>
+<p>Local and CI use the <strong>exact same Makefile targets</strong>. This ensures what works locally will work in CI.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># CI workflow calls the same targets:</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make e2e-db-up</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make e2e-cluster-create</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make e2e-docker-build</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make e2e-image-load</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make e2e-install-crds</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make e2e-deploy-operator</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make e2e-create-db-instance E2E_DATABASE=${{ matrix.database }}</span>
+</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make e2e-local-run-tests E2E_DATABASE=${{ matrix.database }}</span>
 </span></code></pre></div>
-<h2 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h2>
-<h3 id="code-documentation">Code Documentation<a class="headerlink" href="#code-documentation" title="Permanent link">&para;</a></h3>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1">// CreateDatabase creates a new database in the instance.</span>
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="c1">// It returns an error if the database already exists or</span>
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="c1">// if the connection to the instance fails.</span>
-</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="kd">func</span><span class="w"> </span><span class="nx">CreateDatabase</span><span class="p">(</span><span class="nx">ctx</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span><span class="w"> </span><span class="nx">db</span><span class="w"> </span><span class="o">*</span><span class="nx">Database</span><span class="p">)</span><span class="w"> </span><span class="kt">error</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">    </span><span class="c1">// ...</span>
-</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="p">}</span>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="hostk3dinternal-not-resolving">"host.k3d.internal" not resolving<a class="headerlink" href="#hostk3dinternal-not-resolving" title="Permanent link">&para;</a></h3>
+<p>This hostname is automatically configured by k3d. If it's not resolving:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Verify the cluster was created correctly</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>k3d<span class="w"> </span>cluster<span class="w"> </span>list
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1"># Check k3d version (should be recent)</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>k3d<span class="w"> </span>version
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="c1"># Recreate the cluster</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>make<span class="w"> </span>e2e-cluster-delete
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>make<span class="w"> </span>e2e-cluster-create
 </span></code></pre></div>
-<h3 id="user-documentation">User Documentation<a class="headerlink" href="#user-documentation" title="Permanent link">&para;</a></h3>
-<p>Update docs in <code>docs/</code> directory when:
-- Adding new features
-- Changing API
-- Adding new CRDs
-- Changing behavior</p>
-<h2 id="release-process">Release Process<a class="headerlink" href="#release-process" title="Permanent link">&para;</a></h2>
-<p>Releases are automated via GitHub Actions:</p>
-<ol>
-<li>Create tag: <code>git tag v1.2.3</code></li>
-<li>Push tag: <code>git push origin v1.2.3</code></li>
-<li>GitHub Actions builds and releases</li>
-</ol>
-<h2 id="getting-help">Getting Help<a class="headerlink" href="#getting-help" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>Questions:</strong> Open a GitHub Discussion</li>
-<li><strong>Bugs:</strong> Open a GitHub Issue</li>
-<li><strong>Security:</strong> Email <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#101;&#99;&#117;&#114;&#105;&#116;&#121;&#64;&#101;&#120;&#97;&#109;&#112;&#108;&#101;&#46;&#99;&#111;&#109;">&#115;&#101;&#99;&#117;&#114;&#105;&#116;&#121;&#64;&#101;&#120;&#97;&#109;&#112;&#108;&#101;&#46;&#99;&#111;&#109;</a></li>
-</ul>
-<h2 id="code-of-conduct">Code of Conduct<a class="headerlink" href="#code-of-conduct" title="Permanent link">&para;</a></h2>
-<p>Be respectful and inclusive. See <a href="https://github.com/panteparak/db-provision-operator/blob/main/CODE_OF_CONDUCT.md">CODE_OF_CONDUCT.md</a>.</p>
+<h3 id="database-connection-refused">Database connection refused<a class="headerlink" href="#database-connection-refused" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Check if containers are running</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.e2e.yml<span class="w"> </span>ps
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1"># Check container logs</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.e2e.yml<span class="w"> </span>logs<span class="w"> </span>postgres
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="c1"># Verify health check passed</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>docker<span class="w"> </span>inspect<span class="w"> </span>--format<span class="o">=</span><span class="s1">&#39;{{.State.Health.Status}}&#39;</span><span class="w"> </span>db-provision-operator-postgres-1
+</span></code></pre></div>
+<h3 id="operator-not-starting">Operator not starting<a class="headerlink" href="#operator-not-starting" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># Check deployment status</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>kubectl<span class="w"> </span>describe<span class="w"> </span>deployment<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system<span class="w"> </span>db-provision-operator-controller-manager
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="c1"># Check pod logs</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system<span class="w"> </span>-l<span class="w"> </span>control-plane<span class="o">=</span>controller-manager<span class="w"> </span>--tail<span class="o">=</span><span class="m">100</span>
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="c1"># Check if image was loaded into k3d</span>
+</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>k3d-dbprov-e2e-server-0<span class="w"> </span>crictl<span class="w"> </span>images<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>db-provision-operator
+</span></code></pre></div>
+<h3 id="tests-timing-out">Tests timing out<a class="headerlink" href="#tests-timing-out" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Increase test timeout</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>go<span class="w"> </span><span class="nb">test</span><span class="w"> </span>./test/e2e/...<span class="w"> </span>-v<span class="w"> </span>-tags<span class="o">=</span>e2e<span class="w"> </span>-timeout<span class="o">=</span>20m
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="c1"># Run a specific test</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>go<span class="w"> </span><span class="nb">test</span><span class="w"> </span>./test/e2e/...<span class="w"> </span>-v<span class="w"> </span>-tags<span class="o">=</span>e2e<span class="w"> </span>-ginkgo.focus<span class="o">=</span><span class="s2">&quot;should create database&quot;</span><span class="w"> </span>-timeout<span class="o">=</span>10m
+</span></code></pre></div>
+<h3 id="port-already-in-use">Port already in use<a class="headerlink" href="#port-already-in-use" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Check what&#39;s using the port</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>lsof<span class="w"> </span>-i<span class="w"> </span>:5432
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="c1"># Use different ports</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="nv">E2E_POSTGRES_PORT</span><span class="o">=</span><span class="m">15432</span><span class="w"> </span><span class="nv">E2E_MYSQL_PORT</span><span class="o">=</span><span class="m">13306</span><span class="w"> </span><span class="nv">E2E_MARIADB_PORT</span><span class="o">=</span><span class="m">13307</span><span class="w"> </span>make<span class="w"> </span>e2e-local-postgresql
+</span></code></pre></div>
+<h2 id="file-structure">File Structure<a class="headerlink" href="#file-structure" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>db-provision-operator/
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>├── docker-compose.e2e.yml           # Database services for E2E
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>├── test/e2e/
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>│   ├── fixtures/
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>│   │   ├── postgres-init/           # PostgreSQL init scripts
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>│   │   │   └── 01-create-admin.sql
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>│   │   ├── mysql-init/              # MySQL init scripts
+</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>│   │   │   └── 01-create-admin.sql
+</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>│   │   ├── mariadb-init/            # MariaDB init scripts
+</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>│   │   │   └── 01-create-admin.sql
+</span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>│   │   ├── postgresql-local.yaml    # DatabaseInstance for local testing
+</span><span id="__span-18-12"><a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a>│   │   ├── mysql-local.yaml
+</span><span id="__span-18-13"><a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a>│   │   └── mariadb-local.yaml
+</span><span id="__span-18-14"><a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a>│   └── *.go                         # E2E test files
+</span><span id="__span-18-15"><a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a>└── Makefile                         # E2E targets
+</span></code></pre></div>
 
 
 
@@ -3364,7 +3203,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../" class="md-footer__link md-footer__link--prev" aria-label="Previous: Overview">
+          <a href="../testing/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Testing">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -3374,20 +3213,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Overview
+                Testing
               </div>
             </div>
           </a>
         
         
           
-          <a href="../testing/" class="md-footer__link md-footer__link--next" aria-label="Next: Testing">
+          <a href="../ci-cd/" class="md-footer__link md-footer__link--next" aria-label="Next: CI/CD">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Testing
+                CI/CD
               </div>
             </div>
             <div class="md-footer__button md-icon">

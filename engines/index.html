@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://panteparak.github.io/db-provision-operator/engines/">
       
       
-        <link rel="prev" href="../user-guide/backups/">
+        <link rel="prev" href="../user-guide/deletion-protection/">
       
       
         <link rel="next" href="postgresql/">
@@ -869,6 +869,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/drift-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/deletion-protection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deletion Protection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1066,6 +1122,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#cockroachdb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CockroachDB
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1099,6 +1166,17 @@
     <span class="md-ellipsis">
       
         MySQL/MariaDB
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cockroachdb_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CockroachDB
       
     </span>
   </a>
@@ -1212,6 +1290,34 @@
     
   
     MariaDB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="cockroachdb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CockroachDB
   
 
     
@@ -1446,6 +1552,62 @@
     
   
     MySQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/cockroachdb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CockroachDB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/drift-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Detection
   
 
     
@@ -1812,6 +1974,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../operations/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../operations/troubleshooting/" class="md-nav__link">
         
   
@@ -1965,6 +2155,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/e2e-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E2E Testing
   
 
     
@@ -2162,6 +2380,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#cockroachdb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CockroachDB
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2195,6 +2424,17 @@
     <span class="md-ellipsis">
       
         MySQL/MariaDB
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cockroachdb_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CockroachDB
       
     </span>
   </a>
@@ -2275,6 +2515,11 @@
 <td>✅ Stable</td>
 <td>10.5, 10.6, 10.11, 11.x</td>
 </tr>
+<tr>
+<td><a href="cockroachdb/">CockroachDB</a></td>
+<td>✅ Stable</td>
+<td>22.x, 23.x, 24.x</td>
+</tr>
 </tbody>
 </table>
 <h2 id="engine-comparison">Engine Comparison<a class="headerlink" href="#engine-comparison" title="Permanent link">&para;</a></h2>
@@ -2285,6 +2530,7 @@
 <th>PostgreSQL</th>
 <th>MySQL</th>
 <th>MariaDB</th>
+<th>CockroachDB</th>
 </tr>
 </thead>
 <tbody>
@@ -2293,10 +2539,12 @@
 <td>✅ Native</td>
 <td>✅ 8.0+</td>
 <td>✅ 10.0.5+</td>
+<td>✅ Native</td>
 </tr>
 <tr>
 <td>Row-Level Security</td>
 <td>✅</td>
+<td>❌</td>
 <td>❌</td>
 <td>❌</td>
 </tr>
@@ -2305,10 +2553,12 @@
 <td>✅</td>
 <td>❌</td>
 <td>❌</td>
+<td>❌</td>
 </tr>
 <tr>
 <td>Schemas</td>
 <td>✅</td>
+<td>❌</td>
 <td>❌</td>
 <td>❌</td>
 </tr>
@@ -2317,12 +2567,28 @@
 <td>✅</td>
 <td>❌</td>
 <td>❌</td>
+<td>❌</td>
 </tr>
 <tr>
 <td>Backup</td>
 <td>pg_dump</td>
 <td>mysqldump</td>
 <td>mariadb-dump</td>
+<td>Native BACKUP</td>
+</tr>
+<tr>
+<td>Multi-Region</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>✅ Built-in</td>
+</tr>
+<tr>
+<td>Distributed</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>✅ Built-in</td>
 </tr>
 </tbody>
 </table>
@@ -2352,6 +2618,15 @@
 <li>Additional storage engines</li>
 <li>Galera cluster support</li>
 </ul>
+<h3 id="cockroachdb">CockroachDB<a class="headerlink" href="#cockroachdb" title="Permanent link">&para;</a></h3>
+<p>Best for:</p>
+<ul>
+<li>Distributed SQL requirements</li>
+<li>Multi-region deployments</li>
+<li>Horizontal scalability</li>
+<li>PostgreSQL wire compatibility</li>
+<li>Strong consistency guarantees</li>
+</ul>
 <h2 id="engine-specific-features">Engine-Specific Features<a class="headerlink" href="#engine-specific-features" title="Permanent link">&para;</a></h2>
 <h3 id="postgresql-only">PostgreSQL Only<a class="headerlink" href="#postgresql-only" title="Permanent link">&para;</a></h3>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">spec</span><span class="p">:</span>
@@ -2375,26 +2650,41 @@
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="nt">allowedHosts</span><span class="p">:</span>
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;10.0.0.%&quot;</span>
 </span></code></pre></div>
+<h3 id="cockroachdb_1">CockroachDB<a class="headerlink" href="#cockroachdb_1" title="Permanent link">&para;</a></h3>
+<p>CockroachDB uses PostgreSQL wire protocol but has a simpler configuration:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">spec</span><span class="p">:</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cockroachdb</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">connection</span><span class="p">:</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cockroachdb.example.com</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">26257</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="nt">database</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">defaultdb</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">sslMode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verify-full</span><span class="w">  </span><span class="c1"># or disable for insecure mode</span>
+</span></code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">No Extensions or Schemas</p>
+<p>CockroachDB does not support PostgreSQL extensions or custom schemas. Use it for distributed SQL without PostgreSQL-specific features.</p>
+</div>
 <h2 id="connection-configuration">Connection Configuration<a class="headerlink" href="#connection-configuration" title="Permanent link">&para;</a></h2>
 <p>All engines use the same <code>DatabaseInstance</code> structure:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dbops.dbprovision.io/v1alpha1</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DatabaseInstance</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">metadata</span><span class="p">:</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-database</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="nt">spec</span><span class="p">:</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span><span class="w">  </span><span class="c1"># or mysql, mariadb</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="nt">connection</span><span class="p">:</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">database.example.com</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5432</span><span class="w">  </span><span class="c1"># 3306 for MySQL/MariaDB</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="nt">database</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span><span class="w">  </span><span class="c1"># mysql for MySQL/MariaDB</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="nt">secretRef</span><span class="p">:</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">admin-credentials</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dbops.dbprovision.io/v1alpha1</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DatabaseInstance</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">metadata</span><span class="p">:</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-database</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="nt">spec</span><span class="p">:</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span><span class="w">  </span><span class="c1"># or mysql, mariadb, cockroachdb</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">connection</span><span class="p">:</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">database.example.com</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5432</span><span class="w">  </span><span class="c1"># 3306 for MySQL/MariaDB, 26257 for CockroachDB</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nt">database</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span><span class="w">  </span><span class="c1"># mysql for MySQL/MariaDB, defaultdb for CockroachDB</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">    </span><span class="nt">secretRef</span><span class="p">:</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">admin-credentials</span>
 </span></code></pre></div>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="postgresql/">PostgreSQL Guide</a> - PostgreSQL-specific features</li>
 <li><a href="mysql/">MySQL Guide</a> - MySQL-specific features</li>
 <li><a href="mariadb/">MariaDB Guide</a> - MariaDB-specific features</li>
+<li><a href="cockroachdb/">CockroachDB Guide</a> - CockroachDB-specific features</li>
 </ul>
 
 
@@ -2433,7 +2723,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../user-guide/backups/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Backups">
+          <a href="../user-guide/deletion-protection/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Deletion Protection">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2443,7 +2733,7 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Backups
+                Deletion Protection
               </div>
             </div>
           </a>
