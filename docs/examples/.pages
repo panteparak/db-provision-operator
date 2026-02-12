@@ -3,4 +3,6 @@ nav:
   - Overview: index.md
   - PostgreSQL: postgresql.md
   - MySQL: mysql.md
+  - CockroachDB: cockroachdb.md
+  - Drift Detection: drift-detection.md
   - Advanced: advanced.md

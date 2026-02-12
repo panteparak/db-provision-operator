@@ -7,3 +7,5 @@ nav:
   - Roles: roles.md
   - Grants: grants.md
   - Backups: backups.md
+  - Drift Detection: drift-detection.md
+  - Deletion Protection: deletion-protection.md

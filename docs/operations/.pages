@@ -3,4 +3,5 @@ nav:
   - Overview: index.md
   - Admin Account Setup: admin-account-setup.md
   - Monitoring: monitoring.md
+  - Events: events.md
   - Troubleshooting: troubleshooting.md

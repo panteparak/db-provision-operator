@@ -4,3 +4,4 @@ nav:
   - PostgreSQL: postgresql.md
   - MySQL: mysql.md
   - MariaDB: mariadb.md
+  - CockroachDB: cockroachdb.md
