@@ -157,7 +157,7 @@ func TestDatabaseValidation(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: DatabaseSpec{
-					InstanceRef:    InstanceReference{Name: "test-instance"},
+					InstanceRef:    &InstanceReference{Name: "test-instance"},
 					Name:           "valid_db",
 					DeletionPolicy: DeletionPolicyRetain,
 				},
@@ -172,7 +172,7 @@ func TestDatabaseValidation(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: DatabaseSpec{
-					InstanceRef:    InstanceReference{Name: "test-instance"},
+					InstanceRef:    &InstanceReference{Name: "test-instance"},
 					Name:           "valid_db",
 					DeletionPolicy: DeletionPolicyDelete,
 				},
