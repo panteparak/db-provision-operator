@@ -22,6 +22,7 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/service/drift"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 )
 
 // API defines the public interface for the grant module.
@@ -36,7 +37,11 @@ type API interface {
 	Exists(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (bool, error)
 
 	// GetInstance returns the DatabaseInstance for a given spec.
+	// Deprecated: Use ResolveInstance instead, which supports both DatabaseInstance and ClusterDatabaseInstance.
 	GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error)
+
+	// ResolveInstance resolves the instance reference via the user's instanceRef or clusterInstanceRef.
+	ResolveInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*instanceresolver.ResolvedInstance, error)
 
 	// DetectDrift compares the CR spec to the actual grant state and returns any differences.
 	DetectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, allowDestructive bool) (*drift.Result, error)
@@ -70,7 +75,11 @@ type RepositoryInterface interface {
 	GetUser(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*dbopsv1alpha1.DatabaseUser, error)
 
 	// GetInstance returns the DatabaseInstance for a given spec.
+	// Deprecated: Use ResolveInstance instead, which supports both DatabaseInstance and ClusterDatabaseInstance.
 	GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error)
+
+	// ResolveInstance resolves the instance reference via the user's instanceRef or clusterInstanceRef.
+	ResolveInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*instanceresolver.ResolvedInstance, error)
 
 	// GetEngine returns the database engine type for a given spec.
 	GetEngine(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (string, error)

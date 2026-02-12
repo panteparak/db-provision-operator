@@ -22,6 +22,7 @@ import (
 	"time"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 )
 
 // API defines the public interface for the backup module.
@@ -97,7 +98,11 @@ type RepositoryInterface interface {
 	GetDatabase(ctx context.Context, backup *dbopsv1alpha1.DatabaseBackup) (*dbopsv1alpha1.Database, error)
 
 	// GetInstance retrieves the DatabaseInstance for a database.
+	// Deprecated: Use ResolveInstanceForDatabase instead, which supports both DatabaseInstance and ClusterDatabaseInstance.
 	GetInstance(ctx context.Context, database *dbopsv1alpha1.Database) (*dbopsv1alpha1.DatabaseInstance, error)
+
+	// ResolveInstanceForDatabase resolves the instance for a database (supports both instanceRef and clusterInstanceRef).
+	ResolveInstanceForDatabase(ctx context.Context, database *dbopsv1alpha1.Database) (*instanceresolver.ResolvedInstance, error)
 
 	// GetEngine returns the database engine type for a backup.
 	GetEngine(ctx context.Context, backup *dbopsv1alpha1.DatabaseBackup) (string, error)

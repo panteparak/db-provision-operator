@@ -57,6 +57,16 @@ spec:
           spec:
             description: DatabaseSpec defines the desired state of Database.
             properties:
+              clusterInstanceRef:
+                description: ClusterInstanceRef references a cluster-scoped ClusterDatabaseInstance
+                  (mutually exclusive with InstanceRef)
+                properties:
+                  name:
+                    description: Name of the ClusterDatabaseInstance
+                    type: string
+                required:
+                - name
+                type: object
               deletionPolicy:
                 allOf:
                 - enum:
@@ -100,7 +110,8 @@ spec:
                     type: string
                 type: object
               instanceRef:
-                description: InstanceRef references the DatabaseInstance to use
+                description: InstanceRef references a namespaced DatabaseInstance
+                  (mutually exclusive with ClusterInstanceRef)
                 properties:
                   name:
                     description: Name of the DatabaseInstance
@@ -253,9 +264,13 @@ spec:
                     type: string
                 type: object
             required:
-            - instanceRef
             - name
             type: object
+            x-kubernetes-validations:
+            - message: either instanceRef or clusterInstanceRef must be specified
+              rule: has(self.instanceRef) || has(self.clusterInstanceRef)
+            - message: instanceRef and clusterInstanceRef are mutually exclusive
+              rule: '!(has(self.instanceRef) && has(self.clusterInstanceRef))'
           status:
             description: DatabaseStatus defines the observed state of Database.
             properties:

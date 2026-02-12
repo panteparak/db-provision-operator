@@ -50,7 +50,7 @@ func newTestRole(name, namespace string) *dbopsv1alpha1.DatabaseRole {
 		},
 		Spec: dbopsv1alpha1.DatabaseRoleSpec{
 			RoleName: name,
-			InstanceRef: dbopsv1alpha1.InstanceReference{
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
 				Name: "test-instance",
 			},
 		},

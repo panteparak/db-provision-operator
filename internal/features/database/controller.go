@@ -34,6 +34,7 @@ import (
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/logging"
 	"github.com/db-provision-operator/internal/reconcileutil"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -170,15 +171,15 @@ func (c *Controller) reconcile(ctx context.Context, database *dbopsv1alpha1.Data
 		log.Error(err, "Failed to get database info")
 	}
 
-	// 7. Get instance for drift detection
-	instance, err := c.handler.GetInstance(ctx, &database.Spec, database.Namespace)
+	// 7. Resolve instance for drift detection
+	resolved, err := c.handler.ResolveInstance(ctx, &database.Spec, database.Namespace)
 	if err != nil {
-		log.Error(err, "Failed to get instance for drift detection")
+		log.Error(err, "Failed to resolve instance for drift detection")
 		// Continue anyway, drift detection will use defaults
 	}
 
 	// 8. Perform drift detection
-	c.performDriftDetection(ctx, database, instance)
+	c.performDriftDetection(ctx, database, resolved)
 
 	// 9. Update status to Ready
 	database.Status.Phase = dbopsv1alpha1.PhaseReady
@@ -306,11 +307,11 @@ func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
 
 // performDriftDetection detects and optionally corrects drift for the database.
 // It uses the drift policy from the database spec or falls back to the instance's default policy.
-func (c *Controller) performDriftDetection(ctx context.Context, database *dbopsv1alpha1.Database, instance *dbopsv1alpha1.DatabaseInstance) {
+func (c *Controller) performDriftDetection(ctx context.Context, database *dbopsv1alpha1.Database, resolved *instanceresolver.ResolvedInstance) {
 	log := logf.FromContext(ctx).WithValues("database", database.Name, "namespace", database.Namespace)
 
 	// 1. Get effective drift policy
-	policy := c.getEffectiveDriftPolicy(database, instance)
+	policy := c.getEffectiveDriftPolicy(database, resolved)
 	if policy.Mode == dbopsv1alpha1.DriftModeIgnore {
 		log.V(1).Info("Drift detection disabled (mode=ignore)")
 		return
@@ -414,15 +415,15 @@ func (c *Controller) correctDrift(ctx context.Context, database *dbopsv1alpha1.D
 
 // getEffectiveDriftPolicy returns the effective drift policy for a database.
 // It uses the database's drift policy if set, otherwise falls back to the instance's default.
-func (c *Controller) getEffectiveDriftPolicy(database *dbopsv1alpha1.Database, instance *dbopsv1alpha1.DatabaseInstance) dbopsv1alpha1.DriftPolicy {
+func (c *Controller) getEffectiveDriftPolicy(database *dbopsv1alpha1.Database, resolved *instanceresolver.ResolvedInstance) dbopsv1alpha1.DriftPolicy {
 	// Use database-level policy if set
 	if database.Spec.DriftPolicy != nil {
 		return *database.Spec.DriftPolicy
 	}
 
 	// Fall back to instance-level policy if available
-	if instance != nil && instance.Spec.DriftPolicy != nil {
-		return *instance.Spec.DriftPolicy
+	if resolved != nil && resolved.Spec != nil && resolved.Spec.DriftPolicy != nil {
+		return *resolved.Spec.DriftPolicy
 	}
 
 	// Default policy: detect mode, 5 minute interval

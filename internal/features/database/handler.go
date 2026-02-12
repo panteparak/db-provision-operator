@@ -28,6 +28,7 @@ import (
 	"github.com/db-provision-operator/internal/metrics"
 	"github.com/db-provision-operator/internal/service/drift"
 	"github.com/db-provision-operator/internal/shared/eventbus"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 )
 
 // Handler contains the business logic for database operations.
@@ -64,8 +65,17 @@ func (h *Handler) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, 
 		return nil, fmt.Errorf("database name is required")
 	}
 
-	if spec.InstanceRef.Name == "" {
+	// Validate that either instanceRef or clusterInstanceRef is set
+	if spec.InstanceRef == nil && spec.ClusterInstanceRef == nil {
+		return nil, fmt.Errorf("either instanceRef or clusterInstanceRef is required")
+	}
+
+	// Validate that the reference has a name
+	if spec.InstanceRef != nil && spec.InstanceRef.Name == "" {
 		return nil, fmt.Errorf("instanceRef.name is required")
+	}
+	if spec.ClusterInstanceRef != nil && spec.ClusterInstanceRef.Name == "" {
+		return nil, fmt.Errorf("clusterInstanceRef.name is required")
 	}
 
 	// Get engine type for metrics
@@ -104,9 +114,15 @@ func (h *Handler) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, 
 
 	// 4. Publish event for other modules
 	if result.Created && h.eventBus != nil {
+		instanceName := ""
+		if spec.InstanceRef != nil {
+			instanceName = spec.InstanceRef.Name
+		} else if spec.ClusterInstanceRef != nil {
+			instanceName = spec.ClusterInstanceRef.Name
+		}
 		h.eventBus.PublishAsync(ctx, eventbus.NewDatabaseCreated(
 			spec.Name,
-			spec.InstanceRef.Name,
+			instanceName,
 			namespace,
 			engine,
 		))
@@ -132,11 +148,19 @@ func (h *Handler) Update(ctx context.Context, name string, spec *dbopsv1alpha1.D
 		// Get engine for event
 		engine, _ := h.repo.GetEngine(ctx, spec, namespace)
 
+		// Get instance name for event
+		instanceName := ""
+		if spec.InstanceRef != nil {
+			instanceName = spec.InstanceRef.Name
+		} else if spec.ClusterInstanceRef != nil {
+			instanceName = spec.ClusterInstanceRef.Name
+		}
+
 		// Publish update event
 		if h.eventBus != nil {
 			h.eventBus.PublishAsync(ctx, eventbus.NewDatabaseUpdated(
 				name,
-				spec.InstanceRef.Name,
+				instanceName,
 				namespace,
 				[]string{"settings"},
 			))
@@ -162,10 +186,10 @@ func (h *Handler) Delete(ctx context.Context, name string, spec *dbopsv1alpha1.D
 	}
 
 	// Get instance name for metrics cleanup
-	instance, _ := h.repo.GetInstance(ctx, spec, namespace)
+	resolved, _ := h.repo.ResolveInstance(ctx, spec, namespace)
 	instanceName := ""
-	if instance != nil {
-		instanceName = instance.Name
+	if resolved != nil {
+		instanceName = resolved.Name
 	}
 
 	log.Info("Deleting database")
@@ -189,9 +213,10 @@ func (h *Handler) Delete(ctx context.Context, name string, spec *dbopsv1alpha1.D
 
 	// Publish event for other modules
 	if h.eventBus != nil {
+		// Use the instance name we already resolved above
 		h.eventBus.PublishAsync(ctx, eventbus.NewDatabaseDeleted(
 			name,
-			spec.InstanceRef.Name,
+			instanceName,
 			namespace,
 		))
 	}
@@ -226,10 +251,10 @@ func (h *Handler) UpdateDatabaseMetrics(ctx context.Context, name string, spec *
 
 	if info != nil {
 		engine, _ := h.repo.GetEngine(ctx, spec, namespace)
-		instance, _ := h.repo.GetInstance(ctx, spec, namespace)
+		resolved, _ := h.repo.ResolveInstance(ctx, spec, namespace)
 		instanceName := ""
-		if instance != nil {
-			instanceName = instance.Name
+		if resolved != nil {
+			instanceName = resolved.Name
 		}
 		metrics.SetDatabaseSize(name, instanceName, engine, namespace, float64(info.SizeBytes))
 	}
@@ -265,10 +290,18 @@ func (h *Handler) UpdateInfoMetric(database *dbopsv1alpha1.Database) {
 		phase = "Pending"
 	}
 
+	// Get instance name from either instanceRef or clusterInstanceRef
+	instanceName := ""
+	if database.Spec.InstanceRef != nil {
+		instanceName = database.Spec.InstanceRef.Name
+	} else if database.Spec.ClusterInstanceRef != nil {
+		instanceName = database.Spec.ClusterInstanceRef.Name
+	}
+
 	metrics.SetDatabaseInfo(
 		database.Name,
 		database.Namespace,
-		database.Spec.InstanceRef.Name,
+		instanceName,
 		database.Spec.Name,
 		phase,
 	)
@@ -280,9 +313,16 @@ func (h *Handler) CleanupInfoMetric(database *dbopsv1alpha1.Database) {
 }
 
 // GetInstance returns the DatabaseInstance for the given spec.
+// Deprecated: Use ResolveInstance instead, which supports both DatabaseInstance and ClusterDatabaseInstance.
 // Implements API.GetInstance
 func (h *Handler) GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
 	return h.repo.GetInstance(ctx, spec, namespace)
+}
+
+// ResolveInstance resolves the instance reference (supports both instanceRef and clusterInstanceRef).
+// Implements API.ResolveInstance
+func (h *Handler) ResolveInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (*instanceresolver.ResolvedInstance, error) {
+	return h.repo.ResolveInstance(ctx, spec, namespace)
 }
 
 // DetectDrift compares the CR spec to the actual database state and returns any differences.

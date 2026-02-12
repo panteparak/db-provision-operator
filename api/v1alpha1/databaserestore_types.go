@@ -77,10 +77,15 @@ type RestoreFromPath struct {
 }
 
 // RestoreTarget defines where to restore the backup
+// +kubebuilder:validation:XValidation:rule="!(has(self.instanceRef) && has(self.clusterInstanceRef))",message="instanceRef and clusterInstanceRef are mutually exclusive"
 type RestoreTarget struct {
-	// InstanceRef references the target DatabaseInstance
+	// InstanceRef references the target namespaced DatabaseInstance (mutually exclusive with ClusterInstanceRef)
 	// +optional
 	InstanceRef *InstanceReference `json:"instanceRef,omitempty"`
+
+	// ClusterInstanceRef references the target cluster-scoped ClusterDatabaseInstance (mutually exclusive with InstanceRef)
+	// +optional
+	ClusterInstanceRef *ClusterInstanceReference `json:"clusterInstanceRef,omitempty"`
 
 	// DatabaseName is the target database name (for restore to new database)
 	// +optional

@@ -179,6 +179,13 @@ type InstanceReference struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
+// ClusterInstanceReference references a cluster-scoped ClusterDatabaseInstance
+type ClusterInstanceReference struct {
+	// Name of the ClusterDatabaseInstance
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+}
+
 // DatabaseReference references a Database
 type DatabaseReference struct {
 	// Name of the Database resource

@@ -190,7 +190,7 @@ func (b *DatabaseBuilder) WithDatabaseName(name string) *DatabaseBuilder {
 
 // WithInstanceRef sets the instance reference.
 func (b *DatabaseBuilder) WithInstanceRef(name string) *DatabaseBuilder {
-	b.database.Spec.InstanceRef = dbopsv1alpha1.InstanceReference{
+	b.database.Spec.InstanceRef = &dbopsv1alpha1.InstanceReference{
 		Name: name,
 	}
 	return b
@@ -198,7 +198,7 @@ func (b *DatabaseBuilder) WithInstanceRef(name string) *DatabaseBuilder {
 
 // WithInstanceRefAndNamespace sets the instance reference with namespace.
 func (b *DatabaseBuilder) WithInstanceRefAndNamespace(name, namespace string) *DatabaseBuilder {
-	b.database.Spec.InstanceRef = dbopsv1alpha1.InstanceReference{
+	b.database.Spec.InstanceRef = &dbopsv1alpha1.InstanceReference{
 		Name:      name,
 		Namespace: namespace,
 	}
@@ -285,7 +285,7 @@ func (b *DatabaseUserBuilder) WithUsername(username string) *DatabaseUserBuilder
 
 // WithInstanceRef sets the instance reference.
 func (b *DatabaseUserBuilder) WithInstanceRef(name string) *DatabaseUserBuilder {
-	b.user.Spec.InstanceRef = dbopsv1alpha1.InstanceReference{
+	b.user.Spec.InstanceRef = &dbopsv1alpha1.InstanceReference{
 		Name: name,
 	}
 	return b
@@ -293,7 +293,7 @@ func (b *DatabaseUserBuilder) WithInstanceRef(name string) *DatabaseUserBuilder 
 
 // WithInstanceRefAndNamespace sets the instance reference with namespace.
 func (b *DatabaseUserBuilder) WithInstanceRefAndNamespace(name, namespace string) *DatabaseUserBuilder {
-	b.user.Spec.InstanceRef = dbopsv1alpha1.InstanceReference{
+	b.user.Spec.InstanceRef = &dbopsv1alpha1.InstanceReference{
 		Name:      name,
 		Namespace: namespace,
 	}
@@ -386,7 +386,7 @@ func (b *DatabaseRoleBuilder) WithRoleName(roleName string) *DatabaseRoleBuilder
 
 // WithInstanceRef sets the instance reference.
 func (b *DatabaseRoleBuilder) WithInstanceRef(name string) *DatabaseRoleBuilder {
-	b.role.Spec.InstanceRef = dbopsv1alpha1.InstanceReference{
+	b.role.Spec.InstanceRef = &dbopsv1alpha1.InstanceReference{
 		Name: name,
 	}
 	return b
@@ -394,7 +394,7 @@ func (b *DatabaseRoleBuilder) WithInstanceRef(name string) *DatabaseRoleBuilder 
 
 // WithInstanceRefAndNamespace sets the instance reference with namespace.
 func (b *DatabaseRoleBuilder) WithInstanceRefAndNamespace(name, namespace string) *DatabaseRoleBuilder {
-	b.role.Spec.InstanceRef = dbopsv1alpha1.InstanceReference{
+	b.role.Spec.InstanceRef = &dbopsv1alpha1.InstanceReference{
 		Name:      name,
 		Namespace: namespace,
 	}

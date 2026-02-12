@@ -29,13 +29,15 @@ import (
 	"github.com/db-provision-operator/internal/secret"
 	"github.com/db-provision-operator/internal/service"
 	"github.com/db-provision-operator/internal/service/drift"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 )
 
 // Repository handles grant operations via the service layer.
 type Repository struct {
-	client        client.Client
-	secretManager *secret.Manager
-	logger        logr.Logger
+	client           client.Client
+	secretManager    *secret.Manager
+	instanceResolver *instanceresolver.Resolver
+	logger           logr.Logger
 }
 
 // RepositoryConfig holds dependencies for the repository.
@@ -48,14 +50,16 @@ type RepositoryConfig struct {
 // NewRepository creates a new grant repository.
 func NewRepository(cfg RepositoryConfig) *Repository {
 	return &Repository{
-		client:        cfg.Client,
-		secretManager: cfg.SecretManager,
-		logger:        cfg.Logger,
+		client:           cfg.Client,
+		secretManager:    cfg.SecretManager,
+		instanceResolver: instanceresolver.New(cfg.Client),
+		logger:           cfg.Logger,
 	}
 }
 
 // withService creates a grant service connection and executes the given function.
-func (r *Repository) withService(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, fn func(svc *service.GrantService, user *dbopsv1alpha1.DatabaseUser, instance *dbopsv1alpha1.DatabaseInstance) error) error {
+// Supports both namespaced DatabaseInstance and cluster-scoped ClusterDatabaseInstance via the user's instance reference.
+func (r *Repository) withService(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, fn func(svc *service.GrantService, user *dbopsv1alpha1.DatabaseUser, instanceSpec *dbopsv1alpha1.DatabaseInstanceSpec) error) error {
 	// Get the DatabaseUser
 	user := &dbopsv1alpha1.DatabaseUser{}
 	userNamespace := namespace
@@ -74,34 +78,26 @@ func (r *Repository) withService(ctx context.Context, spec *dbopsv1alpha1.Databa
 		return fmt.Errorf("user not ready: phase is %s", user.Status.Phase)
 	}
 
-	// Get the DatabaseInstance from the user's instanceRef
-	instance := &dbopsv1alpha1.DatabaseInstance{}
-	instanceNamespace := user.Namespace
-	if user.Spec.InstanceRef.Namespace != "" {
-		instanceNamespace = user.Spec.InstanceRef.Namespace
+	// Resolve the instance from the user's instanceRef or clusterInstanceRef
+	resolved, err := r.instanceResolver.Resolve(ctx, user.Spec.InstanceRef, user.Spec.ClusterInstanceRef, user.Namespace)
+	if err != nil {
+		return fmt.Errorf("resolve instance: %w", err)
 	}
 
-	if err := r.client.Get(ctx, types.NamespacedName{
-		Namespace: instanceNamespace,
-		Name:      user.Spec.InstanceRef.Name,
-	}, instance); err != nil {
-		return fmt.Errorf("get instance: %w", err)
+	if !resolved.IsReady() {
+		return fmt.Errorf("instance not ready: phase is %s", resolved.Phase)
 	}
 
-	if instance.Status.Phase != dbopsv1alpha1.PhaseReady {
-		return fmt.Errorf("instance not ready: phase is %s", instance.Status.Phase)
-	}
-
-	// Get admin credentials
-	creds, err := r.secretManager.GetCredentials(ctx, instance.Namespace, instance.Spec.Connection.SecretRef)
+	// Get admin credentials from the credential namespace
+	creds, err := r.secretManager.GetCredentials(ctx, resolved.CredentialNamespace, resolved.Spec.Connection.SecretRef)
 	if err != nil {
 		return fmt.Errorf("get credentials: %w", err)
 	}
 
 	// Get TLS credentials if enabled
 	var tlsCA, tlsCert, tlsKey []byte
-	if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
-		tlsCreds, err := r.secretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
+	if resolved.Spec.TLS != nil && resolved.Spec.TLS.Enabled {
+		tlsCreds, err := r.secretManager.GetTLSCredentials(ctx, resolved.CredentialNamespace, resolved.Spec.TLS)
 		if err == nil {
 			tlsCA = tlsCreds.CA
 			tlsCert = tlsCreds.Cert
@@ -110,7 +106,7 @@ func (r *Repository) withService(ctx context.Context, spec *dbopsv1alpha1.Databa
 	}
 
 	// Build service config
-	cfg := service.ConfigFromInstance(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
+	cfg := service.ConfigFromInstance(resolved.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
 	cfg.Logger = logf.FromContext(ctx)
 
 	// Create grant service
@@ -124,14 +120,14 @@ func (r *Repository) withService(ctx context.Context, spec *dbopsv1alpha1.Databa
 		return fmt.Errorf("connect: %w", err)
 	}
 
-	return fn(svc, user, instance)
+	return fn(svc, user, resolved.Spec)
 }
 
 // Apply applies grants to a database user.
 func (r *Repository) Apply(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*Result, error) {
 	var result *Result
 
-	err := r.withService(ctx, spec, namespace, func(svc *service.GrantService, user *dbopsv1alpha1.DatabaseUser, _ *dbopsv1alpha1.DatabaseInstance) error {
+	err := r.withService(ctx, spec, namespace, func(svc *service.GrantService, user *dbopsv1alpha1.DatabaseUser, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
 		svcResult, err := svc.Apply(ctx, service.ApplyGrantServiceOptions{
 			Username: user.Spec.Username,
 			Spec:     spec,
@@ -155,7 +151,7 @@ func (r *Repository) Apply(ctx context.Context, spec *dbopsv1alpha1.DatabaseGran
 
 // Revoke revokes grants from a database user.
 func (r *Repository) Revoke(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) error {
-	return r.withService(ctx, spec, namespace, func(svc *service.GrantService, user *dbopsv1alpha1.DatabaseUser, _ *dbopsv1alpha1.DatabaseInstance) error {
+	return r.withService(ctx, spec, namespace, func(svc *service.GrantService, user *dbopsv1alpha1.DatabaseUser, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
 		_, err := svc.Revoke(ctx, service.ApplyGrantServiceOptions{
 			Username: user.Spec.Username,
 			Spec:     spec,
@@ -168,7 +164,7 @@ func (r *Repository) Revoke(ctx context.Context, spec *dbopsv1alpha1.DatabaseGra
 func (r *Repository) Exists(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (bool, error) {
 	var exists bool
 
-	err := r.withService(ctx, spec, namespace, func(svc *service.GrantService, user *dbopsv1alpha1.DatabaseUser, _ *dbopsv1alpha1.DatabaseInstance) error {
+	err := r.withService(ctx, spec, namespace, func(svc *service.GrantService, user *dbopsv1alpha1.DatabaseUser, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
 		// Check if user has any grants
 		grants, err := svc.GetGrants(ctx, user.Spec.Username)
 		if err != nil {
@@ -200,10 +196,17 @@ func (r *Repository) GetUser(ctx context.Context, spec *dbopsv1alpha1.DatabaseGr
 }
 
 // GetInstance returns the DatabaseInstance for a given spec (via the user's instanceRef).
+// Deprecated: Use ResolveInstance instead, which supports both DatabaseInstance and ClusterDatabaseInstance.
+// This method only works with namespaced DatabaseInstance references.
 func (r *Repository) GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
 	user, err := r.GetUser(ctx, spec, namespace)
 	if err != nil {
 		return nil, err
+	}
+
+	// Only works with namespaced instances
+	if user.Spec.InstanceRef == nil {
+		return nil, fmt.Errorf("user uses clusterInstanceRef, use ResolveInstance instead")
 	}
 
 	instance := &dbopsv1alpha1.DatabaseInstance{}
@@ -222,20 +225,30 @@ func (r *Repository) GetInstance(ctx context.Context, spec *dbopsv1alpha1.Databa
 	return instance, nil
 }
 
+// ResolveInstance resolves the instance reference via the user's instanceRef or clusterInstanceRef.
+func (r *Repository) ResolveInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*instanceresolver.ResolvedInstance, error) {
+	user, err := r.GetUser(ctx, spec, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.instanceResolver.Resolve(ctx, user.Spec.InstanceRef, user.Spec.ClusterInstanceRef, user.Namespace)
+}
+
 // GetEngine returns the database engine type for a given spec.
 func (r *Repository) GetEngine(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (string, error) {
-	instance, err := r.GetInstance(ctx, spec, namespace)
+	resolved, err := r.ResolveInstance(ctx, spec, namespace)
 	if err != nil {
 		return "", err
 	}
-	return string(instance.Spec.Engine), nil
+	return resolved.Engine(), nil
 }
 
 // DetectDrift detects configuration drift between the CR spec and actual grant state.
 func (r *Repository) DetectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
 	var result *drift.Result
 
-	err := r.withService(ctx, spec, namespace, func(svc *service.GrantService, user *dbopsv1alpha1.DatabaseUser, _ *dbopsv1alpha1.DatabaseInstance) error {
+	err := r.withService(ctx, spec, namespace, func(svc *service.GrantService, user *dbopsv1alpha1.DatabaseUser, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
 		driftCfg := &drift.Config{
 			AllowDestructive: allowDestructive,
 			Logger:           logf.FromContext(ctx),
@@ -254,7 +267,7 @@ func (r *Repository) DetectDrift(ctx context.Context, spec *dbopsv1alpha1.Databa
 func (r *Repository) CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
 	var correctionResult *drift.CorrectionResult
 
-	err := r.withService(ctx, spec, namespace, func(svc *service.GrantService, user *dbopsv1alpha1.DatabaseUser, _ *dbopsv1alpha1.DatabaseInstance) error {
+	err := r.withService(ctx, spec, namespace, func(svc *service.GrantService, user *dbopsv1alpha1.DatabaseUser, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
 		driftCfg := &drift.Config{
 			AllowDestructive: allowDestructive,
 			Logger:           logf.FromContext(ctx),

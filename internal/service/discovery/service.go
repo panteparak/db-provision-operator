@@ -322,7 +322,7 @@ func (s *Service) buildDatabaseCR(dbName string) *dbopsv1alpha1.Database {
 		},
 		Spec: dbopsv1alpha1.DatabaseSpec{
 			Name: dbName,
-			InstanceRef: dbopsv1alpha1.InstanceReference{
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
 				Name: s.config.InstanceName,
 			},
 			DriftPolicy: &dbopsv1alpha1.DriftPolicy{
@@ -357,7 +357,7 @@ func (s *Service) buildUserCR(username string) *dbopsv1alpha1.DatabaseUser {
 		},
 		Spec: dbopsv1alpha1.DatabaseUserSpec{
 			Username: username,
-			InstanceRef: dbopsv1alpha1.InstanceReference{
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
 				Name: s.config.InstanceName,
 			},
 			DriftPolicy: &dbopsv1alpha1.DriftPolicy{
@@ -394,7 +394,7 @@ func (s *Service) buildRoleCR(roleName string) *dbopsv1alpha1.DatabaseRole {
 		},
 		Spec: dbopsv1alpha1.DatabaseRoleSpec{
 			RoleName: roleName,
-			InstanceRef: dbopsv1alpha1.InstanceReference{
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
 				Name: s.config.InstanceName,
 			},
 			DriftPolicy: &dbopsv1alpha1.DriftPolicy{

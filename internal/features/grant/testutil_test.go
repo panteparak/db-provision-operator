@@ -22,18 +22,20 @@ import (
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/service/drift"
 	"github.com/db-provision-operator/internal/shared/eventbus"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 )
 
 // MockRepository is a mock implementation of grant repository operations for testing.
 type MockRepository struct {
-	ApplyFunc        func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*Result, error)
-	RevokeFunc       func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) error
-	ExistsFunc       func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (bool, error)
-	GetUserFunc      func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*dbopsv1alpha1.DatabaseUser, error)
-	GetInstanceFunc  func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error)
-	GetEngineFunc    func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (string, error)
-	DetectDriftFunc  func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, allowDestructive bool) (*drift.Result, error)
-	CorrectDriftFunc func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error)
+	ApplyFunc           func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*Result, error)
+	RevokeFunc          func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) error
+	ExistsFunc          func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (bool, error)
+	GetUserFunc         func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*dbopsv1alpha1.DatabaseUser, error)
+	GetInstanceFunc     func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error)
+	ResolveInstanceFunc func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*instanceresolver.ResolvedInstance, error)
+	GetEngineFunc       func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (string, error)
+	DetectDriftFunc     func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, allowDestructive bool) (*drift.Result, error)
+	CorrectDriftFunc    func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error)
 
 	// Call tracking
 	Calls []MockCall
@@ -65,7 +67,7 @@ func NewMockRepository() *MockRepository {
 		return &dbopsv1alpha1.DatabaseUser{
 			Spec: dbopsv1alpha1.DatabaseUserSpec{
 				Username: "testuser",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -82,6 +84,14 @@ func NewMockRepository() *MockRepository {
 			Status: dbopsv1alpha1.DatabaseInstanceStatus{
 				Phase: dbopsv1alpha1.PhaseReady,
 			},
+		}, nil
+	}
+	m.ResolveInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*instanceresolver.ResolvedInstance, error) {
+		return &instanceresolver.ResolvedInstance{
+			Spec:                &dbopsv1alpha1.DatabaseInstanceSpec{Engine: dbopsv1alpha1.EngineTypePostgres},
+			CredentialNamespace: namespace,
+			Phase:               dbopsv1alpha1.PhaseReady,
+			Name:                "test-instance",
 		}, nil
 	}
 	m.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (string, error) {
@@ -130,6 +140,12 @@ func (m *MockRepository) GetUser(ctx context.Context, spec *dbopsv1alpha1.Databa
 func (m *MockRepository) GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
 	m.recordCall("GetInstance", spec, namespace)
 	return m.GetInstanceFunc(ctx, spec, namespace)
+}
+
+// ResolveInstance implements the resolve instance operation.
+func (m *MockRepository) ResolveInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*instanceresolver.ResolvedInstance, error) {
+	m.recordCall("ResolveInstance", spec, namespace)
+	return m.ResolveInstanceFunc(ctx, spec, namespace)
 }
 
 // GetEngine implements the get engine operation.

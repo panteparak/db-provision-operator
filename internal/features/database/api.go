@@ -23,6 +23,7 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/service/drift"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 )
 
 // API defines the public interface for the database module.
@@ -51,7 +52,12 @@ type API interface {
 	VerifyAccess(ctx context.Context, name string, spec *dbopsv1alpha1.DatabaseSpec, namespace string) error
 
 	// GetInstance returns the DatabaseInstance for the given spec.
+	// Deprecated: Use ResolveInstance instead, which supports both DatabaseInstance and ClusterDatabaseInstance.
 	GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error)
+
+	// ResolveInstance resolves the instance reference (supports both instanceRef and clusterInstanceRef).
+	// Returns the resolved instance information needed for operations.
+	ResolveInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (*instanceresolver.ResolvedInstance, error)
 
 	// DetectDrift compares the CR spec to the actual database state and returns any differences.
 	// This is used for drift detection to identify configuration drift.
@@ -117,7 +123,11 @@ type RepositoryInterface interface {
 	GetInfo(ctx context.Context, name string, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (*Info, error)
 
 	// GetInstance returns the DatabaseInstance for a given spec.
+	// Deprecated: Use ResolveInstance instead.
 	GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error)
+
+	// ResolveInstance resolves the instance reference (supports both instanceRef and clusterInstanceRef).
+	ResolveInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (*instanceresolver.ResolvedInstance, error)
 
 	// GetEngine returns the database engine type for a given spec.
 	GetEngine(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (string, error)

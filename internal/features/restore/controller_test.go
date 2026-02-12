@@ -36,6 +36,7 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	adapterpkg "github.com/db-provision-operator/internal/adapter/types"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 	"github.com/db-provision-operator/internal/storage"
 	"github.com/db-provision-operator/internal/util"
 )
@@ -180,7 +181,7 @@ func TestController_Reconcile_NewRestore(t *testing.T) {
 	err = client.Get(context.Background(), types.NamespacedName{Name: "testrestore", Namespace: "default"}, &updatedRestore)
 	require.NoError(t, err)
 	assert.Equal(t, dbopsv1alpha1.PhaseCompleted, updatedRestore.Status.Phase)
-	assert.True(t, mockRepo.WasCalled("ExecuteRestore"))
+	assert.True(t, mockRepo.WasCalled("ExecuteRestoreWithResolved"))
 }
 
 func TestController_Reconcile_BackupNotCompleted(t *testing.T) {
@@ -242,7 +243,7 @@ func TestController_Reconcile_BackupNotCompleted(t *testing.T) {
 	assert.Contains(t, updatedRestore.Status.Message, "is not completed")
 
 	// Verify ExecuteRestore was NOT called
-	assert.False(t, mockRepo.WasCalled("ExecuteRestore"))
+	assert.False(t, mockRepo.WasCalled("ExecuteRestoreWithResolved"))
 }
 
 func TestController_Reconcile_RestoreNotFound(t *testing.T) {
@@ -317,7 +318,7 @@ func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
 	assert.Equal(t, ctrl.Result{}, result)
 
 	// Verify no repository methods were called
-	assert.False(t, mockRepo.WasCalled("ExecuteRestore"))
+	assert.False(t, mockRepo.WasCalled("ExecuteRestoreWithResolved"))
 }
 
 func TestController_Reconcile_Deletion(t *testing.T) {
@@ -397,7 +398,7 @@ func TestController_Reconcile_TerminalStateCompleted(t *testing.T) {
 	assert.Equal(t, ctrl.Result{}, result) // No requeue for terminal state
 
 	// Verify ExecuteRestore was NOT called - terminal state is skipped
-	assert.False(t, mockRepo.WasCalled("ExecuteRestore"))
+	assert.False(t, mockRepo.WasCalled("ExecuteRestoreWithResolved"))
 }
 
 func TestController_Reconcile_TerminalStateFailed(t *testing.T) {
@@ -438,7 +439,7 @@ func TestController_Reconcile_TerminalStateFailed(t *testing.T) {
 	assert.Equal(t, ctrl.Result{}, result) // No requeue for failed
 
 	// Verify ExecuteRestore was NOT called - failed state is terminal
-	assert.False(t, mockRepo.WasCalled("ExecuteRestore"))
+	assert.False(t, mockRepo.WasCalled("ExecuteRestoreWithResolved"))
 }
 
 func TestController_Reconcile_DeadlineExceeded(t *testing.T) {
@@ -489,7 +490,7 @@ func TestController_Reconcile_DeadlineExceeded(t *testing.T) {
 	assert.Contains(t, updatedRestore.Status.Message, "deadline")
 
 	// Verify ExecuteRestore was NOT called
-	assert.False(t, mockRepo.WasCalled("ExecuteRestore"))
+	assert.False(t, mockRepo.WasCalled("ExecuteRestoreWithResolved"))
 }
 
 func TestController_Reconcile_WaitingForInstance(t *testing.T) {
@@ -515,6 +516,15 @@ func TestController_Reconcile_WaitingForInstance(t *testing.T) {
 	}
 	mockRepo.GetInstanceFunc = func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference) (*dbopsv1alpha1.DatabaseInstance, error) {
 		return instance, nil
+	}
+	// Override ResolveInstance to return a pending instance (controller uses this instead of GetInstance)
+	mockRepo.ResolveInstanceFunc = func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference, clusterInstanceRef *dbopsv1alpha1.ClusterInstanceReference) (*instanceresolver.ResolvedInstance, error) {
+		return &instanceresolver.ResolvedInstance{
+			Spec:                &instance.Spec,
+			CredentialNamespace: namespace,
+			Phase:               dbopsv1alpha1.PhasePending, // Not ready
+			Name:                "test-instance",
+		}, nil
 	}
 
 	handler := &Handler{
@@ -546,8 +556,8 @@ func TestController_Reconcile_WaitingForInstance(t *testing.T) {
 	err = client.Get(context.Background(), types.NamespacedName{Name: "testrestore", Namespace: "default"}, &updatedRestore)
 	require.NoError(t, err)
 	assert.Equal(t, dbopsv1alpha1.PhasePending, updatedRestore.Status.Phase)
-	assert.Contains(t, updatedRestore.Status.Message, "Waiting for DatabaseInstance")
+	assert.Contains(t, updatedRestore.Status.Message, "Waiting for instance")
 
 	// Verify ExecuteRestore was NOT called
-	assert.False(t, mockRepo.WasCalled("ExecuteRestore"))
+	assert.False(t, mockRepo.WasCalled("ExecuteRestoreWithResolved"))
 }

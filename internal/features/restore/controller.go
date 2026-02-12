@@ -166,8 +166,8 @@ func (c *Controller) reconcile(ctx context.Context, restore *dbopsv1alpha1.Datab
 	}
 
 	// Check if instance is ready
-	if targetInstance.Status.Phase != dbopsv1alpha1.PhaseReady {
-		return c.handlePending(ctx, restore, fmt.Sprintf("Waiting for DatabaseInstance %s to be ready", targetInstance.Name))
+	if !targetInstance.IsReady() {
+		return c.handlePending(ctx, restore, fmt.Sprintf("Waiting for instance %s to be ready (current phase: %s)", targetInstance.Name, targetInstance.Phase))
 	}
 
 	// Update status to Running

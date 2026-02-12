@@ -32,6 +32,7 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/service/drift"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -49,7 +50,7 @@ func newTestDatabase(name, namespace string) *dbopsv1alpha1.Database {
 		},
 		Spec: dbopsv1alpha1.DatabaseSpec{
 			Name: name,
-			InstanceRef: dbopsv1alpha1.InstanceReference{
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
 				Name: "test-instance",
 			},
 		},
@@ -381,7 +382,7 @@ func TestController_GetEffectiveDriftPolicy(t *testing.T) {
 	tests := []struct {
 		name         string
 		database     *dbopsv1alpha1.Database
-		instance     *dbopsv1alpha1.DatabaseInstance
+		resolved     *instanceresolver.ResolvedInstance
 		expectedMode dbopsv1alpha1.DriftMode
 	}{
 		{
@@ -393,7 +394,7 @@ func TestController_GetEffectiveDriftPolicy(t *testing.T) {
 					},
 				},
 			},
-			instance:     nil,
+			resolved:     nil,
 			expectedMode: dbopsv1alpha1.DriftModeCorrect,
 		},
 		{
@@ -401,8 +402,8 @@ func TestController_GetEffectiveDriftPolicy(t *testing.T) {
 			database: &dbopsv1alpha1.Database{
 				Spec: dbopsv1alpha1.DatabaseSpec{},
 			},
-			instance: &dbopsv1alpha1.DatabaseInstance{
-				Spec: dbopsv1alpha1.DatabaseInstanceSpec{
+			resolved: &instanceresolver.ResolvedInstance{
+				Spec: &dbopsv1alpha1.DatabaseInstanceSpec{
 					DriftPolicy: &dbopsv1alpha1.DriftPolicy{
 						Mode: dbopsv1alpha1.DriftModeIgnore,
 					},
@@ -415,7 +416,7 @@ func TestController_GetEffectiveDriftPolicy(t *testing.T) {
 			database: &dbopsv1alpha1.Database{
 				Spec: dbopsv1alpha1.DatabaseSpec{},
 			},
-			instance:     &dbopsv1alpha1.DatabaseInstance{},
+			resolved:     &instanceresolver.ResolvedInstance{Spec: &dbopsv1alpha1.DatabaseInstanceSpec{}},
 			expectedMode: dbopsv1alpha1.DriftModeDetect,
 		},
 		{
@@ -427,8 +428,8 @@ func TestController_GetEffectiveDriftPolicy(t *testing.T) {
 					},
 				},
 			},
-			instance: &dbopsv1alpha1.DatabaseInstance{
-				Spec: dbopsv1alpha1.DatabaseInstanceSpec{
+			resolved: &instanceresolver.ResolvedInstance{
+				Spec: &dbopsv1alpha1.DatabaseInstanceSpec{
 					DriftPolicy: &dbopsv1alpha1.DriftPolicy{
 						Mode: dbopsv1alpha1.DriftModeIgnore,
 					},
@@ -441,7 +442,7 @@ func TestController_GetEffectiveDriftPolicy(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			controller := &Controller{}
-			policy := controller.getEffectiveDriftPolicy(tt.database, tt.instance)
+			policy := controller.getEffectiveDriftPolicy(tt.database, tt.resolved)
 			assert.Equal(t, tt.expectedMode, policy.Mode)
 		})
 	}

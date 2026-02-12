@@ -24,17 +24,21 @@ import (
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	adapterpkg "github.com/db-provision-operator/internal/adapter/types"
 	"github.com/db-provision-operator/internal/shared/eventbus"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 	"github.com/db-provision-operator/internal/storage"
 )
 
 // MockRepository is a mock implementation of restore repository operations for testing.
 type MockRepository struct {
-	GetBackupFunc           func(ctx context.Context, namespace string, backupRef *dbopsv1alpha1.BackupReference) (*dbopsv1alpha1.DatabaseBackup, error)
-	GetDatabaseFunc         func(ctx context.Context, namespace string, dbRef *dbopsv1alpha1.DatabaseReference) (*dbopsv1alpha1.Database, error)
-	GetInstanceFunc         func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference) (*dbopsv1alpha1.DatabaseInstance, error)
-	CreateRestoreReaderFunc func(ctx context.Context, cfg *storage.RestoreReaderConfig) (io.ReadCloser, error)
-	ExecuteRestoreFunc      func(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error)
-	GetEngineFunc           func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference) (string, error)
+	GetBackupFunc                  func(ctx context.Context, namespace string, backupRef *dbopsv1alpha1.BackupReference) (*dbopsv1alpha1.DatabaseBackup, error)
+	GetDatabaseFunc                func(ctx context.Context, namespace string, dbRef *dbopsv1alpha1.DatabaseReference) (*dbopsv1alpha1.Database, error)
+	GetInstanceFunc                func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference) (*dbopsv1alpha1.DatabaseInstance, error)
+	ResolveInstanceFunc            func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference, clusterInstanceRef *dbopsv1alpha1.ClusterInstanceReference) (*instanceresolver.ResolvedInstance, error)
+	CreateRestoreReaderFunc        func(ctx context.Context, cfg *storage.RestoreReaderConfig) (io.ReadCloser, error)
+	ExecuteRestoreFunc             func(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error)
+	ExecuteRestoreWithResolvedFunc func(ctx context.Context, resolved *instanceresolver.ResolvedInstance, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error)
+	GetEngineFunc                  func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference) (string, error)
+	GetEngineWithRefsFunc          func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference, clusterInstanceRef *dbopsv1alpha1.ClusterInstanceReference) (string, error)
 
 	// Call tracking
 	Calls []MockCall
@@ -84,7 +88,7 @@ func NewMockRepository() *MockRepository {
 		return &dbopsv1alpha1.Database{
 			Spec: dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -106,6 +110,16 @@ func NewMockRepository() *MockRepository {
 		}, nil
 	}
 
+	m.ResolveInstanceFunc = func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference, clusterInstanceRef *dbopsv1alpha1.ClusterInstanceReference) (*instanceresolver.ResolvedInstance, error) {
+		return &instanceresolver.ResolvedInstance{
+			Spec:                &dbopsv1alpha1.DatabaseInstanceSpec{Engine: dbopsv1alpha1.EngineTypePostgres},
+			CredentialNamespace: namespace,
+			Phase:               dbopsv1alpha1.PhaseReady,
+			Name:                "test-instance",
+			Version:             "15.1",
+		}, nil
+	}
+
 	m.CreateRestoreReaderFunc = func(ctx context.Context, cfg *storage.RestoreReaderConfig) (io.ReadCloser, error) {
 		return io.NopCloser(strings.NewReader("mock backup data")), nil
 	}
@@ -117,7 +131,18 @@ func NewMockRepository() *MockRepository {
 		}, nil
 	}
 
+	m.ExecuteRestoreWithResolvedFunc = func(ctx context.Context, resolved *instanceresolver.ResolvedInstance, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error) {
+		return &adapterpkg.RestoreResult{
+			TargetDatabase: opts.Database,
+			TablesRestored: 10,
+		}, nil
+	}
+
 	m.GetEngineFunc = func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference) (string, error) {
+		return "postgres", nil
+	}
+
+	m.GetEngineWithRefsFunc = func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference, clusterInstanceRef *dbopsv1alpha1.ClusterInstanceReference) (string, error) {
 		return "postgres", nil
 	}
 
@@ -147,6 +172,12 @@ func (m *MockRepository) GetInstance(ctx context.Context, namespace string, inst
 	return m.GetInstanceFunc(ctx, namespace, instanceRef)
 }
 
+// ResolveInstance implements the resolve instance operation.
+func (m *MockRepository) ResolveInstance(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference, clusterInstanceRef *dbopsv1alpha1.ClusterInstanceReference) (*instanceresolver.ResolvedInstance, error) {
+	m.recordCall("ResolveInstance", namespace, instanceRef, clusterInstanceRef)
+	return m.ResolveInstanceFunc(ctx, namespace, instanceRef, clusterInstanceRef)
+}
+
 // CreateRestoreReader implements the create restore reader operation.
 func (m *MockRepository) CreateRestoreReader(ctx context.Context, cfg *storage.RestoreReaderConfig) (io.ReadCloser, error) {
 	m.recordCall("CreateRestoreReader", cfg)
@@ -159,10 +190,22 @@ func (m *MockRepository) ExecuteRestore(ctx context.Context, instance *dbopsv1al
 	return m.ExecuteRestoreFunc(ctx, instance, opts)
 }
 
+// ExecuteRestoreWithResolved implements the execute restore with resolved instance operation.
+func (m *MockRepository) ExecuteRestoreWithResolved(ctx context.Context, resolved *instanceresolver.ResolvedInstance, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error) {
+	m.recordCall("ExecuteRestoreWithResolved", resolved, opts)
+	return m.ExecuteRestoreWithResolvedFunc(ctx, resolved, opts)
+}
+
 // GetEngine implements the get engine operation.
 func (m *MockRepository) GetEngine(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference) (string, error) {
 	m.recordCall("GetEngine", namespace, instanceRef)
 	return m.GetEngineFunc(ctx, namespace, instanceRef)
+}
+
+// GetEngineWithRefs implements the get engine with refs operation.
+func (m *MockRepository) GetEngineWithRefs(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference, clusterInstanceRef *dbopsv1alpha1.ClusterInstanceReference) (string, error) {
+	m.recordCall("GetEngineWithRefs", namespace, instanceRef, clusterInstanceRef)
+	return m.GetEngineWithRefsFunc(ctx, namespace, instanceRef, clusterInstanceRef)
 }
 
 // WasCalled checks if a method was called.

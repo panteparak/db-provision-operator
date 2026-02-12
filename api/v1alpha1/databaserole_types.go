@@ -21,10 +21,16 @@ import (
 )
 
 // DatabaseRoleSpec defines the desired state of DatabaseRole.
+// +kubebuilder:validation:XValidation:rule="has(self.instanceRef) || has(self.clusterInstanceRef)",message="either instanceRef or clusterInstanceRef must be specified"
+// +kubebuilder:validation:XValidation:rule="!(has(self.instanceRef) && has(self.clusterInstanceRef))",message="instanceRef and clusterInstanceRef are mutually exclusive"
 type DatabaseRoleSpec struct {
-	// InstanceRef references the DatabaseInstance to use
-	// +kubebuilder:validation:Required
-	InstanceRef InstanceReference `json:"instanceRef"`
+	// InstanceRef references a namespaced DatabaseInstance (mutually exclusive with ClusterInstanceRef)
+	// +optional
+	InstanceRef *InstanceReference `json:"instanceRef,omitempty"`
+
+	// ClusterInstanceRef references a cluster-scoped ClusterDatabaseInstance (mutually exclusive with InstanceRef)
+	// +optional
+	ClusterInstanceRef *ClusterInstanceReference `json:"clusterInstanceRef,omitempty"`
 
 	// RoleName is the role name in the database (immutable after creation)
 	// +kubebuilder:validation:Required

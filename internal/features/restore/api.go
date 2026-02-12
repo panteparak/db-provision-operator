@@ -24,6 +24,7 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	adapterpkg "github.com/db-provision-operator/internal/adapter/types"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 	"github.com/db-provision-operator/internal/storage"
 )
 
@@ -83,16 +84,28 @@ type RepositoryInterface interface {
 	GetDatabase(ctx context.Context, namespace string, dbRef *dbopsv1alpha1.DatabaseReference) (*dbopsv1alpha1.Database, error)
 
 	// GetInstance retrieves the referenced DatabaseInstance.
+	// Deprecated: Use ResolveInstance instead, which supports both DatabaseInstance and ClusterDatabaseInstance.
 	GetInstance(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference) (*dbopsv1alpha1.DatabaseInstance, error)
+
+	// ResolveInstance resolves the instance reference (supports both instanceRef and clusterInstanceRef).
+	ResolveInstance(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference, clusterInstanceRef *dbopsv1alpha1.ClusterInstanceReference) (*instanceresolver.ResolvedInstance, error)
 
 	// CreateRestoreReader creates a reader for the backup data.
 	CreateRestoreReader(ctx context.Context, cfg *storage.RestoreReaderConfig) (io.ReadCloser, error)
 
 	// ExecuteRestore performs the actual database restore operation.
+	// Deprecated: Use ExecuteRestoreWithResolved instead for cluster instance support.
 	ExecuteRestore(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error)
 
+	// ExecuteRestoreWithResolved performs the actual database restore operation using a resolved instance.
+	ExecuteRestoreWithResolved(ctx context.Context, resolved *instanceresolver.ResolvedInstance, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error)
+
 	// GetEngine returns the database engine type for a given instance.
+	// Deprecated: Use GetEngineWithRefs instead for cluster instance support.
 	GetEngine(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference) (string, error)
+
+	// GetEngineWithRefs returns the database engine type, supporting both instanceRef and clusterInstanceRef.
+	GetEngineWithRefs(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference, clusterInstanceRef *dbopsv1alpha1.ClusterInstanceReference) (string, error)
 }
 
 // Ensure Repository implements RepositoryInterface.

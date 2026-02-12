@@ -42,7 +42,7 @@ func TestHandler_Create(t *testing.T) {
 			name: "successful creation",
 			spec: &dbopsv1alpha1.DatabaseRoleSpec{
 				RoleName: "testrole",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -65,7 +65,7 @@ func TestHandler_Create(t *testing.T) {
 			name: "role already exists",
 			spec: &dbopsv1alpha1.DatabaseRoleSpec{
 				RoleName: "testrole",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -85,7 +85,7 @@ func TestHandler_Create(t *testing.T) {
 			name: "empty role name returns error",
 			spec: &dbopsv1alpha1.DatabaseRoleSpec{
 				RoleName: "",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -98,7 +98,7 @@ func TestHandler_Create(t *testing.T) {
 			name: "repository error on exists check",
 			spec: &dbopsv1alpha1.DatabaseRoleSpec{
 				RoleName: "testrole",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -118,7 +118,7 @@ func TestHandler_Create(t *testing.T) {
 			name: "repository error on create",
 			spec: &dbopsv1alpha1.DatabaseRoleSpec{
 				RoleName: "testrole",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -183,7 +183,7 @@ func TestHandler_Delete(t *testing.T) {
 			roleName: "testrole",
 			spec: &dbopsv1alpha1.DatabaseRoleSpec{
 				RoleName: "testrole",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -204,7 +204,7 @@ func TestHandler_Delete(t *testing.T) {
 			roleName: "testrole",
 			spec: &dbopsv1alpha1.DatabaseRoleSpec{
 				RoleName: "testrole",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -226,7 +226,7 @@ func TestHandler_Delete(t *testing.T) {
 			roleName: "testrole",
 			spec: &dbopsv1alpha1.DatabaseRoleSpec{
 				RoleName: "testrole",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -286,7 +286,7 @@ func TestHandler_Exists(t *testing.T) {
 			roleName: "testrole",
 			spec: &dbopsv1alpha1.DatabaseRoleSpec{
 				RoleName: "testrole",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -304,7 +304,7 @@ func TestHandler_Exists(t *testing.T) {
 			roleName: "testrole",
 			spec: &dbopsv1alpha1.DatabaseRoleSpec{
 				RoleName: "testrole",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -322,7 +322,7 @@ func TestHandler_Exists(t *testing.T) {
 			roleName: "testrole",
 			spec: &dbopsv1alpha1.DatabaseRoleSpec{
 				RoleName: "testrole",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -376,7 +376,7 @@ func TestHandler_Update(t *testing.T) {
 			roleName: "testrole",
 			spec: &dbopsv1alpha1.DatabaseRoleSpec{
 				RoleName: "testrole",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -397,7 +397,7 @@ func TestHandler_Update(t *testing.T) {
 			roleName: "testrole",
 			spec: &dbopsv1alpha1.DatabaseRoleSpec{
 				RoleName: "testrole",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -415,7 +415,7 @@ func TestHandler_Update(t *testing.T) {
 			roleName: "testrole",
 			spec: &dbopsv1alpha1.DatabaseRoleSpec{
 				RoleName: "testrole",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -478,7 +478,7 @@ func TestHandler_EventPublishing(t *testing.T) {
 
 		spec := &dbopsv1alpha1.DatabaseRoleSpec{
 			RoleName: "testrole",
-			InstanceRef: dbopsv1alpha1.InstanceReference{
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
 				Name: "test-instance",
 			},
 		}
@@ -508,7 +508,7 @@ func TestHandler_EventPublishing(t *testing.T) {
 
 		spec := &dbopsv1alpha1.DatabaseRoleSpec{
 			RoleName: "testrole",
-			InstanceRef: dbopsv1alpha1.InstanceReference{
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
 				Name: "test-instance",
 			},
 		}

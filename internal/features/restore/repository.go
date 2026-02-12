@@ -29,15 +29,17 @@ import (
 	"github.com/db-provision-operator/internal/adapter"
 	adapterpkg "github.com/db-provision-operator/internal/adapter/types"
 	"github.com/db-provision-operator/internal/secret"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 	"github.com/db-provision-operator/internal/storage"
 	"github.com/db-provision-operator/internal/util"
 )
 
 // Repository handles restore operations via the adapter layer.
 type Repository struct {
-	client        client.Client
-	secretManager *secret.Manager
-	logger        logr.Logger
+	client           client.Client
+	secretManager    *secret.Manager
+	instanceResolver *instanceresolver.Resolver
+	logger           logr.Logger
 }
 
 // RepositoryConfig holds dependencies for the repository.
@@ -50,9 +52,10 @@ type RepositoryConfig struct {
 // NewRepository creates a new restore repository.
 func NewRepository(cfg RepositoryConfig) *Repository {
 	return &Repository{
-		client:        cfg.Client,
-		secretManager: cfg.SecretManager,
-		logger:        cfg.Logger,
+		client:           cfg.Client,
+		secretManager:    cfg.SecretManager,
+		instanceResolver: instanceresolver.New(cfg.Client),
+		logger:           cfg.Logger,
 	}
 }
 
@@ -93,7 +96,12 @@ func (r *Repository) GetDatabase(ctx context.Context, namespace string, dbRef *d
 }
 
 // GetInstance retrieves the referenced DatabaseInstance.
+// Deprecated: Use ResolveInstance instead, which supports both DatabaseInstance and ClusterDatabaseInstance.
 func (r *Repository) GetInstance(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference) (*dbopsv1alpha1.DatabaseInstance, error) {
+	if instanceRef == nil {
+		return nil, fmt.Errorf("instanceRef not specified")
+	}
+
 	instanceNamespace := namespace
 	if instanceRef.Namespace != "" {
 		instanceNamespace = instanceRef.Namespace
@@ -110,19 +118,36 @@ func (r *Repository) GetInstance(ctx context.Context, namespace string, instance
 	return instance, nil
 }
 
+// ResolveInstance resolves the instance reference (supports both instanceRef and clusterInstanceRef).
+func (r *Repository) ResolveInstance(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference, clusterInstanceRef *dbopsv1alpha1.ClusterInstanceReference) (*instanceresolver.ResolvedInstance, error) {
+	return r.instanceResolver.Resolve(ctx, instanceRef, clusterInstanceRef, namespace)
+}
+
 // CreateRestoreReader creates a reader for the backup data.
 func (r *Repository) CreateRestoreReader(ctx context.Context, cfg *storage.RestoreReaderConfig) (io.ReadCloser, error) {
 	return storage.NewRestoreReader(ctx, cfg)
 }
 
 // ExecuteRestore performs the actual database restore operation.
+// Deprecated: Use ExecuteRestoreWithResolved instead for cluster instance support.
 func (r *Repository) ExecuteRestore(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error) {
+	return r.executeRestoreInternal(ctx, &instance.Spec, instance.Namespace, opts)
+}
+
+// ExecuteRestoreWithResolved performs the actual database restore operation using a resolved instance.
+// This supports both namespaced DatabaseInstance and cluster-scoped ClusterDatabaseInstance.
+func (r *Repository) ExecuteRestoreWithResolved(ctx context.Context, resolved *instanceresolver.ResolvedInstance, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error) {
+	return r.executeRestoreInternal(ctx, resolved.Spec, resolved.CredentialNamespace, opts)
+}
+
+// executeRestoreInternal performs the actual database restore operation.
+func (r *Repository) executeRestoreInternal(ctx context.Context, spec *dbopsv1alpha1.DatabaseInstanceSpec, credentialNamespace string, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error) {
 	// Get credentials with retry
 	retryConfig := util.ConnectionRetryConfig()
 	var creds *secret.Credentials
 	result := util.RetryWithBackoff(ctx, retryConfig, func() error {
 		var err error
-		creds, err = r.secretManager.GetCredentials(ctx, instance.Namespace, instance.Spec.Connection.SecretRef)
+		creds, err = r.secretManager.GetCredentials(ctx, credentialNamespace, spec.Connection.SecretRef)
 		return err
 	})
 	if result.LastError != nil {
@@ -131,9 +156,9 @@ func (r *Repository) ExecuteRestore(ctx context.Context, instance *dbopsv1alpha1
 
 	// Get TLS credentials if TLS is enabled
 	var tlsCA, tlsCert, tlsKey []byte
-	if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
+	if spec.TLS != nil && spec.TLS.Enabled {
 		result := util.RetryWithBackoff(ctx, retryConfig, func() error {
-			tlsCreds, err := r.secretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
+			tlsCreds, err := r.secretManager.GetTLSCredentials(ctx, credentialNamespace, spec.TLS)
 			if err != nil {
 				return err
 			}
@@ -148,12 +173,12 @@ func (r *Repository) ExecuteRestore(ctx context.Context, instance *dbopsv1alpha1
 	}
 
 	// Build connection config
-	connConfig := adapter.BuildConnectionConfig(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
+	connConfig := adapter.BuildConnectionConfig(spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
 
 	// Create database adapter
-	dbAdapter, err := adapter.NewAdapter(instance.Spec.Engine, connConfig)
+	dbAdapter, err := adapter.NewAdapter(spec.Engine, connConfig)
 	if err != nil {
-		return nil, fmt.Errorf("unsupported database engine %s: %w", instance.Spec.Engine, err)
+		return nil, fmt.Errorf("unsupported database engine %s: %w", spec.Engine, err)
 	}
 	defer func() { _ = dbAdapter.Close() }()
 
@@ -181,10 +206,20 @@ func (r *Repository) ExecuteRestore(ctx context.Context, instance *dbopsv1alpha1
 }
 
 // GetEngine returns the database engine type for a given instance.
+// Deprecated: Use GetEngineWithRefs instead for cluster instance support.
 func (r *Repository) GetEngine(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference) (string, error) {
 	instance, err := r.GetInstance(ctx, namespace, instanceRef)
 	if err != nil {
 		return "", err
 	}
 	return string(instance.Spec.Engine), nil
+}
+
+// GetEngineWithRefs returns the database engine type, supporting both instanceRef and clusterInstanceRef.
+func (r *Repository) GetEngineWithRefs(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference, clusterInstanceRef *dbopsv1alpha1.ClusterInstanceReference) (string, error) {
+	resolved, err := r.ResolveInstance(ctx, namespace, instanceRef, clusterInstanceRef)
+	if err != nil {
+		return "", err
+	}
+	return resolved.Engine(), nil
 }

@@ -54,6 +54,16 @@ spec:
           spec:
             description: DatabaseRoleSpec defines the desired state of DatabaseRole.
             properties:
+              clusterInstanceRef:
+                description: ClusterInstanceRef references a cluster-scoped ClusterDatabaseInstance
+                  (mutually exclusive with InstanceRef)
+                properties:
+                  name:
+                    description: Name of the ClusterDatabaseInstance
+                    type: string
+                required:
+                - name
+                type: object
               driftPolicy:
                 description: |-
                   DriftPolicy overrides the instance-level drift policy for this role.
@@ -80,7 +90,8 @@ spec:
                     type: string
                 type: object
               instanceRef:
-                description: InstanceRef references the DatabaseInstance to use
+                description: InstanceRef references a namespaced DatabaseInstance
+                  (mutually exclusive with ClusterInstanceRef)
                 properties:
                   name:
                     description: Name of the DatabaseInstance
@@ -250,9 +261,13 @@ spec:
                 - message: roleName is immutable
                   rule: self == oldSelf
             required:
-            - instanceRef
             - roleName
             type: object
+            x-kubernetes-validations:
+            - message: either instanceRef or clusterInstanceRef must be specified
+              rule: has(self.instanceRef) || has(self.clusterInstanceRef)
+            - message: instanceRef and clusterInstanceRef are mutually exclusive
+              rule: '!(has(self.instanceRef) && has(self.clusterInstanceRef))'
           status:
             description: DatabaseRoleStatus defines the observed state of DatabaseRole.
             properties:

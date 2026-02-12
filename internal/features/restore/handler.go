@@ -31,6 +31,7 @@ import (
 	"github.com/db-provision-operator/internal/metrics"
 	"github.com/db-provision-operator/internal/secret"
 	"github.com/db-provision-operator/internal/shared/eventbus"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 	"github.com/db-provision-operator/internal/storage"
 )
 
@@ -62,6 +63,7 @@ func NewHandler(cfg HandlerConfig) *Handler {
 }
 
 // Execute performs a database restore operation.
+// Supports both namespaced DatabaseInstance and cluster-scoped ClusterDatabaseInstance.
 func (h *Handler) Execute(ctx context.Context, restore *dbopsv1alpha1.DatabaseRestore) (*Result, error) {
 	log := logf.FromContext(ctx).WithValues("restore", restore.Name, "namespace", restore.Namespace)
 
@@ -73,17 +75,17 @@ func (h *Handler) Execute(ctx context.Context, restore *dbopsv1alpha1.DatabaseRe
 	startTime := time.Now()
 
 	// Resolve target instance and database
-	targetInstance, targetDatabaseName, err := h.resolveTarget(ctx, restore)
+	resolved, targetDatabaseName, err := h.resolveTarget(ctx, restore)
 	if err != nil {
 		return nil, fmt.Errorf("resolve target: %w", err)
 	}
 
 	// Get engine for metrics
-	engine := string(targetInstance.Spec.Engine)
+	engine := resolved.Engine()
 
 	// Check if instance is ready
-	if targetInstance.Status.Phase != dbopsv1alpha1.PhaseReady {
-		return nil, fmt.Errorf("instance %s is not ready (phase: %s)", targetInstance.Name, targetInstance.Status.Phase)
+	if !resolved.IsReady() {
+		return nil, fmt.Errorf("instance %s is not ready (phase: %s)", resolved.Name, resolved.Phase)
 	}
 
 	// Resolve backup source
@@ -104,7 +106,7 @@ func (h *Handler) Execute(ctx context.Context, restore *dbopsv1alpha1.DatabaseRe
 	h.publishRestoreStarted(ctx, restore, sourceBackupName, targetDatabaseName)
 
 	log.Info("Starting restore",
-		"targetInstance", targetInstance.Name,
+		"targetInstance", resolved.Name,
 		"targetDatabase", targetDatabaseName,
 		"backupPath", backupPath)
 
@@ -125,10 +127,10 @@ func (h *Handler) Execute(ctx context.Context, restore *dbopsv1alpha1.DatabaseRe
 	defer func() { _ = restoreReader.Close() }()
 
 	// Build restore options
-	restoreOpts := h.buildRestoreOptions(restore, sourceBackup, targetDatabaseName, targetInstance.Spec.Engine, restoreReader)
+	restoreOpts := h.buildRestoreOptions(restore, sourceBackup, targetDatabaseName, resolved.Spec.Engine, restoreReader)
 
-	// Execute restore
-	restoreResult, err := h.repo.ExecuteRestore(ctx, targetInstance, restoreOpts)
+	// Execute restore using resolved instance
+	restoreResult, err := h.repo.ExecuteRestoreWithResolved(ctx, resolved, restoreOpts)
 	if err != nil {
 		metrics.RecordRestoreOperation(engine, restore.Namespace, metrics.StatusFailure)
 		h.publishRestoreFailed(ctx, restore, sourceBackupName, targetDatabaseName, err.Error())
@@ -151,7 +153,7 @@ func (h *Handler) Execute(ctx context.Context, restore *dbopsv1alpha1.DatabaseRe
 
 	return &Result{
 		TargetDatabase: restoreResult.TargetDatabase,
-		TargetInstance: targetInstance.Name,
+		TargetInstance: resolved.Name,
 		SourceBackup:   sourceBackupName,
 		TablesRestored: restoreResult.TablesRestored,
 		Duration:       duration,
@@ -181,11 +183,11 @@ func (h *Handler) ValidateSpec(ctx context.Context, restore *dbopsv1alpha1.Datab
 	}
 
 	// Validate target
-	if !restore.Spec.Target.InPlace && restore.Spec.Target.InstanceRef == nil {
+	if !restore.Spec.Target.InPlace && restore.Spec.Target.InstanceRef == nil && restore.Spec.Target.ClusterInstanceRef == nil {
 		if restore.Spec.Target.DatabaseRef == nil {
 			return &ValidationError{
 				Field:   "spec.target",
-				Message: "either target.instanceRef or target.databaseRef (with inPlace: true) must be specified",
+				Message: "either target.instanceRef, target.clusterInstanceRef, or target.databaseRef (with inPlace: true) must be specified",
 			}
 		}
 	}
@@ -268,12 +270,13 @@ func (h *Handler) OnInstanceConnected(ctx context.Context, event *eventbus.Insta
 }
 
 // resolveTarget resolves the target instance and database for the restore.
-func (h *Handler) resolveTarget(ctx context.Context, restore *dbopsv1alpha1.DatabaseRestore) (*dbopsv1alpha1.DatabaseInstance, string, error) {
-	var targetInstance *dbopsv1alpha1.DatabaseInstance
+// Supports both namespaced DatabaseInstance and cluster-scoped ClusterDatabaseInstance.
+func (h *Handler) resolveTarget(ctx context.Context, restore *dbopsv1alpha1.DatabaseRestore) (*instanceresolver.ResolvedInstance, string, error) {
+	var resolved *instanceresolver.ResolvedInstance
 	var targetDatabaseName string
 
 	if restore.Spec.Target.InPlace && restore.Spec.Target.DatabaseRef != nil {
-		// In-place restore: get instance from the target database's instanceRef
+		// In-place restore: get instance from the target database's instanceRef or clusterInstanceRef
 		targetDB, err := h.repo.GetDatabase(ctx, restore.Namespace, restore.Spec.Target.DatabaseRef)
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -284,31 +287,25 @@ func (h *Handler) resolveTarget(ctx context.Context, restore *dbopsv1alpha1.Data
 
 		targetDatabaseName = targetDB.Spec.Name
 
-		// Get the instance from the target database
-		targetInstance, err = h.repo.GetInstance(ctx, targetDB.Namespace, &targetDB.Spec.InstanceRef)
+		// Resolve the instance from the target database's instanceRef or clusterInstanceRef
+		resolved, err = h.repo.ResolveInstance(ctx, targetDB.Namespace, targetDB.Spec.InstanceRef, targetDB.Spec.ClusterInstanceRef)
 		if err != nil {
-			if errors.IsNotFound(err) {
-				return nil, "", fmt.Errorf("instance %s for database %s not found", targetDB.Spec.InstanceRef.Name, targetDB.Name)
-			}
-			return nil, "", fmt.Errorf("get instance: %w", err)
+			return nil, "", fmt.Errorf("resolve instance for database %s: %w", targetDB.Name, err)
 		}
-	} else if restore.Spec.Target.InstanceRef != nil {
+	} else if restore.Spec.Target.InstanceRef != nil || restore.Spec.Target.ClusterInstanceRef != nil {
 		// Restore to new database on specified instance
 		var err error
-		targetInstance, err = h.repo.GetInstance(ctx, restore.Namespace, restore.Spec.Target.InstanceRef)
+		resolved, err = h.repo.ResolveInstance(ctx, restore.Namespace, restore.Spec.Target.InstanceRef, restore.Spec.Target.ClusterInstanceRef)
 		if err != nil {
-			if errors.IsNotFound(err) {
-				return nil, "", fmt.Errorf("target instance %s not found", restore.Spec.Target.InstanceRef.Name)
-			}
-			return nil, "", fmt.Errorf("get instance: %w", err)
+			return nil, "", fmt.Errorf("resolve target instance: %w", err)
 		}
 
 		targetDatabaseName = restore.Spec.Target.DatabaseName
 	} else {
-		return nil, "", fmt.Errorf("either target.instanceRef or target.databaseRef (with inPlace: true) must be specified")
+		return nil, "", fmt.Errorf("either target.instanceRef, target.clusterInstanceRef, or target.databaseRef (with inPlace: true) must be specified")
 	}
 
-	return targetInstance, targetDatabaseName, nil
+	return resolved, targetDatabaseName, nil
 }
 
 // resolveSource resolves the backup source for the restore.
@@ -470,6 +467,8 @@ func (h *Handler) UpdateInfoMetric(restore *dbopsv1alpha1.DatabaseRestore) {
 	targetInstance := ""
 	if restore.Spec.Target.InstanceRef != nil {
 		targetInstance = restore.Spec.Target.InstanceRef.Name
+	} else if restore.Spec.Target.ClusterInstanceRef != nil {
+		targetInstance = restore.Spec.Target.ClusterInstanceRef.Name
 	}
 
 	metrics.SetRestoreInfo(

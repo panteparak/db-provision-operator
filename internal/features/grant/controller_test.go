@@ -67,7 +67,7 @@ func newTestUser(name, namespace string) *dbopsv1alpha1.DatabaseUser {
 		},
 		Spec: dbopsv1alpha1.DatabaseUserSpec{
 			Username: name,
-			InstanceRef: dbopsv1alpha1.InstanceReference{
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
 				Name: "test-instance",
 			},
 		},

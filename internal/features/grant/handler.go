@@ -28,6 +28,7 @@ import (
 	"github.com/db-provision-operator/internal/metrics"
 	"github.com/db-provision-operator/internal/service/drift"
 	"github.com/db-provision-operator/internal/shared/eventbus"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 )
 
 // Handler contains the business logic for grant operations.
@@ -240,6 +241,7 @@ func (h *Handler) CleanupInfoMetric(grant *dbopsv1alpha1.DatabaseGrant) {
 }
 
 // GetInstance returns the DatabaseInstance for the given spec.
+// Deprecated: Use ResolveInstance instead, which supports both DatabaseInstance and ClusterDatabaseInstance.
 func (h *Handler) GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
 	return h.repo.GetInstance(ctx, spec, namespace)
 }
@@ -278,6 +280,11 @@ func (h *Handler) CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.Database
 	}
 
 	return correctionResult, nil
+}
+
+// ResolveInstance resolves the instance reference via the user's instanceRef or clusterInstanceRef.
+func (h *Handler) ResolveInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*instanceresolver.ResolvedInstance, error) {
+	return h.repo.ResolveInstance(ctx, spec, namespace)
 }
 
 // Ensure Handler implements API interface.

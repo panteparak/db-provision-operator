@@ -1,0 +1,518 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: clusterdatabaseinstances.dbops.dbprovision.io
+spec:
+  group: dbops.dbprovision.io
+  names:
+    kind: ClusterDatabaseInstance
+    listKind: ClusterDatabaseInstanceList
+    plural: clusterdatabaseinstances
+    shortNames:
+    - cdbi
+    singular: clusterdatabaseinstance
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.engine
+      name: Engine
+      type: string
+    - jsonPath: .spec.connection.host
+      name: Host
+      type: string
+    - jsonPath: .spec.connection.port
+      name: Port
+      type: integer
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.version
+      name: Version
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          ClusterDatabaseInstance is the Schema for the clusterdatabaseinstances API.
+          It represents a cluster-scoped database instance that can be referenced by
+          resources in any namespace. Use this for shared database infrastructure
+          managed by platform teams.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              Spec defines the desired state of the ClusterDatabaseInstance.
+              Uses the same spec as DatabaseInstance.
+            properties:
+              connection:
+                description: Connection configuration
+                properties:
+                  database:
+                    description: Database is the admin database name for initial connection
+                    type: string
+                  existingSecret:
+                    description: ExistingSecret references an existing secret with
+                      custom keys (mutually exclusive with SecretRef)
+                    properties:
+                      keys:
+                        description: Keys defines the key names for username and password
+                        properties:
+                          password:
+                            default: password
+                            description: 'Password key in the secret (default: "password")'
+                            type: string
+                          username:
+                            default: username
+                            description: 'Username key in the secret (default: "username")'
+                            type: string
+                        type: object
+                      name:
+                        description: Name of the secret containing credentials
+                        type: string
+                      namespace:
+                        description: Namespace of the secret (defaults to the resource's
+                          namespace if not specified)
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  host:
+                    description: Host is the database server hostname or IP
+                    minLength: 1
+                    type: string
+                  port:
+                    description: Port is the database server port
+                    format: int32
+                    maximum: 65535
+                    minimum: 1
+                    type: integer
+                  secretRef:
+                    description: SecretRef references a secret containing credentials
+                      (mutually exclusive with ExistingSecret)
+                    properties:
+                      keys:
+                        description: Keys defines the key names for username and password
+                        properties:
+                          password:
+                            default: password
+                            description: 'Password key in the secret (default: "password")'
+                            type: string
+                          username:
+                            default: username
+                            description: 'Username key in the secret (default: "username")'
+                            type: string
+                        type: object
+                      name:
+                        description: Name of the secret containing credentials
+                        type: string
+                      namespace:
+                        description: Namespace of the secret (defaults to the resource's
+                          namespace if not specified)
+                        type: string
+                    required:
+                    - name
+                    type: object
+                required:
+                - database
+                - host
+                - port
+                type: object
+              deletionProtection:
+                description: DeletionProtection prevents accidental deletion
+                type: boolean
+              discovery:
+                description: |-
+                  Discovery enables scanning for database resources not managed by Kubernetes CRs.
+                  Discovered resources can be adopted via annotations.
+                properties:
+                  enabled:
+                    default: false
+                    description: Enabled enables resource discovery
+                    type: boolean
+                  interval:
+                    default: 30m
+                    description: Interval specifies how often to scan for unmanaged
+                      resources (Go duration string)
+                    type: string
+                type: object
+              driftPolicy:
+                description: |-
+                  DriftPolicy defines the default drift detection policy for resources using this instance.
+                  Individual resources can override this policy.
+                properties:
+                  interval:
+                    default: 5m
+                    description: |-
+                      Interval specifies how often to check for drift (Go duration string)
+                      This is only meaningful when mode is "detect" or "correct"
+                    type: string
+                  mode:
+                    allOf:
+                    - enum:
+                      - ignore
+                      - detect
+                      - correct
+                    - enum:
+                      - ignore
+                      - detect
+                      - correct
+                    default: detect
+                    description: Mode determines how drift is handled
+                    type: string
+                type: object
+              engine:
+                allOf:
+                - enum:
+                  - postgres
+                  - mysql
+                  - mariadb
+                  - cockroachdb
+                - enum:
+                  - postgres
+                  - mysql
+                  - mariadb
+                  - cockroachdb
+                description: Engine type (required, immutable)
+                type: string
+                x-kubernetes-validations:
+                - message: engine is immutable
+                  rule: self == oldSelf
+              healthCheck:
+                description: Health check configuration
+                properties:
+                  enabled:
+                    default: true
+                    description: Enabled enables periodic health checks
+                    type: boolean
+                  intervalSeconds:
+                    default: 30
+                    description: 'IntervalSeconds defines how often to check (default:
+                      30)'
+                    format: int32
+                    minimum: 5
+                    type: integer
+                  timeoutSeconds:
+                    default: 5
+                    description: 'TimeoutSeconds defines the health check timeout
+                      (default: 5)'
+                    format: int32
+                    minimum: 1
+                    type: integer
+                type: object
+              mysql:
+                description: MySQL-specific options (only valid when engine is "mysql")
+                properties:
+                  charset:
+                    default: utf8mb4
+                    description: Charset sets the default character set
+                    type: string
+                  collation:
+                    default: utf8mb4_unicode_ci
+                    description: Collation sets the default collation
+                    type: string
+                  parseTime:
+                    default: true
+                    description: ParseTime enables parsing of DATE and DATETIME to
+                      time.Time
+                    type: boolean
+                  readTimeout:
+                    default: 30s
+                    description: ReadTimeout is the read timeout (e.g., "30s")
+                    type: string
+                  timeout:
+                    default: 10s
+                    description: Timeout is the connection timeout (e.g., "10s")
+                    type: string
+                  tls:
+                    allOf:
+                    - enum:
+                      - disabled
+                      - preferred
+                      - required
+                      - skip-verify
+                    - enum:
+                      - disabled
+                      - preferred
+                      - required
+                      - skip-verify
+                    default: preferred
+                    description: TLS specifies the TLS mode
+                    type: string
+                  writeTimeout:
+                    default: 30s
+                    description: WriteTimeout is the write timeout (e.g., "30s")
+                    type: string
+                type: object
+              postgres:
+                description: PostgreSQL-specific options (only valid when engine is
+                  "postgres")
+                properties:
+                  applicationName:
+                    default: db-provision-operator
+                    description: ApplicationName is the application name for connections
+                    type: string
+                  connectTimeout:
+                    default: 10
+                    description: ConnectTimeout is the connection timeout in seconds
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  sslMode:
+                    allOf:
+                    - enum:
+                      - disable
+                      - allow
+                      - prefer
+                      - require
+                      - verify-ca
+                      - verify-full
+                    - enum:
+                      - disable
+                      - allow
+                      - prefer
+                      - require
+                      - verify-ca
+                      - verify-full
+                    default: prefer
+                    description: SSLMode specifies the SSL mode for connections
+                    type: string
+                  statementTimeout:
+                    description: StatementTimeout is the statement timeout (e.g.,
+                      "30s")
+                    type: string
+                type: object
+              tls:
+                description: TLS configuration
+                properties:
+                  enabled:
+                    description: Enabled enables TLS for connections
+                    type: boolean
+                  mode:
+                    default: disable
+                    description: Mode specifies the TLS verification mode
+                    enum:
+                    - disable
+                    - require
+                    - verify-ca
+                    - verify-full
+                    type: string
+                  secretRef:
+                    description: SecretRef references a secret containing TLS certificates
+                    properties:
+                      keys:
+                        description: Keys defines the key names for TLS certificates
+                        properties:
+                          ca:
+                            default: ca.crt
+                            description: 'CA certificate key (default: "ca.crt")'
+                            type: string
+                          cert:
+                            description: Client certificate key for mTLS (optional)
+                            type: string
+                          key:
+                            description: Client key for mTLS (optional)
+                            type: string
+                        type: object
+                      name:
+                        description: Name of the secret containing TLS certificates
+                        type: string
+                    required:
+                    - name
+                    type: object
+                type: object
+            required:
+            - connection
+            - engine
+            type: object
+          status:
+            description: |-
+              Status defines the observed state of the ClusterDatabaseInstance.
+              Uses the same status as DatabaseInstance.
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              discoveredResources:
+                description: |-
+                  DiscoveredResources contains resources found in the database that are not managed by CRs.
+                  Only populated when discovery is enabled.
+                properties:
+                  databases:
+                    description: Databases contains discovered database resources
+                    items:
+                      description: |-
+                        DiscoveredResource represents a resource found in the database
+                        that is not managed by a Kubernetes CR.
+                      properties:
+                        adopted:
+                          description: Adopted indicates if this resource has been
+                            adopted via annotation
+                          type: boolean
+                        discovered:
+                          description: Discovered is when this resource was first
+                            discovered
+                          format: date-time
+                          type: string
+                        name:
+                          description: Name is the name of the discovered resource
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  lastScan:
+                    description: LastScan is when the last discovery scan was performed
+                    format: date-time
+                    type: string
+                  roles:
+                    description: Roles contains discovered role resources
+                    items:
+                      description: |-
+                        DiscoveredResource represents a resource found in the database
+                        that is not managed by a Kubernetes CR.
+                      properties:
+                        adopted:
+                          description: Adopted indicates if this resource has been
+                            adopted via annotation
+                          type: boolean
+                        discovered:
+                          description: Discovered is when this resource was first
+                            discovered
+                          format: date-time
+                          type: string
+                        name:
+                          description: Name is the name of the discovered resource
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  users:
+                    description: Users contains discovered user resources
+                    items:
+                      description: |-
+                        DiscoveredResource represents a resource found in the database
+                        that is not managed by a Kubernetes CR.
+                      properties:
+                        adopted:
+                          description: Adopted indicates if this resource has been
+                            adopted via annotation
+                          type: boolean
+                        discovered:
+                          description: Discovered is when this resource was first
+                            discovered
+                          format: date-time
+                          type: string
+                        name:
+                          description: Name is the name of the discovered resource
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                type: object
+              lastCheckedAt:
+                description: LastCheckedAt is the timestamp of the last health check
+                format: date-time
+                type: string
+              message:
+                description: Message provides additional information about the current
+                  state
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the last observed generation of
+                  the resource
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current state of the instance
+                enum:
+                - Pending
+                - Ready
+                - Failed
+                type: string
+              version:
+                description: Version is the detected database server version
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

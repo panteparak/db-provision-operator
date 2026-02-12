@@ -43,7 +43,7 @@ func TestHandler_Create(t *testing.T) {
 			name: "successful creation",
 			spec: &dbopsv1alpha1.DatabaseUserSpec{
 				Username: "testuser",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -67,7 +67,7 @@ func TestHandler_Create(t *testing.T) {
 			name: "user already exists",
 			spec: &dbopsv1alpha1.DatabaseUserSpec{
 				Username: "testuser",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -88,7 +88,7 @@ func TestHandler_Create(t *testing.T) {
 			name: "empty username returns error",
 			spec: &dbopsv1alpha1.DatabaseUserSpec{
 				Username: "",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -102,7 +102,7 @@ func TestHandler_Create(t *testing.T) {
 			name: "empty password returns error",
 			spec: &dbopsv1alpha1.DatabaseUserSpec{
 				Username: "testuser",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -116,7 +116,7 @@ func TestHandler_Create(t *testing.T) {
 			name: "repository error on exists check",
 			spec: &dbopsv1alpha1.DatabaseUserSpec{
 				Username: "testuser",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -137,7 +137,7 @@ func TestHandler_Create(t *testing.T) {
 			name: "repository error on create",
 			spec: &dbopsv1alpha1.DatabaseUserSpec{
 				Username: "testuser",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -203,7 +203,7 @@ func TestHandler_Delete(t *testing.T) {
 			username: "testuser",
 			spec: &dbopsv1alpha1.DatabaseUserSpec{
 				Username: "testuser",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -224,7 +224,7 @@ func TestHandler_Delete(t *testing.T) {
 			username: "testuser",
 			spec: &dbopsv1alpha1.DatabaseUserSpec{
 				Username: "testuser",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -246,7 +246,7 @@ func TestHandler_Delete(t *testing.T) {
 			username: "testuser",
 			spec: &dbopsv1alpha1.DatabaseUserSpec{
 				Username: "testuser",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -306,7 +306,7 @@ func TestHandler_Exists(t *testing.T) {
 			username: "testuser",
 			spec: &dbopsv1alpha1.DatabaseUserSpec{
 				Username: "testuser",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -324,7 +324,7 @@ func TestHandler_Exists(t *testing.T) {
 			username: "testuser",
 			spec: &dbopsv1alpha1.DatabaseUserSpec{
 				Username: "testuser",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -342,7 +342,7 @@ func TestHandler_Exists(t *testing.T) {
 			username: "testuser",
 			spec: &dbopsv1alpha1.DatabaseUserSpec{
 				Username: "testuser",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -396,7 +396,7 @@ func TestHandler_Update(t *testing.T) {
 			username: "testuser",
 			spec: &dbopsv1alpha1.DatabaseUserSpec{
 				Username: "testuser",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -417,7 +417,7 @@ func TestHandler_Update(t *testing.T) {
 			username: "testuser",
 			spec: &dbopsv1alpha1.DatabaseUserSpec{
 				Username: "testuser",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -435,7 +435,7 @@ func TestHandler_Update(t *testing.T) {
 			username: "testuser",
 			spec: &dbopsv1alpha1.DatabaseUserSpec{
 				Username: "testuser",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -490,7 +490,7 @@ func TestHandler_RotatePassword(t *testing.T) {
 			username: "testuser",
 			spec: &dbopsv1alpha1.DatabaseUserSpec{
 				Username: "testuser",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -507,7 +507,7 @@ func TestHandler_RotatePassword(t *testing.T) {
 			username: "testuser",
 			spec: &dbopsv1alpha1.DatabaseUserSpec{
 				Username: "testuser",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -571,7 +571,7 @@ func TestHandler_EventPublishing(t *testing.T) {
 
 		spec := &dbopsv1alpha1.DatabaseUserSpec{
 			Username: "testuser",
-			InstanceRef: dbopsv1alpha1.InstanceReference{
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
 				Name: "test-instance",
 			},
 		}
@@ -601,7 +601,7 @@ func TestHandler_EventPublishing(t *testing.T) {
 
 		spec := &dbopsv1alpha1.DatabaseUserSpec{
 			Username: "testuser",
-			InstanceRef: dbopsv1alpha1.InstanceReference{
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
 				Name: "test-instance",
 			},
 		}

@@ -31,15 +31,17 @@ import (
 	"github.com/db-provision-operator/internal/adapter"
 	adapterpkg "github.com/db-provision-operator/internal/adapter/types"
 	"github.com/db-provision-operator/internal/secret"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 	"github.com/db-provision-operator/internal/storage"
 	"github.com/db-provision-operator/internal/util"
 )
 
 // Repository handles backup storage/adapter operations.
 type Repository struct {
-	client        client.Client
-	secretManager *secret.Manager
-	logger        logr.Logger
+	client           client.Client
+	secretManager    *secret.Manager
+	instanceResolver *instanceresolver.Resolver
+	logger           logr.Logger
 }
 
 // RepositoryConfig holds dependencies for the repository.
@@ -52,13 +54,15 @@ type RepositoryConfig struct {
 // NewRepository creates a new backup repository.
 func NewRepository(cfg RepositoryConfig) *Repository {
 	return &Repository{
-		client:        cfg.Client,
-		secretManager: cfg.SecretManager,
-		logger:        cfg.Logger,
+		client:           cfg.Client,
+		secretManager:    cfg.SecretManager,
+		instanceResolver: instanceresolver.New(cfg.Client),
+		logger:           cfg.Logger,
 	}
 }
 
 // ExecuteBackup performs the actual backup operation.
+// Supports both namespaced DatabaseInstance and cluster-scoped ClusterDatabaseInstance.
 func (r *Repository) ExecuteBackup(ctx context.Context, backup *dbopsv1alpha1.DatabaseBackup) (*BackupExecutionResult, error) {
 	log := logf.FromContext(ctx).WithValues("backup", backup.Name, "namespace", backup.Namespace)
 
@@ -68,43 +72,54 @@ func (r *Repository) ExecuteBackup(ctx context.Context, backup *dbopsv1alpha1.Da
 		return nil, fmt.Errorf("get database: %w", err)
 	}
 
-	// Get the instance
-	instance, err := r.GetInstance(ctx, database)
+	// Resolve the instance (supports both instanceRef and clusterInstanceRef)
+	resolved, err := r.ResolveInstanceForDatabase(ctx, database)
 	if err != nil {
-		return nil, fmt.Errorf("get instance: %w", err)
+		return nil, fmt.Errorf("resolve instance: %w", err)
 	}
 
-	// Get credentials
-	creds, err := r.getCredentialsWithRetry(ctx, instance)
-	if err != nil {
-		return nil, fmt.Errorf("get credentials: %w", err)
+	// Get credentials with retry from the credential namespace
+	retryConfig := util.ConnectionRetryConfig()
+	var creds *secret.Credentials
+	result := util.RetryWithBackoff(ctx, retryConfig, func() error {
+		var err error
+		creds, err = r.secretManager.GetCredentials(ctx, resolved.CredentialNamespace, resolved.Spec.Connection.SecretRef)
+		return err
+	})
+	if result.LastError != nil {
+		return nil, fmt.Errorf("get credentials: %w", result.LastError)
 	}
 
 	// Get TLS credentials if enabled
-	tlsCreds, err := r.getTLSCredentials(ctx, instance)
-	if err != nil {
-		return nil, fmt.Errorf("get TLS credentials: %w", err)
+	var tlsCA, tlsCert, tlsKey []byte
+	if resolved.Spec.TLS != nil && resolved.Spec.TLS.Enabled {
+		result := util.RetryWithBackoff(ctx, retryConfig, func() error {
+			tlsCreds, err := r.secretManager.GetTLSCredentials(ctx, resolved.CredentialNamespace, resolved.Spec.TLS)
+			if err != nil {
+				return err
+			}
+			tlsCA = tlsCreds.CA
+			tlsCert = tlsCreds.Cert
+			tlsKey = tlsCreds.Key
+			return nil
+		})
+		if result.LastError != nil {
+			return nil, fmt.Errorf("get TLS credentials: %w", result.LastError)
+		}
 	}
 
 	// Build connection config
-	var tlsCA, tlsCert, tlsKey []byte
-	if tlsCreds != nil {
-		tlsCA = tlsCreds.CA
-		tlsCert = tlsCreds.Cert
-		tlsKey = tlsCreds.Key
-	}
-	connConfig := adapter.BuildConnectionConfig(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
+	connConfig := adapter.BuildConnectionConfig(resolved.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
 
 	// Create database adapter
-	dbAdapter, err := adapter.NewAdapter(instance.Spec.Engine, connConfig)
+	dbAdapter, err := adapter.NewAdapter(resolved.Spec.Engine, connConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create adapter: %w", err)
 	}
 	defer func() { _ = dbAdapter.Close() }()
 
 	// Connect with retry
-	retryConfig := util.ConnectionRetryConfig()
-	result := util.RetryWithBackoff(ctx, retryConfig, func() error {
+	result = util.RetryWithBackoff(ctx, retryConfig, func() error {
 		return dbAdapter.Connect(ctx)
 	})
 	if result.LastError != nil {
@@ -122,14 +137,14 @@ func (r *Repository) ExecuteBackup(ctx context.Context, backup *dbopsv1alpha1.Da
 		BackupName:        backup.Name,
 		DatabaseName:      database.Spec.Name,
 		Timestamp:         now.Time,
-		Extension:         r.getBackupExtension(instance.Spec.Engine, backup),
+		Extension:         r.getBackupExtension(resolved.Spec.Engine, backup),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create backup writer: %w", err)
 	}
 
 	// Build backup options
-	backupOpts := r.buildBackupOptions(backup, database, instance.Spec.Engine, backupWriter)
+	backupOpts := r.buildBackupOptions(backup, database, resolved.Spec.Engine, backupWriter)
 
 	// Execute backup with retry
 	backupRetryConfig := util.BackupRetryConfig()
@@ -163,10 +178,10 @@ func (r *Repository) ExecuteBackup(ctx context.Context, backup *dbopsv1alpha1.Da
 		Checksum:            backupResult.Checksum,
 		Format:              backupResult.Format,
 		Duration:            duration,
-		Instance:            instance.Name,
+		Instance:            resolved.Name,
 		Database:            database.Spec.Name,
-		Engine:              string(instance.Spec.Engine),
-		Version:             instance.Status.Version,
+		Engine:              resolved.Engine(),
+		Version:             resolved.Version,
 	}, nil
 }
 
@@ -225,7 +240,13 @@ func (r *Repository) GetDatabase(ctx context.Context, backup *dbopsv1alpha1.Data
 }
 
 // GetInstance retrieves the DatabaseInstance for a database.
+// Deprecated: Use ResolveInstanceForDatabase instead for cluster instance support.
 func (r *Repository) GetInstance(ctx context.Context, database *dbopsv1alpha1.Database) (*dbopsv1alpha1.DatabaseInstance, error) {
+	// Only works with namespaced instances
+	if database.Spec.InstanceRef == nil {
+		return nil, fmt.Errorf("database uses clusterInstanceRef, use ResolveInstanceForDatabase instead")
+	}
+
 	instanceNamespace := database.Namespace
 	if database.Spec.InstanceRef.Namespace != "" {
 		instanceNamespace = database.Spec.InstanceRef.Namespace
@@ -242,6 +263,11 @@ func (r *Repository) GetInstance(ctx context.Context, database *dbopsv1alpha1.Da
 	return instance, nil
 }
 
+// ResolveInstanceForDatabase resolves the instance for a database (supports both instanceRef and clusterInstanceRef).
+func (r *Repository) ResolveInstanceForDatabase(ctx context.Context, database *dbopsv1alpha1.Database) (*instanceresolver.ResolvedInstance, error) {
+	return r.instanceResolver.Resolve(ctx, database.Spec.InstanceRef, database.Spec.ClusterInstanceRef, database.Namespace)
+}
+
 // GetEngine returns the database engine type for a backup.
 func (r *Repository) GetEngine(ctx context.Context, backup *dbopsv1alpha1.DatabaseBackup) (string, error) {
 	database, err := r.GetDatabase(ctx, backup)
@@ -249,46 +275,12 @@ func (r *Repository) GetEngine(ctx context.Context, backup *dbopsv1alpha1.Databa
 		return "", err
 	}
 
-	instance, err := r.GetInstance(ctx, database)
+	resolved, err := r.ResolveInstanceForDatabase(ctx, database)
 	if err != nil {
 		return "", err
 	}
 
-	return string(instance.Spec.Engine), nil
-}
-
-// getCredentialsWithRetry gets credentials with retry logic.
-func (r *Repository) getCredentialsWithRetry(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance) (*secret.Credentials, error) {
-	var creds *secret.Credentials
-	retryConfig := util.ConnectionRetryConfig()
-	result := util.RetryWithBackoff(ctx, retryConfig, func() error {
-		var err error
-		creds, err = r.secretManager.GetCredentials(ctx, instance.Namespace, instance.Spec.Connection.SecretRef)
-		return err
-	})
-	if result.LastError != nil {
-		return nil, result.LastError
-	}
-	return creds, nil
-}
-
-// getTLSCredentials gets TLS credentials if TLS is enabled.
-func (r *Repository) getTLSCredentials(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance) (*secret.TLSCredentials, error) {
-	if instance.Spec.TLS == nil || !instance.Spec.TLS.Enabled {
-		return nil, nil
-	}
-
-	var tlsCreds *secret.TLSCredentials
-	retryConfig := util.ConnectionRetryConfig()
-	result := util.RetryWithBackoff(ctx, retryConfig, func() error {
-		var err error
-		tlsCreds, err = r.secretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
-		return err
-	})
-	if result.LastError != nil {
-		return nil, result.LastError
-	}
-	return tlsCreds, nil
+	return resolved.Engine(), nil
 }
 
 // getBackupExtension returns the appropriate file extension based on engine and backup config.

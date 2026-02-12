@@ -75,7 +75,7 @@ func newTestDatabase(name, namespace string) *dbopsv1alpha1.Database {
 		},
 		Spec: dbopsv1alpha1.DatabaseSpec{
 			Name: name,
-			InstanceRef: dbopsv1alpha1.InstanceReference{
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
 				Name: "test-instance",
 			},
 		},

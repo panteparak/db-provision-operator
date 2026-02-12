@@ -7,6 +7,7 @@ resources:
 - service_account.yaml
 - role.yaml
 - role_binding.yaml
+
 - leader_election_role.yaml
 - leader_election_role_binding.yaml
 # The following RBAC configurations are used to protect
@@ -46,3 +47,8 @@ resources:
 - databaseinstance_admin_role.yaml
 - databaseinstance_editor_role.yaml
 - databaseinstance_viewer_role.yaml
+- clusterdatabaseinstance_admin_role.yaml
+- clusterdatabaseinstance_editor_role.yaml
+- clusterdatabaseinstance_viewer_role.yaml
+- clusterdatabaseinstance_manager_role.yaml
+- clusterdatabaseinstance_manager_role_binding.yaml

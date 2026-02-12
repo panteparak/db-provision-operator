@@ -23,6 +23,7 @@ import (
 
 	"github.com/db-provision-operator/internal/features/backup"
 	"github.com/db-provision-operator/internal/features/backupschedule"
+	"github.com/db-provision-operator/internal/features/clusterinstance"
 	"github.com/db-provision-operator/internal/features/database"
 	"github.com/db-provision-operator/internal/features/grant"
 	"github.com/db-provision-operator/internal/features/instance"
@@ -76,6 +77,18 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 		return nil, err
 	}
 	modules = append(modules, instanceMod)
+
+	// ClusterInstance module (cluster-scoped instances - parallel to Instance module)
+	clusterInstanceMod, err := clusterinstance.NewModule(clusterinstance.Config{
+		Manager:       mgr,
+		Recorder:      mgr.GetEventRecorderFor("clusterdatabaseinstance-controller"),
+		EventBus:      eventBus,
+		SecretManager: secretManager,
+	})
+	if err != nil {
+		return nil, err
+	}
+	modules = append(modules, clusterInstanceMod)
 
 	// Database module (depends on Instance)
 	databaseMod, err := database.NewModule(database.Config{

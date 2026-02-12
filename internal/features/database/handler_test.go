@@ -43,7 +43,7 @@ func TestHandler_Create(t *testing.T) {
 			name: "successful creation",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -66,7 +66,7 @@ func TestHandler_Create(t *testing.T) {
 			name: "database already exists",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -86,7 +86,7 @@ func TestHandler_Create(t *testing.T) {
 			name: "empty name returns error",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -99,7 +99,7 @@ func TestHandler_Create(t *testing.T) {
 			name: "empty instance ref returns error",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name:        "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{},
+				InstanceRef: &dbopsv1alpha1.InstanceReference{},
 			},
 			namespace:   "default",
 			setupMock:   func(m *MockRepository) {},
@@ -110,7 +110,7 @@ func TestHandler_Create(t *testing.T) {
 			name: "repository error on exists check",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -130,7 +130,7 @@ func TestHandler_Create(t *testing.T) {
 			name: "repository error on create",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -195,7 +195,7 @@ func TestHandler_Delete(t *testing.T) {
 			dbName: "testdb",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -219,7 +219,7 @@ func TestHandler_Delete(t *testing.T) {
 			dbName: "testdb",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -244,7 +244,7 @@ func TestHandler_Delete(t *testing.T) {
 			dbName: "testdb",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -307,7 +307,7 @@ func TestHandler_Exists(t *testing.T) {
 			dbName: "testdb",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -325,7 +325,7 @@ func TestHandler_Exists(t *testing.T) {
 			dbName: "testdb",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -343,7 +343,7 @@ func TestHandler_Exists(t *testing.T) {
 			dbName: "testdb",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -396,7 +396,7 @@ func TestHandler_DetectDrift(t *testing.T) {
 			name: "no drift detected",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -417,7 +417,7 @@ func TestHandler_DetectDrift(t *testing.T) {
 			name: "drift detected",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -444,7 +444,7 @@ func TestHandler_DetectDrift(t *testing.T) {
 			name: "repository error",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -500,7 +500,7 @@ func TestHandler_CorrectDrift(t *testing.T) {
 			name: "successful correction",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -528,7 +528,7 @@ func TestHandler_CorrectDrift(t *testing.T) {
 			name: "correction skipped for immutable field",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -556,7 +556,7 @@ func TestHandler_CorrectDrift(t *testing.T) {
 			name: "repository error",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -617,7 +617,7 @@ func TestHandler_Update(t *testing.T) {
 			dbName: "testdb",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -638,7 +638,7 @@ func TestHandler_Update(t *testing.T) {
 			dbName: "testdb",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -656,7 +656,7 @@ func TestHandler_Update(t *testing.T) {
 			dbName: "testdb",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -711,7 +711,7 @@ func TestHandler_GetInfo(t *testing.T) {
 			dbName: "testdb",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -739,7 +739,7 @@ func TestHandler_GetInfo(t *testing.T) {
 			dbName: "nonexistent",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "nonexistent",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -792,7 +792,7 @@ func TestHandler_VerifyAccess(t *testing.T) {
 			dbName: "testdb",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},
@@ -809,7 +809,7 @@ func TestHandler_VerifyAccess(t *testing.T) {
 			dbName: "testdb",
 			spec: &dbopsv1alpha1.DatabaseSpec{
 				Name: "testdb",
-				InstanceRef: dbopsv1alpha1.InstanceReference{
+				InstanceRef: &dbopsv1alpha1.InstanceReference{
 					Name: "test-instance",
 				},
 			},

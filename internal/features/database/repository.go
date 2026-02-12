@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -29,14 +28,16 @@ import (
 	"github.com/db-provision-operator/internal/secret"
 	"github.com/db-provision-operator/internal/service"
 	"github.com/db-provision-operator/internal/service/drift"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 )
 
 // Repository handles database operations via the service layer.
 // It encapsulates the logic for creating database connections and executing operations.
 type Repository struct {
-	client        client.Client
-	secretManager *secret.Manager
-	logger        logr.Logger
+	client           client.Client
+	secretManager    *secret.Manager
+	instanceResolver *instanceresolver.Resolver
+	logger           logr.Logger
 }
 
 // RepositoryConfig holds dependencies for the repository.
@@ -49,45 +50,38 @@ type RepositoryConfig struct {
 // NewRepository creates a new database repository.
 func NewRepository(cfg RepositoryConfig) *Repository {
 	return &Repository{
-		client:        cfg.Client,
-		secretManager: cfg.SecretManager,
-		logger:        cfg.Logger,
+		client:           cfg.Client,
+		secretManager:    cfg.SecretManager,
+		instanceResolver: instanceresolver.New(cfg.Client),
+		logger:           cfg.Logger,
 	}
 }
 
 // withService creates a database service connection and executes the given function.
 // It handles all the boilerplate of getting the instance, credentials, and connecting.
-func (r *Repository) withService(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, fn func(svc *service.DatabaseService, instance *dbopsv1alpha1.DatabaseInstance) error) error {
-	// Get the DatabaseInstance
-	instance := &dbopsv1alpha1.DatabaseInstance{}
-	instanceRef := spec.InstanceRef
-	instanceNamespace := namespace
-	if instanceRef.Namespace != "" {
-		instanceNamespace = instanceRef.Namespace
-	}
-
-	if err := r.client.Get(ctx, types.NamespacedName{
-		Namespace: instanceNamespace,
-		Name:      instanceRef.Name,
-	}, instance); err != nil {
-		return fmt.Errorf("get instance: %w", err)
+// Supports both namespaced DatabaseInstance and cluster-scoped ClusterDatabaseInstance.
+func (r *Repository) withService(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, fn func(svc *service.DatabaseService, instanceSpec *dbopsv1alpha1.DatabaseInstanceSpec) error) error {
+	// Resolve the instance (supports both instanceRef and clusterInstanceRef)
+	resolved, err := r.instanceResolver.Resolve(ctx, spec.InstanceRef, spec.ClusterInstanceRef, namespace)
+	if err != nil {
+		return fmt.Errorf("resolve instance: %w", err)
 	}
 
 	// Check if instance is ready
-	if instance.Status.Phase != dbopsv1alpha1.PhaseReady {
-		return fmt.Errorf("instance not ready: phase is %s", instance.Status.Phase)
+	if !resolved.IsReady() {
+		return fmt.Errorf("instance not ready: phase is %s", resolved.Phase)
 	}
 
-	// Get credentials
-	creds, err := r.secretManager.GetCredentials(ctx, instance.Namespace, instance.Spec.Connection.SecretRef)
+	// Get credentials from the credential namespace
+	creds, err := r.secretManager.GetCredentials(ctx, resolved.CredentialNamespace, resolved.Spec.Connection.SecretRef)
 	if err != nil {
 		return fmt.Errorf("get credentials: %w", err)
 	}
 
 	// Get TLS credentials if enabled
 	var tlsCA, tlsCert, tlsKey []byte
-	if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
-		tlsCreds, err := r.secretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
+	if resolved.Spec.TLS != nil && resolved.Spec.TLS.Enabled {
+		tlsCreds, err := r.secretManager.GetTLSCredentials(ctx, resolved.CredentialNamespace, resolved.Spec.TLS)
 		if err != nil {
 			logf.FromContext(ctx).Error(err, "Failed to get TLS credentials")
 		} else {
@@ -98,7 +92,7 @@ func (r *Repository) withService(ctx context.Context, spec *dbopsv1alpha1.Databa
 	}
 
 	// Build service config
-	cfg := service.ConfigFromInstance(&instance.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
+	cfg := service.ConfigFromInstance(resolved.Spec, creds.Username, creds.Password, tlsCA, tlsCert, tlsKey)
 	cfg.Logger = logf.FromContext(ctx)
 
 	// Create database service
@@ -114,14 +108,14 @@ func (r *Repository) withService(ctx context.Context, spec *dbopsv1alpha1.Databa
 	}
 
 	// Execute the function with the service
-	return fn(svc, instance)
+	return fn(svc, resolved.Spec)
 }
 
 // Create creates a new database.
 func (r *Repository) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (*Result, error) {
 	var result *Result
 
-	err := r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstance) error {
+	err := r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
 		svcResult, err := svc.CreateOnly(ctx, spec)
 		if err != nil {
 			return fmt.Errorf("create database: %w", err)
@@ -141,7 +135,7 @@ func (r *Repository) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpe
 func (r *Repository) Exists(ctx context.Context, name string, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (bool, error) {
 	var exists bool
 
-	err := r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstance) error {
+	err := r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
 		var err error
 		exists, err = svc.Exists(ctx, name)
 		return err
@@ -154,7 +148,7 @@ func (r *Repository) Exists(ctx context.Context, name string, spec *dbopsv1alpha
 func (r *Repository) Update(ctx context.Context, name string, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (*Result, error) {
 	var result *Result
 
-	err := r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstance) error {
+	err := r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
 		svcResult, err := svc.Update(ctx, name, spec)
 		if err != nil {
 			return fmt.Errorf("update database: %w", err)
@@ -172,7 +166,7 @@ func (r *Repository) Update(ctx context.Context, name string, spec *dbopsv1alpha
 
 // Delete deletes a database.
 func (r *Repository) Delete(ctx context.Context, name string, spec *dbopsv1alpha1.DatabaseSpec, namespace string, force bool) error {
-	return r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstance) error {
+	return r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
 		_, err := svc.Delete(ctx, name, force)
 		return err
 	})
@@ -180,7 +174,7 @@ func (r *Repository) Delete(ctx context.Context, name string, spec *dbopsv1alpha
 
 // VerifyAccess verifies that a database is accepting connections.
 func (r *Repository) VerifyAccess(ctx context.Context, name string, spec *dbopsv1alpha1.DatabaseSpec, namespace string) error {
-	return r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstance) error {
+	return r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
 		return svc.VerifyAccess(ctx, name)
 	})
 }
@@ -189,7 +183,7 @@ func (r *Repository) VerifyAccess(ctx context.Context, name string, spec *dbopsv
 func (r *Repository) GetInfo(ctx context.Context, name string, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (*Info, error) {
 	var info *Info
 
-	err := r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstance) error {
+	err := r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
 		dbInfo, err := svc.Get(ctx, name)
 		if err != nil {
 			return err
@@ -212,7 +206,14 @@ func (r *Repository) GetInfo(ctx context.Context, name string, spec *dbopsv1alph
 }
 
 // GetInstance returns the DatabaseInstance for a given spec.
+// Deprecated: Use ResolveInstance instead, which supports both DatabaseInstance and ClusterDatabaseInstance.
+// This method only works with namespaced DatabaseInstance references.
 func (r *Repository) GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+	// Only works with namespaced instances
+	if spec.InstanceRef == nil {
+		return nil, fmt.Errorf("instanceRef not specified (use ResolveInstance for clusterInstanceRef)")
+	}
+
 	instance := &dbopsv1alpha1.DatabaseInstance{}
 	instanceRef := spec.InstanceRef
 	instanceNamespace := namespace
@@ -220,7 +221,7 @@ func (r *Repository) GetInstance(ctx context.Context, spec *dbopsv1alpha1.Databa
 		instanceNamespace = instanceRef.Namespace
 	}
 
-	if err := r.client.Get(ctx, types.NamespacedName{
+	if err := r.client.Get(ctx, client.ObjectKey{
 		Namespace: instanceNamespace,
 		Name:      instanceRef.Name,
 	}, instance); err != nil {
@@ -230,13 +231,18 @@ func (r *Repository) GetInstance(ctx context.Context, spec *dbopsv1alpha1.Databa
 	return instance, nil
 }
 
+// ResolveInstance resolves the instance reference (supports both instanceRef and clusterInstanceRef).
+func (r *Repository) ResolveInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (*instanceresolver.ResolvedInstance, error) {
+	return r.instanceResolver.Resolve(ctx, spec.InstanceRef, spec.ClusterInstanceRef, namespace)
+}
+
 // GetEngine returns the database engine type for a given spec.
 func (r *Repository) GetEngine(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (string, error) {
-	instance, err := r.GetInstance(ctx, spec, namespace)
+	resolved, err := r.ResolveInstance(ctx, spec, namespace)
 	if err != nil {
 		return "", err
 	}
-	return string(instance.Spec.Engine), nil
+	return resolved.Engine(), nil
 }
 
 // DetectDrift detects configuration drift between the CR spec and actual database state.
@@ -245,7 +251,7 @@ func (r *Repository) GetEngine(ctx context.Context, spec *dbopsv1alpha1.Database
 func (r *Repository) DetectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
 	var result *drift.Result
 
-	err := r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstance) error {
+	err := r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
 		driftCfg := &drift.Config{
 			AllowDestructive: allowDestructive,
 			Logger:           logf.FromContext(ctx),
@@ -266,7 +272,7 @@ func (r *Repository) DetectDrift(ctx context.Context, spec *dbopsv1alpha1.Databa
 func (r *Repository) CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
 	var correctionResult *drift.CorrectionResult
 
-	err := r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstance) error {
+	err := r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
 		driftCfg := &drift.Config{
 			AllowDestructive: allowDestructive,
 			Logger:           logf.FromContext(ctx),

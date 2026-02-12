@@ -389,6 +389,16 @@ spec:
               target:
                 description: Target defines where to restore the backup
                 properties:
+                  clusterInstanceRef:
+                    description: ClusterInstanceRef references the target cluster-scoped
+                      ClusterDatabaseInstance (mutually exclusive with InstanceRef)
+                    properties:
+                      name:
+                        description: Name of the ClusterDatabaseInstance
+                        type: string
+                    required:
+                    - name
+                    type: object
                   databaseName:
                     description: DatabaseName is the target database name (for restore
                       to new database)
@@ -411,7 +421,8 @@ spec:
                     description: InPlace enables in-place restore (destructive!)
                     type: boolean
                   instanceRef:
-                    description: InstanceRef references the target DatabaseInstance
+                    description: InstanceRef references the target namespaced DatabaseInstance
+                      (mutually exclusive with ClusterInstanceRef)
                     properties:
                       name:
                         description: Name of the DatabaseInstance
@@ -424,6 +435,9 @@ spec:
                     - name
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: instanceRef and clusterInstanceRef are mutually exclusive
+                  rule: '!(has(self.instanceRef) && has(self.clusterInstanceRef))'
             required:
             - target
             type: object

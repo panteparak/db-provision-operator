@@ -31,6 +31,7 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	adapterpkg "github.com/db-provision-operator/internal/adapter/types"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 	"github.com/db-provision-operator/internal/storage"
 )
 
@@ -337,17 +338,12 @@ func TestHandler_Execute(t *testing.T) {
 			name:    "successful execution with backup ref",
 			restore: newTestRestore("test-restore", "default"),
 			setupMock: func(m *MockRepository) {
-				m.GetInstanceFunc = func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference) (*dbopsv1alpha1.DatabaseInstance, error) {
-					return &dbopsv1alpha1.DatabaseInstance{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "test-instance",
-						},
-						Spec: dbopsv1alpha1.DatabaseInstanceSpec{
-							Engine: dbopsv1alpha1.EngineTypePostgres,
-						},
-						Status: dbopsv1alpha1.DatabaseInstanceStatus{
-							Phase: dbopsv1alpha1.PhaseReady,
-						},
+				m.ResolveInstanceFunc = func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference, clusterInstanceRef *dbopsv1alpha1.ClusterInstanceReference) (*instanceresolver.ResolvedInstance, error) {
+					return &instanceresolver.ResolvedInstance{
+						Name:                "test-instance",
+						Spec:                &dbopsv1alpha1.DatabaseInstanceSpec{Engine: dbopsv1alpha1.EngineTypePostgres},
+						Phase:               dbopsv1alpha1.PhaseReady,
+						CredentialNamespace: namespace,
 					}, nil
 				}
 				m.GetBackupFunc = func(ctx context.Context, namespace string, backupRef *dbopsv1alpha1.BackupReference) (*dbopsv1alpha1.DatabaseBackup, error) {
@@ -368,7 +364,7 @@ func TestHandler_Execute(t *testing.T) {
 				m.CreateRestoreReaderFunc = func(ctx context.Context, cfg *storage.RestoreReaderConfig) (io.ReadCloser, error) {
 					return io.NopCloser(strings.NewReader("mock data")), nil
 				}
-				m.ExecuteRestoreFunc = func(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error) {
+				m.ExecuteRestoreWithResolvedFunc = func(ctx context.Context, resolved *instanceresolver.ResolvedInstance, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error) {
 					return &adapterpkg.RestoreResult{
 						TargetDatabase: opts.Database,
 						TablesRestored: 5,
@@ -389,17 +385,12 @@ func TestHandler_Execute(t *testing.T) {
 			name:    "instance not ready",
 			restore: newTestRestore("test-restore", "default"),
 			setupMock: func(m *MockRepository) {
-				m.GetInstanceFunc = func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference) (*dbopsv1alpha1.DatabaseInstance, error) {
-					return &dbopsv1alpha1.DatabaseInstance{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "test-instance",
-						},
-						Spec: dbopsv1alpha1.DatabaseInstanceSpec{
-							Engine: dbopsv1alpha1.EngineTypePostgres,
-						},
-						Status: dbopsv1alpha1.DatabaseInstanceStatus{
-							Phase: dbopsv1alpha1.PhasePending,
-						},
+				m.ResolveInstanceFunc = func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference, clusterInstanceRef *dbopsv1alpha1.ClusterInstanceReference) (*instanceresolver.ResolvedInstance, error) {
+					return &instanceresolver.ResolvedInstance{
+						Name:                "test-instance",
+						Spec:                &dbopsv1alpha1.DatabaseInstanceSpec{Engine: dbopsv1alpha1.EngineTypePostgres},
+						Phase:               dbopsv1alpha1.PhasePending, // Not ready
+						CredentialNamespace: namespace,
 					}, nil
 				}
 			},
@@ -410,17 +401,12 @@ func TestHandler_Execute(t *testing.T) {
 			name:    "execute restore error",
 			restore: newTestRestore("test-restore", "default"),
 			setupMock: func(m *MockRepository) {
-				m.GetInstanceFunc = func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference) (*dbopsv1alpha1.DatabaseInstance, error) {
-					return &dbopsv1alpha1.DatabaseInstance{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "test-instance",
-						},
-						Spec: dbopsv1alpha1.DatabaseInstanceSpec{
-							Engine: dbopsv1alpha1.EngineTypePostgres,
-						},
-						Status: dbopsv1alpha1.DatabaseInstanceStatus{
-							Phase: dbopsv1alpha1.PhaseReady,
-						},
+				m.ResolveInstanceFunc = func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference, clusterInstanceRef *dbopsv1alpha1.ClusterInstanceReference) (*instanceresolver.ResolvedInstance, error) {
+					return &instanceresolver.ResolvedInstance{
+						Name:                "test-instance",
+						Spec:                &dbopsv1alpha1.DatabaseInstanceSpec{Engine: dbopsv1alpha1.EngineTypePostgres},
+						Phase:               dbopsv1alpha1.PhaseReady,
+						CredentialNamespace: namespace,
 					}, nil
 				}
 				m.GetBackupFunc = func(ctx context.Context, namespace string, backupRef *dbopsv1alpha1.BackupReference) (*dbopsv1alpha1.DatabaseBackup, error) {
@@ -441,7 +427,7 @@ func TestHandler_Execute(t *testing.T) {
 				m.CreateRestoreReaderFunc = func(ctx context.Context, cfg *storage.RestoreReaderConfig) (io.ReadCloser, error) {
 					return io.NopCloser(strings.NewReader("mock data")), nil
 				}
-				m.ExecuteRestoreFunc = func(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error) {
+				m.ExecuteRestoreWithResolvedFunc = func(ctx context.Context, resolved *instanceresolver.ResolvedInstance, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error) {
 					return nil, errors.New("connection refused")
 				}
 			},
@@ -484,17 +470,12 @@ func TestHandler_EventPublishing(t *testing.T) {
 		mockRepo := NewMockRepository()
 		mockEventBus := NewMockEventBus()
 
-		mockRepo.GetInstanceFunc = func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference) (*dbopsv1alpha1.DatabaseInstance, error) {
-			return &dbopsv1alpha1.DatabaseInstance{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-instance",
-				},
-				Spec: dbopsv1alpha1.DatabaseInstanceSpec{
-					Engine: dbopsv1alpha1.EngineTypePostgres,
-				},
-				Status: dbopsv1alpha1.DatabaseInstanceStatus{
-					Phase: dbopsv1alpha1.PhaseReady,
-				},
+		mockRepo.ResolveInstanceFunc = func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference, clusterInstanceRef *dbopsv1alpha1.ClusterInstanceReference) (*instanceresolver.ResolvedInstance, error) {
+			return &instanceresolver.ResolvedInstance{
+				Name:                "test-instance",
+				Spec:                &dbopsv1alpha1.DatabaseInstanceSpec{Engine: dbopsv1alpha1.EngineTypePostgres},
+				Phase:               dbopsv1alpha1.PhaseReady,
+				CredentialNamespace: namespace,
 			}, nil
 		}
 		mockRepo.GetBackupFunc = func(ctx context.Context, namespace string, backupRef *dbopsv1alpha1.BackupReference) (*dbopsv1alpha1.DatabaseBackup, error) {
@@ -518,7 +499,7 @@ func TestHandler_EventPublishing(t *testing.T) {
 		mockRepo.CreateRestoreReaderFunc = func(ctx context.Context, cfg *storage.RestoreReaderConfig) (io.ReadCloser, error) {
 			return io.NopCloser(strings.NewReader("mock data")), nil
 		}
-		mockRepo.ExecuteRestoreFunc = func(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error) {
+		mockRepo.ExecuteRestoreWithResolvedFunc = func(ctx context.Context, resolved *instanceresolver.ResolvedInstance, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error) {
 			return &adapterpkg.RestoreResult{
 				TargetDatabase: opts.Database,
 				TablesRestored: 5,
@@ -543,17 +524,12 @@ func TestHandler_EventPublishing(t *testing.T) {
 		mockRepo := NewMockRepository()
 		mockEventBus := NewMockEventBus()
 
-		mockRepo.GetInstanceFunc = func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference) (*dbopsv1alpha1.DatabaseInstance, error) {
-			return &dbopsv1alpha1.DatabaseInstance{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-instance",
-				},
-				Spec: dbopsv1alpha1.DatabaseInstanceSpec{
-					Engine: dbopsv1alpha1.EngineTypePostgres,
-				},
-				Status: dbopsv1alpha1.DatabaseInstanceStatus{
-					Phase: dbopsv1alpha1.PhaseReady,
-				},
+		mockRepo.ResolveInstanceFunc = func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference, clusterInstanceRef *dbopsv1alpha1.ClusterInstanceReference) (*instanceresolver.ResolvedInstance, error) {
+			return &instanceresolver.ResolvedInstance{
+				Name:                "test-instance",
+				Spec:                &dbopsv1alpha1.DatabaseInstanceSpec{Engine: dbopsv1alpha1.EngineTypePostgres},
+				Phase:               dbopsv1alpha1.PhaseReady,
+				CredentialNamespace: namespace,
 			}, nil
 		}
 		mockRepo.GetBackupFunc = func(ctx context.Context, namespace string, backupRef *dbopsv1alpha1.BackupReference) (*dbopsv1alpha1.DatabaseBackup, error) {
@@ -577,7 +553,7 @@ func TestHandler_EventPublishing(t *testing.T) {
 		mockRepo.CreateRestoreReaderFunc = func(ctx context.Context, cfg *storage.RestoreReaderConfig) (io.ReadCloser, error) {
 			return io.NopCloser(strings.NewReader("mock data")), nil
 		}
-		mockRepo.ExecuteRestoreFunc = func(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error) {
+		mockRepo.ExecuteRestoreWithResolvedFunc = func(ctx context.Context, resolved *instanceresolver.ResolvedInstance, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error) {
 			return nil, errors.New("restore failed")
 		}
 
