@@ -386,3 +386,254 @@ func TestController_Reconcile_CustomHealthCheckInterval(t *testing.T) {
 	// Should requeue after custom interval (120 seconds)
 	assert.Equal(t, 120, int(result.RequeueAfter.Seconds()))
 }
+
+// --- Error path tests ---
+
+func TestController_Reconcile_ConnectionError(t *testing.T) {
+	scheme := newTestScheme()
+	instance := newTestInstanceResource("testinstance", "default")
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(instance).
+		WithStatusSubresource(instance).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.GetInstanceFunc = func(ctx context.Context, name, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return nil, errors.New("secret not found: test-secret")
+	}
+	// Connect should propagate the GetInstance error via handler.Connect
+	mockRepo.ConnectFunc = func(ctx context.Context, inst *dbopsv1alpha1.DatabaseInstance) (*ConnectResult, error) {
+		return nil, errors.New("get instance: secret not found: test-secret")
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	recorder := record.NewFakeRecorder(10)
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: recorder,
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testinstance",
+			Namespace: "default",
+		},
+	})
+
+	// handleError -> ClassifyRequeue: transient error returns err with RequeueAfter
+	assert.Error(t, err)
+	assert.NotEqual(t, ctrl.Result{}, result)
+	assert.True(t, result.RequeueAfter > 0, "should requeue after error")
+
+	// Verify status updated to Failed with connection error details
+	var updatedInstance dbopsv1alpha1.DatabaseInstance
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testinstance", Namespace: "default"}, &updatedInstance)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseFailed, updatedInstance.Status.Phase)
+	assert.Contains(t, updatedInstance.Status.Message, "secret not found")
+
+	// Verify Connected condition is set to False with ConnectionFailed reason
+	connCond := util.GetCondition(updatedInstance.Status.Conditions, util.ConditionTypeConnected)
+	require.NotNil(t, connCond, "Connected condition should be set")
+	assert.Equal(t, metav1.ConditionFalse, connCond.Status)
+	assert.Equal(t, util.ReasonConnectionFailed, connCond.Reason)
+}
+
+func TestController_Reconcile_DeletionProtectionBlocked(t *testing.T) {
+	scheme := newTestScheme()
+	instance := newTestInstanceResource("testinstance", "default")
+	instance.Spec.DeletionProtection = true
+	instance.Finalizers = []string{util.FinalizerDatabaseInstance}
+	now := metav1.Now()
+	instance.DeletionTimestamp = &now
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(instance).
+		WithStatusSubresource(instance).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	recorder := record.NewFakeRecorder(10)
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: recorder,
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testinstance",
+			Namespace: "default",
+		},
+	})
+
+	// Deletion protection returns an error
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "deletion protection")
+	assert.Equal(t, ctrl.Result{}, result)
+
+	// Verify status updated to Failed with protection message
+	var updatedInstance dbopsv1alpha1.DatabaseInstance
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testinstance", Namespace: "default"}, &updatedInstance)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseFailed, updatedInstance.Status.Phase)
+	assert.Contains(t, updatedInstance.Status.Message, "deletion protection")
+
+	// Verify Ready condition is set to False with DeletionProtected reason
+	readyCond := util.GetCondition(updatedInstance.Status.Conditions, util.ConditionTypeReady)
+	require.NotNil(t, readyCond, "Ready condition should be set")
+	assert.Equal(t, metav1.ConditionFalse, readyCond.Status)
+	assert.Equal(t, util.ReasonDeletionProtected, readyCond.Reason)
+
+	// Verify finalizer is NOT removed (instance stays protected)
+	assert.Contains(t, updatedInstance.Finalizers, util.FinalizerDatabaseInstance)
+}
+
+func TestController_Reconcile_DeletionProtectionBypassedWithForceDelete(t *testing.T) {
+	scheme := newTestScheme()
+	instance := newTestInstanceResource("testinstance", "default")
+	instance.Spec.DeletionProtection = true
+	instance.Finalizers = []string{util.FinalizerDatabaseInstance}
+	instance.Annotations = map[string]string{
+		util.AnnotationForceDelete: "true",
+	}
+	now := metav1.Now()
+	instance.DeletionTimestamp = &now
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(instance).
+		WithStatusSubresource(instance).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testinstance",
+			Namespace: "default",
+		},
+	})
+
+	// Force delete bypasses deletion protection
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+}
+
+// --- Status validation tests ---
+
+func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
+	scheme := newTestScheme()
+	instance := newTestInstanceResource("testinstance", "default")
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(instance).
+		WithStatusSubresource(instance).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.GetInstanceFunc = func(ctx context.Context, name, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return instance, nil
+	}
+	mockRepo.ConnectFunc = func(ctx context.Context, inst *dbopsv1alpha1.DatabaseInstance) (*ConnectResult, error) {
+		return &ConnectResult{
+			Connected: true,
+			Version:   "14.8",
+			Message:   "Connected successfully",
+		}, nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testinstance",
+			Namespace: "default",
+		},
+	})
+	require.NoError(t, err)
+
+	var updatedInstance dbopsv1alpha1.DatabaseInstance
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testinstance", Namespace: "default"}, &updatedInstance)
+	require.NoError(t, err)
+
+	// Phase and Message
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedInstance.Status.Phase)
+	assert.Equal(t, "Connected successfully", updatedInstance.Status.Message)
+
+	// Version from ConnectResult
+	assert.Equal(t, "14.8", updatedInstance.Status.Version)
+
+	// ReconcileID should be an 8-character hex string
+	assert.NotEmpty(t, updatedInstance.Status.ReconcileID)
+	assert.Len(t, updatedInstance.Status.ReconcileID, 8)
+
+	// LastReconcileTime should be set
+	assert.NotNil(t, updatedInstance.Status.LastReconcileTime)
+
+	// LastCheckedAt should be set
+	assert.NotNil(t, updatedInstance.Status.LastCheckedAt)
+
+	// Conditions: Connected, Healthy, and Ready should all be present and True
+	assert.Len(t, updatedInstance.Status.Conditions, 3)
+
+	connCond := util.GetCondition(updatedInstance.Status.Conditions, util.ConditionTypeConnected)
+	require.NotNil(t, connCond)
+	assert.Equal(t, metav1.ConditionTrue, connCond.Status)
+	assert.Equal(t, util.ReasonConnectionSuccess, connCond.Reason)
+
+	healthyCond := util.GetCondition(updatedInstance.Status.Conditions, util.ConditionTypeHealthy)
+	require.NotNil(t, healthyCond)
+	assert.Equal(t, metav1.ConditionTrue, healthyCond.Status)
+	assert.Equal(t, util.ReasonHealthCheckPassed, healthyCond.Reason)
+
+	readyCond := util.GetCondition(updatedInstance.Status.Conditions, util.ConditionTypeReady)
+	require.NotNil(t, readyCond)
+	assert.Equal(t, metav1.ConditionTrue, readyCond.Status)
+	assert.Equal(t, util.ReasonReconcileSuccess, readyCond.Reason)
+}

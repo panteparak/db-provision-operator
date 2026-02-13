@@ -156,14 +156,14 @@ func TestHandler_Delete(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:   "deletion error continues",
+			name:   "deletion error propagated",
 			backup: newTestBackup("testbackup", "default"),
 			setupMock: func(m *MockRepository) {
 				m.DeleteBackupFunc = func(ctx context.Context, backup *dbopsv1alpha1.DatabaseBackup) error {
 					return errors.New("file not found")
 				}
 			},
-			wantErr: false, // Delete continues even on error
+			wantErr: true, // Delete propagates errors to allow caller to decide
 		},
 	}
 

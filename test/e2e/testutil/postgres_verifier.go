@@ -436,6 +436,82 @@ func (v *PostgresVerifier) QueryRow(ctx context.Context, database string, query 
 	return pool.QueryRow(ctx, query).Scan(dest)
 }
 
+// SchemaExistsInDatabase checks if a schema exists in a specific database.
+// This requires connecting to the target database since information_schema is per-database.
+func (v *PostgresVerifier) SchemaExistsInDatabase(ctx context.Context, schemaName, database string) (bool, error) {
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
+		url.QueryEscape(v.config.Username), url.QueryEscape(v.config.Password), v.config.Host, v.config.Port, database)
+
+	pool, err := pgxpool.New(ctx, connStr)
+	if err != nil {
+		return false, fmt.Errorf("failed to connect to database %s: %w", database, err)
+	}
+	defer pool.Close()
+
+	var exists bool
+	err = pool.QueryRow(ctx,
+		"SELECT EXISTS(SELECT 1 FROM information_schema.schemata WHERE schema_name = $1)",
+		schemaName).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check schema existence in database %s: %w", database, err)
+	}
+
+	return exists, nil
+}
+
+// validRoleAttributes is an allowlist of boolean pg_roles columns to prevent SQL injection.
+var validRoleAttributes = map[string]bool{
+	"rolcanlogin":    true,
+	"rolinherit":     true,
+	"rolcreatedb":    true,
+	"rolcreaterole":  true,
+	"rolsuper":       true,
+	"rolreplication": true,
+	"rolbypassrls":   true,
+}
+
+// GetRoleAttribute queries a boolean attribute from pg_roles for a given role.
+// The attribute must be one of the allowed column names (rolcanlogin, rolinherit, etc.)
+// to prevent SQL injection.
+func (v *PostgresVerifier) GetRoleAttribute(ctx context.Context, roleName, attribute string) (bool, error) {
+	if v.pool == nil {
+		return false, fmt.Errorf("not connected to database")
+	}
+
+	if !validRoleAttributes[attribute] {
+		return false, fmt.Errorf("invalid role attribute %q: must be one of rolcanlogin, rolinherit, rolcreatedb, rolcreaterole, rolsuper, rolreplication, rolbypassrls", attribute)
+	}
+
+	var value bool
+	query := fmt.Sprintf("SELECT %s FROM pg_roles WHERE rolname = $1", attribute)
+	err := v.pool.QueryRow(ctx, query, roleName).Scan(&value)
+	if err != nil {
+		return false, fmt.Errorf("failed to get role attribute %s for %s: %w", attribute, roleName, err)
+	}
+
+	return value, nil
+}
+
+// ExecOnDatabase connects to a specific database and executes a SQL statement.
+// This is useful for drift tests that need to ALTER or DROP objects in a specific database.
+func (v *PostgresVerifier) ExecOnDatabase(ctx context.Context, database, sql string) error {
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
+		url.QueryEscape(v.config.Username), url.QueryEscape(v.config.Password), v.config.Host, v.config.Port, database)
+
+	pool, err := pgxpool.New(ctx, connStr)
+	if err != nil {
+		return fmt.Errorf("failed to connect to database %s: %w", database, err)
+	}
+	defer pool.Close()
+
+	_, err = pool.Exec(ctx, sql)
+	if err != nil {
+		return fmt.Errorf("failed to execute SQL on database %s: %w", database, err)
+	}
+
+	return nil
+}
+
 // Ensure PostgresVerifier implements DatabaseVerifier
 var _ DatabaseVerifier = (*PostgresVerifier)(nil)
 

@@ -20,6 +20,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -575,6 +576,595 @@ var _ = Describe("postgresql", Ordered, func() {
 
 			By("cleaning up member user")
 			_ = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Delete(ctx, memberUser, metav1.DeleteOptions{})
+		})
+	})
+
+	// ===== Phase 5: E2E Gap Coverage Tests =====
+
+	Context("Error Recovery", func() {
+		It("should recover DatabaseInstance after database pod restart", func() {
+			By("verifying existing instance is Ready with Connected=True")
+			obj, err := dynamicClient.Resource(databaseInstanceGVR).Namespace(testNamespace).Get(ctx, instanceName, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+			Expect(phase).To(Equal("Ready"))
+
+			By("finding and deleting the PostgreSQL pod")
+			pods, err := k8sClient.CoreV1().Pods("postgres").List(ctx, metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pods.Items).NotTo(BeEmpty(), "Should find PostgreSQL pods")
+
+			podName := pods.Items[0].Name
+			GinkgoWriter.Printf("Deleting PostgreSQL pod: %s\n", podName)
+			gracePeriod := int64(0)
+			err = k8sClient.CoreV1().Pods("postgres").Delete(ctx, podName, metav1.DeleteOptions{
+				GracePeriodSeconds: &gracePeriod,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for instance to detect disconnection")
+			Eventually(func() bool {
+				obj, err := dynamicClient.Resource(databaseInstanceGVR).Namespace(testNamespace).Get(ctx, instanceName, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				conditions, _, _ := unstructured.NestedSlice(obj.Object, "status", "conditions")
+				for _, c := range conditions {
+					condition := c.(map[string]interface{})
+					if condition["type"] == "Connected" && condition["status"] == "False" {
+						return true
+					}
+				}
+				return phase == "Failed"
+			}, 3*time.Minute, interval).Should(BeTrue(), "Instance should detect pod failure")
+
+			By("waiting for PostgreSQL pod to be Running again")
+			Eventually(func() bool {
+				pods, err := k8sClient.CoreV1().Pods("postgres").List(ctx, metav1.ListOptions{})
+				if err != nil || len(pods.Items) == 0 {
+					return false
+				}
+				for _, pod := range pods.Items {
+					if pod.Status.Phase == "Running" {
+						GinkgoWriter.Printf("Pod %s is Running again\n", pod.Name)
+						return true
+					}
+				}
+				return false
+			}, 3*time.Minute, interval).Should(BeTrue(), "PostgreSQL pod should be Running again")
+
+			By("waiting for instance to recover to Ready with Connected=True and Healthy=True")
+			Eventually(func() bool {
+				obj, err := dynamicClient.Resource(databaseInstanceGVR).Namespace(testNamespace).Get(ctx, instanceName, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				if phase != "Ready" {
+					return false
+				}
+				conditions, _, _ := unstructured.NestedSlice(obj.Object, "status", "conditions")
+				connectedTrue := false
+				healthyTrue := false
+				for _, c := range conditions {
+					condition := c.(map[string]interface{})
+					if condition["type"] == "Connected" && condition["status"] == "True" {
+						connectedTrue = true
+					}
+					if condition["type"] == "Healthy" && condition["status"] == "True" {
+						healthyTrue = true
+					}
+				}
+				return connectedTrue && healthyTrue
+			}, 4*time.Minute, interval).Should(BeTrue(), "Instance should recover to Ready with Connected=True and Healthy=True")
+
+			By("reconnecting database verifier")
+			_ = verifier.Close()
+			Eventually(func() error {
+				return verifier.Connect(ctx)
+			}, timeout, interval).Should(Succeed(), "Verifier should reconnect after pod restart")
+		})
+	})
+
+	Context("Database Deletion Protection", func() {
+		It("should block deletion when spec.deletionProtection is true", func() {
+			const crName = "testdb-delprot"
+			const dbName = "testdb_delprot"
+
+			By("creating Database with deletionProtection: true")
+			db := testutil.BuildDatabaseWithOptions(crName, testNamespace, instanceName, dbName, testutil.DatabaseBuildOptions{
+				DeletionProtection: true,
+				DeletionPolicy:     "Delete",
+			})
+			_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Create(ctx, db, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for Database to become Ready")
+			Eventually(func() string {
+				obj, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				return phase
+			}, timeout, interval).Should(Equal("Ready"))
+
+			By("verifying database exists in PostgreSQL")
+			Eventually(func() bool {
+				exists, err := verifier.DatabaseExists(ctx, dbName)
+				return err == nil && exists
+			}, timeout, interval).Should(BeTrue())
+
+			By("attempting to delete the CR")
+			err = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, crName, metav1.DeleteOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying resource is NOT deleted (finalizer blocks)")
+			Consistently(func() bool {
+				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+				return err == nil
+			}, 15*time.Second, 2*time.Second).Should(BeTrue(), "Resource should still exist due to deletion protection")
+
+			By("cleanup: adding force-delete annotation to bypass protection")
+			obj, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			annotations := obj.GetAnnotations()
+			if annotations == nil {
+				annotations = map[string]string{}
+			}
+			annotations["dbops.dbprovision.io/force-delete"] = "true"
+			obj.SetAnnotations(annotations)
+			_, err = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Update(ctx, obj, metav1.UpdateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for CR to be deleted")
+			Eventually(func() bool {
+				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+				return err != nil
+			}, timeout, interval).Should(BeTrue(), "CR should be deleted after force-delete annotation")
+		})
+
+		It("should allow deletion with force-delete annotation", func() {
+			const crName = "testdb-force"
+			const dbName = "testdb_force"
+
+			By("creating Database with deletionProtection: true")
+			db := testutil.BuildDatabaseWithOptions(crName, testNamespace, instanceName, dbName, testutil.DatabaseBuildOptions{
+				DeletionProtection: true,
+				DeletionPolicy:     "Delete",
+			})
+			_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Create(ctx, db, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for Database to become Ready")
+			Eventually(func() string {
+				obj, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				return phase
+			}, timeout, interval).Should(Equal("Ready"))
+
+			By("adding force-delete annotation before deletion")
+			obj, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			annotations := obj.GetAnnotations()
+			if annotations == nil {
+				annotations = map[string]string{}
+			}
+			annotations["dbops.dbprovision.io/force-delete"] = "true"
+			obj.SetAnnotations(annotations)
+			_, err = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Update(ctx, obj, metav1.UpdateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("deleting the CR")
+			err = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, crName, metav1.DeleteOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for CR to be deleted")
+			Eventually(func() bool {
+				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+				return err != nil
+			}, timeout, interval).Should(BeTrue(), "CR should be deleted with force-delete annotation")
+
+			By("verifying database was dropped from PostgreSQL")
+			Eventually(func() bool {
+				exists, err := verifier.DatabaseExists(ctx, dbName)
+				return err == nil && !exists
+			}, timeout, interval).Should(BeTrue(), "Database should be dropped when deletionPolicy is Delete")
+		})
+
+		It("should retain database when deletionPolicy is Retain", func() {
+			const crName = "testdb-retain"
+			const dbName = "testdb_retain"
+
+			By("creating Database with deletionProtection: false, deletionPolicy: Retain")
+			db := testutil.BuildDatabaseWithOptions(crName, testNamespace, instanceName, dbName, testutil.DatabaseBuildOptions{
+				DeletionProtection: false,
+				DeletionPolicy:     "Retain",
+			})
+			_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Create(ctx, db, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for Database to become Ready")
+			Eventually(func() string {
+				obj, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				return phase
+			}, timeout, interval).Should(Equal("Ready"))
+
+			By("verifying database exists in PostgreSQL")
+			Eventually(func() bool {
+				exists, err := verifier.DatabaseExists(ctx, dbName)
+				return err == nil && exists
+			}, timeout, interval).Should(BeTrue())
+
+			By("deleting the CR")
+			err = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, crName, metav1.DeleteOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for CR to be deleted")
+			Eventually(func() bool {
+				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+				return err != nil
+			}, timeout, interval).Should(BeTrue(), "CR should be deleted")
+
+			By("verifying database STILL exists in PostgreSQL (Retain policy)")
+			exists, err := verifier.DatabaseExists(ctx, dbName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(exists).To(BeTrue(), "Database should still exist after CR deletion with Retain policy")
+
+			By("cleanup: dropping retained database")
+			err = verifier.ExecOnDatabase(ctx, "postgres", fmt.Sprintf("DROP DATABASE IF EXISTS %s", dbName))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should drop database when deletionPolicy is Delete", func() {
+			const crName = "testdb-delete"
+			const dbName = "testdb_delete"
+
+			By("creating Database with deletionProtection: false, deletionPolicy: Delete")
+			db := testutil.BuildDatabaseWithOptions(crName, testNamespace, instanceName, dbName, testutil.DatabaseBuildOptions{
+				DeletionProtection: false,
+				DeletionPolicy:     "Delete",
+			})
+			_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Create(ctx, db, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for Database to become Ready")
+			Eventually(func() string {
+				obj, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				return phase
+			}, timeout, interval).Should(Equal("Ready"))
+
+			By("deleting the CR")
+			err = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, crName, metav1.DeleteOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for CR to be deleted")
+			Eventually(func() bool {
+				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+				return err != nil
+			}, timeout, interval).Should(BeTrue(), "CR should be deleted")
+
+			By("verifying database was dropped from PostgreSQL")
+			Eventually(func() bool {
+				exists, err := verifier.DatabaseExists(ctx, dbName)
+				return err == nil && !exists
+			}, timeout, interval).Should(BeTrue(), "Database should be dropped when deletionPolicy is Delete")
+		})
+	})
+
+	Context("Drift Detection", func() {
+		It("should detect role attribute drift in detect mode", func() {
+			const crName = "drift-role-detect"
+			const pgRoleName = "drift_role_detect"
+
+			By("creating DatabaseRole with driftPolicy.mode: detect")
+			role := testutil.BuildDatabaseRoleWithOptions(crName, testNamespace, instanceName, pgRoleName, testutil.RoleBuildOptions{
+				DriftMode:     "detect",
+				DriftInterval: "10s",
+				PostgresConfig: map[string]interface{}{
+					"createDB": false,
+				},
+			})
+			_, err := dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Create(ctx, role, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for DatabaseRole to become Ready")
+			Eventually(func() string {
+				obj, err := dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				return phase
+			}, timeout, interval).Should(Equal("Ready"))
+
+			By("verifying role does NOT have CREATEDB")
+			hasCreateDb, err := verifier.RoleHasCreateDb(ctx, pgRoleName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(hasCreateDb).To(BeFalse(), "Role should not have CREATEDB initially")
+
+			By("introducing drift: granting CREATEDB directly via SQL")
+			err = verifier.ExecOnDatabase(ctx, "postgres", fmt.Sprintf("ALTER ROLE %s CREATEDB", pgRoleName))
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying manual change took effect")
+			hasCreateDb, err = verifier.RoleHasCreateDb(ctx, pgRoleName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(hasCreateDb).To(BeTrue(), "Manual ALTER ROLE should grant CREATEDB")
+
+			By("waiting for operator to detect drift in CR status")
+			Eventually(func() bool {
+				obj, err := dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				detected, _, _ := unstructured.NestedBool(obj.Object, "status", "drift", "detected")
+				return detected
+			}, 60*time.Second, 2*time.Second).Should(BeTrue(), "Drift should be detected in CR status")
+
+			By("verifying CREATEDB is still true (detect mode does NOT correct)")
+			hasCreateDb, err = verifier.RoleHasCreateDb(ctx, pgRoleName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(hasCreateDb).To(BeTrue(), "Detect mode should not correct drift")
+
+			By("cleanup: deleting DatabaseRole CR")
+			_ = dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Delete(ctx, crName, metav1.DeleteOptions{})
+			Eventually(func() bool {
+				_, err := dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+				return err != nil
+			}, timeout, interval).Should(BeTrue())
+		})
+
+		It("should auto-correct role attribute drift in correct mode", func() {
+			const crName = "drift-role-correct"
+			const pgRoleName = "drift_role_correct"
+
+			By("creating DatabaseRole with driftPolicy.mode: correct")
+			role := testutil.BuildDatabaseRoleWithOptions(crName, testNamespace, instanceName, pgRoleName, testutil.RoleBuildOptions{
+				DriftMode:     "correct",
+				DriftInterval: "10s",
+				PostgresConfig: map[string]interface{}{
+					"createDB": false,
+				},
+			})
+			_, err := dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Create(ctx, role, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for DatabaseRole to become Ready")
+			Eventually(func() string {
+				obj, err := dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				return phase
+			}, timeout, interval).Should(Equal("Ready"))
+
+			By("introducing drift: granting CREATEDB directly via SQL")
+			err = verifier.ExecOnDatabase(ctx, "postgres", fmt.Sprintf("ALTER ROLE %s CREATEDB", pgRoleName))
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for operator to auto-correct drift (revoke CREATEDB)")
+			Eventually(func() bool {
+				hasCreateDb, err := verifier.RoleHasCreateDb(ctx, pgRoleName)
+				return err == nil && !hasCreateDb
+			}, 60*time.Second, 2*time.Second).Should(BeTrue(), "Operator should revoke CREATEDB (auto-correct)")
+
+			By("cleanup: deleting DatabaseRole CR")
+			_ = dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Delete(ctx, crName, metav1.DeleteOptions{})
+			Eventually(func() bool {
+				_, err := dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+				return err != nil
+			}, timeout, interval).Should(BeTrue())
+		})
+
+		It("should detect database schema drift", func() {
+			const crName = "testdb-drift-schema"
+			const dbName = "testdb_drift_schema"
+
+			By("creating Database with schemas and driftPolicy.mode: detect")
+			db := testutil.BuildDatabaseWithOptions(crName, testNamespace, instanceName, dbName, testutil.DatabaseBuildOptions{
+				DeletionProtection: false,
+				DeletionPolicy:     "Delete",
+				DriftMode:          "detect",
+				DriftInterval:      "10s",
+				Schemas: []map[string]interface{}{
+					{"name": "app_schema"},
+					{"name": "data_schema"},
+				},
+			})
+			_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Create(ctx, db, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for Database to become Ready")
+			Eventually(func() string {
+				obj, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				return phase
+			}, timeout, interval).Should(Equal("Ready"))
+
+			By("verifying both schemas exist")
+			Eventually(func() bool {
+				exists1, err1 := verifier.SchemaExistsInDatabase(ctx, "app_schema", dbName)
+				exists2, err2 := verifier.SchemaExistsInDatabase(ctx, "data_schema", dbName)
+				return err1 == nil && err2 == nil && exists1 && exists2
+			}, timeout, interval).Should(BeTrue(), "Both schemas should exist")
+
+			By("introducing drift: dropping data_schema")
+			err = verifier.ExecOnDatabase(ctx, dbName, "DROP SCHEMA data_schema CASCADE")
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying schema is gone")
+			exists, err := verifier.SchemaExistsInDatabase(ctx, "data_schema", dbName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(exists).To(BeFalse(), "data_schema should be dropped")
+
+			By("waiting for operator to detect schema drift in status")
+			Eventually(func() bool {
+				obj, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				detected, _, _ := unstructured.NestedBool(obj.Object, "status", "drift", "detected")
+				return detected
+			}, 60*time.Second, 2*time.Second).Should(BeTrue(), "Schema drift should be detected")
+
+			By("cleanup: deleting Database CR")
+			_ = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, crName, metav1.DeleteOptions{})
+			Eventually(func() bool {
+				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+				return err != nil
+			}, timeout, interval).Should(BeTrue())
+		})
+
+		It("should auto-correct database schema drift", func() {
+			const crName = "testdb-drift-correct"
+			const dbName = "testdb_drift_correct"
+
+			By("creating Database with schema and driftPolicy.mode: correct")
+			db := testutil.BuildDatabaseWithOptions(crName, testNamespace, instanceName, dbName, testutil.DatabaseBuildOptions{
+				DeletionProtection: false,
+				DeletionPolicy:     "Delete",
+				DriftMode:          "correct",
+				DriftInterval:      "10s",
+				Schemas: []map[string]interface{}{
+					{"name": "app_schema"},
+				},
+			})
+			_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Create(ctx, db, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for Database to become Ready")
+			Eventually(func() string {
+				obj, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				return phase
+			}, timeout, interval).Should(Equal("Ready"))
+
+			By("verifying schema exists")
+			Eventually(func() bool {
+				exists, err := verifier.SchemaExistsInDatabase(ctx, "app_schema", dbName)
+				return err == nil && exists
+			}, timeout, interval).Should(BeTrue())
+
+			By("introducing drift: dropping app_schema")
+			err = verifier.ExecOnDatabase(ctx, dbName, "DROP SCHEMA app_schema CASCADE")
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for operator to auto-correct schema drift (recreate schema)")
+			Eventually(func() bool {
+				exists, err := verifier.SchemaExistsInDatabase(ctx, "app_schema", dbName)
+				return err == nil && exists
+			}, 60*time.Second, 2*time.Second).Should(BeTrue(), "Operator should recreate app_schema (auto-correct)")
+
+			By("cleanup: deleting Database CR")
+			_ = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, crName, metav1.DeleteOptions{})
+			Eventually(func() bool {
+				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
+				return err != nil
+			}, timeout, interval).Should(BeTrue())
+		})
+	})
+
+	Context("Multi-Resource Independence", func() {
+		It("should operate multiple databases independently on the same instance", func() {
+			const crNameA = "testdb-indep-a"
+			const dbNameA = "testdb_indep_a"
+			const crNameB = "testdb-indep-b"
+			const dbNameB = "testdb_indep_b"
+
+			By("creating two Database CRs")
+			dbA := testutil.BuildDatabaseWithOptions(crNameA, testNamespace, instanceName, dbNameA, testutil.DatabaseBuildOptions{
+				DeletionProtection: false,
+				DeletionPolicy:     "Delete",
+			})
+			dbB := testutil.BuildDatabaseWithOptions(crNameB, testNamespace, instanceName, dbNameB, testutil.DatabaseBuildOptions{
+				DeletionProtection: false,
+				DeletionPolicy:     "Delete",
+			})
+
+			_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Create(ctx, dbA, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Create(ctx, dbB, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for both databases to become Ready")
+			Eventually(func() bool {
+				objA, errA := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crNameA, metav1.GetOptions{})
+				objB, errB := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crNameB, metav1.GetOptions{})
+				if errA != nil || errB != nil {
+					return false
+				}
+				phaseA, _, _ := unstructured.NestedString(objA.Object, "status", "phase")
+				phaseB, _, _ := unstructured.NestedString(objB.Object, "status", "phase")
+				return phaseA == "Ready" && phaseB == "Ready"
+			}, timeout, interval).Should(BeTrue(), "Both databases should become Ready")
+
+			By("verifying both databases exist in PostgreSQL")
+			Eventually(func() bool {
+				existsA, errA := verifier.DatabaseExists(ctx, dbNameA)
+				existsB, errB := verifier.DatabaseExists(ctx, dbNameB)
+				return errA == nil && errB == nil && existsA && existsB
+			}, timeout, interval).Should(BeTrue(), "Both databases should exist in PostgreSQL")
+
+			By("deleting only database A")
+			err = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, crNameA, metav1.DeleteOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for database A CR to be deleted")
+			Eventually(func() bool {
+				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crNameA, metav1.GetOptions{})
+				return err != nil
+			}, timeout, interval).Should(BeTrue(), "Database A CR should be deleted")
+
+			By("verifying database A is dropped from PostgreSQL")
+			Eventually(func() bool {
+				exists, err := verifier.DatabaseExists(ctx, dbNameA)
+				return err == nil && !exists
+			}, timeout, interval).Should(BeTrue(), "Database A should be dropped from PostgreSQL")
+
+			By("verifying database B still exists and its CR is still Ready")
+			existsB, err := verifier.DatabaseExists(ctx, dbNameB)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(existsB).To(BeTrue(), "Database B should still exist in PostgreSQL")
+
+			objB, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crNameB, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			phaseB, _, _ := unstructured.NestedString(objB.Object, "status", "phase")
+			Expect(phaseB).To(Equal("Ready"), "Database B CR should still be Ready")
+
+			By("connecting to database B to confirm full functionality")
+			conn, err := verifier.ConnectAsUser(ctx, adminUsername, adminPassword, dbNameB)
+			Expect(err).NotTo(HaveOccurred())
+			defer conn.Close()
+
+			err = conn.Query(ctx, "SELECT 1")
+			Expect(err).NotTo(HaveOccurred(), "Should be able to query database B")
+
+			By("cleanup: deleting database B")
+			_ = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, crNameB, metav1.DeleteOptions{})
+			Eventually(func() bool {
+				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crNameB, metav1.GetOptions{})
+				return err != nil
+			}, timeout, interval).Should(BeTrue())
 		})
 	})
 

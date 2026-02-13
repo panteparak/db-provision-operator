@@ -18,6 +18,7 @@ package user
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -883,4 +884,343 @@ func TestController_Reconcile_SetsReconcileID(t *testing.T) {
 	assert.NotEmpty(t, updatedUser.Status.ReconcileID, "ReconcileID should be set")
 	assert.Len(t, updatedUser.Status.ReconcileID, 8, "ReconcileID should be 8 characters")
 	assert.NotNil(t, updatedUser.Status.LastReconcileTime, "LastReconcileTime should be set")
+}
+
+func TestController_Reconcile_ExistsError(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return false, fmt.Errorf("connection refused")
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:        client,
+		Scheme:        scheme,
+		Recorder:      record.NewFakeRecorder(10),
+		Handler:       handler,
+		SecretManager: secret.NewManager(client),
+		Logger:        logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+	})
+
+	// The handleError path calls reconcileutil.ClassifyRequeue which may or may not return the error,
+	// so we check status instead of the returned error.
+	_ = err
+
+	// Verify status was set to failed with appropriate message
+	var updatedUser dbopsv1alpha1.DatabaseUser
+	err = client.Get(context.Background(), types.NamespacedName{Name: "testuser", Namespace: "default"}, &updatedUser)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseFailed, updatedUser.Status.Phase)
+	assert.Contains(t, updatedUser.Status.Message, "check existence")
+
+	// Verify Create was NOT called since Exists returned an error
+	assert.False(t, mockRepo.WasCalled("Create"))
+}
+
+func TestController_Reconcile_CreateError(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return false, nil
+	}
+	mockRepo.CreateFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error) {
+		return nil, fmt.Errorf("permission denied")
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:        client,
+		Scheme:        scheme,
+		Recorder:      record.NewFakeRecorder(10),
+		Handler:       handler,
+		SecretManager: secret.NewManager(client),
+		Logger:        logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+	})
+
+	_ = err
+
+	// Verify status was set to failed with appropriate message
+	var updatedUser dbopsv1alpha1.DatabaseUser
+	err = client.Get(context.Background(), types.NamespacedName{Name: "testuser", Namespace: "default"}, &updatedUser)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseFailed, updatedUser.Status.Phase)
+	assert.Contains(t, updatedUser.Status.Message, "create")
+}
+
+func TestController_Reconcile_DeletionDeleteError(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+	user.Annotations = map[string]string{
+		"dbops.dbprovision.io/deletion-policy": string(dbopsv1alpha1.DeletionPolicyDelete),
+	}
+	user.Finalizers = []string{util.FinalizerDatabaseUser}
+	now := metav1.Now()
+	user.DeletionTimestamp = &now
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.GetOwnedObjectsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) ([]OwnedObject, error) {
+		return []OwnedObject{}, nil
+	}
+	mockRepo.DeleteFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, force bool) error {
+		return fmt.Errorf("database unavailable")
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:        client,
+		Scheme:        scheme,
+		Recorder:      record.NewFakeRecorder(10),
+		Handler:       handler,
+		SecretManager: secret.NewManager(client),
+		Logger:        logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+	})
+
+	// Should return error with requeue
+	require.Error(t, err)
+	assert.True(t, result.RequeueAfter > 0, "Expected RequeueAfter > 0")
+
+	// Verify Delete WAS called
+	assert.True(t, mockRepo.WasCalled("Delete"))
+
+	// Verify finalizer NOT removed (still present)
+	var updatedUser dbopsv1alpha1.DatabaseUser
+	err = client.Get(context.Background(), types.NamespacedName{Name: "testuser", Namespace: "default"}, &updatedUser)
+	require.NoError(t, err)
+	assert.Contains(t, updatedUser.Finalizers, util.FinalizerDatabaseUser, "Finalizer should still be present after delete error")
+}
+
+func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+	user.Generation = 3 // Set a non-zero generation to verify ObservedGeneration is not copied
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return false, nil
+	}
+	mockRepo.CreateFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error) {
+		return &Result{Created: true, Message: "created"}, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:        client,
+		Scheme:        scheme,
+		Recorder:      record.NewFakeRecorder(10),
+		Handler:       handler,
+		SecretManager: secret.NewManager(client),
+		Logger:        logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, RequeueAfterReady, result.RequeueAfter, "Should requeue after ready interval")
+
+	// Fetch the updated user to verify all status fields
+	var updatedUser dbopsv1alpha1.DatabaseUser
+	err = client.Get(context.Background(), types.NamespacedName{Name: "testuser", Namespace: "default"}, &updatedUser)
+	require.NoError(t, err)
+
+	// --- Phase and Message ---
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedUser.Status.Phase, "Phase should be Ready")
+	assert.Equal(t, "User is ready", updatedUser.Status.Message, "Message should indicate user is ready")
+
+	// --- Secret info ---
+	require.NotNil(t, updatedUser.Status.Secret, "Secret status should be populated")
+	assert.Equal(t, "testuser-credentials", updatedUser.Status.Secret.Name, "Secret name should be <username>-credentials")
+	assert.Equal(t, "default", updatedUser.Status.Secret.Namespace, "Secret namespace should match user namespace")
+
+	// --- User info ---
+	// Note: The controller does not currently set Status.User; verify it is nil
+	assert.Nil(t, updatedUser.Status.User, "User info is not populated by the controller")
+
+	// --- ReconcileID ---
+	assert.NotEmpty(t, updatedUser.Status.ReconcileID, "ReconcileID should be set")
+	assert.Len(t, updatedUser.Status.ReconcileID, 8, "ReconcileID should be 8 characters (hex string)")
+
+	// --- LastReconcileTime ---
+	assert.NotNil(t, updatedUser.Status.LastReconcileTime, "LastReconcileTime should be set")
+
+	// --- ObservedGeneration ---
+	// Note: The controller does not currently set ObservedGeneration; verify it remains at zero-value
+	assert.Equal(t, int64(0), updatedUser.Status.ObservedGeneration, "ObservedGeneration is not populated by the controller")
+
+	// --- Conditions ---
+	// Verify Ready condition
+	readyCondition := util.GetCondition(updatedUser.Status.Conditions, util.ConditionTypeReady)
+	require.NotNil(t, readyCondition, "Ready condition should exist")
+	assert.Equal(t, metav1.ConditionTrue, readyCondition.Status, "Ready condition should be True")
+	assert.Equal(t, util.ReasonReconcileSuccess, readyCondition.Reason, "Ready condition reason should be ReconcileSuccess")
+	assert.Equal(t, "User is ready", readyCondition.Message, "Ready condition message should match")
+
+	// Verify Synced condition
+	syncedCondition := util.GetCondition(updatedUser.Status.Conditions, util.ConditionTypeSynced)
+	require.NotNil(t, syncedCondition, "Synced condition should exist")
+	assert.Equal(t, metav1.ConditionTrue, syncedCondition.Status, "Synced condition should be True")
+	assert.Equal(t, util.ReasonReconcileSuccess, syncedCondition.Reason, "Synced condition reason should be ReconcileSuccess")
+	assert.Equal(t, "User is synced", syncedCondition.Message, "Synced condition message should match")
+}
+
+func TestController_Reconcile_DeletionDeleteError_WithForce(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+	user.Annotations = map[string]string{
+		"dbops.dbprovision.io/deletion-policy": string(dbopsv1alpha1.DeletionPolicyDelete),
+		"dbops.dbprovision.io/force-delete":    "true",
+	}
+	user.Finalizers = []string{util.FinalizerDatabaseUser}
+	now := metav1.Now()
+	user.DeletionTimestamp = &now
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.GetOwnedObjectsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) ([]OwnedObject, error) {
+		return []OwnedObject{}, nil
+	}
+	mockRepo.DeleteFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, force bool) error {
+		return fmt.Errorf("database unavailable")
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:        client,
+		Scheme:        scheme,
+		Recorder:      record.NewFakeRecorder(10),
+		Handler:       handler,
+		SecretManager: secret.NewManager(client),
+		Logger:        logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+	})
+
+	// With force-delete, error is swallowed and finalizer is removed
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+
+	// Verify Delete WAS called
+	assert.True(t, mockRepo.WasCalled("Delete"))
 }

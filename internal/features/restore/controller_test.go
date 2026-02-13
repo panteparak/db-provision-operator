@@ -18,6 +18,7 @@ package restore
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -32,7 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	adapterpkg "github.com/db-provision-operator/internal/adapter/types"
@@ -559,5 +562,127 @@ func TestController_Reconcile_WaitingForInstance(t *testing.T) {
 	assert.Contains(t, updatedRestore.Status.Message, "Waiting for instance")
 
 	// Verify ExecuteRestore was NOT called
+	assert.False(t, mockRepo.WasCalled("ExecuteRestoreWithResolved"))
+}
+
+func TestController_Reconcile_RestoreError(t *testing.T) {
+	scheme := newTestScheme()
+	restore := newTestRestoreResource("testrestore", "default")
+	// Set phase to Pending to skip initialization step
+	restore.Status.Phase = dbopsv1alpha1.PhasePending
+	backup := newTestBackup("test-backup", "default")
+	instance := newTestInstanceResource("test-instance", "default")
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(restore, backup, instance).
+		WithStatusSubresource(restore, backup, instance).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.GetBackupFunc = func(ctx context.Context, namespace string, backupRef *dbopsv1alpha1.BackupReference) (*dbopsv1alpha1.DatabaseBackup, error) {
+		return backup, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, namespace string, instanceRef *dbopsv1alpha1.InstanceReference) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return instance, nil
+	}
+	mockRepo.CreateRestoreReaderFunc = func(ctx context.Context, cfg *storage.RestoreReaderConfig) (io.ReadCloser, error) {
+		return io.NopCloser(strings.NewReader("mock data")), nil
+	}
+	mockRepo.ExecuteRestoreWithResolvedFunc = func(ctx context.Context, resolved *instanceresolver.ResolvedInstance, opts adapterpkg.RestoreOptions) (*adapterpkg.RestoreResult, error) {
+		return nil, fmt.Errorf("connection refused: database server is unreachable")
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   client,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testrestore",
+			Namespace: "default",
+		},
+	})
+
+	// handleError returns the error and requeues after RequeueAfterError
+	require.Error(t, err)
+	assert.Equal(t, ctrl.Result{RequeueAfter: RequeueAfterError}, result)
+
+	// Verify the restore status was set to Failed with error info
+	var updatedRestore dbopsv1alpha1.DatabaseRestore
+	err = client.Get(context.Background(), types.NamespacedName{Name: "testrestore", Namespace: "default"}, &updatedRestore)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseFailed, updatedRestore.Status.Phase)
+	assert.Contains(t, updatedRestore.Status.Message, "execute restore")
+	assert.Contains(t, updatedRestore.Status.Message, "connection refused")
+
+	// Verify ExecuteRestoreWithResolved WAS called (it failed)
+	assert.True(t, mockRepo.WasCalled("ExecuteRestoreWithResolved"))
+}
+
+func TestController_Reconcile_DeletionError(t *testing.T) {
+	scheme := newTestScheme()
+	restore := newTestRestoreResource("testrestore", "default")
+	restore.Finalizers = []string{util.FinalizerDatabaseRestore}
+	now := metav1.Now()
+	restore.DeletionTimestamp = &now
+
+	// Use an interceptor to make Update fail during finalizer removal.
+	// The deletion handler calls c.Update(ctx, restore) to remove the finalizer;
+	// if that update fails the controller should propagate the error.
+	updateCallCount := 0
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(restore).
+		WithStatusSubresource(restore).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Update: func(ctx context.Context, c crclient.WithWatch, obj crclient.Object, opts ...crclient.UpdateOption) error {
+				updateCallCount++
+				return fmt.Errorf("conflict: the object has been modified")
+			},
+		}).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   client,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testrestore",
+			Namespace: "default",
+		},
+	})
+
+	// The deletion handler returns the Update error directly
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "conflict")
+	assert.Equal(t, ctrl.Result{}, result)
+
+	// Verify Update was attempted
+	assert.Greater(t, updateCallCount, 0)
+
+	// Verify no restore execution occurred during deletion
 	assert.False(t, mockRepo.WasCalled("ExecuteRestoreWithResolved"))
 }

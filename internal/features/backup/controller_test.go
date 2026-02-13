@@ -18,6 +18,7 @@ package backup
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -487,4 +488,172 @@ func TestController_Reconcile_WaitingForDatabaseReady(t *testing.T) {
 
 	// Verify ExecuteBackup was NOT called
 	assert.False(t, mockRepo.WasCalled("ExecuteBackup"))
+}
+
+func TestController_Reconcile_BackupError(t *testing.T) {
+	scheme := newTestScheme()
+	backup := newTestBackupResource("testbackup", "default")
+	database := newTestDatabase("test-db", "default")
+	instance := newTestInstance("test-instance", "default")
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(backup, database, instance).
+		WithStatusSubresource(backup, database, instance).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.GetDatabaseFunc = func(ctx context.Context, b *dbopsv1alpha1.DatabaseBackup) (*dbopsv1alpha1.Database, error) {
+		return database, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, db *dbopsv1alpha1.Database) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return instance, nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, b *dbopsv1alpha1.DatabaseBackup) (string, error) {
+		return "postgres", nil
+	}
+	mockRepo.ExecuteBackupFunc = func(ctx context.Context, b *dbopsv1alpha1.DatabaseBackup) (*BackupExecutionResult, error) {
+		return nil, fmt.Errorf("execute backup: storage unavailable")
+	}
+
+	handler := &Handler{
+		repo:              mockRepo,
+		eventBus:          NewMockEventBus(),
+		logger:            logr.Discard(),
+		instanceConnected: make(map[string]bool),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   client,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testbackup",
+			Namespace: "default",
+		},
+	})
+
+	// Error should be returned for requeue
+	require.Error(t, err)
+	assert.Greater(t, result.RequeueAfter, time.Duration(0))
+
+	// Verify ExecuteBackup WAS called
+	assert.True(t, mockRepo.WasCalled("ExecuteBackup"))
+
+	// Verify the backup status is Failed with error info
+	var updatedBackup2 dbopsv1alpha1.DatabaseBackup
+	getErr := client.Get(context.Background(), types.NamespacedName{Name: "testbackup", Namespace: "default"}, &updatedBackup2)
+	require.NoError(t, getErr)
+	assert.Equal(t, dbopsv1alpha1.PhaseFailed, updatedBackup2.Status.Phase)
+	assert.Contains(t, updatedBackup2.Status.Message, "storage unavailable")
+}
+
+func TestController_Reconcile_DeletionDeleteError(t *testing.T) {
+	scheme := newTestScheme()
+	backup := newTestBackupResource("testbackup", "default")
+	backup.Finalizers = []string{util.FinalizerDatabaseBackup}
+	now := metav1.Now()
+	backup.DeletionTimestamp = &now
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(backup).
+		WithStatusSubresource(backup).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.DeleteBackupFunc = func(ctx context.Context, b *dbopsv1alpha1.DatabaseBackup) error {
+		return fmt.Errorf("storage unavailable")
+	}
+
+	handler := &Handler{
+		repo:              mockRepo,
+		eventBus:          NewMockEventBus(),
+		logger:            logr.Discard(),
+		instanceConnected: make(map[string]bool),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   client,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testbackup",
+			Namespace: "default",
+		},
+	})
+
+	// Error should be returned for requeue
+	require.Error(t, err)
+	assert.Greater(t, result.RequeueAfter, time.Duration(0))
+
+	// Verify DeleteBackup WAS called
+	assert.True(t, mockRepo.WasCalled("DeleteBackup"))
+
+	// Verify finalizer is NOT removed (backup still has it)
+	var updatedBackup dbopsv1alpha1.DatabaseBackup
+	getErr := client.Get(context.Background(), types.NamespacedName{Name: "testbackup", Namespace: "default"}, &updatedBackup)
+	require.NoError(t, getErr)
+	assert.Contains(t, updatedBackup.Finalizers, util.FinalizerDatabaseBackup)
+}
+
+func TestController_Reconcile_DeletionDeleteError_WithForce(t *testing.T) {
+	scheme := newTestScheme()
+	backup := newTestBackupResource("testbackup", "default")
+	backup.Annotations = map[string]string{
+		"dbops.dbprovision.io/force-delete": "true",
+	}
+	backup.Finalizers = []string{util.FinalizerDatabaseBackup}
+	now := metav1.Now()
+	backup.DeletionTimestamp = &now
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(backup).
+		WithStatusSubresource(backup).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.DeleteBackupFunc = func(ctx context.Context, b *dbopsv1alpha1.DatabaseBackup) error {
+		return fmt.Errorf("storage unavailable")
+	}
+
+	handler := &Handler{
+		repo:              mockRepo,
+		eventBus:          NewMockEventBus(),
+		logger:            logr.Discard(),
+		instanceConnected: make(map[string]bool),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   client,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testbackup",
+			Namespace: "default",
+		},
+	})
+
+	// No error returned with force delete
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+
+	// Verify DeleteBackup WAS called
+	assert.True(t, mockRepo.WasCalled("DeleteBackup"))
 }

@@ -699,3 +699,519 @@ func TestBackupScheduleValidation(t *testing.T) {
 		})
 	}
 }
+
+// TestDatabaseGrantValidation tests DatabaseGrant CRD validation
+func TestDatabaseGrantValidation(t *testing.T) {
+	k8sClient, ctx := setupTestEnv(t)
+
+	tests := []struct {
+		name      string
+		grant     *DatabaseGrant
+		wantErr   bool
+		errSubstr string
+	}{
+		{
+			name: "valid grant with userRef - should succeed",
+			grant: &DatabaseGrant{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-valid-grant-user",
+					Namespace: "default",
+				},
+				Spec: DatabaseGrantSpec{
+					UserRef: &UserReference{Name: "test-user"},
+					Postgres: &PostgresGrantConfig{
+						Roles: []string{"app_read"},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid grant with roleRef - should succeed",
+			grant: &DatabaseGrant{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-valid-grant-role",
+					Namespace: "default",
+				},
+				Spec: DatabaseGrantSpec{
+					RoleRef: &RoleReference{Name: "test-role"},
+					Postgres: &PostgresGrantConfig{
+						Roles: []string{"app_read"},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "missing both userRef and roleRef - should fail",
+			grant: &DatabaseGrant{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-no-ref-grant",
+					Namespace: "default",
+				},
+				Spec: DatabaseGrantSpec{
+					Postgres: &PostgresGrantConfig{
+						Roles: []string{"app_read"},
+					},
+				},
+			},
+			wantErr:   true,
+			errSubstr: "userRef",
+		},
+		{
+			name: "both userRef and roleRef - should fail",
+			grant: &DatabaseGrant{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-both-ref-grant",
+					Namespace: "default",
+				},
+				Spec: DatabaseGrantSpec{
+					UserRef: &UserReference{Name: "test-user"},
+					RoleRef: &RoleReference{Name: "test-role"},
+					Postgres: &PostgresGrantConfig{
+						Roles: []string{"app_read"},
+					},
+				},
+			},
+			wantErr:   true,
+			errSubstr: "mutually exclusive",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := k8sClient.Create(ctx, tt.grant)
+
+			if tt.wantErr {
+				assert.Error(t, err, "Expected validation error")
+				if tt.errSubstr != "" && err != nil {
+					assert.Contains(t, err.Error(), tt.errSubstr,
+						"Error should mention '%s'", tt.errSubstr)
+				}
+			} else {
+				assert.NoError(t, err, "Expected no validation error")
+				if err == nil {
+					_ = k8sClient.Delete(ctx, tt.grant)
+				}
+			}
+		})
+	}
+}
+
+// TestClusterDatabaseInstanceValidation tests ClusterDatabaseInstance CRD validation
+func TestClusterDatabaseInstanceValidation(t *testing.T) {
+	k8sClient, ctx := setupTestEnv(t)
+
+	tests := []struct {
+		name      string
+		instance  *ClusterDatabaseInstance
+		wantErr   bool
+		errSubstr string
+	}{
+		{
+			name: "valid cluster instance - should succeed",
+			instance: &ClusterDatabaseInstance{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-valid-cluster-instance",
+				},
+				Spec: DatabaseInstanceSpec{
+					Engine: EngineTypePostgres,
+					Connection: ConnectionConfig{
+						Host:     "db.example.com",
+						Port:     5432,
+						Database: "postgres",
+						SecretRef: &CredentialSecretRef{
+							Name:      "test-secret",
+							Namespace: "default",
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "empty host - should fail",
+			instance: &ClusterDatabaseInstance{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster-empty-host",
+				},
+				Spec: DatabaseInstanceSpec{
+					Engine: EngineTypePostgres,
+					Connection: ConnectionConfig{
+						Host:     "",
+						Port:     5432,
+						Database: "postgres",
+						SecretRef: &CredentialSecretRef{
+							Name:      "test-secret",
+							Namespace: "default",
+						},
+					},
+				},
+			},
+			wantErr:   true,
+			errSubstr: "host",
+		},
+		{
+			name: "invalid port - should fail",
+			instance: &ClusterDatabaseInstance{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster-invalid-port",
+				},
+				Spec: DatabaseInstanceSpec{
+					Engine: EngineTypePostgres,
+					Connection: ConnectionConfig{
+						Host:     "localhost",
+						Port:     70000,
+						Database: "postgres",
+						SecretRef: &CredentialSecretRef{
+							Name:      "test-secret",
+							Namespace: "default",
+						},
+					},
+				},
+			},
+			wantErr:   true,
+			errSubstr: "port",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := k8sClient.Create(ctx, tt.instance)
+
+			if tt.wantErr {
+				assert.Error(t, err, "Expected validation error")
+				if tt.errSubstr != "" && err != nil {
+					assert.Contains(t, err.Error(), tt.errSubstr,
+						"Error should mention '%s'", tt.errSubstr)
+				}
+			} else {
+				assert.NoError(t, err, "Expected no validation error")
+				if err == nil {
+					_ = k8sClient.Delete(ctx, tt.instance)
+				}
+			}
+		})
+	}
+}
+
+// TestClusterDatabaseRoleValidation tests ClusterDatabaseRole CRD validation
+func TestClusterDatabaseRoleValidation(t *testing.T) {
+	k8sClient, ctx := setupTestEnv(t)
+
+	tests := []struct {
+		name      string
+		role      *ClusterDatabaseRole
+		wantErr   bool
+		errSubstr string
+	}{
+		{
+			name: "valid cluster role - should succeed",
+			role: &ClusterDatabaseRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-valid-cluster-role",
+				},
+				Spec: ClusterDatabaseRoleSpec{
+					ClusterInstanceRef: ClusterInstanceReference{
+						Name: "test-cluster-instance",
+					},
+					RoleName: "valid_role",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "empty role name - should fail",
+			role: &ClusterDatabaseRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster-empty-role",
+				},
+				Spec: ClusterDatabaseRoleSpec{
+					ClusterInstanceRef: ClusterInstanceReference{
+						Name: "test-cluster-instance",
+					},
+					RoleName: "",
+				},
+			},
+			wantErr:   true,
+			errSubstr: "roleName",
+		},
+		{
+			name: "invalid role name pattern (starts with number) - should fail",
+			role: &ClusterDatabaseRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster-invalid-role",
+				},
+				Spec: ClusterDatabaseRoleSpec{
+					ClusterInstanceRef: ClusterInstanceReference{
+						Name: "test-cluster-instance",
+					},
+					RoleName: "123invalid",
+				},
+			},
+			wantErr:   true,
+			errSubstr: "roleName",
+		},
+		{
+			name: "role name with hyphen - should fail",
+			role: &ClusterDatabaseRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster-hyphen-role",
+				},
+				Spec: ClusterDatabaseRoleSpec{
+					ClusterInstanceRef: ClusterInstanceReference{
+						Name: "test-cluster-instance",
+					},
+					RoleName: "invalid-role",
+				},
+			},
+			wantErr:   true,
+			errSubstr: "roleName",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := k8sClient.Create(ctx, tt.role)
+
+			if tt.wantErr {
+				assert.Error(t, err, "Expected validation error")
+				if tt.errSubstr != "" && err != nil {
+					assert.Contains(t, err.Error(), tt.errSubstr,
+						"Error should mention '%s'", tt.errSubstr)
+				}
+			} else {
+				assert.NoError(t, err, "Expected no validation error")
+				if err == nil {
+					_ = k8sClient.Delete(ctx, tt.role)
+				}
+			}
+		})
+	}
+}
+
+// TestClusterDatabaseGrantValidation tests ClusterDatabaseGrant CRD validation
+func TestClusterDatabaseGrantValidation(t *testing.T) {
+	k8sClient, ctx := setupTestEnv(t)
+
+	tests := []struct {
+		name      string
+		grant     *ClusterDatabaseGrant
+		wantErr   bool
+		errSubstr string
+	}{
+		{
+			name: "valid cluster grant with userRef - should succeed",
+			grant: &ClusterDatabaseGrant{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-valid-cluster-grant",
+				},
+				Spec: ClusterDatabaseGrantSpec{
+					ClusterInstanceRef: ClusterInstanceReference{
+						Name: "test-cluster-instance",
+					},
+					UserRef: &NamespacedUserReference{
+						Name:      "test-user",
+						Namespace: "default",
+					},
+					Postgres: &PostgresGrantConfig{
+						Roles: []string{"app_read"},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid cluster grant with roleRef - should succeed",
+			grant: &ClusterDatabaseGrant{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-valid-cluster-grant-role",
+				},
+				Spec: ClusterDatabaseGrantSpec{
+					ClusterInstanceRef: ClusterInstanceReference{
+						Name: "test-cluster-instance",
+					},
+					RoleRef: &NamespacedRoleReference{
+						Name: "test-role",
+					},
+					Postgres: &PostgresGrantConfig{
+						Roles: []string{"app_read"},
+					},
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := k8sClient.Create(ctx, tt.grant)
+
+			if tt.wantErr {
+				assert.Error(t, err, "Expected validation error")
+				if tt.errSubstr != "" && err != nil {
+					assert.Contains(t, err.Error(), tt.errSubstr,
+						"Error should mention '%s'", tt.errSubstr)
+				}
+			} else {
+				assert.NoError(t, err, "Expected no validation error")
+				if err == nil {
+					_ = k8sClient.Delete(ctx, tt.grant)
+				}
+			}
+		})
+	}
+}
+
+// TestDatabaseBackupValidation tests DatabaseBackup CRD validation
+func TestDatabaseBackupValidation(t *testing.T) {
+	k8sClient, ctx := setupTestEnv(t)
+
+	tests := []struct {
+		name      string
+		backup    *DatabaseBackup
+		wantErr   bool
+		errSubstr string
+	}{
+		{
+			name: "valid backup - should succeed",
+			backup: &DatabaseBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-valid-backup",
+					Namespace: "default",
+				},
+				Spec: DatabaseBackupSpec{
+					DatabaseRef: DatabaseReference{
+						Name: "test-db",
+					},
+					Storage: StorageConfig{
+						Type: StorageTypePVC,
+						PVC: &PVCStorageConfig{
+							ClaimName: "backup-pvc",
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "missing databaseRef name - should fail",
+			backup: &DatabaseBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-no-dbref-backup",
+					Namespace: "default",
+				},
+				Spec: DatabaseBackupSpec{
+					DatabaseRef: DatabaseReference{
+						Name: "",
+					},
+					Storage: StorageConfig{
+						Type: StorageTypePVC,
+						PVC: &PVCStorageConfig{
+							ClaimName: "backup-pvc",
+						},
+					},
+				},
+			},
+			wantErr:   true,
+			errSubstr: "databaseRef",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := k8sClient.Create(ctx, tt.backup)
+
+			if tt.wantErr {
+				assert.Error(t, err, "Expected validation error")
+				if tt.errSubstr != "" && err != nil {
+					assert.Contains(t, err.Error(), tt.errSubstr,
+						"Error should mention '%s'", tt.errSubstr)
+				}
+			} else {
+				assert.NoError(t, err, "Expected no validation error")
+				if err == nil {
+					_ = k8sClient.Delete(ctx, tt.backup)
+				}
+			}
+		})
+	}
+}
+
+// TestDatabaseRestoreValidation tests DatabaseRestore CRD validation
+func TestDatabaseRestoreValidation(t *testing.T) {
+	k8sClient, ctx := setupTestEnv(t)
+
+	tests := []struct {
+		name      string
+		restore   *DatabaseRestore
+		wantErr   bool
+		errSubstr string
+	}{
+		{
+			name: "valid restore with backupRef - should succeed",
+			restore: &DatabaseRestore{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-valid-restore",
+					Namespace: "default",
+				},
+				Spec: DatabaseRestoreSpec{
+					BackupRef: &BackupReference{
+						Name: "test-backup",
+					},
+					Target: RestoreTarget{
+						InstanceRef: &InstanceReference{
+							Name: "test-instance",
+						},
+						DatabaseName: "restored_db",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "mutually exclusive target refs - should fail",
+			restore: &DatabaseRestore{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-exclusive-restore",
+					Namespace: "default",
+				},
+				Spec: DatabaseRestoreSpec{
+					BackupRef: &BackupReference{
+						Name: "test-backup",
+					},
+					Target: RestoreTarget{
+						InstanceRef: &InstanceReference{
+							Name: "test-instance",
+						},
+						ClusterInstanceRef: &ClusterInstanceReference{
+							Name: "test-cluster-instance",
+						},
+						DatabaseName: "restored_db",
+					},
+				},
+			},
+			wantErr:   true,
+			errSubstr: "mutually exclusive",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := k8sClient.Create(ctx, tt.restore)
+
+			if tt.wantErr {
+				assert.Error(t, err, "Expected validation error")
+				if tt.errSubstr != "" && err != nil {
+					assert.Contains(t, err.Error(), tt.errSubstr,
+						"Error should mention '%s'", tt.errSubstr)
+				}
+			} else {
+				assert.NoError(t, err, "Expected no validation error")
+				if err == nil {
+					_ = k8sClient.Delete(ctx, tt.restore)
+				}
+			}
+		})
+	}
+}

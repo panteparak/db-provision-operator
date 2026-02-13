@@ -151,10 +151,10 @@ func (h *Handler) Delete(ctx context.Context, backup *dbopsv1alpha1.DatabaseBack
 
 	if err := h.repo.DeleteBackup(ctx, backup); err != nil {
 		log.Error(err, "Failed to delete backup file")
-		// Continue with deletion even if file deletion fails
-	} else {
-		log.Info("Backup file deleted successfully")
+		return fmt.Errorf("delete backup file: %w", err)
 	}
+
+	log.Info("Backup file deleted successfully")
 
 	// Clean up backup metrics
 	if backup.Status.Source != nil {

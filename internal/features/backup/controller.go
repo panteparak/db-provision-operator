@@ -282,9 +282,13 @@ func (c *Controller) handleDeletion(ctx context.Context, backup *dbopsv1alpha1.D
 	}
 
 	// Delete backup via handler
+	force := util.HasForceDeleteAnnotation(backup)
 	if err := c.handler.Delete(ctx, backup); err != nil {
 		log.Error(err, "Failed to delete backup")
-		// Continue with finalizer removal even if backup deletion fails
+		c.Recorder.Eventf(backup, corev1.EventTypeWarning, "DeleteFailed", "Failed to delete backup: %v", err)
+		if !errors.IsNotFound(err) && !force {
+			return ctrl.Result{RequeueAfter: RequeueAfterError}, err
+		}
 	}
 
 	// Clean up info metric

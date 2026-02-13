@@ -253,6 +253,81 @@ func BuildDatabaseBackupSchedule(name, namespace, instanceRef, schedule string) 
 	return obj
 }
 
+// DatabaseBuildOptions configures optional fields for BuildDatabaseWithOptions.
+type DatabaseBuildOptions struct {
+	DeletionProtection bool
+	DeletionPolicy     string                   // "Retain" or "Delete"
+	DriftMode          string                   // "detect", "correct", "ignore"
+	DriftInterval      string                   // e.g. "10s"
+	Schemas            []map[string]interface{} // postgres.schemas entries
+}
+
+// BuildDatabaseWithOptions creates an unstructured Database resource with additional options.
+// It wraps BuildDatabase and overlays optional spec fields.
+func BuildDatabaseWithOptions(name, namespace, instanceRef, dbName string, opts DatabaseBuildOptions) *unstructured.Unstructured {
+	obj := BuildDatabase(name, namespace, instanceRef, dbName)
+
+	spec := obj.Object["spec"].(map[string]interface{})
+	spec["deletionProtection"] = opts.DeletionProtection
+
+	if opts.DeletionPolicy != "" {
+		spec["deletionPolicy"] = opts.DeletionPolicy
+	}
+
+	if opts.DriftMode != "" {
+		driftPolicy := map[string]interface{}{
+			"mode": opts.DriftMode,
+		}
+		if opts.DriftInterval != "" {
+			driftPolicy["interval"] = opts.DriftInterval
+		}
+		spec["driftPolicy"] = driftPolicy
+	}
+
+	if len(opts.Schemas) > 0 {
+		schemas := make([]interface{}, len(opts.Schemas))
+		for i, s := range opts.Schemas {
+			schemas[i] = s
+		}
+		spec["postgres"] = map[string]interface{}{
+			"schemas": schemas,
+		}
+	}
+
+	return obj
+}
+
+// RoleBuildOptions configures optional fields for BuildDatabaseRoleWithOptions.
+type RoleBuildOptions struct {
+	DriftMode      string                 // "detect", "correct", "ignore"
+	DriftInterval  string                 // e.g. "10s"
+	PostgresConfig map[string]interface{} // postgres attributes (e.g. createDB, login)
+}
+
+// BuildDatabaseRoleWithOptions creates an unstructured DatabaseRole resource with additional options.
+// It wraps BuildDatabaseRole and overlays driftPolicy and postgres config.
+func BuildDatabaseRoleWithOptions(name, namespace, instanceRef, roleName string, opts RoleBuildOptions) *unstructured.Unstructured {
+	obj := BuildDatabaseRole(name, namespace, instanceRef, roleName)
+
+	spec := obj.Object["spec"].(map[string]interface{})
+
+	if opts.DriftMode != "" {
+		driftPolicy := map[string]interface{}{
+			"mode": opts.DriftMode,
+		}
+		if opts.DriftInterval != "" {
+			driftPolicy["interval"] = opts.DriftInterval
+		}
+		spec["driftPolicy"] = driftPolicy
+	}
+
+	if len(opts.PostgresConfig) > 0 {
+		spec["postgres"] = opts.PostgresConfig
+	}
+
+	return obj
+}
+
 // getDefaultDatabase returns the default database name for the given engine.
 func getDefaultDatabase(engine string) string {
 	switch engine {
