@@ -60,6 +60,7 @@ spec:
                 properties:
                   name:
                     description: Name of the ClusterDatabaseInstance
+                    minLength: 1
                     type: string
                 required:
                 - name
@@ -95,6 +96,7 @@ spec:
                 properties:
                   name:
                     description: Name of the DatabaseInstance
+                    minLength: 1
                     type: string
                   namespace:
                     description: Namespace of the DatabaseInstance (defaults to the

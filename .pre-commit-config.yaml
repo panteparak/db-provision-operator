@@ -83,6 +83,16 @@ repos:
         files: \.go$
         pass_filenames: false
 
+  # Envtest CRD validation (runs when API types or CRDs change)
+  - repo: local
+    hooks:
+      - id: envtest-validation
+        name: envtest CRD validation
+        entry: make test-envtest-precommit
+        language: system
+        files: ^(api/v1alpha1/|config/crd/)
+        pass_filenames: false
+
   # Shell script linting (for scripts in Makefile, CI, etc.)
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.10.0.1

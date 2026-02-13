@@ -59,6 +59,7 @@ spec:
                 properties:
                   name:
                     description: Name of the Database resource
+                    minLength: 1
                     type: string
                   namespace:
                     description: Namespace of the Database (defaults to the resource
@@ -265,6 +266,7 @@ spec:
                 properties:
                   name:
                     description: Name of the DatabaseRole resource
+                    minLength: 1
                     type: string
                   namespace:
                     description: Namespace of the DatabaseRole (defaults to the resource
@@ -279,6 +281,7 @@ spec:
                 properties:
                   name:
                     description: Name of the DatabaseUser resource
+                    minLength: 1
                     type: string
                   namespace:
                     description: Namespace of the DatabaseUser (defaults to the resource

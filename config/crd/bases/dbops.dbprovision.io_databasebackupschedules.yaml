@@ -197,6 +197,7 @@ spec:
                         properties:
                           name:
                             description: Name of the Database resource
+                            minLength: 1
                             type: string
                           namespace:
                             description: Namespace of the Database (defaults to the

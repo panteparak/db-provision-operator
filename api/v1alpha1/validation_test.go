@@ -179,21 +179,20 @@ func TestDatabaseValidation(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		// Note: InstanceRef with empty name passes validation because InstanceReference.Name
-		// doesn't have MinLength=1 validation. The controller handles this check at runtime.
 		{
-			name: "empty instance ref name - currently allowed by CRD",
+			name:    "empty instance ref name - should fail",
 			database: &Database{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-empty-instance-ref",
 					Namespace: "default",
 				},
 				Spec: DatabaseSpec{
-					InstanceRef: &InstanceReference{Name: ""}, // Empty name allowed by CRD
+					InstanceRef: &InstanceReference{Name: ""},
 					Name:        "valid_db",
 				},
 			},
-			wantErr: false, // CRD allows this; controller validates at runtime
+			wantErr:   true,
+			errSubstr: "instanceRef",
 		},
 	}
 

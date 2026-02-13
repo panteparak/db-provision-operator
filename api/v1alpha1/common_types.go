@@ -172,6 +172,7 @@ type HealthCheckConfig struct {
 type InstanceReference struct {
 	// Name of the DatabaseInstance
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 
 	// Namespace of the DatabaseInstance (defaults to the resource namespace)
@@ -183,6 +184,7 @@ type InstanceReference struct {
 type ClusterInstanceReference struct {
 	// Name of the ClusterDatabaseInstance
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 }
 
@@ -190,6 +192,7 @@ type ClusterInstanceReference struct {
 type DatabaseReference struct {
 	// Name of the Database resource
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 
 	// Namespace of the Database (defaults to the resource namespace)
@@ -201,6 +204,7 @@ type DatabaseReference struct {
 type UserReference struct {
 	// Name of the DatabaseUser resource
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 
 	// Namespace of the DatabaseUser (defaults to the resource namespace)
@@ -212,6 +216,7 @@ type UserReference struct {
 type RoleReference struct {
 	// Name of the DatabaseRole resource
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 
 	// Namespace of the DatabaseRole (defaults to the resource namespace)
@@ -223,6 +228,7 @@ type RoleReference struct {
 type BackupReference struct {
 	// Name of the DatabaseBackup resource
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 
 	// Namespace of the DatabaseBackup (defaults to the resource namespace)

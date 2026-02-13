@@ -123,6 +123,11 @@ test-envtest: manifests generate setup-envtest ## Run envtest-based controller a
 	go test ./api/v1alpha1/... -v -tags=envtest -timeout=5m \
 		-coverprofile cover-validation.out
 
+.PHONY: test-envtest-precommit
+test-envtest-precommit: setup-envtest ## Run CRD validation tests via envtest (for pre-commit hook).
+	@KUBEBUILDER_ASSETS="$$($(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
+	go test ./api/v1alpha1/... -tags=envtest -timeout=5m
+
 .PHONY: test-integration
 test-integration: manifests generate setup-envtest ## Run integration tests with testcontainers-go and profiling.
 	@mkdir -p test-reports
