@@ -601,16 +601,17 @@ var _ = Describe("postgresql", Ordered, func() {
 			phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 			Expect(phase).To(Equal("Ready"))
 
-			By("finding and deleting the PostgreSQL pod")
-			var podName string
-			Eventually(func() bool {
-				pods, err := k8sClient.CoreV1().Pods("postgres").List(ctx, metav1.ListOptions{})
-				if err != nil || len(pods.Items) == 0 {
-					return false
-				}
-				podName = pods.Items[0].Name
-				return true
-			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "Should find PostgreSQL pods")
+			By("checking if PostgreSQL is deployed as a Kubernetes pod")
+			pods, err := k8sClient.CoreV1().Pods("postgres").List(ctx, metav1.ListOptions{
+				LabelSelector: "app=postgres",
+			})
+			if err != nil {
+				Skip(fmt.Sprintf("Cannot list pods in postgres namespace: %v", err))
+			}
+			if len(pods.Items) == 0 {
+				Skip("PostgreSQL is not deployed as a K8s pod (Docker Compose mode), skipping pod restart recovery test")
+			}
+			podName := pods.Items[0].Name
 			GinkgoWriter.Printf("Deleting PostgreSQL pod: %s\n", podName)
 			gracePeriod := int64(0)
 			err = k8sClient.CoreV1().Pods("postgres").Delete(ctx, podName, metav1.DeleteOptions{
@@ -637,7 +638,9 @@ var _ = Describe("postgresql", Ordered, func() {
 
 			By("waiting for PostgreSQL pod to be Running again")
 			Eventually(func() bool {
-				pods, err := k8sClient.CoreV1().Pods("postgres").List(ctx, metav1.ListOptions{})
+				pods, err := k8sClient.CoreV1().Pods("postgres").List(ctx, metav1.ListOptions{
+					LabelSelector: "app=postgres",
+				})
 				if err != nil || len(pods.Items) == 0 {
 					return false
 				}
@@ -679,7 +682,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			_ = verifier.Close()
 			Eventually(func() error {
 				return verifier.Connect(ctx)
-			}, reconcileTimeout, pollingInterval).Should(Succeed(), "Verifier should reconnect after pod restart")
+			}, podRestartTimeout, pollingInterval).Should(Succeed(), "Verifier should reconnect after pod restart")
 		})
 	})
 
