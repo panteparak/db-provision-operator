@@ -47,7 +47,7 @@ var (
 	databaseEngine = os.Getenv("E2E_DATABASE_ENGINE")
 
 	// Default test timeout
-	defaultTimeout = 2 * time.Minute
+	defaultTimeout = 30 * time.Second
 
 	// Polling interval for Eventually checks
 	pollingInterval = 2 * time.Second

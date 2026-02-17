@@ -42,8 +42,20 @@ var _ = Describe("postgresql", Ordered, func() {
 		postgresHost    = "postgres.postgres.svc.cluster.local" // K8s DNS for CR (runs inside cluster)
 		secretName      = "postgres-credentials"
 		secretNamespace = "postgres"
-		timeout         = 2 * time.Minute
-		interval        = 2 * time.Second
+
+		// reconcileTimeout is the default timeout for waiting on reconcile-driven state changes
+		// (CR phase transitions, resource creation/deletion in DB, CR deletion).
+		// Adjustable globally here; individual tests override when longer waits are needed.
+		reconcileTimeout = 30 * time.Second
+
+		// pollingInterval is the frequency at which Eventually/Consistently poll.
+		pollingInterval = 2 * time.Second
+
+		// podRestartTimeout is for waiting on infrastructure recovery (pod restart, reconnection).
+		podRestartTimeout = 3 * time.Minute
+
+		// driftTimeout is for waiting on drift detection/correction cycles.
+		driftTimeout = 60 * time.Second
 	)
 
 	ctx := context.Background()
@@ -114,7 +126,7 @@ var _ = Describe("postgresql", Ordered, func() {
 		// Connect with retry since database may still be starting
 		Eventually(func() error {
 			return verifier.Connect(ctx)
-		}, timeout, interval).Should(Succeed(), "Should connect to PostgreSQL for verification")
+		}, reconcileTimeout, pollingInterval).Should(Succeed(), "Should connect to PostgreSQL for verification")
 	})
 
 	Context("DatabaseInstance lifecycle", func() {
@@ -158,7 +170,7 @@ var _ = Describe("postgresql", Ordered, func() {
 				}
 				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 				return phase
-			}, timeout, interval).Should(Equal("Ready"), "DatabaseInstance should become Ready")
+			}, reconcileTimeout, pollingInterval).Should(Equal("Ready"), "DatabaseInstance should become Ready")
 
 			By("verifying the Connected condition is True")
 			Eventually(func() bool {
@@ -174,7 +186,7 @@ var _ = Describe("postgresql", Ordered, func() {
 					}
 				}
 				return false
-			}, timeout, interval).Should(BeTrue(), "Connected condition should be True")
+			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "Connected condition should be True")
 		})
 	})
 
@@ -209,7 +221,7 @@ var _ = Describe("postgresql", Ordered, func() {
 				}
 				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 				return phase
-			}, timeout, interval).Should(Equal("Ready"), "Database should become Ready")
+			}, reconcileTimeout, pollingInterval).Should(Equal("Ready"), "Database should become Ready")
 
 			By("verifying database actually exists in PostgreSQL")
 			Eventually(func() bool {
@@ -219,7 +231,7 @@ var _ = Describe("postgresql", Ordered, func() {
 					return false
 				}
 				return exists
-			}, timeout, interval).Should(BeTrue(), "Database '%s' should exist in PostgreSQL", databaseName)
+			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "Database '%s' should exist in PostgreSQL", databaseName)
 		})
 	})
 
@@ -254,7 +266,7 @@ var _ = Describe("postgresql", Ordered, func() {
 				}
 				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 				return phase
-			}, timeout, interval).Should(Equal("Ready"), "DatabaseUser should become Ready")
+			}, reconcileTimeout, pollingInterval).Should(Equal("Ready"), "DatabaseUser should become Ready")
 
 			By("verifying user actually exists in PostgreSQL")
 			Eventually(func() bool {
@@ -264,7 +276,7 @@ var _ = Describe("postgresql", Ordered, func() {
 					return false
 				}
 				return exists
-			}, timeout, interval).Should(BeTrue(), "User '%s' should exist in PostgreSQL", userName)
+			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "User '%s' should exist in PostgreSQL", userName)
 		})
 	})
 
@@ -322,7 +334,7 @@ var _ = Describe("postgresql", Ordered, func() {
 				}
 				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 				return phase
-			}, timeout, interval).Should(Equal("Ready"), "DatabaseRole should become Ready")
+			}, reconcileTimeout, pollingInterval).Should(Equal("Ready"), "DatabaseRole should become Ready")
 
 			By("verifying role actually exists in PostgreSQL")
 			Eventually(func() bool {
@@ -332,7 +344,7 @@ var _ = Describe("postgresql", Ordered, func() {
 					return false
 				}
 				return exists
-			}, timeout, interval).Should(BeTrue(), "Role '%s' should exist in PostgreSQL", roleName)
+			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "Role '%s' should exist in PostgreSQL", roleName)
 		})
 	})
 
@@ -380,7 +392,7 @@ var _ = Describe("postgresql", Ordered, func() {
 				}
 				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 				return phase
-			}, timeout, interval).Should(Equal("Ready"), "DatabaseGrant should become Ready")
+			}, reconcileTimeout, pollingInterval).Should(Equal("Ready"), "DatabaseGrant should become Ready")
 
 			By("verifying user has USAGE privilege on public schema in testdb")
 			Eventually(func() bool {
@@ -391,7 +403,7 @@ var _ = Describe("postgresql", Ordered, func() {
 					return false
 				}
 				return hasPriv
-			}, timeout, interval).Should(BeTrue(), "User '%s' should have USAGE privilege on public schema in database '%s'", userName, databaseName)
+			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "User '%s' should have USAGE privilege on public schema in database '%s'", userName, databaseName)
 		})
 	})
 
@@ -492,7 +504,7 @@ var _ = Describe("postgresql", Ordered, func() {
 				}
 				// Grant on sequence
 				return retryConn.Exec(ctx, "GRANT USAGE ON SEQUENCE "+seqName+" TO "+userName)
-			}, 30*time.Second, 2*time.Second).Should(Succeed(), "Should grant permissions on table and sequence")
+			}, reconcileTimeout, pollingInterval).Should(Succeed(), "Should grant permissions on table and sequence")
 
 			By("verifying SELECT is allowed")
 			err = userConn.CanSelectData(ctx, testTable)
@@ -562,7 +574,7 @@ var _ = Describe("postgresql", Ordered, func() {
 				}
 				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 				return phase
-			}, timeout, interval).Should(Equal("Ready"))
+			}, reconcileTimeout, pollingInterval).Should(Equal("Ready"))
 
 			By("verifying user is a member of the role")
 			Eventually(func() bool {
@@ -572,7 +584,7 @@ var _ = Describe("postgresql", Ordered, func() {
 					return false
 				}
 				return isMember
-			}, timeout, interval).Should(BeTrue(), "User '%s' should be a member of role '%s'", memberUser, roleName)
+			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "User '%s' should be a member of role '%s'", memberUser, roleName)
 
 			By("cleaning up member user")
 			_ = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Delete(ctx, memberUser, metav1.DeleteOptions{})
@@ -590,11 +602,15 @@ var _ = Describe("postgresql", Ordered, func() {
 			Expect(phase).To(Equal("Ready"))
 
 			By("finding and deleting the PostgreSQL pod")
-			pods, err := k8sClient.CoreV1().Pods("postgres").List(ctx, metav1.ListOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(pods.Items).NotTo(BeEmpty(), "Should find PostgreSQL pods")
-
-			podName := pods.Items[0].Name
+			var podName string
+			Eventually(func() bool {
+				pods, err := k8sClient.CoreV1().Pods("postgres").List(ctx, metav1.ListOptions{})
+				if err != nil || len(pods.Items) == 0 {
+					return false
+				}
+				podName = pods.Items[0].Name
+				return true
+			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "Should find PostgreSQL pods")
 			GinkgoWriter.Printf("Deleting PostgreSQL pod: %s\n", podName)
 			gracePeriod := int64(0)
 			err = k8sClient.CoreV1().Pods("postgres").Delete(ctx, podName, metav1.DeleteOptions{
@@ -617,7 +633,7 @@ var _ = Describe("postgresql", Ordered, func() {
 					}
 				}
 				return phase == "Failed"
-			}, 3*time.Minute, interval).Should(BeTrue(), "Instance should detect pod failure")
+			}, podRestartTimeout, pollingInterval).Should(BeTrue(), "Instance should detect pod failure")
 
 			By("waiting for PostgreSQL pod to be Running again")
 			Eventually(func() bool {
@@ -632,7 +648,7 @@ var _ = Describe("postgresql", Ordered, func() {
 					}
 				}
 				return false
-			}, 3*time.Minute, interval).Should(BeTrue(), "PostgreSQL pod should be Running again")
+			}, podRestartTimeout, pollingInterval).Should(BeTrue(), "PostgreSQL pod should be Running again")
 
 			By("waiting for instance to recover to Ready with Connected=True and Healthy=True")
 			Eventually(func() bool {
@@ -657,13 +673,13 @@ var _ = Describe("postgresql", Ordered, func() {
 					}
 				}
 				return connectedTrue && healthyTrue
-			}, 4*time.Minute, interval).Should(BeTrue(), "Instance should recover to Ready with Connected=True and Healthy=True")
+			}, podRestartTimeout, pollingInterval).Should(BeTrue(), "Instance should recover to Ready with Connected=True and Healthy=True")
 
 			By("reconnecting database verifier")
 			_ = verifier.Close()
 			Eventually(func() error {
 				return verifier.Connect(ctx)
-			}, timeout, interval).Should(Succeed(), "Verifier should reconnect after pod restart")
+			}, reconcileTimeout, pollingInterval).Should(Succeed(), "Verifier should reconnect after pod restart")
 		})
 	})
 
@@ -688,13 +704,13 @@ var _ = Describe("postgresql", Ordered, func() {
 				}
 				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 				return phase
-			}, timeout, interval).Should(Equal("Ready"))
+			}, reconcileTimeout, pollingInterval).Should(Equal("Ready"))
 
 			By("verifying database exists in PostgreSQL")
 			Eventually(func() bool {
 				exists, err := verifier.DatabaseExists(ctx, dbName)
 				return err == nil && exists
-			}, timeout, interval).Should(BeTrue())
+			}, reconcileTimeout, pollingInterval).Should(BeTrue())
 
 			By("attempting to delete the CR")
 			err = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, crName, metav1.DeleteOptions{})
@@ -722,7 +738,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
 				return err != nil
-			}, timeout, interval).Should(BeTrue(), "CR should be deleted after force-delete annotation")
+			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "CR should be deleted after force-delete annotation")
 		})
 
 		It("should allow deletion with force-delete annotation", func() {
@@ -745,7 +761,7 @@ var _ = Describe("postgresql", Ordered, func() {
 				}
 				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 				return phase
-			}, timeout, interval).Should(Equal("Ready"))
+			}, reconcileTimeout, pollingInterval).Should(Equal("Ready"))
 
 			By("adding force-delete annotation before deletion")
 			obj, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
@@ -767,13 +783,13 @@ var _ = Describe("postgresql", Ordered, func() {
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
 				return err != nil
-			}, timeout, interval).Should(BeTrue(), "CR should be deleted with force-delete annotation")
+			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "CR should be deleted with force-delete annotation")
 
 			By("verifying database was dropped from PostgreSQL")
 			Eventually(func() bool {
 				exists, err := verifier.DatabaseExists(ctx, dbName)
 				return err == nil && !exists
-			}, timeout, interval).Should(BeTrue(), "Database should be dropped when deletionPolicy is Delete")
+			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "Database should be dropped when deletionPolicy is Delete")
 		})
 
 		It("should retain database when deletionPolicy is Retain", func() {
@@ -796,13 +812,13 @@ var _ = Describe("postgresql", Ordered, func() {
 				}
 				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 				return phase
-			}, timeout, interval).Should(Equal("Ready"))
+			}, reconcileTimeout, pollingInterval).Should(Equal("Ready"))
 
 			By("verifying database exists in PostgreSQL")
 			Eventually(func() bool {
 				exists, err := verifier.DatabaseExists(ctx, dbName)
 				return err == nil && exists
-			}, timeout, interval).Should(BeTrue())
+			}, reconcileTimeout, pollingInterval).Should(BeTrue())
 
 			By("deleting the CR")
 			err = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, crName, metav1.DeleteOptions{})
@@ -812,7 +828,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
 				return err != nil
-			}, timeout, interval).Should(BeTrue(), "CR should be deleted")
+			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "CR should be deleted")
 
 			By("verifying database STILL exists in PostgreSQL (Retain policy)")
 			exists, err := verifier.DatabaseExists(ctx, dbName)
@@ -844,7 +860,7 @@ var _ = Describe("postgresql", Ordered, func() {
 				}
 				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 				return phase
-			}, timeout, interval).Should(Equal("Ready"))
+			}, reconcileTimeout, pollingInterval).Should(Equal("Ready"))
 
 			By("deleting the CR")
 			err = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, crName, metav1.DeleteOptions{})
@@ -854,13 +870,13 @@ var _ = Describe("postgresql", Ordered, func() {
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
 				return err != nil
-			}, timeout, interval).Should(BeTrue(), "CR should be deleted")
+			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "CR should be deleted")
 
 			By("verifying database was dropped from PostgreSQL")
 			Eventually(func() bool {
 				exists, err := verifier.DatabaseExists(ctx, dbName)
 				return err == nil && !exists
-			}, timeout, interval).Should(BeTrue(), "Database should be dropped when deletionPolicy is Delete")
+			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "Database should be dropped when deletionPolicy is Delete")
 		})
 	})
 
@@ -888,7 +904,7 @@ var _ = Describe("postgresql", Ordered, func() {
 				}
 				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 				return phase
-			}, timeout, interval).Should(Equal("Ready"))
+			}, reconcileTimeout, pollingInterval).Should(Equal("Ready"))
 
 			By("verifying role does NOT have CREATEDB")
 			hasCreateDb, err := verifier.RoleHasCreateDb(ctx, pgRoleName)
@@ -912,7 +928,7 @@ var _ = Describe("postgresql", Ordered, func() {
 				}
 				detected, _, _ := unstructured.NestedBool(obj.Object, "status", "drift", "detected")
 				return detected
-			}, 60*time.Second, 2*time.Second).Should(BeTrue(), "Drift should be detected in CR status")
+			}, driftTimeout, pollingInterval).Should(BeTrue(), "Drift should be detected in CR status")
 
 			By("verifying CREATEDB is still true (detect mode does NOT correct)")
 			hasCreateDb, err = verifier.RoleHasCreateDb(ctx, pgRoleName)
@@ -924,7 +940,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
 				return err != nil
-			}, timeout, interval).Should(BeTrue())
+			}, reconcileTimeout, pollingInterval).Should(BeTrue())
 		})
 
 		It("should auto-correct role attribute drift in correct mode", func() {
@@ -950,7 +966,7 @@ var _ = Describe("postgresql", Ordered, func() {
 				}
 				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 				return phase
-			}, timeout, interval).Should(Equal("Ready"))
+			}, reconcileTimeout, pollingInterval).Should(Equal("Ready"))
 
 			By("introducing drift: granting CREATEDB directly via SQL")
 			err = verifier.ExecOnDatabase(ctx, "postgres", fmt.Sprintf("ALTER ROLE %s CREATEDB", pgRoleName))
@@ -960,14 +976,14 @@ var _ = Describe("postgresql", Ordered, func() {
 			Eventually(func() bool {
 				hasCreateDb, err := verifier.RoleHasCreateDb(ctx, pgRoleName)
 				return err == nil && !hasCreateDb
-			}, 60*time.Second, 2*time.Second).Should(BeTrue(), "Operator should revoke CREATEDB (auto-correct)")
+			}, driftTimeout, pollingInterval).Should(BeTrue(), "Operator should revoke CREATEDB (auto-correct)")
 
 			By("cleanup: deleting DatabaseRole CR")
 			_ = dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Delete(ctx, crName, metav1.DeleteOptions{})
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
 				return err != nil
-			}, timeout, interval).Should(BeTrue())
+			}, reconcileTimeout, pollingInterval).Should(BeTrue())
 		})
 
 		It("should detect database schema drift", func() {
@@ -996,14 +1012,14 @@ var _ = Describe("postgresql", Ordered, func() {
 				}
 				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 				return phase
-			}, timeout, interval).Should(Equal("Ready"))
+			}, reconcileTimeout, pollingInterval).Should(Equal("Ready"))
 
 			By("verifying both schemas exist")
 			Eventually(func() bool {
 				exists1, err1 := verifier.SchemaExistsInDatabase(ctx, "app_schema", dbName)
 				exists2, err2 := verifier.SchemaExistsInDatabase(ctx, "data_schema", dbName)
 				return err1 == nil && err2 == nil && exists1 && exists2
-			}, timeout, interval).Should(BeTrue(), "Both schemas should exist")
+			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "Both schemas should exist")
 
 			By("introducing drift: dropping data_schema")
 			err = verifier.ExecOnDatabase(ctx, dbName, "DROP SCHEMA data_schema CASCADE")
@@ -1022,14 +1038,14 @@ var _ = Describe("postgresql", Ordered, func() {
 				}
 				detected, _, _ := unstructured.NestedBool(obj.Object, "status", "drift", "detected")
 				return detected
-			}, 60*time.Second, 2*time.Second).Should(BeTrue(), "Schema drift should be detected")
+			}, driftTimeout, pollingInterval).Should(BeTrue(), "Schema drift should be detected")
 
 			By("cleanup: deleting Database CR")
 			_ = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, crName, metav1.DeleteOptions{})
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
 				return err != nil
-			}, timeout, interval).Should(BeTrue())
+			}, reconcileTimeout, pollingInterval).Should(BeTrue())
 		})
 
 		It("should auto-correct database schema drift", func() {
@@ -1057,13 +1073,13 @@ var _ = Describe("postgresql", Ordered, func() {
 				}
 				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
 				return phase
-			}, timeout, interval).Should(Equal("Ready"))
+			}, reconcileTimeout, pollingInterval).Should(Equal("Ready"))
 
 			By("verifying schema exists")
 			Eventually(func() bool {
 				exists, err := verifier.SchemaExistsInDatabase(ctx, "app_schema", dbName)
 				return err == nil && exists
-			}, timeout, interval).Should(BeTrue())
+			}, reconcileTimeout, pollingInterval).Should(BeTrue())
 
 			By("introducing drift: dropping app_schema")
 			err = verifier.ExecOnDatabase(ctx, dbName, "DROP SCHEMA app_schema CASCADE")
@@ -1073,14 +1089,14 @@ var _ = Describe("postgresql", Ordered, func() {
 			Eventually(func() bool {
 				exists, err := verifier.SchemaExistsInDatabase(ctx, "app_schema", dbName)
 				return err == nil && exists
-			}, 60*time.Second, 2*time.Second).Should(BeTrue(), "Operator should recreate app_schema (auto-correct)")
+			}, driftTimeout, pollingInterval).Should(BeTrue(), "Operator should recreate app_schema (auto-correct)")
 
 			By("cleanup: deleting Database CR")
 			_ = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, crName, metav1.DeleteOptions{})
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
 				return err != nil
-			}, timeout, interval).Should(BeTrue())
+			}, reconcileTimeout, pollingInterval).Should(BeTrue())
 		})
 	})
 
@@ -1116,14 +1132,14 @@ var _ = Describe("postgresql", Ordered, func() {
 				phaseA, _, _ := unstructured.NestedString(objA.Object, "status", "phase")
 				phaseB, _, _ := unstructured.NestedString(objB.Object, "status", "phase")
 				return phaseA == "Ready" && phaseB == "Ready"
-			}, timeout, interval).Should(BeTrue(), "Both databases should become Ready")
+			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "Both databases should become Ready")
 
 			By("verifying both databases exist in PostgreSQL")
 			Eventually(func() bool {
 				existsA, errA := verifier.DatabaseExists(ctx, dbNameA)
 				existsB, errB := verifier.DatabaseExists(ctx, dbNameB)
 				return errA == nil && errB == nil && existsA && existsB
-			}, timeout, interval).Should(BeTrue(), "Both databases should exist in PostgreSQL")
+			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "Both databases should exist in PostgreSQL")
 
 			By("deleting only database A")
 			err = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, crNameA, metav1.DeleteOptions{})
@@ -1133,13 +1149,13 @@ var _ = Describe("postgresql", Ordered, func() {
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crNameA, metav1.GetOptions{})
 				return err != nil
-			}, timeout, interval).Should(BeTrue(), "Database A CR should be deleted")
+			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "Database A CR should be deleted")
 
 			By("verifying database A is dropped from PostgreSQL")
 			Eventually(func() bool {
 				exists, err := verifier.DatabaseExists(ctx, dbNameA)
 				return err == nil && !exists
-			}, timeout, interval).Should(BeTrue(), "Database A should be dropped from PostgreSQL")
+			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "Database A should be dropped from PostgreSQL")
 
 			By("verifying database B still exists and its CR is still Ready")
 			existsB, err := verifier.DatabaseExists(ctx, dbNameB)
@@ -1164,7 +1180,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crNameB, metav1.GetOptions{})
 				return err != nil
-			}, timeout, interval).Should(BeTrue())
+			}, reconcileTimeout, pollingInterval).Should(BeTrue())
 		})
 	})
 
@@ -1198,6 +1214,6 @@ var _ = Describe("postgresql", Ordered, func() {
 		Eventually(func() bool {
 			_, err := dynamicClient.Resource(databaseInstanceGVR).Namespace(testNamespace).Get(ctx, instanceName, metav1.GetOptions{})
 			return err != nil // Should return error (not found) when deleted
-		}, timeout, interval).Should(BeTrue(), "DatabaseInstance should be deleted")
+		}, reconcileTimeout, pollingInterval).Should(BeTrue(), "DatabaseInstance should be deleted")
 	})
 })
