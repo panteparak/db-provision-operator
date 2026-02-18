@@ -36,7 +36,7 @@ var _ = Describe("clusterdatabasegrant", Ordered, func() {
 	const (
 		clusterInstanceName = "shared-postgres-for-grant"
 		testNamespace       = "default"
-		postgresHost        = "postgres.postgres.svc.cluster.local"
+		postgresHost        = "host.k3d.internal"
 		secretName          = "postgres-credentials"
 		secretNamespace     = "postgres"
 		timeout             = 2 * time.Minute

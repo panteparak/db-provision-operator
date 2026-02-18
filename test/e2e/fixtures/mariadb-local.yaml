@@ -29,7 +29,7 @@ metadata:
   name: mariadb-instance
   namespace: mariadb
 spec:
-  engine: mariadb
+  engine: mysql  # MariaDB uses the MySQL adapter
   connection:
     host: host.k3d.internal
     port: 13307

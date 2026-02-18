@@ -10,6 +10,9 @@ resources:
 - bases/dbops.dbprovision.io_databasebackups.yaml
 - bases/dbops.dbprovision.io_databasebackupschedules.yaml
 - bases/dbops.dbprovision.io_databaserestores.yaml
+- bases/dbops.dbprovision.io_clusterdatabaseinstances.yaml
+- bases/dbops.dbprovision.io_clusterdatabaseroles.yaml
+- bases/dbops.dbprovision.io_clusterdatabasegrants.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

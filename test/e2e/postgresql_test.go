@@ -39,7 +39,7 @@ var _ = Describe("postgresql", Ordered, func() {
 		databaseName    = "testdb"
 		userName        = "testuser"
 		testNamespace   = "default"
-		postgresHost    = "postgres.postgres.svc.cluster.local" // K8s DNS for CR (runs inside cluster)
+		postgresHost    = "host.k3d.internal" // Docker host from k3d (database runs in Docker Compose)
 		secretName      = "postgres-credentials"
 		secretNamespace = "postgres"
 
@@ -64,8 +64,7 @@ var _ = Describe("postgresql", Ordered, func() {
 	var verifier *testutil.PostgresVerifier
 
 	// getVerifierHost returns the host for the verifier to connect to.
-	// In CI, we use port-forwarding so the verifier connects to localhost.
-	// Locally, we may connect directly to the K8s service.
+	// Tests connect to localhost; override with E2E_DATABASE_HOST if needed.
 	getVerifierHost := func() string {
 		if host := os.Getenv("E2E_DATABASE_HOST"); host != "" {
 			return host
@@ -84,8 +83,7 @@ var _ = Describe("postgresql", Ordered, func() {
 	}
 
 	// getInstanceHost returns the host for the DatabaseInstance CR.
-	// For local Docker Compose testing, use host.k3d.internal.
-	// For in-cluster testing, use the K8s service DNS.
+	// Defaults to host.k3d.internal (Docker host from k3d).
 	getInstanceHost := func() string {
 		if host := os.Getenv("E2E_INSTANCE_HOST"); host != "" {
 			return host

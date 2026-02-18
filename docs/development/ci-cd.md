@@ -1,275 +1,237 @@
 # CI/CD
 
-Continuous integration and deployment pipeline documentation.
+Continuous integration and deployment pipeline for the DB Provision Operator.
 
 ## Overview
 
+The CI pipeline runs on every push to `main` and every pull request. It uses a 6-stage architecture where each stage gates the next:
+
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        CI/CD Pipeline                           │
-│                                                                 │
-│  ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────────┐  │
-│  │  Push   │───▶│  Test   │───▶│  Build  │───▶│   Deploy    │  │
-│  │         │    │  & Lint │    │  Image  │    │   (Release) │  │
-│  └─────────┘    └─────────┘    └─────────┘    └─────────────┘  │
-│       │              │              │               │           │
-│       │              │              │               │           │
-│  ┌────┴────┐    ┌────┴────┐   ┌────┴────┐    ┌────┴────────┐  │
-│  │  PR     │    │  Unit   │   │  Docker │    │  GitHub     │  │
-│  │  Main   │    │  E2E    │   │  Multi- │    │  Release    │  │
-│  │  Tags   │    │  Lint   │   │  arch   │    │  Helm Chart │  │
-│  └─────────┘    └─────────┘   └─────────┘    │  Docs       │  │
-│                                              └─────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           CI Pipeline                                   │
+│                                                                         │
+│  Stage 0    Stage 1          Stage 2    Stage 3       Stage 4   Stage 5 │
+│  ┌──────┐  ┌──────────────┐  ┌──────┐  ┌──────────┐  ┌─────┐  ┌─────┐ │
+│  │Setup ├─►│ 8 Parallel   ├─►│ Gate ├─►│Integration├─►│ E2E ├─►│ CI  │ │
+│  │      │  │ Jobs         │  │      │  │ Tests     │  │     │  │Done │ │
+│  └──────┘  └──────────────┘  └──────┘  └──────────┘  └─────┘  └─────┘ │
+│                                                                         │
+│  On tag: Stage 6 ──► Release Artifacts + Security Scan                  │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Workflows
+### Triggers
 
-### CI Workflow (`.github/workflows/ci.yml`)
+| Event | Branches/Tags | What Runs |
+|-------|---------------|-----------|
+| Pull request | `main` | Stages 0–5 (Docker build without push) |
+| Push | `main` | Stages 0–5 + Docker push + Security scan |
+| Tag | `v*` | Stages 0–5 + Stage 6 (Release) |
 
-Runs on:
-- Pull requests to main
-- Push to main
+## Stage 1: Parallel Jobs
+
+Eight jobs run concurrently after setup:
+
+### 1. Lint
+
+Runs `golangci-lint` (v2.1.0) via the official GitHub Action.
+
+### 2. Unit Tests
+
+```bash
+make test  # go test (excludes /e2e), outputs cover.out
+```
+
+Uploads coverage to Codecov.
+
+### 3. Controller Tests (envtest)
+
+```bash
+make test-envtest  # Runs controller + CRD validation tests with envtest
+```
+
+Uses `KUBEBUILDER_ASSETS` from `setup-envtest`. Envtest binaries (~100MB) are cached by Kubernetes version.
+
+### 4. Template Comparison
+
+```bash
+make test-templates  # Verifies Helm ≡ Kustomize template equivalence
+```
+
+Ensures the Helm chart and Kustomize overlays produce equivalent manifests.
+
+### 5. Docker Build
+
+Builds the operator image per platform (currently `linux/amd64`). Uses a multi-layer cache strategy:
+
+- **GHA cache** (fast, per-platform, workflow-local)
+- **Registry cache** (persistent fallback when GHA cache is evicted)
+
+On **push events**: Pushes by digest, uploads digest artifact for manifest merging.
+On **PRs**: Builds locally, saves as tarball artifact for E2E tests.
+
+### 6. Verify Manifests
+
+```bash
+make manifests  # Generates CRDs, RBAC, webhook configs
+```
+
+On `main` push: auto-commits if manifests are outdated.
+On PRs: fails the check so the developer runs `make manifests` locally.
+
+Also runs Helm chart linting, template rendering, and strict YAML validation (duplicate key detection).
+
+### 7. Verify Generated Code
+
+```bash
+make generate  # Generates DeepCopy methods
+```
+
+Fails if generated code is outdated.
+
+### 8. Docs Build
+
+```bash
+mkdocs build --strict  # Builds documentation, fails on warnings
+```
+
+## Stage 2: Gate
+
+Waits for all Stage 1 jobs to succeed before allowing integration tests. Checks each job's result and fails with a clear error message identifying which job(s) failed.
+
+For PRs, `docker-merge` is skipped (no push), so the gate only checks `docker-build`.
+
+## Stage 3: Integration Tests
+
+Runs after the gate passes. Uses a matrix strategy across all four database engines:
 
 ```yaml
-name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.21'
-
-      - name: Run tests
-        run: make test
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
-
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: golangci/golangci-lint-action@v3
-        with:
-          version: latest
-
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build
-        run: make build
-
-      - name: Build Docker image
-        run: make docker-build
-
-  e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Create kind cluster
-        uses: helm/kind-action@v1
-
-      - name: Run E2E tests
-        run: make test-e2e
+matrix:
+  database: [postgresql, mysql, mariadb, cockroachdb]
 ```
 
-### Release Workflow (`.github/workflows/release.yml`)
+Each job uses **testcontainers-go** to manage Docker containers programmatically — no manual container setup needed. The tests run against real database instances with envtest providing the Kubernetes API.
 
-Runs on:
-- Git tags matching `v*`
-
-```yaml
-name: Release
-
-on:
-  push:
-    tags:
-      - 'v*'
-
-jobs:
-  release:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.21'
-
-      - name: Run tests
-        run: make test
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push image
-        run: |
-          make docker-build docker-push \
-            IMG=ghcr.io/${{ github.repository }}:${{ github.ref_name }}
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          generate_release_notes: true
-          files: |
-            dist/*.yaml
-
-  helm-release:
-    needs: [release]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Package Helm chart
-        run: |
-          helm package charts/db-provision-operator \
-            --version ${{ github.ref_name }} \
-            --app-version ${{ github.ref_name }}
-
-      - name: Update Helm repo
-        run: |
-          git checkout gh-pages
-          mv *.tgz charts/
-          helm repo index charts/ --url https://panteparak.github.io/db-provision-operator/charts
-          git add charts/
-          git commit -m "Release Helm chart ${{ github.ref_name }}"
-          git push
-
-  docs:
-    needs: [release]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: pip install -r docs/requirements.txt
-
-      - name: Deploy docs
-        run: mkdocs gh-deploy --force
+```bash
+make test-integration INTEGRATION_TEST_DATABASE=${{ matrix.database }}
 ```
 
-### Documentation Workflow (`.github/workflows/docs.yml`)
+## Stage 4: E2E Tests
 
-Runs on:
-- Push to main (docs changes)
-- Pull requests (docs changes)
+Runs after integration tests pass. Full end-to-end validation using Docker Compose + k3d + Helm.
 
-```yaml
-name: Documentation
+### Pipeline Per Database (16 Steps)
 
-on:
-  push:
-    branches: [main]
-    paths:
-      - 'docs/**'
-      - 'mkdocs.yml'
-  pull_request:
-    paths:
-      - 'docs/**'
-      - 'mkdocs.yml'
+Each database engine runs in parallel with this sequence:
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+| # | Step | Description |
+|---|------|-------------|
+| 1 | Checkout | Clone repository |
+| 2 | Setup Go | Install Go from `go.mod` version |
+| 3 | Get SHA | Short commit SHA for image tagging |
+| 4 | Install k3d | Install k3d CLI |
+| 5 | Start database | `make e2e-db-up E2E_DATABASE=<engine>` |
+| 6 | Create cluster | `make e2e-cluster-create` |
+| 7 | Get operator image | Pull from registry (push) or load from artifact (PR) |
+| 8 | Load into k3d | `make e2e-image-load E2E_IMG=<image>` |
+| 9 | Install CRDs | `make e2e-install-crds` |
+| 10 | Install Helm | Setup Helm v3.14.0 |
+| 11 | Deploy operator | `helm install` with the chart (not Kustomize) |
+| 12 | Wait for ready | `kubectl wait --for=condition=Available` |
+| 13 | Create instance | `make e2e-create-db-instance E2E_DATABASE=<engine>` |
+| 14 | Run tests | `make e2e-local-run-tests E2E_DATABASE=<engine>` |
+| 15 | Collect logs | On failure: operator logs, pod descriptions, Docker Compose logs, CR YAML, events |
+| 16 | Cleanup | `make e2e-local-cleanup` (always runs) |
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+### Helm Deployment (Not Kustomize)
 
-      - run: pip install -r docs/requirements.txt
+CI intentionally deploys the operator via the **Helm chart** (`charts/db-provision-operator/`) rather than Kustomize. This validates the Helm chart in a real cluster as part of every CI run. Local development uses `make e2e-deploy-operator` (Kustomize) for faster iteration.
 
-      - name: Build docs
-        run: mkdocs build --strict
+### Log Collection on Failure
 
-  deploy:
-    needs: [build]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    permissions:
-      contents: write
+When any E2E step fails, CI collects:
 
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+- Operator pod logs (last 500 lines)
+- Operator pod description
+- Docker Compose database logs (last 100 lines)
+- All database-related CR YAML dumps
+- Kubernetes events (last 100)
+- Pod list across all namespaces
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+## Stage 5: CI Success
 
-      - run: pip install -r docs/requirements.txt
+A summary job that runs after all E2E tests pass. Confirms the full pipeline succeeded.
 
-      - name: Deploy
-        run: mkdocs gh-deploy --force
+## Security Scan (Push Events Only)
+
+After `docker-merge`, Trivy scans each platform image:
+
+1. **Generate CycloneDX SBOM** from the container image
+2. **Scan for vulnerabilities** — outputs JSON (all severities) + table (MEDIUM+ with unfixed ignored)
+3. **Generate SARIF report** — uploaded to GitHub Security tab via CodeQL
+4. **Upload artifacts** — SBOM, vulnerability reports retained for 30 days
+
+## Docker Image Build
+
+### Multi-Stage Dockerfile
+
+The operator image uses a multi-stage build:
+
+1. **Builder stage**: Compiles the Go binary
+2. **Runtime stage**: Alpine-based minimal image with database client tools
+
+### Image Tags
+
+| Tag Pattern | When | Example |
+|-------------|------|---------|
+| `sha-<short>` | Every build | `sha-abc1234` |
+| `latest` | Push to main | `latest` |
+| `main` | Push to main | `main` |
+| `<version>` | Semver tag | `1.2.3` |
+| `<major>.<minor>` | Semver tag | `1.2` |
+
+### Cache Strategy
+
 ```
+GHA cache (fast, per-platform)
+  └── fallback: Registry cache (persistent, cross-workflow)
+```
+
+PRs share cache from the `main` branch via registry cache, enabling fast builds even on new branches.
+
+## Release Pipeline (Stage 6)
+
+Triggered only on tags matching `v*`. Runs after `ci-success`.
+
+### Steps
+
+1. **Package Helm chart** — `helm package charts/db-provision-operator`
+2. **Build Kustomize manifest** — `kustomize build config/default > install.yaml`
+3. **Build CRDs manifest** — `kustomize build config/crd > crds.yaml`
+4. **Create GitHub Release** — with release notes, attaches all artifacts
+
+### Release Assets
+
+Each release includes:
+
+| Asset | Description |
+|-------|-------------|
+| `db-provision-operator-*.tgz` | Helm chart package |
+| `install.yaml` | Full installation manifest (CRDs + operator) |
+| `crds.yaml` | CRD definitions only |
 
 ## Build Artifacts
 
 ### Container Images
 
-| Tag | Description |
-|-----|-------------|
-| `v1.2.3` | Release version |
-| `latest` | Latest release |
-| `main` | Latest main branch |
-| `sha-abc123` | Specific commit |
+Published to: `ghcr.io/<owner>/db-provision-operator`
 
-### Helm Charts
+### SBOM
 
-Published to: `https://panteparak.github.io/db-provision-operator/charts`
+Generated in two formats:
 
-### Release Assets
-
-Each release includes:
-- `install.yaml` - Full installation manifest
-- `crds.yaml` - CRD definitions only
-- `db-provision-operator-*.tgz` - Helm chart package
+- **SPDX** (via `anchore/sbom-action`) — uploaded as artifact
+- **CycloneDX** (via Trivy) — used for vulnerability scanning
 
 ## Environment Configuration
 
@@ -277,143 +239,52 @@ Each release includes:
 
 | Secret | Purpose |
 |--------|---------|
-| `GITHUB_TOKEN` | Auto-provided, GitHub API access |
-| `CODECOV_TOKEN` | Code coverage reporting |
+| `GITHUB_TOKEN` | Auto-provided — registry login, release creation |
+| `CODECOV_TOKEN` | Coverage reporting |
 
-### Variables
+### Global Environment
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `GO_VERSION` | `1.21` | Go version for builds |
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `GO_VERSION_FILE` | `go.mod` | Go version source of truth |
 | `REGISTRY` | `ghcr.io` | Container registry |
+| `IMAGE_NAME` | `${{ github.repository }}` | Image name |
 
 ## Local CI Simulation
 
-### Run CI Locally
+Reproduce each CI stage locally:
 
 ```bash
-# Lint
+# Stage 1: Lint
 make lint
 
-# Test
+# Stage 1: Unit tests
 make test
 
-# Build
-make build
+# Stage 1: Controller tests (envtest)
+make test-envtest
 
-# Docker build
+# Stage 1: Template comparison
+make test-templates
+
+# Stage 1: Docker build
 make docker-build
 
-# E2E (requires cluster)
-make test-e2e
+# Stage 1: Manifests
+make manifests && git diff --exit-code
+
+# Stage 1: Generated code
+make generate && git diff --exit-code
+
+# Stage 1: Docs
+mkdocs build --strict
+
+# Stage 3: Integration tests (single engine)
+make test-integration INTEGRATION_TEST_DATABASE=postgresql
+
+# Stage 4: E2E tests (single engine)
+make e2e-local-postgresql
+
+# Full E2E (all engines)
+make e2e-local-all
 ```
-
-### Act (GitHub Actions Locally)
-
-```bash
-# Install act
-brew install act
-
-# Run CI workflow
-act -j test
-
-# Run with secrets
-act -j release --secret-file .secrets
-```
-
-## Pipeline Stages
-
-### Test Stage
-
-1. **Unit tests** - Fast, isolated tests
-2. **Integration tests** - Tests with envtest
-3. **E2E tests** - Full cluster tests
-4. **Lint** - Code quality checks
-
-### Build Stage
-
-1. **Go build** - Compile binary
-2. **Docker build** - Create image
-3. **Multi-arch** - AMD64 and ARM64
-
-### Release Stage
-
-1. **Tag validation** - Verify semver
-2. **Image push** - Push to registry
-3. **GitHub release** - Create release
-4. **Helm publish** - Update chart repo
-5. **Docs deploy** - Update documentation
-
-## Quality Gates
-
-### Required Checks
-
-- All tests pass
-- Lint passes
-- Build succeeds
-- Coverage meets threshold
-
-### Branch Protection
-
-```yaml
-# .github/settings.yml
-branches:
-  - name: main
-    protection:
-      required_status_checks:
-        strict: true
-        contexts:
-          - test
-          - lint
-          - build
-      required_pull_request_reviews:
-        required_approving_review_count: 1
-```
-
-## Troubleshooting
-
-### Failed Tests
-
-```bash
-# View test logs in Actions
-# Click on failed job > View raw logs
-
-# Reproduce locally
-make test
-```
-
-### Failed Docker Build
-
-```bash
-# Check Dockerfile syntax
-docker build --no-cache .
-
-# Check multi-arch
-docker buildx build --platform linux/amd64,linux/arm64 .
-```
-
-### Failed Release
-
-```bash
-# Verify tag format
-git tag -l 'v*'
-
-# Ensure tag is pushed
-git push origin v1.2.3
-```
-
-## Metrics
-
-### Pipeline Duration
-
-Target times:
-- CI: < 10 minutes
-- Release: < 15 minutes
-- Docs: < 5 minutes
-
-### Success Rate
-
-Monitor in GitHub Actions insights:
-- Workflow runs
-- Success/failure rate
-- Duration trends

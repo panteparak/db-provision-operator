@@ -183,97 +183,6 @@ setup-precommit: ## Install pre-commit and its dependencies
 E2E_K3D_CLUSTER ?= dbprov-e2e
 E2E_IMG ?= db-provision-operator:e2e
 
-.PHONY: test-e2e-postgresql
-test-e2e-postgresql: ## Run E2E tests with PostgreSQL
-	$(MAKE) e2e-setup-cluster E2E_DATABASE=postgresql
-	$(MAKE) e2e-run-tests E2E_DATABASE=postgresql || ($(MAKE) e2e-cleanup E2E_DATABASE=postgresql && exit 1)
-	$(MAKE) e2e-cleanup E2E_DATABASE=postgresql
-
-.PHONY: test-e2e-mysql
-test-e2e-mysql: ## Run E2E tests with MySQL
-	$(MAKE) e2e-setup-cluster E2E_DATABASE=mysql
-	$(MAKE) e2e-run-tests E2E_DATABASE=mysql || ($(MAKE) e2e-cleanup E2E_DATABASE=mysql && exit 1)
-	$(MAKE) e2e-cleanup E2E_DATABASE=mysql
-
-.PHONY: test-e2e-mariadb
-test-e2e-mariadb: ## Run E2E tests with MariaDB
-	$(MAKE) e2e-setup-cluster E2E_DATABASE=mariadb
-	$(MAKE) e2e-run-tests E2E_DATABASE=mariadb || ($(MAKE) e2e-cleanup E2E_DATABASE=mariadb && exit 1)
-	$(MAKE) e2e-cleanup E2E_DATABASE=mariadb
-
-.PHONY: e2e-setup-cluster
-e2e-setup-cluster: ## Set up k3d cluster with database for E2E tests
-	@command -v k3d >/dev/null 2>&1 || { echo "Error: k3d not installed. Install with: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash"; exit 1; }
-	@echo "Creating k3d cluster $(E2E_K3D_CLUSTER)-$(E2E_DATABASE)..."
-	k3d cluster create $(E2E_K3D_CLUSTER)-$(E2E_DATABASE) \
-		--agents 0 \
-		--wait --timeout 120s \
-		--no-lb \
-		--no-rollback \
-		--k3s-arg "--disable=traefik@server:*" \
-		--k3s-arg "--disable=servicelb@server:*" \
-		--k3s-arg "--disable=metrics-server@server:*" || true
-	kubectl wait --for=condition=Ready nodes --all --timeout=60s
-	@echo "Deploying $(E2E_DATABASE)..."
-	kubectl apply -f test/e2e/fixtures/$(E2E_DATABASE).yaml
-	@if [ "$(E2E_DATABASE)" = "postgresql" ]; then \
-		echo "Waiting for PostgreSQL pod to be created..."; \
-		for i in $$(seq 1 30); do kubectl get pod/postgres-0 -n postgres >/dev/null 2>&1 && break || sleep 2; done; \
-		echo "Waiting for PostgreSQL to be ready..."; \
-		kubectl wait --for=condition=Ready pod/postgres-0 -n postgres --timeout=180s; \
-	elif [ "$(E2E_DATABASE)" = "mysql" ]; then \
-		echo "Waiting for MySQL pod to be created..."; \
-		for i in $$(seq 1 30); do kubectl get pod/mysql-0 -n mysql >/dev/null 2>&1 && break || sleep 2; done; \
-		echo "Waiting for MySQL to be ready..."; \
-		kubectl wait --for=condition=Ready pod/mysql-0 -n mysql --timeout=180s; \
-	elif [ "$(E2E_DATABASE)" = "mariadb" ]; then \
-		echo "Waiting for MariaDB pod to be created..."; \
-		for i in $$(seq 1 30); do kubectl get pod/mariadb-0 -n mariadb >/dev/null 2>&1 && break || sleep 2; done; \
-		echo "Waiting for MariaDB to be ready..."; \
-		kubectl wait --for=condition=Ready pod/mariadb-0 -n mariadb --timeout=180s; \
-	fi
-	@echo "Building operator image..."
-	$(MAKE) docker-build IMG=$(E2E_IMG)
-	@echo "Loading image into k3d..."
-	k3d image import $(E2E_IMG) -c $(E2E_K3D_CLUSTER)-$(E2E_DATABASE)
-	@echo "Installing CRDs..."
-	$(MAKE) install
-	@echo "Deploying operator..."
-	$(MAKE) deploy IMG=$(E2E_IMG)
-	@echo "Waiting for operator to be ready..."
-	kubectl wait --for=condition=Available deployment/db-provision-operator-controller-manager \
-		-n db-provision-operator-system --timeout=120s
-	@echo "E2E setup complete for $(E2E_DATABASE)"
-
-.PHONY: e2e-run-tests
-e2e-run-tests: ## Run E2E tests for specified database
-	@echo "Setting up port-forwarding for $(E2E_DATABASE)..."
-	@if [ "$(E2E_DATABASE)" = "postgresql" ]; then \
-		kubectl port-forward -n postgres svc/postgres 5432:5432 & \
-		echo $$! > /tmp/e2e-port-forward.pid; \
-		export E2E_LOCAL_PORT=5432; \
-	elif [ "$(E2E_DATABASE)" = "mysql" ]; then \
-		kubectl port-forward -n mysql svc/mysql 3306:3306 & \
-		echo $$! > /tmp/e2e-port-forward.pid; \
-		export E2E_LOCAL_PORT=3306; \
-	elif [ "$(E2E_DATABASE)" = "mariadb" ]; then \
-		kubectl port-forward -n mariadb svc/mariadb 3306:3306 & \
-		echo $$! > /tmp/e2e-port-forward.pid; \
-		export E2E_LOCAL_PORT=3306; \
-	fi
-	@sleep 3
-	@echo "Running E2E tests for $(E2E_DATABASE)..."
-	E2E_DATABASE_HOST=127.0.0.1 go test ./test/e2e/... -v -tags=e2e -ginkgo.focus="$(E2E_DATABASE)" -ginkgo.v -timeout=10m; \
-		TEST_EXIT=$$?; \
-		kill $$(cat /tmp/e2e-port-forward.pid) 2>/dev/null || true; \
-		rm -f /tmp/e2e-port-forward.pid; \
-		exit $$TEST_EXIT
-
-.PHONY: e2e-cleanup
-e2e-cleanup: ## Clean up k3d cluster
-	@echo "Cleaning up k3d cluster $(E2E_K3D_CLUSTER)-$(E2E_DATABASE)..."
-	k3d cluster delete $(E2E_K3D_CLUSTER)-$(E2E_DATABASE) || true
-
 .PHONY: e2e-logs
 e2e-logs: ## Show operator logs from E2E cluster
 	kubectl logs -n db-provision-operator-system -l control-plane=controller-manager -f
@@ -281,7 +190,7 @@ e2e-logs: ## Show operator logs from E2E cluster
 E2E_DEBUG_LOG ?= e2e-debug-$(E2E_DATABASE).log
 
 .PHONY: e2e-debug
-e2e-debug: ## Show debug information for E2E cluster (pods, pvcs, events) - also saves to $(E2E_DEBUG_LOG)
+e2e-debug: ## Show debug information for E2E cluster (pods, events, Docker Compose logs) - also saves to $(E2E_DEBUG_LOG)
 	@{ \
 		echo "=== E2E Debug Log for $(E2E_DATABASE) ===" ; \
 		echo "=== Generated at $$(date -u '+%Y-%m-%d %H:%M:%S UTC') ===" ; \
@@ -292,32 +201,17 @@ e2e-debug: ## Show debug information for E2E cluster (pods, pvcs, events) - also
 		echo "=== Pods (all namespaces) ===" ; \
 		kubectl get pods -A -o wide ; \
 		echo "" ; \
-		echo "=== PVCs (all namespaces) ===" ; \
-		kubectl get pvc -A ; \
-		echo "" ; \
-		echo "=== PVC Details ===" ; \
-		kubectl describe pvc -A ; \
-		echo "" ; \
-		echo "=== PVs ===" ; \
-		kubectl get pv ; \
-		echo "" ; \
-		echo "=== StorageClasses ===" ; \
-		kubectl get storageclass ; \
-		echo "" ; \
 		echo "=== Events (last 50) ===" ; \
 		kubectl get events -A --sort-by='.lastTimestamp' | tail -50 ; \
 		echo "" ; \
 		echo "=== Operator Logs (last 100 lines) ===" ; \
 		kubectl logs -n db-provision-operator-system -l control-plane=controller-manager --tail=100 2>&1 || true ; \
 		echo "" ; \
-		echo "=== Database Pod Logs ($(E2E_DATABASE)) ===" ; \
-		if [ "$(E2E_DATABASE)" = "postgresql" ]; then \
-			kubectl logs -n postgres postgres-0 --tail=50 2>&1 || true ; \
-		elif [ "$(E2E_DATABASE)" = "mysql" ]; then \
-			kubectl logs -n mysql mysql-0 --tail=50 2>&1 || true ; \
-		elif [ "$(E2E_DATABASE)" = "mariadb" ]; then \
-			kubectl logs -n mariadb mariadb-0 --tail=50 2>&1 || true ; \
-		fi ; \
+		echo "=== Docker Compose Database Logs ===" ; \
+		docker compose -f docker-compose.e2e.yml logs --tail=50 2>&1 || true ; \
+		echo "" ; \
+		echo "=== Docker Compose Service Status ===" ; \
+		docker compose -f docker-compose.e2e.yml ps 2>&1 || true ; \
 	} 2>&1 | tee $(E2E_DEBUG_LOG)
 	@echo ""
 	@echo "Debug log saved to: $(E2E_DEBUG_LOG)"
