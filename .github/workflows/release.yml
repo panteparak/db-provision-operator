@@ -1,207 +1,349 @@
 name: Release
 
 on:
-  push:
-    tags: ['v*']
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v0.1.8)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+  pages: write
+  id-token: write
+  actions: read  # Required for cross-workflow artifact download
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # Run tests before release
-  test:
-    name: Test
+  # ============================================================================
+  # Guard: Verify CI passed and extract release metadata
+  # ============================================================================
+
+  guard:
+    name: Guard
     runs-on: ubuntu-latest
+    outputs:
+      should-release: ${{ steps.version.outputs.should-release }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      image-tag: ${{ steps.image-tag.outputs.image-tag }}
+      ci-run-id: ${{ steps.ci-run.outputs.run-id }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Check CI conclusion
+        if: github.event_name == 'workflow_run'
+        env:
+          WR_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        run: |
+          if [[ "$WR_CONCLUSION" != "success" ]]; then
+            echo "::error::CI workflow did not succeed (conclusion: $WR_CONCLUSION)"
+            exit 1
+          fi
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Run tests
-        run: make test
-
-  # Promote existing image from CI (retag sha-xxx to version tag)
-  # This is faster and ensures we release the exact same binary that was tested
-  promote-image:
-    name: Promote Docker Image
-    runs-on: ubuntu-latest
-    needs: [test]
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Get short SHA
-        id: short-sha
-        run: echo "sha=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
-
-      - name: Extract version from tag
+      - name: Extract tag and version
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        env:
+          WR_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          WD_TAG: ${{ inputs.tag }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            TAG="$WR_HEAD_BRANCH"
+          else
+            TAG="$WD_TAG"
+          fi
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9] ]]; then
+            echo "::notice::Not a version tag ($TAG), skipping release"
+            echo "should-release=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
 
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "should-release=true" >> $GITHUB_OUTPUT
+          echo "Release: $TAG (version $VERSION)"
+
+      - uses: actions/checkout@v4
+        if: steps.version.outputs.should-release == 'true'
+        with:
+          ref: ${{ steps.version.outputs.tag }}
+
+      - name: Validate Chart.yaml version
+        if: steps.version.outputs.should-release == 'true'
+        env:
+          TAG_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          CHART_VERSION=$(grep '^version:' charts/db-provision-operator/Chart.yaml | awk '{print $2}')
+          if [[ "${CHART_VERSION}" != "${TAG_VERSION}" ]]; then
+            echo "::error::Chart.yaml version (${CHART_VERSION}) does not match tag version (${TAG_VERSION})"
+            exit 1
+          fi
+          echo "Chart version matches tag: ${CHART_VERSION}"
+
+      - name: Compute image tag
+        if: steps.version.outputs.should-release == 'true'
+        id: image-tag
+        env:
+          WR_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            SHA="$WR_HEAD_SHA"
+          else
+            SHA=$(git rev-parse HEAD)
+          fi
+          SHORT_SHA="${SHA:0:7}"
+          echo "image-tag=sha-${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "Image tag: sha-${SHORT_SHA}"
+
+      - name: Set CI run ID
+        if: steps.version.outputs.should-release == 'true'
+        id: ci-run
+        env:
+          WR_RUN_ID: ${{ github.event.workflow_run.id }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            echo "run-id=$WR_RUN_ID" >> $GITHUB_OUTPUT
+          else
+            echo "run-id=" >> $GITHUB_OUTPUT
+          fi
+
+  # ============================================================================
+  # Docker Release: Retag CI images or rebuild (manual dispatch)
+  # ============================================================================
+  # For workflow_run: retags CI-built SHA images to version tags using
+  # `docker buildx imagetools create`. This is a manifest-only operation —
+  # no rebuild, bit-for-bit identical to what CI tested.
+  # For workflow_dispatch: rebuilds from source as a fallback.
+
+  docker-release:
+    name: Docker Release
+    runs-on: ubuntu-latest
+    needs: [guard]
+    if: needs.guard.outputs.should-release == 'true'
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Promote image (retag sha to version)
+      # workflow_run: retag existing CI-tested images
+      - name: Retag CI images to release version
+        if: needs.guard.outputs.ci-run-id != ''
+        env:
+          IMAGE_TAG: ${{ needs.guard.outputs.image-tag }}
+          VERSION: ${{ needs.guard.outputs.version }}
         run: |
-          SOURCE_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.short-sha.outputs.sha }}"
-          VERSION_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}"
-          LATEST_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-
-          echo "Promoting image from CI..."
-          echo "  Source: $SOURCE_IMAGE"
-          echo "  Target: $VERSION_TAG, $LATEST_TAG"
-
-          # Use buildx imagetools to retag without pulling/pushing the full image
+          echo "Retagging ${IMAGE_TAG} -> ${VERSION} and latest"
           docker buildx imagetools create \
-            --tag "$VERSION_TAG" \
-            --tag "$LATEST_TAG" \
-            "$SOURCE_IMAGE"
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}
 
-          echo "Image promoted successfully!"
-
-      - name: Verify promoted image
-        run: |
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
-
-  # Build release artifacts
-  artifacts:
-    name: Build Release Artifacts
-    runs-on: ubuntu-latest
-    needs: [test]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      # workflow_dispatch fallback: rebuild from source
+      - uses: actions/checkout@v4
+        if: needs.guard.outputs.ci-run-id == ''
         with:
-          go-version-file: go.mod
+          ref: ${{ needs.guard.outputs.tag }}
 
-      - name: Extract version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - uses: docker/setup-qemu-action@v3
+        if: needs.guard.outputs.ci-run-id == ''
 
-      - name: Generate CRDs
-        run: make manifests
-
-      - name: Build Kustomize installer
-        run: |
-          make build-installer IMG=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
-          mv dist/install.yaml dist/db-provision-operator-${{ steps.version.outputs.VERSION }}.yaml
-
-      - name: Package CRDs
-        run: |
-          mkdir -p dist/crds
-          cp config/crd/bases/*.yaml dist/crds/
-          cd dist && tar -czvf crds-${{ steps.version.outputs.VERSION }}.tar.gz crds/
-
-      - name: Install Helm
-        uses: azure/setup-helm@v4
+      - name: Build and push (manual dispatch)
+        if: needs.guard.outputs.ci-run-id == ''
+        uses: docker/build-push-action@v6
         with:
-          version: v3.14.0
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.guard.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Package Helm chart
-        run: |
-          # Update Chart.yaml version
-          sed -i "s/^version:.*/version: ${{ steps.version.outputs.VERSION }}/" charts/db-provision-operator/Chart.yaml
-          sed -i "s/^appVersion:.*/appVersion: \"${{ steps.version.outputs.VERSION }}\"/" charts/db-provision-operator/Chart.yaml
-
-          # Update default image tag in values.yaml
-          sed -i "s/tag:.*/tag: \"${{ steps.version.outputs.VERSION }}\"/" charts/db-provision-operator/values.yaml
-
-          # Package Helm chart
-          helm package charts/db-provision-operator -d dist/
-
-      - name: Generate checksums
-        run: |
-          cd dist
-          sha256sum *.yaml *.tar.gz *.tgz > checksums.txt
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-artifacts
-          path: |
-            dist/*.yaml
-            dist/*.tar.gz
-            dist/*.tgz
-            dist/checksums.txt
-
+  # ============================================================================
   # Create GitHub Release
-  release:
-    name: Create GitHub Release
+  # ============================================================================
+
+  github-release:
+    name: GitHub Release
     runs-on: ubuntu-latest
-    needs: [promote-image, artifacts]
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Extract version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: release-artifacts
-          path: dist/
-
-      - name: Generate changelog
-        id: changelog
-        run: |
-          # Get previous tag
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-
-          if [ -n "$PREV_TAG" ]; then
-            echo "## Changes since $PREV_TAG" > CHANGELOG.md
-            echo "" >> CHANGELOG.md
-            git log --pretty=format:"- %s (%h)" $PREV_TAG..HEAD >> CHANGELOG.md
-          else
-            echo "## Initial Release" > CHANGELOG.md
-            echo "" >> CHANGELOG.md
-            echo "First release of db-provision-operator" >> CHANGELOG.md
-          fi
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: v${{ steps.version.outputs.VERSION }}
-          body_path: CHANGELOG.md
-          draft: false
-          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-alpha') || contains(github.ref, '-beta') }}
-          files: |
-            dist/db-provision-operator-${{ steps.version.outputs.VERSION }}.yaml
-            dist/crds-${{ steps.version.outputs.VERSION }}.tar.gz
-            dist/db-provision-operator-${{ steps.version.outputs.VERSION }}.tgz
-            dist/checksums.txt
-          generate_release_notes: true
-
-  # Deploy documentation with release (runs first to create gh-pages structure)
-  docs:
-    name: Deploy Documentation
-    runs-on: ubuntu-latest
-    needs: [release]
-    permissions:
-      contents: write
+    needs: [guard, docker-release]
+    if: needs.guard.outputs.should-release == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ needs.guard.outputs.tag }}
+          fetch-depth: 0
+
+      # Download SBOMs from CI run (only available via workflow_run)
+      - name: Download SBOM
+        if: needs.guard.outputs.ci-run-id != ''
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ needs.guard.outputs.ci-run-id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: sbom
+          path: /tmp/sbom/
+        continue-on-error: true
+
+      # Build versioned install manifest
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build install manifest
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          make build-installer IMG=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}
+          mv dist/install.yaml dist/db-provision-operator-${VERSION}.yaml
+
+      # Package CRDs tarball
+      - name: Package CRDs
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          mkdir -p dist/crds
+          cp config/crd/bases/*.yaml dist/crds/
+          cd dist && tar -czvf crds-${VERSION}.tar.gz crds/
+
+      # Copy dashboards, install Helm, stamp versions, package chart
+      - name: Copy dashboards
+        run: make copy-dashboards
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      - name: Stamp version in chart
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          sed -i "s/^version:.*/version: ${VERSION}/" charts/db-provision-operator/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: \"${VERSION}\"/" charts/db-provision-operator/Chart.yaml
+          sed -i "s/tag:.*/tag: \"${VERSION}\"/" charts/db-provision-operator/values.yaml
+
+      - name: Package Helm chart
+        run: helm package charts/db-provision-operator -d dist/
+
+      # Generate checksums
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum db-provision-operator-*.yaml crds-*.tar.gz *.tgz > checksums.txt
+
+      # Prepare release assets
+      - name: Prepare release assets
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          mkdir -p release-assets
+          cp dist/db-provision-operator-${VERSION}.yaml release-assets/
+          cp dist/crds-${VERSION}.tar.gz release-assets/
+          cp dist/db-provision-operator-${VERSION}.tgz release-assets/
+          cp dist/checksums.txt release-assets/
+          [ -f /tmp/sbom/sbom.spdx.json ] && cp /tmp/sbom/sbom.spdx.json release-assets/ || true
+          echo "Release assets:"
+          ls -la release-assets/
+
+      - name: Generate changelog
+        env:
+          TAG: ${{ needs.guard.outputs.tag }}
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            echo "Generating changelog from $PREV_TAG to $TAG"
+            CHANGELOG=$(git log --pretty=format:"- %s" "$PREV_TAG".."$TAG" | head -50)
+          else
+            echo "No previous tag found, using all commits"
+            CHANGELOG=$(git log --pretty=format:"- %s" | head -50)
+          fi
+          echo "$CHANGELOG" > /tmp/changelog.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.guard.outputs.tag }}
+          name: ${{ needs.guard.outputs.tag }}
+          body_path: /tmp/changelog.txt
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(needs.guard.outputs.tag, '-rc') || contains(needs.guard.outputs.tag, '-alpha') || contains(needs.guard.outputs.tag, '-beta') }}
+          files: release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================================================
+  # Helm OCI: Push chart to container registry
+  # ============================================================================
+
+  helm-oci:
+    name: Helm Chart (OCI)
+    runs-on: ubuntu-latest
+    needs: [guard, github-release]
+    if: needs.guard.outputs.should-release == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.guard.outputs.tag }}
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      - name: Copy dashboards
+        run: make copy-dashboards
+
+      - name: Stamp version in chart
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          sed -i "s/^version:.*/version: ${VERSION}/" charts/db-provision-operator/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: \"${VERSION}\"/" charts/db-provision-operator/Chart.yaml
+          sed -i "s/tag:.*/tag: \"${VERSION}\"/" charts/db-provision-operator/values.yaml
+
+      - name: Login to GHCR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
+        run: echo "${GITHUB_TOKEN}" | helm registry login ghcr.io --username "${GH_ACTOR}" --password-stdin
+
+      - name: Package and push Helm chart
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          helm package charts/db-provision-operator
+          helm push "db-provision-operator-${VERSION}.tgz" "oci://ghcr.io/${REPO_OWNER}/charts"
+
+  # ============================================================================
+  # Deploy Documentation
+  # ============================================================================
+
+  docs-release:
+    name: Deploy Documentation
+    runs-on: ubuntu-latest
+    needs: [guard, github-release]
+    if: needs.guard.outputs.should-release == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.guard.outputs.tag }}
           fetch-depth: 0
 
       - uses: actions/setup-python@v5
@@ -221,42 +363,44 @@ jobs:
       - name: Deploy to GitHub Pages
         run: mkdocs gh-deploy --force
 
-  # Update Helm repository AFTER docs deployment (to preserve charts/ directory)
-  helm-repo:
-    name: Update Helm Repository
+  # ============================================================================
+  # Summary
+  # ============================================================================
+
+  release-summary:
+    name: Release Summary
     runs-on: ubuntu-latest
-    needs: [docs]  # Run after docs to avoid being overwritten by mkdocs gh-deploy --force
-    permissions:
-      contents: write
+    needs: [guard, docker-release, github-release, helm-oci, docs-release]
+    if: always() && needs.guard.outputs.should-release == 'true'
+    env:
+      VERSION: ${{ needs.guard.outputs.version }}
+      TAG: ${{ needs.guard.outputs.tag }}
     steps:
-      - name: Checkout gh-pages branch
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-          fetch-depth: 0
-
-      - name: Download Helm chart
-        uses: actions/download-artifact@v4
-        with:
-          name: release-artifacts
-          path: dist/
-
-      - name: Install Helm
-        uses: azure/setup-helm@v4
-        with:
-          version: v3.14.0
-
-      - name: Update Helm repo index
+      - name: Summary
+        env:
+          DOCKER_RESULT: ${{ needs.docker-release.result }}
+          RELEASE_RESULT: ${{ needs.github-release.result }}
+          HELM_RESULT: ${{ needs.helm-oci.result }}
+          DOCS_RESULT: ${{ needs.docs-release.result }}
+          REPO: ${{ github.repository }}
+          REPO_OWNER: ${{ github.repository_owner }}
         run: |
-          mkdir -p charts
-          cp dist/*.tgz charts/ 2>/dev/null || true
-          helm repo index charts --url https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/charts
-
-      - name: Commit and push
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add charts/
-          git diff --staged --quiet || git commit -m "Update Helm repository for v${{ steps.version.outputs.VERSION }}"
-          git push
-        continue-on-error: true  # Don't fail if gh-pages doesn't exist yet
+          echo "## Release $TAG" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker Release | $DOCKER_RESULT |" >> $GITHUB_STEP_SUMMARY
+          echo "| GitHub Release | $RELEASE_RESULT |" >> $GITHUB_STEP_SUMMARY
+          echo "| Helm OCI | $HELM_RESULT |" >> $GITHUB_STEP_SUMMARY
+          echo "| Documentation | $DOCS_RESULT |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Artifact | Location |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker Image | \`ghcr.io/${REPO}:${VERSION}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Helm Chart | \`helm install db-provision-operator oci://ghcr.io/${REPO_OWNER}/charts/db-provision-operator --version ${VERSION}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Documentation | https://${REPO_OWNER}.github.io/db-provision-operator/ |" >> $GITHUB_STEP_SUMMARY
+          echo "| GitHub Release | https://github.com/${REPO}/releases/tag/${TAG} |" >> $GITHUB_STEP_SUMMARY

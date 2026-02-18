@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
     branches: [main]
 
@@ -875,64 +876,4 @@ jobs:
           echo "  ✅ E2E Tests (PostgreSQL)"
           echo "  ✅ E2E Tests (MySQL)"
           echo "  ✅ E2E Tests (MariaDB)"
-
-  # ============================================================================
-  # Stage 6: Release (only on tags)
-  # ============================================================================
-
-  release:
-    name: Release Artifacts
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [ci-success]
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: ${{ env.GO_VERSION_FILE }}
-          cache: true
-
-      - name: Install Helm
-        uses: azure/setup-helm@v4
-        with:
-          version: 'v3.14.0'
-
-      - name: Copy dashboards to Helm chart
-        run: |
-          mkdir -p charts/db-provision-operator/dashboards
-          cp dashboards/*.json charts/db-provision-operator/dashboards/
-
-      - name: Copy dashboards to Kustomize
-        run: |
-          mkdir -p config/grafana/dashboards
-          cp dashboards/*.json config/grafana/dashboards/
-
-      - name: Create release artifacts directory
-        run: mkdir -p release-artifacts
-
-      - name: Package Helm chart
-        run: |
-          helm package charts/db-provision-operator --destination ./release-artifacts
-
-      - name: Build Kustomize install manifest
-        run: kustomize build config/default > ./release-artifacts/install.yaml
-
-      - name: Build CRDs manifest
-        run: kustomize build config/crd > ./release-artifacts/crds.yaml
-
-      - name: List release artifacts
-        run: ls -la release-artifacts/
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            release-artifacts/*.tgz
-            release-artifacts/install.yaml
-            release-artifacts/crds.yaml
-          generate_release_notes: true
+          echo "  ✅ E2E Tests (CockroachDB)"

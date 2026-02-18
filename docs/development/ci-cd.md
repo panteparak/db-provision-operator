@@ -4,7 +4,10 @@ Continuous integration and deployment pipeline for the DB Provision Operator.
 
 ## Overview
 
-The CI pipeline runs on every push to `main` and every pull request. It uses a 6-stage architecture where each stage gates the next:
+The pipeline uses two workflows:
+
+1. **CI** (`ci.yml`) — Runs the full test suite on every push to `main`, every PR, and every tag push (`v*`)
+2. **Release** (`release.yml`) — Triggered automatically when CI completes on a `v*` tag, or manually via `workflow_dispatch`
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -15,8 +18,16 @@ The CI pipeline runs on every push to `main` and every pull request. It uses a 6
 │  │Setup ├─►│ 8 Parallel   ├─►│ Gate ├─►│Integration├─►│ E2E ├─►│ CI  │ │
 │  │      │  │ Jobs         │  │      │  │ Tests     │  │     │  │Done │ │
 │  └──────┘  └──────────────┘  └──────┘  └──────────┘  └─────┘  └─────┘ │
+└─────────────────────────────────────────────────────────────────────────┘
+                              │ on v* tag
+                              ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        Release Pipeline                                 │
 │                                                                         │
-│  On tag: Stage 6 ──► Release Artifacts + Security Scan                  │
+│  ┌───────┐  ┌────────┐  ┌─────────┐  ┌──────────┐  ┌──────┐  ┌─────┐ │
+│  │ Guard ├─►│ Docker ├─►│ GitHub  ├─►│ Helm OCI ├─►│ Docs ├─►│Sum- │ │
+│  │       │  │Release │  │ Release │  │          │  │      │  │mary │ │
+│  └───────┘  └────────┘  └─────────┘  └──────────┘  └──────┘  └─────┘ │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -24,19 +35,35 @@ The CI pipeline runs on every push to `main` and every pull request. It uses a 6
 
 | Event | Branches/Tags | What Runs |
 |-------|---------------|-----------|
-| Pull request | `main` | Stages 0–5 (Docker build without push) |
-| Push | `main` | Stages 0–5 + Docker push + Security scan |
-| Tag | `v*` | Stages 0–5 + Stage 6 (Release) |
+| Pull request | `main` | CI Stages 0–5 (Docker build without push) |
+| Push | `main` | CI Stages 0–5 + Docker push + Security scan |
+| Tag | `v*` | CI Stages 0–5 (full pipeline) → Release (automatic) |
+| Manual | `workflow_dispatch` | Release only (with tag input) |
 
-## Stage 1: Parallel Jobs
+### Release Flow
+
+```
+git tag v0.1.8 && git push origin v0.1.8
+  └─► CI runs full pipeline (lint, test, envtest, integration, E2E)
+       └─► CI succeeds → workflow_run triggers Release
+            └─► Guard validates tag + Chart.yaml version match
+                 └─► Docker retag (sha-xxx → version + latest)
+                 └─► GitHub Release (install.yaml, CRDs, Helm chart, checksums, SBOMs)
+                 └─► Helm OCI push (oci://ghcr.io/<owner>/charts/db-provision-operator)
+                 └─► Documentation deploy (GitHub Pages)
+```
+
+## CI Workflow
+
+### Stage 1: Parallel Jobs
 
 Eight jobs run concurrently after setup:
 
-### 1. Lint
+#### 1. Lint
 
 Runs `golangci-lint` (v2.1.0) via the official GitHub Action.
 
-### 2. Unit Tests
+#### 2. Unit Tests
 
 ```bash
 make test  # go test (excludes /e2e), outputs cover.out
@@ -44,7 +71,7 @@ make test  # go test (excludes /e2e), outputs cover.out
 
 Uploads coverage to Codecov.
 
-### 3. Controller Tests (envtest)
+#### 3. Controller Tests (envtest)
 
 ```bash
 make test-envtest  # Runs controller + CRD validation tests with envtest
@@ -52,7 +79,7 @@ make test-envtest  # Runs controller + CRD validation tests with envtest
 
 Uses `KUBEBUILDER_ASSETS` from `setup-envtest`. Envtest binaries (~100MB) are cached by Kubernetes version.
 
-### 4. Template Comparison
+#### 4. Template Comparison
 
 ```bash
 make test-templates  # Verifies Helm ≡ Kustomize template equivalence
@@ -60,7 +87,7 @@ make test-templates  # Verifies Helm ≡ Kustomize template equivalence
 
 Ensures the Helm chart and Kustomize overlays produce equivalent manifests.
 
-### 5. Docker Build
+#### 5. Docker Build
 
 Builds the operator image per platform (currently `linux/amd64`). Uses a multi-layer cache strategy:
 
@@ -70,7 +97,7 @@ Builds the operator image per platform (currently `linux/amd64`). Uses a multi-l
 On **push events**: Pushes by digest, uploads digest artifact for manifest merging.
 On **PRs**: Builds locally, saves as tarball artifact for E2E tests.
 
-### 6. Verify Manifests
+#### 6. Verify Manifests
 
 ```bash
 make manifests  # Generates CRDs, RBAC, webhook configs
@@ -81,7 +108,7 @@ On PRs: fails the check so the developer runs `make manifests` locally.
 
 Also runs Helm chart linting, template rendering, and strict YAML validation (duplicate key detection).
 
-### 7. Verify Generated Code
+#### 7. Verify Generated Code
 
 ```bash
 make generate  # Generates DeepCopy methods
@@ -89,19 +116,19 @@ make generate  # Generates DeepCopy methods
 
 Fails if generated code is outdated.
 
-### 8. Docs Build
+#### 8. Docs Build
 
 ```bash
 mkdocs build --strict  # Builds documentation, fails on warnings
 ```
 
-## Stage 2: Gate
+### Stage 2: Gate
 
 Waits for all Stage 1 jobs to succeed before allowing integration tests. Checks each job's result and fails with a clear error message identifying which job(s) failed.
 
 For PRs, `docker-merge` is skipped (no push), so the gate only checks `docker-build`.
 
-## Stage 3: Integration Tests
+### Stage 3: Integration Tests
 
 Runs after the gate passes. Uses a matrix strategy across all four database engines:
 
@@ -116,11 +143,11 @@ Each job uses **testcontainers-go** to manage Docker containers programmatically
 make test-integration INTEGRATION_TEST_DATABASE=${{ matrix.database }}
 ```
 
-## Stage 4: E2E Tests
+### Stage 4: E2E Tests
 
 Runs after integration tests pass. Full end-to-end validation using Docker Compose + k3d + Helm.
 
-### Pipeline Per Database (16 Steps)
+#### Pipeline Per Database (16 Steps)
 
 Each database engine runs in parallel with this sequence:
 
@@ -143,11 +170,11 @@ Each database engine runs in parallel with this sequence:
 | 15 | Collect logs | On failure: operator logs, pod descriptions, Docker Compose logs, CR YAML, events |
 | 16 | Cleanup | `make e2e-local-cleanup` (always runs) |
 
-### Helm Deployment (Not Kustomize)
+#### Helm Deployment (Not Kustomize)
 
 CI intentionally deploys the operator via the **Helm chart** (`charts/db-provision-operator/`) rather than Kustomize. This validates the Helm chart in a real cluster as part of every CI run. Local development uses `make e2e-deploy-operator` (Kustomize) for faster iteration.
 
-### Log Collection on Failure
+#### Log Collection on Failure
 
 When any E2E step fails, CI collects:
 
@@ -158,11 +185,11 @@ When any E2E step fails, CI collects:
 - Kubernetes events (last 100)
 - Pod list across all namespaces
 
-## Stage 5: CI Success
+### Stage 5: CI Success
 
 A summary job that runs after all E2E tests pass. Confirms the full pipeline succeeded.
 
-## Security Scan (Push Events Only)
+### Security Scan (Push Events Only)
 
 After `docker-merge`, Trivy scans each platform image:
 
@@ -170,6 +197,65 @@ After `docker-merge`, Trivy scans each platform image:
 2. **Scan for vulnerabilities** — outputs JSON (all severities) + table (MEDIUM+ with unfixed ignored)
 3. **Generate SARIF report** — uploaded to GitHub Security tab via CodeQL
 4. **Upload artifacts** — SBOM, vulnerability reports retained for 30 days
+
+## Release Workflow
+
+The release workflow uses the `workflow_run` pattern: it triggers automatically when the CI workflow completes, but only proceeds if CI succeeded and the trigger was a `v*` semver tag.
+
+### Guard Job
+
+The guard job gates all downstream release jobs:
+
+1. **Checks CI conclusion** — fails immediately if CI didn't succeed
+2. **Extracts tag** — from `workflow_run.head_branch` (automatic) or `inputs.tag` (manual dispatch)
+3. **Validates semver** — skips release for non-version tags (e.g., plain push to main)
+4. **Validates Chart.yaml** — ensures chart version matches the tag version
+5. **Computes image tag** — derives the `sha-<short>` tag used by CI for Docker retagging
+6. **Stores CI run ID** — used for cross-workflow artifact download (SBOMs)
+
+### Docker Release
+
+- **Automatic (workflow_run)**: Retags the CI-built `sha-xxx` image to `<version>` and `latest` using `docker buildx imagetools create`. This is a manifest-only operation — no rebuild, bit-for-bit identical to what CI tested.
+- **Manual (workflow_dispatch)**: Rebuilds from source as a fallback when no CI-built image exists.
+
+### GitHub Release
+
+Creates a GitHub Release with the following assets:
+
+| Asset | Description |
+|-------|-------------|
+| `db-provision-operator-<ver>.yaml` | Versioned Kustomize install manifest |
+| `crds-<ver>.tar.gz` | CRD definitions tarball |
+| `db-provision-operator-<ver>.tgz` | Helm chart package |
+| `checksums.txt` | SHA-256 checksums for all artifacts |
+| `sbom.spdx.json` | SBOM from CI (when available) |
+
+Tags containing `-rc`, `-alpha`, or `-beta` are marked as pre-releases.
+
+### Helm OCI
+
+Pushes the Helm chart as an OCI artifact to the GitHub Container Registry:
+
+```bash
+# Install the operator via OCI
+helm install db-provision-operator \
+  oci://ghcr.io/<owner>/charts/db-provision-operator \
+  --version <version>
+```
+
+No gh-pages Helm repository is needed — images and charts use the same container registry.
+
+### Documentation Deploy
+
+Builds documentation with mkdocs-material and deploys to GitHub Pages via `mkdocs gh-deploy --force`.
+
+### Manual Dispatch
+
+The release can be triggered manually via `workflow_dispatch` with a tag input. This bypasses the `workflow_run` trigger and rebuilds Docker images from source. Useful for re-releasing or releasing from an existing tag when CI artifacts have expired.
+
+```bash
+gh workflow run release.yml -f tag=v0.1.8
+```
 
 ## Docker Image Build
 
@@ -185,7 +271,7 @@ The operator image uses a multi-stage build:
 | Tag Pattern | When | Example |
 |-------------|------|---------|
 | `sha-<short>` | Every build | `sha-abc1234` |
-| `latest` | Push to main | `latest` |
+| `latest` | Push to main / release | `latest` |
 | `main` | Push to main | `main` |
 | `<version>` | Semver tag | `1.2.3` |
 | `<major>.<minor>` | Semver tag | `1.2` |
@@ -199,38 +285,21 @@ GHA cache (fast, per-platform)
 
 PRs share cache from the `main` branch via registry cache, enabling fast builds even on new branches.
 
-## Release Pipeline (Stage 6)
-
-Triggered only on tags matching `v*`. Runs after `ci-success`.
-
-### Steps
-
-1. **Package Helm chart** — `helm package charts/db-provision-operator`
-2. **Build Kustomize manifest** — `kustomize build config/default > install.yaml`
-3. **Build CRDs manifest** — `kustomize build config/crd > crds.yaml`
-4. **Create GitHub Release** — with release notes, attaches all artifacts
-
-### Release Assets
-
-Each release includes:
-
-| Asset | Description |
-|-------|-------------|
-| `db-provision-operator-*.tgz` | Helm chart package |
-| `install.yaml` | Full installation manifest (CRDs + operator) |
-| `crds.yaml` | CRD definitions only |
-
 ## Build Artifacts
 
 ### Container Images
 
 Published to: `ghcr.io/<owner>/db-provision-operator`
 
+### Helm Charts
+
+Published as OCI artifacts to: `oci://ghcr.io/<owner>/charts/db-provision-operator`
+
 ### SBOM
 
 Generated in two formats:
 
-- **SPDX** (via `anchore/sbom-action`) — uploaded as artifact
+- **SPDX** (via `anchore/sbom-action`) — uploaded as artifact, attached to GitHub releases
 - **CycloneDX** (via Trivy) — used for vulnerability scanning
 
 ## Environment Configuration

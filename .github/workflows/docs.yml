@@ -42,31 +42,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Backup charts from gh-pages
-        run: |
-          # Clone gh-pages branch to backup charts/
-          git fetch origin gh-pages:gh-pages || true
-          if git show gh-pages:charts/index.yaml &>/dev/null; then
-            mkdir -p /tmp/charts-backup
-            git archive gh-pages charts/ | tar -x -C /tmp/charts-backup
-            echo "Charts backup created"
-          else
-            echo "No charts directory found on gh-pages, skipping backup"
-          fi
-
       - name: Deploy to GitHub Pages
         run: mkdocs gh-deploy --force
-
-      - name: Restore charts to gh-pages
-        run: |
-          if [ -d "/tmp/charts-backup/charts" ]; then
-            git fetch origin gh-pages:gh-pages
-            git checkout gh-pages
-            cp -r /tmp/charts-backup/charts .
-            git add charts/
-            git diff --staged --quiet || git commit -m "Restore Helm charts after docs deploy"
-            git push origin gh-pages
-            echo "Charts restored successfully"
-          else
-            echo "No charts backup to restore"
-          fi
