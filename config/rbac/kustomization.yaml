@@ -50,5 +50,3 @@ resources:
 - clusterdatabaseinstance_admin_role.yaml
 - clusterdatabaseinstance_editor_role.yaml
 - clusterdatabaseinstance_viewer_role.yaml
-- clusterdatabaseinstance_manager_role.yaml
-- clusterdatabaseinstance_manager_role_binding.yaml

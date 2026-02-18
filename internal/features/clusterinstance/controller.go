@@ -77,11 +77,12 @@ func NewController(cfg ControllerConfig) *Controller {
 	}
 }
 
-// Reconcile implements the reconciliation loop for ClusterDatabaseInstance resources.
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=clusterdatabaseinstances,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=clusterdatabaseinstances/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=clusterdatabaseinstances/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+
+// Reconcile implements the reconciliation loop for ClusterDatabaseInstance resources.
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Note: For cluster-scoped resources, req.Namespace is empty
 	log := logf.FromContext(ctx).WithValues("clusterinstance", req.Name)

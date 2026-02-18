@@ -180,7 +180,7 @@ func TestDatabaseValidation(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "empty instance ref name - should fail",
+			name: "empty instance ref name - should fail",
 			database: &Database{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-empty-instance-ref",

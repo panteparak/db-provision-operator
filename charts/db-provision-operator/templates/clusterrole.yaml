@@ -11,7 +11,6 @@ rules:
   - secrets
   verbs:
   - create
-  - delete
   - get
   - list
   - patch
@@ -20,6 +19,9 @@ rules:
 - apiGroups:
   - dbops.dbprovision.io
   resources:
+  - clusterdatabasegrants
+  - clusterdatabaseinstances
+  - clusterdatabaseroles
   - databasebackups
   - databasebackupschedules
   - databasegrants
@@ -39,6 +41,9 @@ rules:
 - apiGroups:
   - dbops.dbprovision.io
   resources:
+  - clusterdatabasegrants/finalizers
+  - clusterdatabaseinstances/finalizers
+  - clusterdatabaseroles/finalizers
   - databasebackups/finalizers
   - databasebackupschedules/finalizers
   - databasegrants/finalizers
@@ -52,6 +57,9 @@ rules:
 - apiGroups:
   - dbops.dbprovision.io
   resources:
+  - clusterdatabasegrants/status
+  - clusterdatabaseinstances/status
+  - clusterdatabaseroles/status
   - databasebackups/status
   - databasebackupschedules/status
   - databasegrants/status

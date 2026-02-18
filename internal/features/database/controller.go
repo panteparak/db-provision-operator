@@ -83,12 +83,13 @@ func NewController(cfg ControllerConfig) *Controller {
 	}
 }
 
-// Reconcile implements the reconciliation loop for Database resources.
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databases,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databases/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databases/finalizers,verbs=update
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseinstances,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+
+// Reconcile implements the reconciliation loop for Database resources.
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Generate reconcileID for end-to-end tracing
 	ctx, log, reconcileID := reconcilecontext.WithReconcileID(ctx)
