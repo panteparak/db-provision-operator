@@ -739,7 +739,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
 				return err != nil
-			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "CR should be deleted after force-delete annotation")
+			}, getDeletionTimeout(), pollingInterval).Should(BeTrue(), "CR should be deleted after force-delete annotation")
 		})
 
 		It("should allow deletion with force-delete annotation", func() {
@@ -784,7 +784,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
 				return err != nil
-			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "CR should be deleted with force-delete annotation")
+			}, getDeletionTimeout(), pollingInterval).Should(BeTrue(), "CR should be deleted with force-delete annotation")
 
 			By("verifying database was dropped from PostgreSQL")
 			Eventually(func() bool {
@@ -829,7 +829,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
 				return err != nil
-			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "CR should be deleted")
+			}, getDeletionTimeout(), pollingInterval).Should(BeTrue(), "CR should be deleted")
 
 			By("verifying database STILL exists in PostgreSQL (Retain policy)")
 			exists, err := verifier.DatabaseExists(ctx, dbName)
@@ -871,7 +871,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
 				return err != nil
-			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "CR should be deleted")
+			}, getDeletionTimeout(), pollingInterval).Should(BeTrue(), "CR should be deleted")
 
 			By("verifying database was dropped from PostgreSQL")
 			Eventually(func() bool {
@@ -941,7 +941,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
 				return err != nil
-			}, reconcileTimeout, pollingInterval).Should(BeTrue())
+			}, getDeletionTimeout(), pollingInterval).Should(BeTrue())
 		})
 
 		It("should auto-correct role attribute drift in correct mode", func() {
@@ -984,7 +984,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
 				return err != nil
-			}, reconcileTimeout, pollingInterval).Should(BeTrue())
+			}, getDeletionTimeout(), pollingInterval).Should(BeTrue())
 		})
 
 		It("should detect database schema drift", func() {
@@ -1046,7 +1046,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
 				return err != nil
-			}, reconcileTimeout, pollingInterval).Should(BeTrue())
+			}, getDeletionTimeout(), pollingInterval).Should(BeTrue())
 		})
 
 		It("should auto-correct database schema drift", func() {
@@ -1097,7 +1097,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
 				return err != nil
-			}, reconcileTimeout, pollingInterval).Should(BeTrue())
+			}, getDeletionTimeout(), pollingInterval).Should(BeTrue())
 		})
 	})
 
@@ -1150,7 +1150,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crNameA, metav1.GetOptions{})
 				return err != nil
-			}, reconcileTimeout, pollingInterval).Should(BeTrue(), "Database A CR should be deleted")
+			}, getDeletionTimeout(), pollingInterval).Should(BeTrue(), "Database A CR should be deleted")
 
 			By("verifying database A is dropped from PostgreSQL")
 			Eventually(func() bool {
@@ -1181,7 +1181,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crNameB, metav1.GetOptions{})
 				return err != nil
-			}, reconcileTimeout, pollingInterval).Should(BeTrue())
+			}, getDeletionTimeout(), pollingInterval).Should(BeTrue())
 		})
 	})
 
@@ -1215,6 +1215,6 @@ var _ = Describe("postgresql", Ordered, func() {
 		Eventually(func() bool {
 			_, err := dynamicClient.Resource(databaseInstanceGVR).Namespace(testNamespace).Get(ctx, instanceName, metav1.GetOptions{})
 			return err != nil // Should return error (not found) when deleted
-		}, reconcileTimeout, pollingInterval).Should(BeTrue(), "DatabaseInstance should be deleted")
+		}, getDeletionTimeout(), pollingInterval).Should(BeTrue(), "DatabaseInstance should be deleted")
 	})
 })

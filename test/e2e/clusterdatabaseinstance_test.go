@@ -501,6 +501,6 @@ var _ = Describe("clusterdatabaseinstance", Ordered, func() {
 		Eventually(func() bool {
 			_, err := dynamicClient.Resource(clusterDatabaseInstanceGVR).Get(ctx, clusterInstanceName, metav1.GetOptions{})
 			return err != nil // Should return error (not found) when deleted
-		}, timeout, interval).Should(BeTrue(), "ClusterDatabaseInstance should be deleted")
+		}, getDeletionTimeout(), interval).Should(BeTrue(), "ClusterDatabaseInstance should be deleted")
 	})
 })

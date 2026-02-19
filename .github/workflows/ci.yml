@@ -830,6 +830,8 @@ jobs:
 
       # Run E2E tests (Makefile micro-step)
       - name: Run E2E tests
+        env:
+          E2E_DELETION_TIMEOUT: "120s"
         run: make e2e-local-run-tests E2E_DATABASE=${{ matrix.database }}
 
       - name: Collect logs on failure

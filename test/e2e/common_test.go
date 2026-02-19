@@ -20,6 +20,7 @@ package e2e
 
 import (
 	"context"
+	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -76,6 +77,17 @@ func (cfg *DatabaseTestConfig) DefaultInterval() time.Duration {
 		return 2 * time.Second
 	}
 	return cfg.Interval
+}
+
+// getDeletionTimeout returns the timeout for waiting on CR deletion.
+// Override with E2E_DELETION_TIMEOUT for resource-constrained CI environments.
+func getDeletionTimeout() time.Duration {
+	if val := os.Getenv("E2E_DELETION_TIMEOUT"); val != "" {
+		if d, err := time.ParseDuration(val); err == nil {
+			return d
+		}
+	}
+	return 60 * time.Second
 }
 
 // ===== Shared Test Runners =====
@@ -574,7 +586,7 @@ func (cfg *DatabaseTestConfig) CleanupTestResources(ctx context.Context) {
 	Eventually(func() bool {
 		_, err := dynamicClient.Resource(databaseInstanceGVR).Namespace(cfg.TestNamespace).Get(ctx, cfg.InstanceName, metav1.GetOptions{})
 		return err != nil // Should return error (not found) when deleted
-	}, cfg.DefaultTimeout(), cfg.DefaultInterval()).Should(BeTrue(), "DatabaseInstance should be deleted")
+	}, getDeletionTimeout(), cfg.DefaultInterval()).Should(BeTrue(), "DatabaseInstance should be deleted")
 }
 
 // ===== Engine-Specific Configurations =====

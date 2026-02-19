@@ -459,7 +459,7 @@ var _ = Describe("clusterdatabaserole", Ordered, func() {
 			Eventually(func() bool {
 				_, err := dynamicClient.Resource(clusterDatabaseRoleGVR).Get(ctx, deleteRoleName, metav1.GetOptions{})
 				return err != nil
-			}, timeout, interval).Should(BeTrue(), "ClusterDatabaseRole CR should be deleted")
+			}, getDeletionTimeout(), interval).Should(BeTrue(), "ClusterDatabaseRole CR should be deleted")
 
 			By("verifying role is removed from PostgreSQL")
 			Eventually(func() bool {
@@ -491,6 +491,6 @@ var _ = Describe("clusterdatabaserole", Ordered, func() {
 		Eventually(func() bool {
 			_, err := dynamicClient.Resource(clusterDatabaseInstanceGVR).Get(ctx, clusterInstanceName, metav1.GetOptions{})
 			return err != nil
-		}, timeout, interval).Should(BeTrue(), "ClusterDatabaseInstance should be deleted")
+		}, getDeletionTimeout(), interval).Should(BeTrue(), "ClusterDatabaseInstance should be deleted")
 	})
 })
