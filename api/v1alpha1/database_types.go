@@ -62,7 +62,8 @@ type DatabaseSpec struct {
 
 	// DeletionProtection prevents accidental deletion
 	// +kubebuilder:default=true
-	DeletionProtection bool `json:"deletionProtection,omitempty"`
+	// +optional
+	DeletionProtection bool `json:"deletionProtection"`
 
 	// DriftPolicy overrides the instance-level drift policy for this database.
 	// If not specified, the instance's drift policy is used.
