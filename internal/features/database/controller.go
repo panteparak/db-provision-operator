@@ -218,7 +218,7 @@ func (c *Controller) reconcile(ctx context.Context, database *dbopsv1alpha1.Data
 	c.handler.UpdateInfoMetric(database)
 
 	log.Info("Successfully reconciled Database", "name", database.Name, "database", database.Spec.Name)
-	return ctrl.Result{RequeueAfter: RequeueAfterReady}, nil
+	return ctrl.Result{RequeueAfter: c.getRequeueInterval(database, resolved)}, nil
 }
 
 // handleDeletion handles the deletion of a Database resource.
@@ -425,6 +425,12 @@ func (c *Controller) correctDrift(ctx context.Context, database *dbopsv1alpha1.D
 			log.Error(f.Error, "Drift correction failed", "field", f.Diff.Field)
 		}
 	}
+}
+
+// getRequeueInterval returns the requeue interval based on the effective drift policy.
+func (c *Controller) getRequeueInterval(database *dbopsv1alpha1.Database, resolved *instanceresolver.ResolvedInstance) time.Duration {
+	policy := c.getEffectiveDriftPolicy(database, resolved)
+	return util.ParseDriftRequeueInterval(policy, RequeueAfterReady)
 }
 
 // getEffectiveDriftPolicy returns the effective drift policy for a database.

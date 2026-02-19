@@ -1311,3 +1311,135 @@ func TestController_Reconcile_DriftCorrection_NoDestructive(t *testing.T) {
 	assert.NotNil(t, updatedRole.Status.Drift)
 	assert.True(t, updatedRole.Status.Drift.Detected)
 }
+
+// --- Requeue interval tests ---
+
+// newReconcileSetup creates a standard test controller for requeue interval tests.
+func newReconcileSetup(t *testing.T, role *dbopsv1alpha1.DatabaseRole, instance *dbopsv1alpha1.DatabaseInstance) (*Controller, types.NamespacedName) {
+	t.Helper()
+	scheme := newTestScheme()
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(role).
+		WithStatusSubresource(role).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, roleName string, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, roleName string, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		if instance != nil {
+			return instance, nil
+		}
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	nn := types.NamespacedName{Name: role.Name, Namespace: role.Namespace}
+	return controller, nn
+}
+
+func TestController_Reconcile_RequeueAfterDriftInterval_DetectMode(t *testing.T) {
+	role := newTestRole("testrole", "default")
+	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
+		Mode:     dbopsv1alpha1.DriftModeDetect,
+		Interval: "10s",
+	}
+
+	controller, nn := newReconcileSetup(t, role, nil)
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: nn})
+	require.NoError(t, err)
+	assert.Equal(t, 10*time.Second, result.RequeueAfter)
+}
+
+func TestController_Reconcile_RequeueAfterDriftInterval_CorrectMode(t *testing.T) {
+	role := newTestRole("testrole", "default")
+	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
+		Mode:     dbopsv1alpha1.DriftModeCorrect,
+		Interval: "30s",
+	}
+
+	controller, nn := newReconcileSetup(t, role, nil)
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: nn})
+	require.NoError(t, err)
+	assert.Equal(t, 30*time.Second, result.RequeueAfter)
+}
+
+func TestController_Reconcile_RequeueAfterDefault_IgnoreMode(t *testing.T) {
+	role := newTestRole("testrole", "default")
+	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
+		Mode:     dbopsv1alpha1.DriftModeIgnore,
+		Interval: "10s",
+	}
+
+	controller, nn := newReconcileSetup(t, role, nil)
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: nn})
+	require.NoError(t, err)
+	assert.Equal(t, RequeueAfterReady, result.RequeueAfter)
+}
+
+func TestController_Reconcile_RequeueAfterDefault_NoDriftPolicy(t *testing.T) {
+	role := newTestRole("testrole", "default")
+	// No DriftPolicy set — getEffectiveDriftPolicy returns default {detect, "5m"}
+
+	controller, nn := newReconcileSetup(t, role, nil)
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: nn})
+	require.NoError(t, err)
+	assert.Equal(t, 5*time.Minute, result.RequeueAfter)
+}
+
+func TestController_Reconcile_RequeueAfterDefault_InvalidInterval(t *testing.T) {
+	role := newTestRole("testrole", "default")
+	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
+		Mode:     dbopsv1alpha1.DriftModeDetect,
+		Interval: "xyz",
+	}
+
+	controller, nn := newReconcileSetup(t, role, nil)
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: nn})
+	require.NoError(t, err)
+	assert.Equal(t, RequeueAfterReady, result.RequeueAfter)
+}
+
+func TestController_Reconcile_RequeueAfterInstanceLevel(t *testing.T) {
+	role := newTestRole("testrole", "default")
+	// No role-level drift policy — falls back to instance
+
+	instance := newTestInstance("test-instance", "default")
+	instance.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
+		Mode:     dbopsv1alpha1.DriftModeDetect,
+		Interval: "15s",
+	}
+
+	controller, nn := newReconcileSetup(t, role, instance)
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: nn})
+	require.NoError(t, err)
+	assert.Equal(t, 15*time.Second, result.RequeueAfter)
+}

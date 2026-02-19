@@ -210,7 +210,7 @@ func (c *Controller) reconcile(ctx context.Context, user *dbopsv1alpha1.Database
 	c.handler.UpdateInfoMetric(user)
 
 	log.Info("Successfully reconciled DatabaseUser", "username", user.Spec.Username)
-	return ctrl.Result{RequeueAfter: RequeueAfterReady}, nil
+	return ctrl.Result{RequeueAfter: c.getRequeueInterval(user, instance)}, nil
 }
 
 func (c *Controller) ensureCredentialsSecret(ctx context.Context, user *dbopsv1alpha1.DatabaseUser, password, secretName string) error {
@@ -577,6 +577,12 @@ func (c *Controller) correctDrift(ctx context.Context, user *dbopsv1alpha1.Datab
 			log.Error(f.Error, "Drift correction failed", "field", f.Diff.Field)
 		}
 	}
+}
+
+// getRequeueInterval returns the requeue interval based on the effective drift policy.
+func (c *Controller) getRequeueInterval(user *dbopsv1alpha1.DatabaseUser, instance *dbopsv1alpha1.DatabaseInstance) time.Duration {
+	policy := c.getEffectiveDriftPolicy(user, instance)
+	return util.ParseDriftRequeueInterval(policy, RequeueAfterReady)
 }
 
 // getEffectiveDriftPolicy returns the effective drift policy for a user.

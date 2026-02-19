@@ -188,7 +188,7 @@ func (c *Controller) reconcile(ctx context.Context, role *dbopsv1alpha1.Database
 	c.handler.UpdateInfoMetric(role)
 
 	log.Info("Successfully reconciled DatabaseRole", "roleName", role.Spec.RoleName)
-	return ctrl.Result{RequeueAfter: RequeueAfterReady}, nil
+	return ctrl.Result{RequeueAfter: c.getRequeueInterval(role, instance)}, nil
 }
 
 func (c *Controller) handleDeletion(ctx context.Context, role *dbopsv1alpha1.DatabaseRole) (ctrl.Result, error) {
@@ -409,6 +409,12 @@ func (c *Controller) correctDrift(ctx context.Context, role *dbopsv1alpha1.Datab
 			log.Error(f.Error, "Drift correction failed", "field", f.Diff.Field)
 		}
 	}
+}
+
+// getRequeueInterval returns the requeue interval based on the effective drift policy.
+func (c *Controller) getRequeueInterval(role *dbopsv1alpha1.DatabaseRole, instance *dbopsv1alpha1.DatabaseInstance) time.Duration {
+	policy := c.getEffectiveDriftPolicy(role, instance)
+	return util.ParseDriftRequeueInterval(policy, RequeueAfterReady)
 }
 
 // getEffectiveDriftPolicy returns the effective drift policy for a role.

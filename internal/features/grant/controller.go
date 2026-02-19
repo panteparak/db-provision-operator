@@ -189,7 +189,7 @@ func (c *Controller) reconcile(ctx context.Context, grant *dbopsv1alpha1.Databas
 		"roles", len(result.Roles),
 		"directGrants", result.DirectGrants,
 		"defaultPrivileges", result.DefaultPrivileges)
-	return ctrl.Result{RequeueAfter: RequeueAfterReady}, nil
+	return ctrl.Result{RequeueAfter: c.getRequeueInterval(grant, instance)}, nil
 }
 
 func (c *Controller) getUser(ctx context.Context, grant *dbopsv1alpha1.DatabaseGrant) (*dbopsv1alpha1.DatabaseUser, error) {
@@ -455,6 +455,12 @@ func (c *Controller) correctDrift(ctx context.Context, grant *dbopsv1alpha1.Data
 			log.Error(f.Error, "Drift correction failed", "field", f.Diff.Field)
 		}
 	}
+}
+
+// getRequeueInterval returns the requeue interval based on the effective drift policy.
+func (c *Controller) getRequeueInterval(grant *dbopsv1alpha1.DatabaseGrant, instance *dbopsv1alpha1.DatabaseInstance) time.Duration {
+	policy := c.getEffectiveDriftPolicy(grant, instance)
+	return util.ParseDriftRequeueInterval(policy, RequeueAfterReady)
 }
 
 // getEffectiveDriftPolicy returns the effective drift policy for a grant.
