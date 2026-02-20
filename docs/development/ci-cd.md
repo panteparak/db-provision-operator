@@ -9,26 +9,23 @@ The pipeline uses two workflows:
 1. **CI** (`ci.yml`) — Runs the full test suite on every push to `main`, every PR, and every tag push (`v*`)
 2. **Release** (`release.yml`) — Triggered automatically when CI completes on a `v*` tag, or manually via `workflow_dispatch`
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           CI Pipeline                                   │
-│                                                                         │
-│  Stage 0    Stage 1          Stage 2    Stage 3       Stage 4   Stage 5 │
-│  ┌──────┐  ┌──────────────┐  ┌──────┐  ┌──────────┐  ┌─────┐  ┌─────┐ │
-│  │Setup ├─►│ 8 Parallel   ├─►│ Gate ├─►│Integration├─►│ E2E ├─►│ CI  │ │
-│  │      │  │ Jobs         │  │      │  │ Tests     │  │     │  │Done │ │
-│  └──────┘  └──────────────┘  └──────┘  └──────────┘  └─────┘  └─────┘ │
-└─────────────────────────────────────────────────────────────────────────┘
-                              │ on v* tag
-                              ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        Release Pipeline                                 │
-│                                                                         │
-│  ┌───────┐  ┌────────┐  ┌─────────┐  ┌──────────┐  ┌──────┐  ┌─────┐ │
-│  │ Guard ├─►│ Docker ├─►│ GitHub  ├─►│ Helm OCI ├─►│ Docs ├─►│Sum- │ │
-│  │       │  │Release │  │ Release │  │          │  │      │  │mary │ │
-│  └───────┘  └────────┘  └─────────┘  └──────────┘  └──────┘  └─────┘ │
-└─────────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph LR
+    subgraph CI["CI Pipeline"]
+        S0[Setup] --> S1["8 Parallel Jobs"]
+        S1 --> S2[Gate]
+        S2 --> S3[Integration Tests]
+        S3 --> S4[E2E Tests]
+        S4 --> S5[CI Done]
+    end
+    S5 -->|"on v* tag"| R
+    subgraph Release["Release Pipeline"]
+        R[Guard] --> DR[Docker Release]
+        DR --> GR[GitHub Release]
+        GR --> HO[Helm OCI]
+        HO --> DO[Docs]
+        DO --> SM[Summary]
+    end
 ```
 
 ### Triggers

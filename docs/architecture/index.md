@@ -6,36 +6,29 @@ Overview of DB Provision Operator's architecture and design.
 
 DB Provision Operator follows the Kubernetes Operator pattern, using Custom Resource Definitions (CRDs) to extend the Kubernetes API with database-specific resources.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Kubernetes Cluster                          │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │                    Control Plane                          │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐   │  │
-│  │  │ API Server  │  │    etcd     │  │  Controller     │   │  │
-│  │  │             │  │             │  │  Manager        │   │  │
-│  │  └──────┬──────┘  └─────────────┘  └────────┬────────┘   │  │
-│  │         │                                    │            │  │
-│  │         │    ┌──────────────────────────────┼────────┐   │  │
-│  │         │    │     DB Provision Operator    │        │   │  │
-│  │         │    │  ┌──────────────────────────┴──────┐  │   │  │
-│  │         ├────┼──┤       Reconciler Loop           │  │   │  │
-│  │         │    │  │  ┌────────┐ ┌────────┐ ┌──────┐ │  │   │  │
-│  │         │    │  │  │Instance│ │Database│ │ User │ │  │   │  │
-│  │         │    │  │  │  Ctrl  │ │  Ctrl  │ │ Ctrl │ │  │   │  │
-│  │         │    │  │  └────────┘ └────────┘ └──────┘ │  │   │  │
-│  │         │    │  └─────────────────────────────────┘  │   │  │
-│  │         │    └───────────────────────────────────────┘   │  │
-│  └─────────┼────────────────────────────────────────────────┘  │
-│            │                                                    │
-│  ┌─────────┴────────────────────────────────────────────────┐  │
-│  │                      Data Plane                          │  │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │  │
-│  │  │  PostgreSQL  │  │    MySQL     │  │   MariaDB    │   │  │
-│  │  │   Instance   │  │   Instance   │  │   Instance   │   │  │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘   │  │
-│  └──────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph K8s["Kubernetes Cluster"]
+        subgraph CP["Control Plane"]
+            API[API Server]
+            ETCD[etcd]
+            CM[Controller Manager]
+        end
+        subgraph OP["DB Provision Operator"]
+            RL["Reconciler Loop"]
+            IC[Instance Ctrl]
+            DC[Database Ctrl]
+            UC[User Ctrl]
+        end
+        API <--> RL
+        CM --> RL
+        subgraph DP["Data Plane"]
+            PG[PostgreSQL Instance]
+            MY[MySQL Instance]
+            MR[MariaDB Instance]
+        end
+    end
+    OP --> DP
 ```
 
 ## Core Components
@@ -57,31 +50,25 @@ Each CRD has a dedicated controller:
 
 ### Reconciliation Loop
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Reconciliation Loop                       │
-│                                                             │
-│  ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐  │
-│  │  Watch  │───▶│ Compare │───▶│ Execute │───▶│ Update  │  │
-│  │  Event  │    │  State  │    │ Actions │    │ Status  │  │
-│  └─────────┘    └─────────┘    └─────────┘    └─────────┘  │
-│       │                                            │        │
-│       └────────────────────────────────────────────┘        │
-│                        (Requeue)                            │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+graph LR
+    A[Watch Event] --> B[Compare State]
+    B --> C[Execute Actions]
+    C --> D[Update Status]
+    D -->|Requeue| A
 ```
 
 ## Resource Hierarchy
 
-```
-DatabaseInstance
-├── Database
-│   ├── DatabaseBackup
-│   └── DatabaseBackupSchedule
-├── DatabaseUser
-│   └── DatabaseGrant
-└── DatabaseRole
-    └── DatabaseGrant
+```mermaid
+graph TD
+    DI[DatabaseInstance] --> DB[Database]
+    DI --> DU[DatabaseUser]
+    DI --> DR[DatabaseRole]
+    DB --> BK[DatabaseBackup]
+    DB --> BS[DatabaseBackupSchedule]
+    DU --> DG1[DatabaseGrant]
+    DR --> DG2[DatabaseGrant]
 ```
 
 ### Dependencies

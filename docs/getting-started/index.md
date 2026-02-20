@@ -36,30 +36,28 @@ Choose your preferred installation method:
 
 ## Architecture Overview
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                   Kubernetes Cluster                     │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │              DB Provision Operator                 │  │
-│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ │  │
-│  │  │Instance │ │Database │ │  User   │ │ Backup  │ │  │
-│  │  │Controller│ │Controller│ │Controller│ │Controller│ │  │
-│  │  └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘ │  │
-│  └───────┼───────────┼───────────┼───────────┼───────┘  │
-│          │           │           │           │          │
-│          └───────────┴─────┬─────┴───────────┘          │
-│                            │                             │
-│  ┌─────────────────────────┴─────────────────────────┐  │
-│  │                  Database Adapters                 │  │
-│  │   PostgreSQL        MySQL         MariaDB          │  │
-│  └─────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
-                             │
-                             ▼
-              ┌──────────────────────────┐
-              │    External Databases    │
-              │  PostgreSQL │ MySQL │ ...│
-              └──────────────────────────┘
+```mermaid
+graph TD
+    subgraph K8s["Kubernetes Cluster"]
+        subgraph Operator["DB Provision Operator"]
+            IC[Instance Controller]
+            DC[Database Controller]
+            UC[User Controller]
+            BC[Backup Controller]
+        end
+        IC & DC & UC & BC --> Adapters
+        subgraph Adapters["Database Adapters"]
+            PGA[PostgreSQL]
+            MYA[MySQL]
+            MRA[MariaDB]
+        end
+    end
+    Adapters --> ExtDB
+    subgraph ExtDB["External Databases"]
+        PG[PostgreSQL]
+        MY[MySQL]
+        ETC[...]
+    end
 ```
 
 ## Next Steps

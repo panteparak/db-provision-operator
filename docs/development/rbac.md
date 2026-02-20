@@ -12,39 +12,22 @@ The db-provision-operator uses **ClusterRole** and **ClusterRoleBinding** (not n
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Kubernetes Cluster                           │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                       │
-│  ┌─────────────────────┐         ┌─────────────────────────────┐    │
-│  │   Namespace: app    │         │   Namespace: db-secrets     │    │
-│  │                     │         │                              │    │
-│  │  ┌───────────────┐  │         │  ┌────────────────────────┐ │    │
-│  │  │DatabaseInstance│  │ ─────▶ │  │ Secret: pg-credentials │ │    │
-│  │  │ name: prod-db │  │ refs   │  │  username: admin       │ │    │
-│  │  │ secretRef:    │  │         │  │  password: ****        │ │    │
-│  │  │   name: pg-*  │  │         │  └────────────────────────┘ │    │
-│  │  │   namespace:  │  │         │                              │    │
-│  │  │   db-secrets  │  │         │  ┌────────────────────────┐ │    │
-│  │  └───────────────┘  │         │  │ Secret: mysql-creds    │ │    │
-│  │                     │         │  │  username: root        │ │    │
-│  └─────────────────────┘         │  │  password: ****        │ │    │
-│                                   │  └────────────────────────┘ │    │
-│                                   └─────────────────────────────┘    │
-│                                                                       │
-│  ┌───────────────────────────────────────────────────────────────┐   │
-│  │                db-provision-operator-system                     │   │
-│  │                                                                  │   │
-│  │  ┌────────────────────────┐    ┌─────────────────────────────┐ │   │
-│  │  │ controller-manager Pod │───▶│ ServiceAccount              │ │   │
-│  │  │                        │    │ + ClusterRoleBinding        │ │   │
-│  │  │ - Watches all namespaces│   │ + ClusterRole (secrets: *)  │ │   │
-│  │  │ - Reads secrets globally│   └─────────────────────────────┘ │   │
-│  │  └────────────────────────┘                                     │   │
-│  └───────────────────────────────────────────────────────────────┘   │
-│                                                                       │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph LR
+    subgraph AppNS["Namespace: app"]
+        DI["DatabaseInstance\nname: prod-db\nsecretRef → db-secrets"]
+    end
+    subgraph SecNS["Namespace: db-secrets"]
+        S1["Secret: pg-credentials\nusername: admin"]
+        S2["Secret: mysql-creds\nusername: root"]
+    end
+    subgraph SysNS["db-provision-operator-system"]
+        POD["controller-manager Pod"] --> SA["ServiceAccount\n+ ClusterRoleBinding\n+ ClusterRole"]
+    end
+    DI -->|refs| S1
+    POD -->|watches all namespaces| DI
+    POD -->|reads secrets globally| S1
+    POD -->|reads secrets globally| S2
 ```
 
 ## RBAC Configuration

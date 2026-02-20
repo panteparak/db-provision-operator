@@ -6,22 +6,19 @@ Security architecture and best practices.
 
 DB Provision Operator implements multiple security layers:
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    Security Layers                           │
-│                                                              │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │ 1. Kubernetes RBAC - API Access Control                 │ │
-│  ├─────────────────────────────────────────────────────────┤ │
-│  │ 2. Namespace Isolation - Resource Boundaries            │ │
-│  ├─────────────────────────────────────────────────────────┤ │
-│  │ 3. Secret Management - Credential Storage               │ │
-│  ├─────────────────────────────────────────────────────────┤ │
-│  │ 4. TLS Encryption - Transport Security                  │ │
-│  ├─────────────────────────────────────────────────────────┤ │
-│  │ 5. Database Security - Engine-Level Controls            │ │
-│  └─────────────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    L1["1. Kubernetes RBAC — API Access Control"]
+    L2["2. Namespace Isolation — Resource Boundaries"]
+    L3["3. Secret Management — Credential Storage"]
+    L4["4. TLS Encryption — Transport Security"]
+    L5["5. Database Security — Engine-Level Controls"]
+    L1 --> L2 --> L3 --> L4 --> L5
+    style L1 fill:#e3f2fd
+    style L2 fill:#e8f5e9
+    style L3 fill:#fff3e0
+    style L4 fill:#fce4ec
+    style L5 fill:#f3e5f5
 ```
 
 ## Kubernetes RBAC

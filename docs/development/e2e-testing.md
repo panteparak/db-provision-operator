@@ -17,52 +17,39 @@ End-to-end tests validate the full operator lifecycle against real databases and
 
 Databases run in Docker Compose on the host machine. The operator runs inside a k3d cluster and reaches databases via `host.k3d.internal` — a DNS name that k3d automatically resolves to the Docker host IP.
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                         Local Machine                            │
-│                                                                  │
-│  ┌─────────────────────┐      ┌────────────────────────────────┐ │
-│  │   Docker Compose    │      │         k3d Cluster            │ │
-│  │                     │      │                                │ │
-│  │  ┌──────────────┐   │      │  ┌──────────────────────────┐  │ │
-│  │  │ PostgreSQL   │◄──┼──────┼──│  Operator Pod            │  │ │
-│  │  │ :15432       │   │      │  │  (db-provision-operator)  │  │ │
-│  │  └──────────────┘   │      │  └──────────────────────────┘  │ │
-│  │  ┌──────────────┐   │      │              │                 │ │
-│  │  │ MySQL        │◄──┼──────┼── host.k3d.internal            │ │
-│  │  │ :13306       │   │      │                                │ │
-│  │  └──────────────┘   │      │  ┌──────────────────────────┐  │ │
-│  │  ┌──────────────┐   │      │  │  DatabaseInstance CRs    │  │ │
-│  │  │ MariaDB      │   │      │  │  → host.k3d.internal     │  │ │
-│  │  │ :13307       │◄──┼──────┼──│                          │  │ │
-│  │  └──────────────┘   │      │  └──────────────────────────┘  │ │
-│  │  ┌──────────────┐   │      │                                │ │
-│  │  │ CockroachDB  │◄──┼──────┤                                │ │
-│  │  │ :26257       │   │      │                                │ │
-│  │  └──────────────┘   │      └────────────────────────────────┘ │
-│  └─────────────────────┘                                         │
-│            │                                                     │
-│            ▼                                                     │
-│  ┌─────────────────────┐                                         │
-│  │  E2E Tests (go test)│  connects to 127.0.0.1                  │
-│  └─────────────────────┘                                         │
-└──────────────────────────────────────────────────────────────────┘
+```mermaid
+graph LR
+    subgraph Host["Local Machine"]
+        subgraph DC["Docker Compose"]
+            PG["PostgreSQL\n:15432"]
+            MY["MySQL\n:13306"]
+            MR["MariaDB\n:13307"]
+            CR["CockroachDB\n:26257"]
+        end
+        subgraph K3D["k3d Cluster"]
+            OP["Operator Pod\n(db-provision-operator)"]
+            DICR["DatabaseInstance CRs\n→ host.k3d.internal"]
+        end
+        E2E["E2E Tests (go test)\nconnects to 127.0.0.1"]
+    end
+    OP -->|host.k3d.internal| PG
+    OP -->|host.k3d.internal| MY
+    OP -->|host.k3d.internal| MR
+    OP -->|host.k3d.internal| CR
+    E2E -->|127.0.0.1| PG
+    E2E -->|127.0.0.1| MY
+    E2E -->|127.0.0.1| MR
+    E2E -->|127.0.0.1| CR
 ```
 
 ### Dual-Connection Model
 
 Each test connects to the database via **two paths**:
 
-```
-┌─────────────┐  E2E_DATABASE_HOST (127.0.0.1)    ┌────────────┐
-│  Test Runner ├──────────────────────────────────►│  Database   │
-│  (go test)   │                                    │  (Docker    │
-└─────────────┘                                    │   Compose)  │
-                                                   │             │
-┌─────────────┐  E2E_INSTANCE_HOST                 │             │
-│  Operator    │  (host.k3d.internal) ────────────►│             │
-│  (k3d pod)   │                                    └────────────┘
-└─────────────┘
+```mermaid
+graph LR
+    TR["Test Runner\n(go test)"] -->|"E2E_DATABASE_HOST\n(127.0.0.1)"| DB["Database\n(Docker Compose)"]
+    OP["Operator\n(k3d pod)"] -->|"E2E_INSTANCE_HOST\n(host.k3d.internal)"| DB
 ```
 
 1. **Test verifier** (`E2E_DATABASE_HOST`): The test process connects from the host to the database on `127.0.0.1` to verify that the operator's SQL operations (CREATE DATABASE, CREATE USER, etc.) took effect.

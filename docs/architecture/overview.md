@@ -14,56 +14,30 @@ The **db-provision-operator** is a Kubernetes operator designed to provide unifi
 
 ## High-Level Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          Kubernetes Cluster                              │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  ┌────────────────────────────────────────────────────────────────────┐ │
-│  │                    db-provision-operator                            │ │
-│  │                                                                      │ │
-│  │  ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐   │ │
-│  │  │ DatabaseInstance │ │    Database      │ │  DatabaseUser    │   │ │
-│  │  │   Controller     │ │   Controller     │ │   Controller     │   │ │
-│  │  └────────┬─────────┘ └────────┬─────────┘ └────────┬─────────┘   │ │
-│  │           │                    │                    │              │ │
-│  │           └────────────────────┴────────────────────┘              │ │
-│  │                              │                                      │ │
-│  │                    ┌─────────┴─────────┐                           │ │
-│  │                    │   Adapter Layer   │                           │ │
-│  │                    ├───────────────────┤                           │ │
-│  │                    │ ┌───────────────┐ │                           │ │
-│  │                    │ │   PostgreSQL  │ │                           │ │
-│  │                    │ │    Adapter    │ │                           │ │
-│  │                    │ └───────────────┘ │                           │ │
-│  │                    │ ┌───────────────┐ │                           │ │
-│  │                    │ │     MySQL     │ │                           │ │
-│  │                    │ │    Adapter    │ │                           │ │
-│  │                    │ └───────────────┘ │                           │ │
-│  │                    └───────────────────┘                           │ │
-│  │                              │                                      │ │
-│  │  ┌───────────────────┐      │      ┌───────────────────┐          │ │
-│  │  │  Secret Manager   │◄─────┴─────►│   Utility Layer   │          │ │
-│  │  └───────────────────┘             └───────────────────┘          │ │
-│  │                                                                      │ │
-│  └────────────────────────────────────────────────────────────────────┘ │
-│                                                                          │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐             │
-│  │DatabaseInst. │    │   Database   │    │DatabaseUser  │             │
-│  │    CRD       │    │     CRD      │    │    CRD       │             │
-│  └──────────────┘    └──────────────┘    └──────────────┘             │
-│                                                                          │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-                    ┌───────────────────────────────┐
-                    │     External Databases        │
-                    ├───────────────────────────────┤
-                    │  ┌─────────┐    ┌─────────┐  │
-                    │  │PostgreSQL│   │  MySQL  │  │
-                    │  │ Server   │   │ Server  │  │
-                    │  └─────────┘    └─────────┘  │
-                    └───────────────────────────────┘
+```mermaid
+graph TD
+    subgraph K8s["Kubernetes Cluster"]
+        subgraph Operator["db-provision-operator"]
+            DIC[DatabaseInstance Controller]
+            DBC[Database Controller]
+            DUC[DatabaseUser Controller]
+            DIC & DBC & DUC --> AL
+            subgraph AL["Adapter Layer"]
+                PGA[PostgreSQL Adapter]
+                MYA[MySQL Adapter]
+            end
+            SM[Secret Manager] <--> AL
+            UL[Utility Layer] <--> AL
+        end
+        CRD1[DatabaseInstance CRD]
+        CRD2[Database CRD]
+        CRD3[DatabaseUser CRD]
+    end
+    AL --> ExtDB
+    subgraph ExtDB["External Databases"]
+        PGS[PostgreSQL Server]
+        MYS[MySQL Server]
+    end
 ```
 
 ## Technology Stack
@@ -93,11 +67,11 @@ The **db-provision-operator** is a Kubernetes operator designed to provide unifi
 
 ### Resource Hierarchy
 
-```
-DatabaseInstance (server connection)
-├── Database (logical database)
-│   └── DatabaseUser (user with access to database)
-└── DatabaseUser (instance-level user/role)
+```mermaid
+graph TD
+    DI[DatabaseInstance] --> DB[Database]
+    DB --> DU1[DatabaseUser]
+    DI --> DU2["DatabaseUser (instance-level)"]
 ```
 
 ## Component Architecture
@@ -139,46 +113,54 @@ Responsibilities:
 The adapter layer provides a unified interface for database operations across different engines.
 
 #### Interface Hierarchy
-```
-DatabaseAdapter (main interface)
-├── Connect(ctx) error
-├── Close() error
-├── Ping(ctx) error
-├── GetVersion(ctx) (string, error)
-│
-├── DatabaseOperations
-│   ├── CreateDatabase(ctx, opts) error
-│   ├── DropDatabase(ctx, name, opts) error
-│   ├── UpdateDatabase(ctx, name, opts) error
-│   ├── DatabaseExists(ctx, name) (bool, error)
-│   └── GetDatabaseInfo(ctx, name) (*DatabaseInfo, error)
-│
-├── UserOperations
-│   ├── CreateUser(ctx, opts) error
-│   ├── DropUser(ctx, name, opts) error
-│   ├── UpdateUser(ctx, name, opts) error
-│   ├── UserExists(ctx, name) (bool, error)
-│   └── GetUserInfo(ctx, name) (*UserInfo, error)
-│
-├── GrantOperations
-│   ├── Grant(ctx, opts) error
-│   ├── Revoke(ctx, opts) error
-│   └── GetGrants(ctx, user, db) ([]GrantInfo, error)
-│
-├── BackupOperations
-│   ├── Backup(ctx, opts) (*BackupResult, error)
-│   ├── GetBackupProgress(ctx, id) (int, error)
-│   └── CancelBackup(ctx, id) error
-│
-├── RestoreOperations
-│   ├── Restore(ctx, opts) (*RestoreResult, error)
-│   ├── GetRestoreProgress(ctx, id) (int, error)
-│   └── CancelRestore(ctx, id) error
-│
-└── SchemaOperations (PostgreSQL only)
-    ├── CreateSchema(ctx, opts) error
-    ├── DropSchema(ctx, name, opts) error
-    └── SchemaExists(ctx, name) (bool, error)
+```mermaid
+classDiagram
+    class DatabaseAdapter {
+        +Connect(ctx) error
+        +Close() error
+        +Ping(ctx) error
+        +GetVersion(ctx) (string, error)
+    }
+    class DatabaseOperations {
+        +CreateDatabase(ctx, opts) error
+        +DropDatabase(ctx, name, opts) error
+        +UpdateDatabase(ctx, name, opts) error
+        +DatabaseExists(ctx, name) (bool, error)
+        +GetDatabaseInfo(ctx, name) (*DatabaseInfo, error)
+    }
+    class UserOperations {
+        +CreateUser(ctx, opts) error
+        +DropUser(ctx, name, opts) error
+        +UpdateUser(ctx, name, opts) error
+        +UserExists(ctx, name) (bool, error)
+        +GetUserInfo(ctx, name) (*UserInfo, error)
+    }
+    class GrantOperations {
+        +Grant(ctx, opts) error
+        +Revoke(ctx, opts) error
+        +GetGrants(ctx, user, db) ([]GrantInfo, error)
+    }
+    class BackupOperations {
+        +Backup(ctx, opts) (*BackupResult, error)
+        +GetBackupProgress(ctx, id) (int, error)
+        +CancelBackup(ctx, id) error
+    }
+    class RestoreOperations {
+        +Restore(ctx, opts) (*RestoreResult, error)
+        +GetRestoreProgress(ctx, id) (int, error)
+        +CancelRestore(ctx, id) error
+    }
+    class SchemaOperations {
+        +CreateSchema(ctx, opts) error
+        +DropSchema(ctx, name, opts) error
+        +SchemaExists(ctx, name) (bool, error)
+    }
+    DatabaseAdapter <|-- DatabaseOperations
+    DatabaseAdapter <|-- UserOperations
+    DatabaseAdapter <|-- GrantOperations
+    DatabaseAdapter <|-- BackupOperations
+    DatabaseAdapter <|-- RestoreOperations
+    DatabaseAdapter <|-- SchemaOperations
 ```
 
 ### Secret Manager
@@ -198,80 +180,34 @@ Responsibilities:
 ## Data Flow
 
 ### Resource Creation Flow
-```
-User Creates CRD
-       │
-       ▼
-Controller Receives Event
-       │
-       ▼
-Fetch Resource from API Server
-       │
-       ▼
-Add Finalizer (if missing)
-       │
-       ▼
-Get Referenced Resources
-       │
-       ▼
-Get Credentials from Secret
-       │
-       ▼
-Create Database Adapter
-       │
-       ▼
-Connect to Database Server
-       │
-       ▼
-Execute Database Operations
-       │
-       ▼
-Create Credentials Secret (if needed)
-       │
-       ▼
-Update Resource Status
-       │
-       ▼
-Requeue for Periodic Reconciliation
+```mermaid
+graph TD
+    A[User Creates CRD] --> B[Controller Receives Event]
+    B --> C[Fetch Resource from API Server]
+    C --> D[Add Finalizer]
+    D --> E[Get Referenced Resources]
+    E --> F[Get Credentials from Secret]
+    F --> G[Create Database Adapter]
+    G --> H[Connect to Database Server]
+    H --> I[Execute Database Operations]
+    I --> J[Create Credentials Secret]
+    J --> K[Update Resource Status]
+    K --> L[Requeue for Periodic Reconciliation]
 ```
 
 ### Resource Deletion Flow
-```
-User Deletes CRD
-       │
-       ▼
-Controller Receives Delete Event
-       │
-       ▼
-Check Deletion Protection
-       │
-       ├── Protected + No Force Delete
-       │   └── Return Error, Keep Resource
-       │
-       └── Not Protected or Force Delete
-           │
-           ▼
-    Check Deletion Policy
-           │
-           ├── Retain
-           │   └── Remove Finalizer Only
-           │
-           └── Delete
-               │
-               ▼
-        Connect to Database
-               │
-               ▼
-        Drop Resource (DB/User)
-               │
-               ▼
-        Delete Credentials Secret
-               │
-               ▼
-        Remove Finalizer
-               │
-               ▼
-        Resource Removed from Cluster
+```mermaid
+graph TD
+    A[User Deletes CRD] --> B[Controller Receives Delete Event]
+    B --> C{Check Deletion Protection}
+    C -->|Protected + No Force| D[Return Error, Keep Resource]
+    C -->|Not Protected or Force| E{Check Deletion Policy}
+    E -->|Retain| F[Remove Finalizer Only]
+    E -->|Delete| G[Connect to Database]
+    G --> H["Drop Resource (DB/User)"]
+    H --> I[Delete Credentials Secret]
+    I --> J[Remove Finalizer]
+    J --> K[Resource Removed from Cluster]
 ```
 
 ## Project Structure
