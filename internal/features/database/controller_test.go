@@ -25,6 +25,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -1561,4 +1562,204 @@ func TestController_Reconcile_DriftCorrection_NoDestructive(t *testing.T) {
 	assert.True(t, updatedDB.Status.Drift.Detected)
 	require.Len(t, updatedDB.Status.Drift.Diffs, 1)
 	assert.True(t, updatedDB.Status.Drift.Diffs[0].Destructive)
+}
+
+// =============================================================================
+// Phase 4: Dependency-checking deletion tests
+// =============================================================================
+
+func TestController_Reconcile_DeletionBlockedByGrantDependencies(t *testing.T) {
+	scheme := newTestScheme()
+	database := newTestDatabase("testdb", "default")
+	database.Finalizers = []string{util.FinalizerDatabase}
+	now := metav1.Now()
+	database.DeletionTimestamp = &now
+
+	// Create a DatabaseGrant that references this database
+	grant := &dbopsv1alpha1.DatabaseGrant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-grant",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseGrantSpec{
+			DatabaseRef: &dbopsv1alpha1.DatabaseReference{
+				Name: "testdb",
+			},
+			UserRef: &dbopsv1alpha1.UserReference{
+				Name: "someuser",
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(database, grant).
+		WithStatusSubresource(database).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := NewHandler(HandlerConfig{
+		Repository: mockRepo,
+		EventBus:   NewMockEventBus(),
+		Logger:     logr.Discard(),
+	})
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testdb",
+			Namespace: "default",
+		},
+	})
+
+	// Dependency check blocks deletion: returns RequeueAfter with no error
+	require.NoError(t, err)
+	assert.Equal(t, 10*time.Second, result.RequeueAfter)
+
+	// Verify the database still has its finalizer (not removed)
+	var updatedDB dbopsv1alpha1.Database
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testdb", Namespace: "default"}, &updatedDB)
+	require.NoError(t, err)
+	assert.True(t, controllerutil.ContainsFinalizer(&updatedDB, util.FinalizerDatabase))
+
+	// Verify status: Phase=Failed, Ready condition = DependenciesExist
+	assert.Equal(t, dbopsv1alpha1.PhaseFailed, updatedDB.Status.Phase)
+	assert.Contains(t, updatedDB.Status.Message, "test-grant")
+
+	readyCond := util.GetCondition(updatedDB.Status.Conditions, util.ConditionTypeReady)
+	require.NotNil(t, readyCond, "Ready condition should be set")
+	assert.Equal(t, metav1.ConditionFalse, readyCond.Status)
+	assert.Equal(t, util.ReasonDependenciesExist, readyCond.Reason)
+
+	// Verify Delete was NOT called (we never reached the deletion handler)
+	assert.False(t, mockRepo.WasCalled("Delete"))
+}
+
+func TestController_Reconcile_DeletionSucceedsWhenNoGrants(t *testing.T) {
+	scheme := newTestScheme()
+	database := newTestDatabase("testdb", "default")
+	database.Finalizers = []string{util.FinalizerDatabase}
+	now := metav1.Now()
+	database.DeletionTimestamp = &now
+	// Default deletion policy is Retain — no external deletion, just finalizer removal
+
+	// No grant resources created — database has no dependencies
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(database).
+		WithStatusSubresource(database).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := NewHandler(HandlerConfig{
+		Repository: mockRepo,
+		EventBus:   NewMockEventBus(),
+		Logger:     logr.Discard(),
+	})
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testdb",
+			Namespace: "default",
+		},
+	})
+
+	// No children: deletion proceeds without dependency blocking
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+
+	// Verify the database was fully deleted (fake client removes objects
+	// once all finalizers are cleared and DeletionTimestamp is set)
+	var updatedDB dbopsv1alpha1.Database
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testdb", Namespace: "default"}, &updatedDB)
+	assert.True(t, apierrors.IsNotFound(err), "database should be deleted after finalizer removal")
+
+	// Verify Delete was NOT called (Retain policy)
+	assert.False(t, mockRepo.WasCalled("Delete"))
+}
+
+func TestController_Reconcile_ForceDeleteBypassesGrantCheck(t *testing.T) {
+	scheme := newTestScheme()
+	database := newTestDatabase("testdb", "default")
+	database.Finalizers = []string{util.FinalizerDatabase}
+	database.Annotations = map[string]string{
+		util.AnnotationForceDelete: "true",
+	}
+	now := metav1.Now()
+	database.DeletionTimestamp = &now
+	// Default deletion policy is Retain
+
+	// Create a DatabaseGrant that references this database
+	grant := &dbopsv1alpha1.DatabaseGrant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-grant",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseGrantSpec{
+			DatabaseRef: &dbopsv1alpha1.DatabaseReference{
+				Name: "testdb",
+			},
+			UserRef: &dbopsv1alpha1.UserReference{
+				Name: "someuser",
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(database, grant).
+		WithStatusSubresource(database).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := NewHandler(HandlerConfig{
+		Repository: mockRepo,
+		EventBus:   NewMockEventBus(),
+		Logger:     logr.Discard(),
+	})
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testdb",
+			Namespace: "default",
+		},
+	})
+
+	// Force delete bypasses dependency check: deletion proceeds
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+
+	// Verify the database was fully deleted (fake client removes objects
+	// once all finalizers are cleared and DeletionTimestamp is set)
+	var updatedDB dbopsv1alpha1.Database
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testdb", Namespace: "default"}, &updatedDB)
+	assert.True(t, apierrors.IsNotFound(err), "database should be deleted after force-delete bypasses grant check")
+
+	// Verify Delete was NOT called (Retain policy — force-delete only bypasses dependency check,
+	// it does not change the deletion policy)
+	assert.False(t, mockRepo.WasCalled("Delete"))
 }

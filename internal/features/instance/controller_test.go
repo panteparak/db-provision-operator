@@ -20,11 +20,13 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -636,4 +638,182 @@ func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
 	require.NotNil(t, readyCond)
 	assert.Equal(t, metav1.ConditionTrue, readyCond.Status)
 	assert.Equal(t, util.ReasonReconcileSuccess, readyCond.Reason)
+}
+
+// --- Dependency-checking deletion tests ---
+
+func TestController_Reconcile_DeletionBlockedByChildDependencies(t *testing.T) {
+	scheme := newTestScheme()
+	instance := newTestInstanceResource("testinstance", "default")
+	instance.Finalizers = []string{util.FinalizerDatabaseInstance}
+	now := metav1.Now()
+	instance.DeletionTimestamp = &now
+
+	// Create a Database that references this instance
+	childDB := &dbopsv1alpha1.Database{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "child-db",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseSpec{
+			InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "testinstance"},
+			Name:        "mydb",
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(instance, childDB).
+		WithStatusSubresource(instance, childDB).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testinstance",
+			Namespace: "default",
+		},
+	})
+
+	// Dependency check blocks deletion: returns RequeueAfter with no error
+	require.NoError(t, err)
+	assert.Equal(t, 10*time.Second, result.RequeueAfter)
+
+	// Verify the instance still has its finalizer (not removed)
+	var updatedInstance dbopsv1alpha1.DatabaseInstance
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testinstance", Namespace: "default"}, &updatedInstance)
+	require.NoError(t, err)
+	assert.Contains(t, updatedInstance.Finalizers, util.FinalizerDatabaseInstance)
+
+	// Verify status: Phase=Failed, Ready condition = DependenciesExist
+	assert.Equal(t, dbopsv1alpha1.PhaseFailed, updatedInstance.Status.Phase)
+	assert.Contains(t, updatedInstance.Status.Message, "child-db")
+
+	readyCond := util.GetCondition(updatedInstance.Status.Conditions, util.ConditionTypeReady)
+	require.NotNil(t, readyCond, "Ready condition should be set")
+	assert.Equal(t, metav1.ConditionFalse, readyCond.Status)
+	assert.Equal(t, util.ReasonDependenciesExist, readyCond.Reason)
+}
+
+func TestController_Reconcile_DeletionSucceedsWhenNoChildren(t *testing.T) {
+	scheme := newTestScheme()
+	instance := newTestInstanceResource("testinstance", "default")
+	instance.Finalizers = []string{util.FinalizerDatabaseInstance}
+	now := metav1.Now()
+	instance.DeletionTimestamp = &now
+
+	// No child resources created — instance has no dependencies
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(instance).
+		WithStatusSubresource(instance).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testinstance",
+			Namespace: "default",
+		},
+	})
+
+	// No children: deletion proceeds without dependency blocking
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+
+	// Verify the instance was fully deleted (fake client removes objects
+	// once all finalizers are cleared and DeletionTimestamp is set)
+	var updatedInstance dbopsv1alpha1.DatabaseInstance
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testinstance", Namespace: "default"}, &updatedInstance)
+	assert.True(t, apierrors.IsNotFound(err), "instance should be deleted after finalizer removal")
+}
+
+func TestController_Reconcile_ForceDeleteBypassesChildCheck(t *testing.T) {
+	scheme := newTestScheme()
+	instance := newTestInstanceResource("testinstance", "default")
+	instance.Finalizers = []string{util.FinalizerDatabaseInstance}
+	instance.Annotations = map[string]string{
+		util.AnnotationForceDelete: "true",
+	}
+	now := metav1.Now()
+	instance.DeletionTimestamp = &now
+
+	// Create a Database that references this instance — should be bypassed
+	childDB := &dbopsv1alpha1.Database{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "child-db",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseSpec{
+			InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "testinstance"},
+			Name:        "mydb",
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(instance, childDB).
+		WithStatusSubresource(instance, childDB).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testinstance",
+			Namespace: "default",
+		},
+	})
+
+	// Force-delete bypasses child dependency check: deletion proceeds
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+
+	// Verify the instance was fully deleted (fake client removes objects
+	// once all finalizers are cleared and DeletionTimestamp is set)
+	var updatedInstance dbopsv1alpha1.DatabaseInstance
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testinstance", Namespace: "default"}, &updatedInstance)
+	assert.True(t, apierrors.IsNotFound(err), "instance should be deleted despite having children")
 }

@@ -19,6 +19,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -88,6 +89,7 @@ func NewController(cfg ControllerConfig) *Controller {
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databases/finalizers,verbs=update
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseinstances,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databasegrants,verbs=list
 
 // Reconcile implements the reconciliation loop for Database resources.
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -247,6 +249,27 @@ func (c *Controller) handleDeletion(ctx context.Context, database *dbopsv1alpha1
 			log.Error(err, "Failed to update status")
 		}
 		return ctrl.Result{}, fmt.Errorf("deletion protection enabled")
+	}
+
+	// Check for child dependencies (skip if force-delete)
+	if !util.HasForceDeleteAnnotation(database) {
+		hasChildren, msg, err := c.hasChildDependencies(ctx, database)
+		if err != nil {
+			log.Error(err, "Failed to check child dependencies")
+			// Don't block on check errors — proceed with deletion
+		} else if hasChildren {
+			log.Info("Deletion blocked by child dependencies", "message", msg)
+			util.SetReadyCondition(&database.Status.Conditions, metav1.ConditionFalse,
+				util.ReasonDependenciesExist, msg)
+			database.Status.Phase = dbopsv1alpha1.PhaseFailed
+			database.Status.Message = msg
+			if statusErr := c.Status().Update(ctx, database); statusErr != nil {
+				log.Error(statusErr, "Failed to update status")
+			}
+			c.Recorder.Eventf(database, corev1.EventTypeWarning, "DeletionBlocked",
+				"Deletion blocked: %s", msg)
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		}
 	}
 
 	// Handle based on deletion policy
@@ -459,4 +482,31 @@ func (c *Controller) hasDestructiveDriftAnnotation(database *dbopsv1alpha1.Datab
 		return false
 	}
 	return database.Annotations[dbopsv1alpha1.AnnotationAllowDestructiveDrift] == "true"
+}
+
+// hasChildDependencies checks if any DatabaseGrant resources reference this database.
+// Returns true with a descriptive message if children exist.
+func (c *Controller) hasChildDependencies(ctx context.Context, database *dbopsv1alpha1.Database) (bool, string, error) {
+	var childNames []string
+
+	var grants dbopsv1alpha1.DatabaseGrantList
+	if err := c.List(ctx, &grants, client.InNamespace(database.Namespace)); err != nil {
+		return false, "", fmt.Errorf("list grants: %w", err)
+	}
+	for _, g := range grants.Items {
+		if g.Spec.DatabaseRef != nil && g.Spec.DatabaseRef.Name == database.Name {
+			ns := g.Spec.DatabaseRef.Namespace
+			if ns == "" || ns == database.Namespace {
+				childNames = append(childNames, "DatabaseGrant/"+g.Name)
+			}
+		}
+	}
+
+	if len(childNames) == 0 {
+		return false, "", nil
+	}
+
+	msg := fmt.Sprintf("cannot delete: %d DatabaseGrant(s) still reference this database: %s. "+
+		"Delete grants first or use force-delete annotation", len(childNames), strings.Join(childNames, ", "))
+	return true, msg, nil
 }

@@ -75,6 +75,7 @@ const (
 	ReasonRestoreCompleted  = "RestoreCompleted"
 	ReasonRestoreFailed     = "RestoreFailed"
 	ReasonDeletionProtected = "DeletionProtected"
+	ReasonDependenciesExist = "DependenciesExist"
 )
 
 // SetCondition adds or updates a condition in the conditions list

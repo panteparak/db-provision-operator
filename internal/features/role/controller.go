@@ -19,6 +19,7 @@ package role
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -85,6 +86,7 @@ func NewController(cfg ControllerConfig) *Controller {
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseroles/finalizers,verbs=update
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseinstances,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databasegrants,verbs=list
 
 // Reconcile implements the reconciliation loop for DatabaseRole resources.
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -214,6 +216,27 @@ func (c *Controller) handleDeletion(ctx context.Context, role *dbopsv1alpha1.Dat
 			log.Error(err, "Failed to update status")
 		}
 		return ctrl.Result{}, fmt.Errorf("deletion protection enabled")
+	}
+
+	// Check for grant dependencies (skip if force-delete)
+	if !util.HasForceDeleteAnnotation(role) {
+		hasGrants, msg, err := c.hasGrantDependencies(ctx, role)
+		if err != nil {
+			log.Error(err, "Failed to check grant dependencies")
+			// Don't block on check errors — proceed with deletion
+		} else if hasGrants {
+			log.Info("Deletion blocked by grant dependencies", "message", msg)
+			util.SetReadyCondition(&role.Status.Conditions, metav1.ConditionFalse,
+				util.ReasonDependenciesExist, msg)
+			role.Status.Phase = dbopsv1alpha1.PhaseFailed
+			role.Status.Message = msg
+			if statusErr := c.Status().Update(ctx, role); statusErr != nil {
+				log.Error(statusErr, "Failed to update status")
+			}
+			c.Recorder.Eventf(role, corev1.EventTypeWarning, "DeletionBlocked",
+				"Deletion blocked: %s", msg)
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		}
 	}
 
 	if deletionPolicy == string(dbopsv1alpha1.DeletionPolicyDelete) {
@@ -443,4 +466,31 @@ func (c *Controller) hasDestructiveDriftAnnotation(role *dbopsv1alpha1.DatabaseR
 		return false
 	}
 	return role.Annotations[dbopsv1alpha1.AnnotationAllowDestructiveDrift] == "true"
+}
+
+// hasGrantDependencies checks if any DatabaseGrant resources reference this role.
+// Returns true with a descriptive message if grants exist.
+func (c *Controller) hasGrantDependencies(ctx context.Context, role *dbopsv1alpha1.DatabaseRole) (bool, string, error) {
+	var childNames []string
+
+	var grants dbopsv1alpha1.DatabaseGrantList
+	if err := c.List(ctx, &grants, client.InNamespace(role.Namespace)); err != nil {
+		return false, "", fmt.Errorf("list grants: %w", err)
+	}
+	for _, g := range grants.Items {
+		if g.Spec.RoleRef != nil && g.Spec.RoleRef.Name == role.Name {
+			ns := g.Spec.RoleRef.Namespace
+			if ns == "" || ns == role.Namespace {
+				childNames = append(childNames, "DatabaseGrant/"+g.Name)
+			}
+		}
+	}
+
+	if len(childNames) == 0 {
+		return false, "", nil
+	}
+
+	msg := fmt.Sprintf("cannot delete: %d DatabaseGrant(s) still reference this role: %s. "+
+		"Delete grants first or use force-delete annotation", len(childNames), strings.Join(childNames, ", "))
+	return true, msg, nil
 }

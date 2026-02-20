@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -1442,4 +1443,174 @@ func TestController_Reconcile_RequeueAfterInstanceLevel(t *testing.T) {
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: nn})
 	require.NoError(t, err)
 	assert.Equal(t, 15*time.Second, result.RequeueAfter)
+}
+
+// --- Grant dependency deletion tests ---
+
+func TestController_Reconcile_DeletionBlockedByGrantDependencies(t *testing.T) {
+	scheme := newTestScheme()
+	role := newTestRole("testrole", "default")
+	role.Finalizers = []string{util.FinalizerDatabaseRole}
+	now := metav1.Now()
+	role.DeletionTimestamp = &now
+
+	grant := &dbopsv1alpha1.DatabaseGrant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-grant",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseGrantSpec{
+			RoleRef:     &dbopsv1alpha1.RoleReference{Name: role.Name},
+			DatabaseRef: &dbopsv1alpha1.DatabaseReference{Name: "somedb"},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(role, grant).
+		WithStatusSubresource(role).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testrole",
+			Namespace: "default",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 10*time.Second, result.RequeueAfter)
+
+	// Verify finalizer is NOT removed
+	var updatedRole dbopsv1alpha1.DatabaseRole
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testrole", Namespace: "default"}, &updatedRole)
+	require.NoError(t, err)
+	assert.Contains(t, updatedRole.Finalizers, util.FinalizerDatabaseRole)
+
+	// Verify Phase=Failed
+	assert.Equal(t, dbopsv1alpha1.PhaseFailed, updatedRole.Status.Phase)
+
+	// Verify DependenciesExist condition
+	readyCond := util.GetCondition(updatedRole.Status.Conditions, util.ConditionTypeReady)
+	require.NotNil(t, readyCond)
+	assert.Equal(t, metav1.ConditionFalse, readyCond.Status)
+	assert.Equal(t, util.ReasonDependenciesExist, readyCond.Reason)
+}
+
+func TestController_Reconcile_DeletionSucceedsWhenNoGrants(t *testing.T) {
+	scheme := newTestScheme()
+	role := newTestRole("testrole", "default")
+	role.Finalizers = []string{util.FinalizerDatabaseRole}
+	now := metav1.Now()
+	role.DeletionTimestamp = &now
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(role).
+		WithStatusSubresource(role).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testrole",
+			Namespace: "default",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+
+	// Verify finalizer was removed — with deletionTimestamp set the fake client
+	// garbage-collects the object once all finalizers are gone.
+	var updatedRole dbopsv1alpha1.DatabaseRole
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testrole", Namespace: "default"}, &updatedRole)
+	assert.True(t, apierrors.IsNotFound(err), "expected NotFound after finalizer removal, got: %v", err)
+}
+
+func TestController_Reconcile_ForceDeleteBypassesGrantCheck(t *testing.T) {
+	scheme := newTestScheme()
+	role := newTestRole("testrole", "default")
+	role.Annotations = map[string]string{
+		util.AnnotationForceDelete: "true",
+	}
+	role.Finalizers = []string{util.FinalizerDatabaseRole}
+	now := metav1.Now()
+	role.DeletionTimestamp = &now
+
+	grant := &dbopsv1alpha1.DatabaseGrant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-grant",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseGrantSpec{
+			RoleRef:     &dbopsv1alpha1.RoleReference{Name: role.Name},
+			DatabaseRef: &dbopsv1alpha1.DatabaseReference{Name: "somedb"},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(role, grant).
+		WithStatusSubresource(role).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testrole",
+			Namespace: "default",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+
+	// Verify deletion proceeded — object should be gone (finalizer removed + deletionTimestamp set)
+	var updatedRole dbopsv1alpha1.DatabaseRole
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testrole", Namespace: "default"}, &updatedRole)
+	assert.True(t, apierrors.IsNotFound(err), "expected NotFound after force-delete bypass, got: %v", err)
 }

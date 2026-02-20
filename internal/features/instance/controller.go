@@ -19,6 +19,7 @@ package instance
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -79,6 +80,9 @@ func NewController(cfg ControllerConfig) *Controller {
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseinstances/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseinstances/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databases,verbs=list
+// +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseusers,verbs=list
+// +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseroles,verbs=list
 
 // Reconcile implements the reconciliation loop for DatabaseInstance resources.
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -201,6 +205,27 @@ func (c *Controller) handleDeletion(ctx context.Context, instance *dbopsv1alpha1
 		return ctrl.Result{}, fmt.Errorf("deletion protection enabled")
 	}
 
+	// Check for child dependencies (skip if force-delete)
+	if !util.HasForceDeleteAnnotation(instance) {
+		hasChildren, msg, err := c.hasChildDependencies(ctx, instance)
+		if err != nil {
+			log.Error(err, "Failed to check child dependencies")
+			// Don't block on check errors — proceed with deletion
+		} else if hasChildren {
+			log.Info("Deletion blocked by child dependencies", "message", msg)
+			util.SetReadyCondition(&instance.Status.Conditions, metav1.ConditionFalse,
+				util.ReasonDependenciesExist, msg)
+			instance.Status.Phase = dbopsv1alpha1.PhaseFailed
+			instance.Status.Message = msg
+			if statusErr := c.Status().Update(ctx, instance); statusErr != nil {
+				log.Error(statusErr, "Failed to update status")
+			}
+			c.Recorder.Eventf(instance, corev1.EventTypeWarning, "DeletionBlocked",
+				"Deletion blocked: %s", msg)
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		}
+	}
+
 	// Clean up metrics
 	c.handler.CleanupMetrics(instance)
 
@@ -251,6 +276,62 @@ func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
 		For(&dbopsv1alpha1.DatabaseInstance{}).
 		Named("databaseinstance").
 		Complete(c)
+}
+
+// hasChildDependencies checks if any child resources (Database, DatabaseUser, DatabaseRole)
+// reference this instance. Returns true with a descriptive message if children exist.
+func (c *Controller) hasChildDependencies(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance) (bool, string, error) {
+	var childTypes []string
+
+	// Check Databases referencing this instance
+	var databases dbopsv1alpha1.DatabaseList
+	if err := c.List(ctx, &databases, client.InNamespace(instance.Namespace)); err != nil {
+		return false, "", fmt.Errorf("list databases: %w", err)
+	}
+	for _, db := range databases.Items {
+		if db.Spec.InstanceRef != nil && db.Spec.InstanceRef.Name == instance.Name {
+			ns := db.Spec.InstanceRef.Namespace
+			if ns == "" || ns == instance.Namespace {
+				childTypes = append(childTypes, "Database/"+db.Name)
+			}
+		}
+	}
+
+	// Check DatabaseUsers referencing this instance
+	var users dbopsv1alpha1.DatabaseUserList
+	if err := c.List(ctx, &users, client.InNamespace(instance.Namespace)); err != nil {
+		return false, "", fmt.Errorf("list users: %w", err)
+	}
+	for _, u := range users.Items {
+		if u.Spec.InstanceRef != nil && u.Spec.InstanceRef.Name == instance.Name {
+			ns := u.Spec.InstanceRef.Namespace
+			if ns == "" || ns == instance.Namespace {
+				childTypes = append(childTypes, "DatabaseUser/"+u.Name)
+			}
+		}
+	}
+
+	// Check DatabaseRoles referencing this instance
+	var roles dbopsv1alpha1.DatabaseRoleList
+	if err := c.List(ctx, &roles, client.InNamespace(instance.Namespace)); err != nil {
+		return false, "", fmt.Errorf("list roles: %w", err)
+	}
+	for _, r := range roles.Items {
+		if r.Spec.InstanceRef != nil && r.Spec.InstanceRef.Name == instance.Name {
+			ns := r.Spec.InstanceRef.Namespace
+			if ns == "" || ns == instance.Namespace {
+				childTypes = append(childTypes, "DatabaseRole/"+r.Name)
+			}
+		}
+	}
+
+	if len(childTypes) == 0 {
+		return false, "", nil
+	}
+
+	msg := fmt.Sprintf("cannot delete: %d child resource(s) still reference this instance: %s. "+
+		"Delete children first or use force-delete annotation", len(childTypes), strings.Join(childTypes, ", "))
+	return true, msg, nil
 }
 
 // hasDeletionProtection checks if the instance has deletion protection enabled.
