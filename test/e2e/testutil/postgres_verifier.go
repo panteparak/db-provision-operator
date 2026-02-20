@@ -512,6 +512,46 @@ func (v *PostgresVerifier) ExecOnDatabase(ctx context.Context, database, sql str
 	return nil
 }
 
+// GetConnectionLimit returns the connection limit for a PostgreSQL role.
+// Returns -1 for unlimited, or the configured limit.
+func (v *PostgresVerifier) GetConnectionLimit(ctx context.Context, roleName string) (int32, error) {
+	if v.pool == nil {
+		return 0, fmt.Errorf("not connected to database")
+	}
+
+	var connLimit int32
+	err := v.pool.QueryRow(ctx,
+		"SELECT rolconnlimit FROM pg_roles WHERE rolname = $1",
+		roleName).Scan(&connLimit)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get connection limit for %s: %w", roleName, err)
+	}
+
+	return connLimit, nil
+}
+
+// ExtensionExistsInDatabase checks if a PostgreSQL extension exists in a specific database.
+func (v *PostgresVerifier) ExtensionExistsInDatabase(ctx context.Context, extensionName, database string) (bool, error) {
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
+		url.QueryEscape(v.config.Username), url.QueryEscape(v.config.Password), v.config.Host, v.config.Port, database)
+
+	pool, err := pgxpool.New(ctx, connStr)
+	if err != nil {
+		return false, fmt.Errorf("failed to connect to database %s: %w", database, err)
+	}
+	defer pool.Close()
+
+	var exists bool
+	err = pool.QueryRow(ctx,
+		"SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = $1)",
+		extensionName).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check extension existence in database %s: %w", database, err)
+	}
+
+	return exists, nil
+}
+
 // Ensure PostgresVerifier implements DatabaseVerifier
 var _ DatabaseVerifier = (*PostgresVerifier)(nil)
 

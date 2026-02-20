@@ -328,6 +328,88 @@ func BuildDatabaseRoleWithOptions(name, namespace, instanceRef, roleName string,
 	return obj
 }
 
+// UserBuildOptions configures optional fields for BuildDatabaseUserWithOptions.
+type UserBuildOptions struct {
+	DriftMode      string                 // "detect", "correct", "ignore"
+	DriftInterval  string                 // e.g. "10s"
+	PostgresConfig map[string]interface{} // postgres attributes (connectionLimit, createDB, etc.)
+}
+
+// BuildDatabaseUserWithOptions creates an unstructured DatabaseUser resource with additional options.
+// It wraps BuildDatabaseUser and overlays driftPolicy and postgres config.
+func BuildDatabaseUserWithOptions(name, namespace, instanceRef, username string, opts UserBuildOptions) *unstructured.Unstructured {
+	obj := BuildDatabaseUser(name, namespace, instanceRef, username)
+
+	spec := obj.Object["spec"].(map[string]interface{})
+
+	if opts.DriftMode != "" {
+		driftPolicy := map[string]interface{}{
+			"mode": opts.DriftMode,
+		}
+		if opts.DriftInterval != "" {
+			driftPolicy["interval"] = opts.DriftInterval
+		}
+		spec["driftPolicy"] = driftPolicy
+	}
+
+	if len(opts.PostgresConfig) > 0 {
+		spec["postgres"] = opts.PostgresConfig
+	}
+
+	return obj
+}
+
+// GrantBuildOptions configures optional fields for BuildDatabaseGrantWithOptions.
+type GrantBuildOptions struct {
+	DriftMode     string                 // "detect", "correct", "ignore"
+	DriftInterval string                 // e.g. "10s"
+	Postgres      map[string]interface{} // postgres grant config (grants, roles)
+}
+
+// BuildDatabaseGrantWithOptions creates an unstructured DatabaseGrant resource with drift support.
+// It accepts roleRef or userRef via the granteeType ("role" or "user") parameter.
+func BuildDatabaseGrantWithOptions(name, namespace, granteeType, granteeName string, opts GrantBuildOptions) *unstructured.Unstructured {
+	obj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": APIVersion,
+			"kind":       "DatabaseGrant",
+			"metadata": map[string]interface{}{
+				"name":      name,
+				"namespace": namespace,
+			},
+			"spec": map[string]interface{}{},
+		},
+	}
+
+	spec := obj.Object["spec"].(map[string]interface{})
+
+	if granteeType == "role" {
+		spec["roleRef"] = map[string]interface{}{
+			"name": granteeName,
+		}
+	} else {
+		spec["userRef"] = map[string]interface{}{
+			"name": granteeName,
+		}
+	}
+
+	if opts.DriftMode != "" {
+		driftPolicy := map[string]interface{}{
+			"mode": opts.DriftMode,
+		}
+		if opts.DriftInterval != "" {
+			driftPolicy["interval"] = opts.DriftInterval
+		}
+		spec["driftPolicy"] = driftPolicy
+	}
+
+	if len(opts.Postgres) > 0 {
+		spec["postgres"] = opts.Postgres
+	}
+
+	return obj
+}
+
 // getDefaultDatabase returns the default database name for the given engine.
 func getDefaultDatabase(engine string) string {
 	switch engine {
