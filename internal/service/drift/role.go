@@ -236,8 +236,8 @@ func (s *Service) applyRoleCorrection(ctx context.Context, spec *dbopsv1alpha1.D
 		diff.Field == "superuser" ||
 		diff.Field == "replication" ||
 		diff.Field == "bypassrls":
-		// Update role attributes
-		return s.updateRoleAttributes(ctx, spec)
+		// Update only the specific drifted attribute
+		return s.updateRoleAttribute(ctx, spec, diff.Field)
 
 	case strings.HasPrefix(diff.Field, "inRoles"):
 		// Update role memberships
@@ -248,30 +248,41 @@ func (s *Service) applyRoleCorrection(ctx context.Context, spec *dbopsv1alpha1.D
 	}
 }
 
-// updateRoleAttributes updates role attributes based on spec.
-func (s *Service) updateRoleAttributes(ctx context.Context, spec *dbopsv1alpha1.DatabaseRoleSpec) error {
+// updateRoleAttribute updates a single role attribute based on the drifted field.
+// Only the specific drifted attribute is included in the ALTER ROLE statement
+// to avoid requiring privileges for attributes that haven't changed (e.g. SUPERUSER).
+func (s *Service) updateRoleAttribute(ctx context.Context, spec *dbopsv1alpha1.DatabaseRoleSpec, field string) error {
 	if spec.Postgres == nil {
 		return nil
 	}
 
 	pgSpec := spec.Postgres
-	// Convert to pointer types for UpdateRoleOptions
-	login := pgSpec.Login
-	inherit := pgSpec.Inherit
-	createDB := pgSpec.CreateDB
-	createRole := pgSpec.CreateRole
-	superuser := pgSpec.Superuser
-	replication := pgSpec.Replication
-	bypassRLS := pgSpec.BypassRLS
+	opts := types.UpdateRoleOptions{}
 
-	opts := types.UpdateRoleOptions{
-		Login:       &login,
-		Inherit:     &inherit,
-		CreateDB:    &createDB,
-		CreateRole:  &createRole,
-		Superuser:   &superuser,
-		Replication: &replication,
-		BypassRLS:   &bypassRLS,
+	switch field {
+	case "login":
+		v := pgSpec.Login
+		opts.Login = &v
+	case "inherit":
+		v := pgSpec.Inherit
+		opts.Inherit = &v
+	case "createdb":
+		v := pgSpec.CreateDB
+		opts.CreateDB = &v
+	case "createrole":
+		v := pgSpec.CreateRole
+		opts.CreateRole = &v
+	case "superuser":
+		v := pgSpec.Superuser
+		opts.Superuser = &v
+	case "replication":
+		v := pgSpec.Replication
+		opts.Replication = &v
+	case "bypassrls":
+		v := pgSpec.BypassRLS
+		opts.BypassRLS = &v
+	default:
+		return fmt.Errorf("unknown role attribute: %s", field)
 	}
 
 	return s.adapter.UpdateRole(ctx, spec.RoleName, opts)
