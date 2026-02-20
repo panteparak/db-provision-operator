@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/service/drift"
 )
 
 func TestHandler_Apply(t *testing.T) {
@@ -448,4 +449,210 @@ func TestHandler_CollectPrivileges(t *testing.T) {
 			assert.Equal(t, tt.want, privileges)
 		})
 	}
+}
+
+func TestHandler_DetectDrift(t *testing.T) {
+	t.Run("successful drift detection", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
+			result := drift.NewResult("grant", "test-user")
+			result.AddDiff(drift.Diff{
+				Field:    "roles",
+				Expected: "[app_read, app_write]",
+				Actual:   "[app_read]",
+			})
+			return result, nil
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.DatabaseGrantSpec{
+			UserRef:  &dbopsv1alpha1.UserReference{Name: "test-user"},
+			Postgres: &dbopsv1alpha1.PostgresGrantConfig{Roles: []string{"app_read"}},
+		}
+
+		result, err := handler.DetectDrift(context.Background(), spec, "default", false)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.HasDrift())
+		assert.Len(t, result.Diffs, 1)
+		assert.Equal(t, "roles", result.Diffs[0].Field)
+		assert.Equal(t, "[app_read, app_write]", result.Diffs[0].Expected)
+		assert.Equal(t, "[app_read]", result.Diffs[0].Actual)
+	})
+
+	t.Run("no drift detected", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
+			return drift.NewResult("grant", "test-user"), nil
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.DatabaseGrantSpec{
+			UserRef:  &dbopsv1alpha1.UserReference{Name: "test-user"},
+			Postgres: &dbopsv1alpha1.PostgresGrantConfig{Roles: []string{"app_read"}},
+		}
+
+		result, err := handler.DetectDrift(context.Background(), spec, "default", false)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.HasDrift())
+		assert.Empty(t, result.Diffs)
+	})
+
+	t.Run("repository error", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
+			return nil, errors.New("connection refused")
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.DatabaseGrantSpec{
+			UserRef:  &dbopsv1alpha1.UserReference{Name: "test-user"},
+			Postgres: &dbopsv1alpha1.PostgresGrantConfig{Roles: []string{"app_read"}},
+		}
+
+		result, err := handler.DetectDrift(context.Background(), spec, "default", false)
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "detect drift: connection refused")
+	})
+}
+
+func TestHandler_CorrectDrift(t *testing.T) {
+	t.Run("successful correction", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+			cr := drift.NewCorrectionResult("test-user")
+			cr.AddCorrected(drift.Diff{
+				Field:    "roles",
+				Expected: "[app_read, app_write]",
+				Actual:   "[app_read]",
+			})
+			return cr, nil
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.DatabaseGrantSpec{
+			UserRef:  &dbopsv1alpha1.UserReference{Name: "test-user"},
+			Postgres: &dbopsv1alpha1.PostgresGrantConfig{Roles: []string{"app_read"}},
+		}
+
+		driftResult := drift.NewResult("grant", "test-user")
+		driftResult.AddDiff(drift.Diff{
+			Field:    "roles",
+			Expected: "[app_read, app_write]",
+			Actual:   "[app_read]",
+		})
+
+		result, err := handler.CorrectDrift(context.Background(), spec, "default", driftResult, false)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.HasCorrections())
+		assert.Len(t, result.Corrected, 1)
+		assert.Equal(t, "roles", result.Corrected[0].Diff.Field)
+	})
+
+	t.Run("repository error", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+			return nil, errors.New("permission denied")
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.DatabaseGrantSpec{
+			UserRef:  &dbopsv1alpha1.UserReference{Name: "test-user"},
+			Postgres: &dbopsv1alpha1.PostgresGrantConfig{Roles: []string{"app_read"}},
+		}
+
+		driftResult := drift.NewResult("grant", "test-user")
+		driftResult.AddDiff(drift.Diff{
+			Field:    "roles",
+			Expected: "[app_read, app_write]",
+			Actual:   "[app_read]",
+		})
+
+		result, err := handler.CorrectDrift(context.Background(), spec, "default", driftResult, false)
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "correct drift: permission denied")
+	})
+
+	t.Run("correction with results", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+			cr := drift.NewCorrectionResult("test-user")
+			cr.AddCorrected(drift.Diff{
+				Field:    "roles",
+				Expected: "[app_read, app_write]",
+				Actual:   "[app_read]",
+			})
+			cr.AddSkipped(drift.Diff{
+				Field:       "privileges.public.users",
+				Expected:    "[SELECT, INSERT, DELETE]",
+				Actual:      "[SELECT, INSERT]",
+				Destructive: true,
+			}, "destructive change not allowed")
+			cr.AddFailed(drift.Diff{
+				Field:    "privileges.public.orders",
+				Expected: "[SELECT]",
+				Actual:   "[]",
+			}, errors.New("relation does not exist"))
+			return cr, nil
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.DatabaseGrantSpec{
+			UserRef:  &dbopsv1alpha1.UserReference{Name: "test-user"},
+			Postgres: &dbopsv1alpha1.PostgresGrantConfig{Roles: []string{"app_read"}},
+		}
+
+		driftResult := drift.NewResult("grant", "test-user")
+		driftResult.AddDiff(drift.Diff{Field: "roles", Expected: "[app_read, app_write]", Actual: "[app_read]"})
+		driftResult.AddDiff(drift.Diff{Field: "privileges.public.users", Expected: "[SELECT, INSERT, DELETE]", Actual: "[SELECT, INSERT]", Destructive: true})
+		driftResult.AddDiff(drift.Diff{Field: "privileges.public.orders", Expected: "[SELECT]", Actual: "[]"})
+
+		result, err := handler.CorrectDrift(context.Background(), spec, "default", driftResult, false)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.HasCorrections())
+		assert.True(t, result.HasFailures())
+		assert.Len(t, result.Corrected, 1)
+		assert.Len(t, result.Skipped, 1)
+		assert.Len(t, result.Failed, 1)
+		assert.Equal(t, "roles", result.Corrected[0].Diff.Field)
+		assert.Equal(t, "privileges.public.users", result.Skipped[0].Diff.Field)
+		assert.Equal(t, "destructive change not allowed", result.Skipped[0].Reason)
+		assert.Equal(t, "privileges.public.orders", result.Failed[0].Diff.Field)
+		assert.EqualError(t, result.Failed[0].Error, "relation does not exist")
+	})
 }

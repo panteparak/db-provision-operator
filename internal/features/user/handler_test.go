@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/service/drift"
 )
 
 func TestHandler_Create(t *testing.T) {
@@ -781,4 +782,210 @@ func TestHandler_GetOwnedObjects(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHandler_DetectDrift(t *testing.T) {
+	t.Run("successful drift detection", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
+			result := drift.NewResult("user", spec.Username)
+			result.AddDiff(drift.Diff{
+				Field:    "connectionLimit",
+				Expected: "10",
+				Actual:   "5",
+			})
+			return result, nil
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.DatabaseUserSpec{
+			Username:    "testuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "test-instance"},
+		}
+
+		result, err := handler.DetectDrift(context.Background(), spec, "default", false)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.HasDrift())
+		assert.Len(t, result.Diffs, 1)
+		assert.Equal(t, "connectionLimit", result.Diffs[0].Field)
+		assert.Equal(t, "10", result.Diffs[0].Expected)
+		assert.Equal(t, "5", result.Diffs[0].Actual)
+	})
+
+	t.Run("no drift detected", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
+			return drift.NewResult("user", spec.Username), nil
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.DatabaseUserSpec{
+			Username:    "testuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "test-instance"},
+		}
+
+		result, err := handler.DetectDrift(context.Background(), spec, "default", false)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.HasDrift())
+		assert.Empty(t, result.Diffs)
+	})
+
+	t.Run("repository error", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
+			return nil, errors.New("connection refused")
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.DatabaseUserSpec{
+			Username:    "testuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "test-instance"},
+		}
+
+		result, err := handler.DetectDrift(context.Background(), spec, "default", false)
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "detect drift: connection refused")
+	})
+}
+
+func TestHandler_CorrectDrift(t *testing.T) {
+	t.Run("successful correction", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+			cr := drift.NewCorrectionResult(spec.Username)
+			cr.AddCorrected(drift.Diff{
+				Field:    "connectionLimit",
+				Expected: "10",
+				Actual:   "5",
+			})
+			return cr, nil
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.DatabaseUserSpec{
+			Username:    "testuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "test-instance"},
+		}
+
+		driftResult := drift.NewResult("user", "testuser")
+		driftResult.AddDiff(drift.Diff{
+			Field:    "connectionLimit",
+			Expected: "10",
+			Actual:   "5",
+		})
+
+		result, err := handler.CorrectDrift(context.Background(), spec, "default", driftResult, false)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.HasCorrections())
+		assert.Len(t, result.Corrected, 1)
+		assert.Equal(t, "connectionLimit", result.Corrected[0].Diff.Field)
+	})
+
+	t.Run("repository error", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+			return nil, errors.New("permission denied")
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.DatabaseUserSpec{
+			Username:    "testuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "test-instance"},
+		}
+
+		driftResult := drift.NewResult("user", "testuser")
+		driftResult.AddDiff(drift.Diff{
+			Field:    "connectionLimit",
+			Expected: "10",
+			Actual:   "5",
+		})
+
+		result, err := handler.CorrectDrift(context.Background(), spec, "default", driftResult, false)
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "correct drift: permission denied")
+	})
+
+	t.Run("correction with results", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+			cr := drift.NewCorrectionResult(spec.Username)
+			cr.AddCorrected(drift.Diff{
+				Field:    "connectionLimit",
+				Expected: "10",
+				Actual:   "5",
+			})
+			cr.AddSkipped(drift.Diff{
+				Field:       "superuser",
+				Expected:    "false",
+				Actual:      "true",
+				Destructive: true,
+			}, "destructive change not allowed")
+			cr.AddFailed(drift.Diff{
+				Field:    "validUntil",
+				Expected: "2026-12-31",
+				Actual:   "2025-12-31",
+			}, errors.New("syntax error"))
+			return cr, nil
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.DatabaseUserSpec{
+			Username:    "testuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "test-instance"},
+		}
+
+		driftResult := drift.NewResult("user", "testuser")
+		driftResult.AddDiff(drift.Diff{Field: "connectionLimit", Expected: "10", Actual: "5"})
+		driftResult.AddDiff(drift.Diff{Field: "superuser", Expected: "false", Actual: "true", Destructive: true})
+		driftResult.AddDiff(drift.Diff{Field: "validUntil", Expected: "2026-12-31", Actual: "2025-12-31"})
+
+		result, err := handler.CorrectDrift(context.Background(), spec, "default", driftResult, false)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.HasCorrections())
+		assert.True(t, result.HasFailures())
+		assert.Len(t, result.Corrected, 1)
+		assert.Len(t, result.Skipped, 1)
+		assert.Len(t, result.Failed, 1)
+		assert.Equal(t, "connectionLimit", result.Corrected[0].Diff.Field)
+		assert.Equal(t, "superuser", result.Skipped[0].Diff.Field)
+		assert.Equal(t, "destructive change not allowed", result.Skipped[0].Reason)
+		assert.Equal(t, "validUntil", result.Failed[0].Diff.Field)
+		assert.EqualError(t, result.Failed[0].Error, "syntax error")
+	})
 }

@@ -562,4 +562,116 @@ func TestHandler_DetectDrift(t *testing.T) {
 		assert.True(t, result.HasDrift())
 		assert.Len(t, result.Diffs, 1)
 	})
+
+	t.Run("no drift detected", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseRoleSpec, allowDestructive bool) (*drift.Result, error) {
+			return drift.NewResult("clusterrole", spec.RoleName), nil
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.ClusterDatabaseRoleSpec{
+			RoleName: "testrole",
+			ClusterInstanceRef: dbopsv1alpha1.ClusterInstanceReference{
+				Name: "test-cluster-instance",
+			},
+		}
+
+		result, err := handler.DetectDrift(context.Background(), spec, false)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.HasDrift())
+		assert.Empty(t, result.Diffs)
+	})
+
+	t.Run("repository error", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseRoleSpec, allowDestructive bool) (*drift.Result, error) {
+			return nil, errors.New("connection refused")
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.ClusterDatabaseRoleSpec{
+			RoleName: "testrole",
+			ClusterInstanceRef: dbopsv1alpha1.ClusterInstanceReference{
+				Name: "test-cluster-instance",
+			},
+		}
+
+		result, err := handler.DetectDrift(context.Background(), spec, false)
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "detect drift: connection refused")
+	})
+}
+
+func TestHandler_CorrectDrift(t *testing.T) {
+	t.Run("successful correction", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseRoleSpec, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+			result := drift.NewCorrectionResult(spec.RoleName)
+			result.AddCorrected(drift.Diff{Field: "canLogin", Expected: "true", Actual: "false"})
+			return result, nil
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.ClusterDatabaseRoleSpec{
+			RoleName: "testrole",
+			ClusterInstanceRef: dbopsv1alpha1.ClusterInstanceReference{
+				Name: "test-cluster-instance",
+			},
+		}
+
+		driftResult := drift.NewResult("clusterrole", spec.RoleName)
+		driftResult.AddDiff(drift.Diff{Field: "canLogin", Expected: "true", Actual: "false"})
+
+		result, err := handler.CorrectDrift(context.Background(), spec, driftResult, false)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Len(t, result.Corrected, 1)
+		assert.True(t, result.HasCorrections())
+	})
+
+	t.Run("repository error", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseRoleSpec, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+			return nil, errors.New("correction failed")
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.ClusterDatabaseRoleSpec{
+			RoleName: "testrole",
+			ClusterInstanceRef: dbopsv1alpha1.ClusterInstanceReference{
+				Name: "test-cluster-instance",
+			},
+		}
+
+		driftResult := drift.NewResult("clusterrole", spec.RoleName)
+		driftResult.AddDiff(drift.Diff{Field: "canLogin", Expected: "true", Actual: "false"})
+
+		result, err := handler.CorrectDrift(context.Background(), spec, driftResult, false)
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "correct drift: correction failed")
+	})
 }

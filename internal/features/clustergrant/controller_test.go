@@ -539,3 +539,480 @@ func TestController_Reconcile_WaitingForInstanceReady(t *testing.T) {
 	assert.Contains(t, updatedGrant.Status.Message, "to be ready")
 	assert.False(t, mockRepo.WasCalled("Apply"))
 }
+
+// --- Drift detection tests ---
+
+func TestController_Reconcile_DriftDetected_DetectMode(t *testing.T) {
+	scheme := newTestScheme()
+	grant := newTestClusterGrant("testgrant")
+	instance := newTestClusterInstance("test-cluster-instance")
+
+	clientBuilder := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(grant, instance).
+		WithStatusSubresource(grant, instance)
+
+	mockRepo := NewMockRepository()
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*dbopsv1alpha1.ClusterDatabaseInstance, error) {
+		return instance, nil
+	}
+	mockRepo.ResolveTargetFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*TargetInfo, error) {
+		return &TargetInfo{Type: "user", Name: "test-user", Namespace: "default", DatabaseName: "test-user"}, nil
+	}
+	mockRepo.ApplyFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*Result, error) {
+		return &Result{Applied: true, Roles: []string{"app_read"}, DirectGrants: 1, Message: "applied"}, nil
+	}
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec, allowDestructive bool) (*drift.Result, error) {
+		r := drift.NewResult("grant", "testgrant")
+		r.AddDiff(drift.Diff{
+			Field:    "roles.missing",
+			Expected: "editor",
+			Actual:   "",
+		})
+		return r, nil
+	}
+
+	controller := newTestController(clientBuilder, mockRepo)
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testgrant"},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, ctrl.Result{}, result)
+
+	var updatedGrant dbopsv1alpha1.ClusterDatabaseGrant
+	err = controller.Get(context.Background(), types.NamespacedName{Name: "testgrant"}, &updatedGrant)
+	require.NoError(t, err)
+
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedGrant.Status.Phase)
+	require.NotNil(t, updatedGrant.Status.Drift)
+	assert.True(t, updatedGrant.Status.Drift.Detected)
+	require.Len(t, updatedGrant.Status.Drift.Diffs, 1)
+	assert.Equal(t, "roles.missing", updatedGrant.Status.Drift.Diffs[0].Field)
+	assert.Equal(t, "editor", updatedGrant.Status.Drift.Diffs[0].Expected)
+	assert.Equal(t, "", updatedGrant.Status.Drift.Diffs[0].Actual)
+
+	// In detect mode (default), CorrectDrift should NOT be called
+	assert.False(t, mockRepo.WasCalled("CorrectDrift"))
+}
+
+func TestController_Reconcile_DriftDetected_CorrectMode(t *testing.T) {
+	scheme := newTestScheme()
+	grant := newTestClusterGrant("testgrant")
+	grant.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{Mode: dbopsv1alpha1.DriftModeCorrect}
+	instance := newTestClusterInstance("test-cluster-instance")
+
+	clientBuilder := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(grant, instance).
+		WithStatusSubresource(grant, instance)
+
+	rolesDiff := drift.Diff{
+		Field:    "roles.missing",
+		Expected: "editor",
+		Actual:   "",
+	}
+
+	mockRepo := NewMockRepository()
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*dbopsv1alpha1.ClusterDatabaseInstance, error) {
+		return instance, nil
+	}
+	mockRepo.ResolveTargetFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*TargetInfo, error) {
+		return &TargetInfo{Type: "user", Name: "test-user", Namespace: "default", DatabaseName: "test-user"}, nil
+	}
+	mockRepo.ApplyFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*Result, error) {
+		return &Result{Applied: true, Roles: []string{"app_read"}, DirectGrants: 1, Message: "applied"}, nil
+	}
+	// DetectDrift is called twice in correct mode (once for detection, once inside correctDrift)
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec, allowDestructive bool) (*drift.Result, error) {
+		r := drift.NewResult("grant", "testgrant")
+		r.AddDiff(rolesDiff)
+		return r, nil
+	}
+	mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+		cr := drift.NewCorrectionResult("testgrant")
+		cr.AddCorrected(rolesDiff)
+		return cr, nil
+	}
+
+	controller := newTestController(clientBuilder, mockRepo)
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testgrant"},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, ctrl.Result{}, result)
+
+	// Verify CorrectDrift was called
+	assert.True(t, mockRepo.WasCalled("CorrectDrift"))
+
+	// DetectDrift called twice (once for detection, once inside correctDrift)
+	assert.Equal(t, 2, mockRepo.CallCount("DetectDrift"))
+
+	// After successful correction, drift should be cleared
+	var updatedGrant dbopsv1alpha1.ClusterDatabaseGrant
+	err = controller.Get(context.Background(), types.NamespacedName{Name: "testgrant"}, &updatedGrant)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedGrant.Status.Phase)
+	require.NotNil(t, updatedGrant.Status.Drift)
+	assert.False(t, updatedGrant.Status.Drift.Detected)
+}
+
+func TestController_Reconcile_DriftCorrection_PartialFail(t *testing.T) {
+	scheme := newTestScheme()
+	grant := newTestClusterGrant("testgrant")
+	grant.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{Mode: dbopsv1alpha1.DriftModeCorrect}
+	instance := newTestClusterInstance("test-cluster-instance")
+
+	clientBuilder := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(grant, instance).
+		WithStatusSubresource(grant, instance)
+
+	rolesDiff := drift.Diff{
+		Field:    "roles.missing",
+		Expected: "editor",
+		Actual:   "",
+	}
+	privilegeDiff := drift.Diff{
+		Field:    "privileges.select",
+		Expected: "GRANT",
+		Actual:   "REVOKE",
+	}
+
+	mockRepo := NewMockRepository()
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*dbopsv1alpha1.ClusterDatabaseInstance, error) {
+		return instance, nil
+	}
+	mockRepo.ResolveTargetFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*TargetInfo, error) {
+		return &TargetInfo{Type: "user", Name: "test-user", Namespace: "default", DatabaseName: "test-user"}, nil
+	}
+	mockRepo.ApplyFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*Result, error) {
+		return &Result{Applied: true, Roles: []string{"app_read"}, DirectGrants: 1, Message: "applied"}, nil
+	}
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec, allowDestructive bool) (*drift.Result, error) {
+		r := drift.NewResult("grant", "testgrant")
+		r.AddDiff(rolesDiff)
+		r.AddDiff(privilegeDiff)
+		return r, nil
+	}
+	// CorrectDrift: one succeeds, one fails
+	mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+		cr := drift.NewCorrectionResult("testgrant")
+		cr.AddCorrected(rolesDiff)
+		cr.AddFailed(privilegeDiff, fmt.Errorf("privilege correction failed"))
+		return cr, nil
+	}
+
+	controller := newTestController(clientBuilder, mockRepo)
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testgrant"},
+	})
+
+	// Reconcile should still succeed (drift correction failures are non-fatal)
+	require.NoError(t, err)
+	assert.NotEqual(t, ctrl.Result{}, result)
+
+	// Verify CorrectDrift was called
+	assert.True(t, mockRepo.WasCalled("CorrectDrift"))
+
+	// Still ends up Ready
+	var updatedGrant dbopsv1alpha1.ClusterDatabaseGrant
+	err = controller.Get(context.Background(), types.NamespacedName{Name: "testgrant"}, &updatedGrant)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedGrant.Status.Phase)
+}
+
+func TestController_Reconcile_DriftCorrection_AllFailed(t *testing.T) {
+	scheme := newTestScheme()
+	grant := newTestClusterGrant("testgrant")
+	grant.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{Mode: dbopsv1alpha1.DriftModeCorrect}
+	instance := newTestClusterInstance("test-cluster-instance")
+
+	clientBuilder := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(grant, instance).
+		WithStatusSubresource(grant, instance)
+
+	rolesDiff := drift.Diff{
+		Field:    "roles.missing",
+		Expected: "editor",
+		Actual:   "",
+	}
+
+	mockRepo := NewMockRepository()
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*dbopsv1alpha1.ClusterDatabaseInstance, error) {
+		return instance, nil
+	}
+	mockRepo.ResolveTargetFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*TargetInfo, error) {
+		return &TargetInfo{Type: "user", Name: "test-user", Namespace: "default", DatabaseName: "test-user"}, nil
+	}
+	mockRepo.ApplyFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*Result, error) {
+		return &Result{Applied: true, Roles: []string{"app_read"}, DirectGrants: 1, Message: "applied"}, nil
+	}
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec, allowDestructive bool) (*drift.Result, error) {
+		r := drift.NewResult("grant", "testgrant")
+		r.AddDiff(rolesDiff)
+		return r, nil
+	}
+	// CorrectDrift returns error (all failed)
+	mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+		return nil, fmt.Errorf("permission denied")
+	}
+
+	controller := newTestController(clientBuilder, mockRepo)
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testgrant"},
+	})
+
+	// Reconcile itself should still succeed (drift correction errors are non-fatal)
+	require.NoError(t, err)
+	assert.NotEqual(t, ctrl.Result{}, result)
+
+	// CorrectDrift should have been called
+	assert.True(t, mockRepo.WasCalled("CorrectDrift"))
+
+	// Grant should still be Ready with drift status showing detected
+	var updatedGrant dbopsv1alpha1.ClusterDatabaseGrant
+	err = controller.Get(context.Background(), types.NamespacedName{Name: "testgrant"}, &updatedGrant)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedGrant.Status.Phase)
+	require.NotNil(t, updatedGrant.Status.Drift)
+	assert.True(t, updatedGrant.Status.Drift.Detected)
+}
+
+func TestController_Reconcile_DriftDetected_IgnoreMode(t *testing.T) {
+	scheme := newTestScheme()
+	grant := newTestClusterGrant("testgrant")
+	grant.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{Mode: dbopsv1alpha1.DriftModeIgnore}
+	instance := newTestClusterInstance("test-cluster-instance")
+
+	clientBuilder := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(grant, instance).
+		WithStatusSubresource(grant, instance)
+
+	detectDriftCalled := false
+
+	mockRepo := NewMockRepository()
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*dbopsv1alpha1.ClusterDatabaseInstance, error) {
+		return instance, nil
+	}
+	mockRepo.ResolveTargetFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*TargetInfo, error) {
+		return &TargetInfo{Type: "user", Name: "test-user", Namespace: "default", DatabaseName: "test-user"}, nil
+	}
+	mockRepo.ApplyFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*Result, error) {
+		return &Result{Applied: true, Roles: []string{"app_read"}, DirectGrants: 1, Message: "applied"}, nil
+	}
+	// DetectDrift should NOT be called when mode is ignore, but set it up just in case
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec, allowDestructive bool) (*drift.Result, error) {
+		detectDriftCalled = true
+		r := drift.NewResult("grant", "testgrant")
+		r.AddDiff(drift.Diff{Field: "roles.missing", Expected: "editor", Actual: ""})
+		return r, nil
+	}
+
+	controller := newTestController(clientBuilder, mockRepo)
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testgrant"},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, ctrl.Result{}, result)
+
+	// In ignore mode, DetectDrift should NOT be called
+	assert.False(t, detectDriftCalled, "DetectDrift should not be called in ignore mode")
+
+	// No drift status should be set
+	var updatedGrant dbopsv1alpha1.ClusterDatabaseGrant
+	err = controller.Get(context.Background(), types.NamespacedName{Name: "testgrant"}, &updatedGrant)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedGrant.Status.Phase)
+	assert.Nil(t, updatedGrant.Status.Drift)
+
+	// CorrectDrift should NOT be called
+	assert.False(t, mockRepo.WasCalled("CorrectDrift"))
+}
+
+func TestController_Reconcile_DriftDetection_Error(t *testing.T) {
+	scheme := newTestScheme()
+	grant := newTestClusterGrant("testgrant")
+	instance := newTestClusterInstance("test-cluster-instance")
+
+	clientBuilder := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(grant, instance).
+		WithStatusSubresource(grant, instance)
+
+	mockRepo := NewMockRepository()
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*dbopsv1alpha1.ClusterDatabaseInstance, error) {
+		return instance, nil
+	}
+	mockRepo.ResolveTargetFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*TargetInfo, error) {
+		return &TargetInfo{Type: "user", Name: "test-user", Namespace: "default", DatabaseName: "test-user"}, nil
+	}
+	mockRepo.ApplyFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*Result, error) {
+		return &Result{Applied: true, Roles: []string{"app_read"}, DirectGrants: 1, Message: "applied"}, nil
+	}
+	// DetectDrift returns an error
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec, allowDestructive bool) (*drift.Result, error) {
+		return nil, fmt.Errorf("unable to query database state")
+	}
+
+	controller := newTestController(clientBuilder, mockRepo)
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testgrant"},
+	})
+
+	// Drift detection errors are non-fatal; reconcile should still succeed
+	require.NoError(t, err)
+	assert.NotEqual(t, ctrl.Result{}, result)
+
+	// Grant should still be Ready
+	var updatedGrant dbopsv1alpha1.ClusterDatabaseGrant
+	err = controller.Get(context.Background(), types.NamespacedName{Name: "testgrant"}, &updatedGrant)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedGrant.Status.Phase)
+
+	// No drift status set because detection failed
+	assert.Nil(t, updatedGrant.Status.Drift)
+}
+
+func TestController_Reconcile_DriftCorrection_Destructive(t *testing.T) {
+	scheme := newTestScheme()
+	grant := newTestClusterGrant("testgrant")
+	grant.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{Mode: dbopsv1alpha1.DriftModeCorrect}
+	grant.Annotations = map[string]string{
+		dbopsv1alpha1.AnnotationAllowDestructiveDrift: "true",
+	}
+	instance := newTestClusterInstance("test-cluster-instance")
+
+	clientBuilder := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(grant, instance).
+		WithStatusSubresource(grant, instance)
+
+	destructiveDiff := drift.Diff{
+		Field:       "roles.extra",
+		Expected:    "",
+		Actual:      "admin",
+		Destructive: true,
+	}
+
+	mockRepo := NewMockRepository()
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*dbopsv1alpha1.ClusterDatabaseInstance, error) {
+		return instance, nil
+	}
+	mockRepo.ResolveTargetFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*TargetInfo, error) {
+		return &TargetInfo{Type: "user", Name: "test-user", Namespace: "default", DatabaseName: "test-user"}, nil
+	}
+	mockRepo.ApplyFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*Result, error) {
+		return &Result{Applied: true, Roles: []string{"app_read"}, DirectGrants: 1, Message: "applied"}, nil
+	}
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec, allowDestructive bool) (*drift.Result, error) {
+		// Verify that allowDestructive is true when annotation is set
+		assert.True(t, allowDestructive, "allowDestructive should be true when annotation is set")
+		r := drift.NewResult("grant", "testgrant")
+		r.AddDiff(destructiveDiff)
+		return r, nil
+	}
+	mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+		assert.True(t, allowDestructive, "allowDestructive should be passed through to CorrectDrift")
+		cr := drift.NewCorrectionResult("testgrant")
+		cr.AddCorrected(destructiveDiff)
+		return cr, nil
+	}
+
+	controller := newTestController(clientBuilder, mockRepo)
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testgrant"},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, ctrl.Result{}, result)
+
+	// Verify CorrectDrift was called
+	assert.True(t, mockRepo.WasCalled("CorrectDrift"))
+
+	// Verify Ready state
+	var updatedGrant dbopsv1alpha1.ClusterDatabaseGrant
+	err = controller.Get(context.Background(), types.NamespacedName{Name: "testgrant"}, &updatedGrant)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedGrant.Status.Phase)
+}
+
+func TestController_Reconcile_DriftCorrection_NoDestructive(t *testing.T) {
+	scheme := newTestScheme()
+	grant := newTestClusterGrant("testgrant")
+	grant.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{Mode: dbopsv1alpha1.DriftModeCorrect}
+	// NO destructive annotation set (default behavior)
+	instance := newTestClusterInstance("test-cluster-instance")
+
+	clientBuilder := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(grant, instance).
+		WithStatusSubresource(grant, instance)
+
+	destructiveDiff := drift.Diff{
+		Field:       "roles.extra",
+		Expected:    "",
+		Actual:      "admin",
+		Destructive: true,
+	}
+
+	mockRepo := NewMockRepository()
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*dbopsv1alpha1.ClusterDatabaseInstance, error) {
+		return instance, nil
+	}
+	mockRepo.ResolveTargetFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*TargetInfo, error) {
+		return &TargetInfo{Type: "user", Name: "test-user", Namespace: "default", DatabaseName: "test-user"}, nil
+	}
+	mockRepo.ApplyFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec) (*Result, error) {
+		return &Result{Applied: true, Roles: []string{"app_read"}, DirectGrants: 1, Message: "applied"}, nil
+	}
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec, allowDestructive bool) (*drift.Result, error) {
+		// Verify that allowDestructive is false (no annotation)
+		assert.False(t, allowDestructive, "allowDestructive should be false when annotation is not set")
+		r := drift.NewResult("grant", "testgrant")
+		r.AddDiff(destructiveDiff)
+		return r, nil
+	}
+	// CorrectDrift skips the destructive diff
+	mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+		assert.False(t, allowDestructive, "allowDestructive should be false")
+		cr := drift.NewCorrectionResult("testgrant")
+		cr.AddSkipped(destructiveDiff, "destructive corrections not allowed")
+		return cr, nil
+	}
+
+	controller := newTestController(clientBuilder, mockRepo)
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testgrant"},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, ctrl.Result{}, result)
+
+	// Verify CorrectDrift was called (it attempts correction but skips destructive ones)
+	assert.True(t, mockRepo.WasCalled("CorrectDrift"))
+
+	// Verify the grant is still Ready
+	var updatedGrant dbopsv1alpha1.ClusterDatabaseGrant
+	err = controller.Get(context.Background(), types.NamespacedName{Name: "testgrant"}, &updatedGrant)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedGrant.Status.Phase)
+
+	// Drift status should still show detected drift since correction was skipped
+	require.NotNil(t, updatedGrant.Status.Drift)
+	assert.True(t, updatedGrant.Status.Drift.Detected)
+	require.Len(t, updatedGrant.Status.Drift.Diffs, 1)
+	assert.True(t, updatedGrant.Status.Drift.Diffs[0].Destructive)
+}

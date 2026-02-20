@@ -610,3 +610,228 @@ func TestController_Reconcile_DriftDetection_Error(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedRole.Status.Phase)
 }
+
+func TestController_Reconcile_DriftCorrection_PartialFail(t *testing.T) {
+	scheme := newTestScheme()
+	role := newTestClusterRole("testrole")
+	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
+		Mode: dbopsv1alpha1.DriftModeCorrect,
+	}
+
+	clientBuilder := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(role).
+		WithStatusSubresource(role)
+
+	loginDiff := drift.Diff{
+		Field:    "login",
+		Expected: "true",
+		Actual:   "false",
+	}
+	superuserDiff := drift.Diff{
+		Field:    "superuser",
+		Expected: "false",
+		Actual:   "true",
+	}
+
+	driftResult := drift.NewResult("clusterrole", "testrole")
+	driftResult.AddDiff(loginDiff)
+	driftResult.AddDiff(superuserDiff)
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, roleName string, spec *dbopsv1alpha1.ClusterDatabaseRoleSpec) (bool, error) {
+		return true, nil
+	}
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseRoleSpec, allowDestructive bool) (*drift.Result, error) {
+		return driftResult, nil
+	}
+	mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseRoleSpec, dr *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+		cr := drift.NewCorrectionResult(spec.RoleName)
+		cr.AddCorrected(loginDiff)
+		cr.AddFailed(superuserDiff, fmt.Errorf("permission denied"))
+		return cr, nil
+	}
+
+	controller := newTestController(clientBuilder, mockRepo)
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testrole"},
+	})
+
+	// Partial failure does not fail the reconcile
+	require.NoError(t, err)
+	assert.True(t, mockRepo.WasCalled("CorrectDrift"))
+
+	var updatedRole dbopsv1alpha1.ClusterDatabaseRole
+	err = controller.Get(context.Background(), types.NamespacedName{Name: "testrole"}, &updatedRole)
+	require.NoError(t, err)
+	// Phase is still Ready because drift correction failures do not fail reconcile
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedRole.Status.Phase)
+}
+
+func TestController_Reconcile_DriftCorrection_AllFailed(t *testing.T) {
+	scheme := newTestScheme()
+	role := newTestClusterRole("testrole")
+	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
+		Mode: dbopsv1alpha1.DriftModeCorrect,
+	}
+
+	clientBuilder := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(role).
+		WithStatusSubresource(role)
+
+	loginDiff := drift.Diff{
+		Field:    "login",
+		Expected: "true",
+		Actual:   "false",
+	}
+
+	driftResult := drift.NewResult("clusterrole", "testrole")
+	driftResult.AddDiff(loginDiff)
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, roleName string, spec *dbopsv1alpha1.ClusterDatabaseRoleSpec) (bool, error) {
+		return true, nil
+	}
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseRoleSpec, allowDestructive bool) (*drift.Result, error) {
+		return driftResult, nil
+	}
+	mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseRoleSpec, dr *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+		cr := drift.NewCorrectionResult(spec.RoleName)
+		cr.AddFailed(loginDiff, fmt.Errorf("database connection lost"))
+		return cr, nil
+	}
+
+	controller := newTestController(clientBuilder, mockRepo)
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testrole"},
+	})
+
+	// All corrections failed but reconcile still succeeds (drift errors are non-fatal)
+	require.NoError(t, err)
+	assert.True(t, mockRepo.WasCalled("CorrectDrift"))
+
+	var updatedRole dbopsv1alpha1.ClusterDatabaseRole
+	err = controller.Get(context.Background(), types.NamespacedName{Name: "testrole"}, &updatedRole)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedRole.Status.Phase)
+	// Drift status should still show detected since corrections failed (not cleared)
+	assert.NotNil(t, updatedRole.Status.Drift)
+	assert.True(t, updatedRole.Status.Drift.Detected)
+}
+
+func TestController_Reconcile_DriftCorrection_Destructive(t *testing.T) {
+	scheme := newTestScheme()
+	role := newTestClusterRole("testrole")
+	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
+		Mode: dbopsv1alpha1.DriftModeCorrect,
+	}
+	role.Annotations = map[string]string{
+		dbopsv1alpha1.AnnotationAllowDestructiveDrift: "true",
+	}
+
+	clientBuilder := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(role).
+		WithStatusSubresource(role)
+
+	destructiveDiff := drift.Diff{
+		Field:       "superuser",
+		Expected:    "true",
+		Actual:      "false",
+		Destructive: true,
+	}
+
+	driftResult := drift.NewResult("clusterrole", "testrole")
+	driftResult.AddDiff(destructiveDiff)
+
+	var capturedAllowDestructive bool
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, roleName string, spec *dbopsv1alpha1.ClusterDatabaseRoleSpec) (bool, error) {
+		return true, nil
+	}
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseRoleSpec, allowDestructive bool) (*drift.Result, error) {
+		capturedAllowDestructive = allowDestructive
+		return driftResult, nil
+	}
+	mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseRoleSpec, dr *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+		cr := drift.NewCorrectionResult(spec.RoleName)
+		if allowDestructive {
+			cr.AddCorrected(destructiveDiff)
+		} else {
+			cr.AddSkipped(destructiveDiff, "destructive correction not allowed")
+		}
+		return cr, nil
+	}
+
+	controller := newTestController(clientBuilder, mockRepo)
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testrole"},
+	})
+	require.NoError(t, err)
+
+	// allowDestructive should be true because of the annotation
+	assert.True(t, capturedAllowDestructive)
+	assert.True(t, mockRepo.WasCalled("CorrectDrift"))
+}
+
+func TestController_Reconcile_DriftCorrection_NoDestructive(t *testing.T) {
+	scheme := newTestScheme()
+	role := newTestClusterRole("testrole")
+	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
+		Mode: dbopsv1alpha1.DriftModeCorrect,
+	}
+	// No allow-destructive-drift annotation
+
+	clientBuilder := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(role).
+		WithStatusSubresource(role)
+
+	destructiveDiff := drift.Diff{
+		Field:       "superuser",
+		Expected:    "true",
+		Actual:      "false",
+		Destructive: true,
+	}
+
+	driftResult := drift.NewResult("clusterrole", "testrole")
+	driftResult.AddDiff(destructiveDiff)
+
+	var capturedAllowDestructive bool
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, roleName string, spec *dbopsv1alpha1.ClusterDatabaseRoleSpec) (bool, error) {
+		return true, nil
+	}
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseRoleSpec, allowDestructive bool) (*drift.Result, error) {
+		capturedAllowDestructive = allowDestructive
+		return driftResult, nil
+	}
+	mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseRoleSpec, dr *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+		cr := drift.NewCorrectionResult(spec.RoleName)
+		// Without destructive allowed, skips destructive changes
+		cr.AddSkipped(destructiveDiff, "destructive correction not allowed")
+		return cr, nil
+	}
+
+	controller := newTestController(clientBuilder, mockRepo)
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testrole"},
+	})
+	require.NoError(t, err)
+
+	// allowDestructive should be false (no annotation)
+	assert.False(t, capturedAllowDestructive)
+	assert.True(t, mockRepo.WasCalled("CorrectDrift"))
+
+	var updatedRole dbopsv1alpha1.ClusterDatabaseRole
+	err = controller.Get(context.Background(), types.NamespacedName{Name: "testrole"}, &updatedRole)
+	require.NoError(t, err)
+	// Drift should still be detected since the correction was skipped
+	assert.NotNil(t, updatedRole.Status.Drift)
+	assert.True(t, updatedRole.Status.Drift.Detected)
+}

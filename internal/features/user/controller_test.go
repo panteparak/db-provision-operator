@@ -34,6 +34,7 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/secret"
+	"github.com/db-provision-operator/internal/service/drift"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -1223,4 +1224,583 @@ func TestController_Reconcile_DeletionDeleteError_WithForce(t *testing.T) {
 
 	// Verify Delete WAS called
 	assert.True(t, mockRepo.WasCalled("Delete"))
+}
+
+// --- Drift detection tests ---
+
+func TestController_Reconcile_DriftDetected_DetectMode(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+	// Default drift policy is detect mode (no DriftPolicy set on spec)
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
+		result := drift.NewResult("user", spec.Username)
+		result.AddDiff(drift.Diff{
+			Field:    "connectionLimit",
+			Expected: "10",
+			Actual:   "5",
+		})
+		return result, nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:        client,
+		Scheme:        scheme,
+		Recorder:      record.NewFakeRecorder(10),
+		Handler:       handler,
+		SecretManager: secret.NewManager(client),
+		Logger:        logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+	})
+	require.NoError(t, err)
+
+	// In detect mode (default), drift is logged but CorrectDrift is NOT called
+	assert.False(t, mockRepo.WasCalled("CorrectDrift"))
+
+	var updatedUser dbopsv1alpha1.DatabaseUser
+	err = client.Get(context.Background(), types.NamespacedName{Name: "testuser", Namespace: "default"}, &updatedUser)
+	require.NoError(t, err)
+	assert.NotNil(t, updatedUser.Status.Drift)
+	assert.True(t, updatedUser.Status.Drift.Detected)
+}
+
+func TestController_Reconcile_DriftDetected_CorrectMode(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+	user.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
+		Mode: dbopsv1alpha1.DriftModeCorrect,
+	}
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	driftResult := drift.NewResult("user", "testuser")
+	driftResult.AddDiff(drift.Diff{
+		Field:    "connectionLimit",
+		Expected: "10",
+		Actual:   "5",
+	})
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
+		return driftResult, nil
+	}
+	mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, dr *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+		cr := drift.NewCorrectionResult(spec.Username)
+		cr.AddCorrected(driftResult.Diffs[0])
+		return cr, nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:        client,
+		Scheme:        scheme,
+		Recorder:      record.NewFakeRecorder(10),
+		Handler:       handler,
+		SecretManager: secret.NewManager(client),
+		Logger:        logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+	})
+	require.NoError(t, err)
+
+	// In correct mode, CorrectDrift should be called
+	assert.True(t, mockRepo.WasCalled("CorrectDrift"))
+}
+
+func TestController_Reconcile_DriftCorrection_PartialFail(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+	user.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
+		Mode: dbopsv1alpha1.DriftModeCorrect,
+	}
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	connectionLimitDiff := drift.Diff{
+		Field:    "connectionLimit",
+		Expected: "10",
+		Actual:   "5",
+	}
+	superuserDiff := drift.Diff{
+		Field:    "superuser",
+		Expected: "false",
+		Actual:   "true",
+	}
+
+	driftResult := drift.NewResult("user", "testuser")
+	driftResult.AddDiff(connectionLimitDiff)
+	driftResult.AddDiff(superuserDiff)
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
+		return driftResult, nil
+	}
+	mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, dr *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+		cr := drift.NewCorrectionResult(spec.Username)
+		cr.AddCorrected(connectionLimitDiff)
+		cr.AddFailed(superuserDiff, fmt.Errorf("permission denied"))
+		return cr, nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:        client,
+		Scheme:        scheme,
+		Recorder:      record.NewFakeRecorder(10),
+		Handler:       handler,
+		SecretManager: secret.NewManager(client),
+		Logger:        logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+	})
+
+	// Partial failure does not fail the reconcile
+	require.NoError(t, err)
+	assert.True(t, mockRepo.WasCalled("CorrectDrift"))
+
+	var updatedUser dbopsv1alpha1.DatabaseUser
+	err = client.Get(context.Background(), types.NamespacedName{Name: "testuser", Namespace: "default"}, &updatedUser)
+	require.NoError(t, err)
+	// Phase is still Ready because drift correction failures do not fail reconcile
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedUser.Status.Phase)
+}
+
+func TestController_Reconcile_DriftCorrection_AllFailed(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+	user.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
+		Mode: dbopsv1alpha1.DriftModeCorrect,
+	}
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	connectionLimitDiff := drift.Diff{
+		Field:    "connectionLimit",
+		Expected: "10",
+		Actual:   "5",
+	}
+
+	driftResult := drift.NewResult("user", "testuser")
+	driftResult.AddDiff(connectionLimitDiff)
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
+		return driftResult, nil
+	}
+	mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, dr *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+		cr := drift.NewCorrectionResult(spec.Username)
+		cr.AddFailed(connectionLimitDiff, fmt.Errorf("database connection lost"))
+		return cr, nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:        client,
+		Scheme:        scheme,
+		Recorder:      record.NewFakeRecorder(10),
+		Handler:       handler,
+		SecretManager: secret.NewManager(client),
+		Logger:        logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+	})
+
+	// All corrections failed but reconcile still succeeds (drift errors are non-fatal)
+	require.NoError(t, err)
+	assert.True(t, mockRepo.WasCalled("CorrectDrift"))
+
+	var updatedUser dbopsv1alpha1.DatabaseUser
+	err = client.Get(context.Background(), types.NamespacedName{Name: "testuser", Namespace: "default"}, &updatedUser)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedUser.Status.Phase)
+	// Drift status should still show detected since corrections failed (not cleared)
+	assert.NotNil(t, updatedUser.Status.Drift)
+	assert.True(t, updatedUser.Status.Drift.Detected)
+}
+
+func TestController_Reconcile_DriftDetected_IgnoreMode(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+	user.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
+		Mode: dbopsv1alpha1.DriftModeIgnore,
+	}
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:        client,
+		Scheme:        scheme,
+		Recorder:      record.NewFakeRecorder(10),
+		Handler:       handler,
+		SecretManager: secret.NewManager(client),
+		Logger:        logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+	})
+	require.NoError(t, err)
+
+	// In ignore mode, DetectDrift should NOT be called
+	assert.False(t, mockRepo.WasCalled("DetectDrift"))
+}
+
+func TestController_Reconcile_DriftDetection_Error(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
+		return nil, fmt.Errorf("drift detection failed")
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:        client,
+		Scheme:        scheme,
+		Recorder:      record.NewFakeRecorder(10),
+		Handler:       handler,
+		SecretManager: secret.NewManager(client),
+		Logger:        logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+	})
+
+	// Drift detection error should NOT fail the reconcile
+	require.NoError(t, err)
+
+	var updatedUser dbopsv1alpha1.DatabaseUser
+	err = client.Get(context.Background(), types.NamespacedName{Name: "testuser", Namespace: "default"}, &updatedUser)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedUser.Status.Phase)
+}
+
+func TestController_Reconcile_DriftCorrection_Destructive(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+	user.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
+		Mode: dbopsv1alpha1.DriftModeCorrect,
+	}
+	user.Annotations = map[string]string{
+		dbopsv1alpha1.AnnotationAllowDestructiveDrift: "true",
+	}
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	destructiveDiff := drift.Diff{
+		Field:       "superuser",
+		Expected:    "true",
+		Actual:      "false",
+		Destructive: true,
+	}
+
+	driftResult := drift.NewResult("user", "testuser")
+	driftResult.AddDiff(destructiveDiff)
+
+	var capturedAllowDestructive bool
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
+		capturedAllowDestructive = allowDestructive
+		return driftResult, nil
+	}
+	mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, dr *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+		cr := drift.NewCorrectionResult(spec.Username)
+		if allowDestructive {
+			cr.AddCorrected(destructiveDiff)
+		} else {
+			cr.AddSkipped(destructiveDiff, "destructive correction not allowed")
+		}
+		return cr, nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:        client,
+		Scheme:        scheme,
+		Recorder:      record.NewFakeRecorder(10),
+		Handler:       handler,
+		SecretManager: secret.NewManager(client),
+		Logger:        logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+	})
+	require.NoError(t, err)
+
+	// allowDestructive should be true because of the annotation
+	assert.True(t, capturedAllowDestructive)
+	assert.True(t, mockRepo.WasCalled("CorrectDrift"))
+}
+
+func TestController_Reconcile_DriftCorrection_NoDestructive(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+	user.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
+		Mode: dbopsv1alpha1.DriftModeCorrect,
+	}
+	// No allow-destructive-drift annotation
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	destructiveDiff := drift.Diff{
+		Field:       "superuser",
+		Expected:    "true",
+		Actual:      "false",
+		Destructive: true,
+	}
+
+	driftResult := drift.NewResult("user", "testuser")
+	driftResult.AddDiff(destructiveDiff)
+
+	var capturedAllowDestructive bool
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
+		capturedAllowDestructive = allowDestructive
+		return driftResult, nil
+	}
+	mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, dr *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+		cr := drift.NewCorrectionResult(spec.Username)
+		// Without destructive allowed, skips destructive changes
+		cr.AddSkipped(destructiveDiff, "destructive correction not allowed")
+		return cr, nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:        client,
+		Scheme:        scheme,
+		Recorder:      record.NewFakeRecorder(10),
+		Handler:       handler,
+		SecretManager: secret.NewManager(client),
+		Logger:        logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+	})
+	require.NoError(t, err)
+
+	// allowDestructive should be false (no annotation)
+	assert.False(t, capturedAllowDestructive)
+	assert.True(t, mockRepo.WasCalled("CorrectDrift"))
+
+	var updatedUser dbopsv1alpha1.DatabaseUser
+	err = client.Get(context.Background(), types.NamespacedName{Name: "testuser", Namespace: "default"}, &updatedUser)
+	require.NoError(t, err)
+	// Drift should still be detected since the correction was skipped
+	assert.NotNil(t, updatedUser.Status.Drift)
+	assert.True(t, updatedUser.Status.Drift.Detected)
 }

@@ -636,6 +636,171 @@ func TestHandler_DetectDrift(t *testing.T) {
 		assert.True(t, result.HasDrift())
 		assert.Len(t, result.Diffs, 1)
 	})
+
+	t.Run("no drift detected", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec, allowDestructive bool) (*drift.Result, error) {
+			return drift.NewResult("clustergrant", "test-cluster-instance"), nil
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.ClusterDatabaseGrantSpec{
+			ClusterInstanceRef: dbopsv1alpha1.ClusterInstanceReference{
+				Name: "test-cluster-instance",
+			},
+			UserRef: &dbopsv1alpha1.NamespacedUserReference{
+				Name:      "testuser",
+				Namespace: "team-a",
+			},
+		}
+
+		result, err := handler.DetectDrift(context.Background(), spec, false)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.False(t, result.HasDrift())
+		assert.Empty(t, result.Diffs)
+	})
+
+	t.Run("repository error", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec, allowDestructive bool) (*drift.Result, error) {
+			return nil, errors.New("connection refused")
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.ClusterDatabaseGrantSpec{
+			ClusterInstanceRef: dbopsv1alpha1.ClusterInstanceReference{
+				Name: "test-cluster-instance",
+			},
+			UserRef: &dbopsv1alpha1.NamespacedUserReference{
+				Name:      "testuser",
+				Namespace: "team-a",
+			},
+		}
+
+		result, err := handler.DetectDrift(context.Background(), spec, false)
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "detect drift: connection refused")
+	})
+}
+
+func TestHandler_CorrectDrift(t *testing.T) {
+	t.Run("successful correction", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+			result := drift.NewCorrectionResult("test-cluster-instance")
+			result.AddCorrected(drift.Diff{Field: "privileges", Expected: "SELECT,INSERT", Actual: "SELECT"})
+			return result, nil
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.ClusterDatabaseGrantSpec{
+			ClusterInstanceRef: dbopsv1alpha1.ClusterInstanceReference{
+				Name: "test-cluster-instance",
+			},
+			UserRef: &dbopsv1alpha1.NamespacedUserReference{
+				Name:      "testuser",
+				Namespace: "team-a",
+			},
+		}
+
+		driftResult := drift.NewResult("clustergrant", "test-cluster-instance")
+		driftResult.AddDiff(drift.Diff{Field: "privileges", Expected: "SELECT,INSERT", Actual: "SELECT"})
+
+		result, err := handler.CorrectDrift(context.Background(), spec, driftResult, false)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Len(t, result.Corrected, 1)
+		assert.True(t, result.HasCorrections())
+	})
+
+	t.Run("repository error", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+			return nil, errors.New("correction failed")
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.ClusterDatabaseGrantSpec{
+			ClusterInstanceRef: dbopsv1alpha1.ClusterInstanceReference{
+				Name: "test-cluster-instance",
+			},
+			UserRef: &dbopsv1alpha1.NamespacedUserReference{
+				Name:      "testuser",
+				Namespace: "team-a",
+			},
+		}
+
+		driftResult := drift.NewResult("clustergrant", "test-cluster-instance")
+		driftResult.AddDiff(drift.Diff{Field: "privileges", Expected: "SELECT,INSERT", Actual: "SELECT"})
+
+		result, err := handler.CorrectDrift(context.Background(), spec, driftResult, false)
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "correct drift: correction failed")
+	})
+
+	t.Run("correction with mixed results", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.ClusterDatabaseGrantSpec, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
+			result := drift.NewCorrectionResult("test-cluster-instance")
+			result.AddCorrected(drift.Diff{Field: "privileges", Expected: "SELECT,INSERT", Actual: "SELECT"})
+			result.AddSkipped(drift.Diff{Field: "owner", Expected: "admin", Actual: "postgres", Immutable: true}, "immutable field")
+			result.AddFailed(drift.Diff{Field: "schema", Expected: "public", Actual: "private"}, errors.New("permission denied"))
+			return result, nil
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		spec := &dbopsv1alpha1.ClusterDatabaseGrantSpec{
+			ClusterInstanceRef: dbopsv1alpha1.ClusterInstanceReference{
+				Name: "test-cluster-instance",
+			},
+			UserRef: &dbopsv1alpha1.NamespacedUserReference{
+				Name:      "testuser",
+				Namespace: "team-a",
+			},
+		}
+
+		driftResult := drift.NewResult("clustergrant", "test-cluster-instance")
+		driftResult.AddDiff(drift.Diff{Field: "privileges", Expected: "SELECT,INSERT", Actual: "SELECT"})
+		driftResult.AddDiff(drift.Diff{Field: "owner", Expected: "admin", Actual: "postgres", Immutable: true})
+		driftResult.AddDiff(drift.Diff{Field: "schema", Expected: "public", Actual: "private"})
+
+		result, err := handler.CorrectDrift(context.Background(), spec, driftResult, false)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Len(t, result.Corrected, 1)
+		assert.Len(t, result.Skipped, 1)
+		assert.Len(t, result.Failed, 1)
+		assert.True(t, result.HasCorrections())
+		assert.True(t, result.HasFailures())
+	})
 }
 
 func TestHandler_CollectPrivileges(t *testing.T) {
