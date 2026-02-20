@@ -89,16 +89,15 @@ func (a *Adapter) DropDatabase(ctx context.Context, name string, opts types.Drop
 		return err
 	}
 
-	// Force drop: terminate active connections first
-	if opts.Force {
-		terminateQuery := `
-			SELECT pg_terminate_backend(pid)
-			FROM pg_stat_activity
-			WHERE datname = $1 AND pid <> pg_backend_pid()`
-		_, err = pool.Exec(ctx, terminateQuery, name)
-		if err != nil {
-			return fmt.Errorf("failed to terminate connections to database %s: %w", name, err)
-		}
+	// Terminate active connections before dropping.
+	// PostgreSQL does not allow DROP DATABASE while there are active sessions.
+	terminateQuery := `
+		SELECT pg_terminate_backend(pid)
+		FROM pg_stat_activity
+		WHERE datname = $1 AND pid <> pg_backend_pid()`
+	_, err = pool.Exec(ctx, terminateQuery, name)
+	if err != nil {
+		return fmt.Errorf("failed to terminate connections to database %s: %w", name, err)
 	}
 
 	query := fmt.Sprintf("DROP DATABASE IF EXISTS %s", escapeIdentifier(name))

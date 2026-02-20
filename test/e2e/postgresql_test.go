@@ -958,10 +958,10 @@ var _ = Describe("postgresql", Ordered, func() {
 			By("connecting to database B to confirm full functionality")
 			conn, err := verifier.ConnectAsUser(ctx, adminUsername, adminPassword, dbNameB)
 			Expect(err).NotTo(HaveOccurred())
-			defer conn.Close()
 
 			err = conn.Query(ctx, "SELECT 1")
 			Expect(err).NotTo(HaveOccurred(), "Should be able to query database B")
+			conn.Close()
 
 			By("cleanup: deleting database B")
 			_ = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, crNameB, metav1.DeleteOptions{})

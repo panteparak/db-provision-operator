@@ -235,7 +235,7 @@ var _ = Describe("Database Operations", func() {
 				Expect(sql).To(Equal(`DROP DATABASE IF EXISTS "test""db"`))
 			})
 
-			It("should generate terminate connections query when force is true", func() {
+			It("should generate terminate connections query", func() {
 				sql := buildTerminateConnectionsSQL("testdb")
 				Expect(sql).To(ContainSubstring("pg_terminate_backend"))
 				Expect(sql).To(ContainSubstring("pg_stat_activity"))
@@ -640,6 +640,9 @@ var _ = Describe("Database Operations", func() {
 
 		Describe("DropDatabase with mock", func() {
 			It("should execute DROP DATABASE query", func() {
+				mock.ExpectExec("SELECT pg_terminate_backend").
+					WithArgs("testdb").
+					WillReturnResult(pgxmock.NewResult("SELECT", 0))
 				mock.ExpectExec(`DROP DATABASE IF EXISTS "testdb"`).
 					WillReturnResult(pgxmock.NewResult("DROP DATABASE", 0))
 
@@ -650,7 +653,7 @@ var _ = Describe("Database Operations", func() {
 				Expect(mock.ExpectationsWereMet()).NotTo(HaveOccurred())
 			})
 
-			It("should terminate connections when force is true", func() {
+			It("should always terminate connections before dropping", func() {
 				mock.ExpectExec("SELECT pg_terminate_backend").
 					WithArgs("testdb").
 					WillReturnResult(pgxmock.NewResult("SELECT", 1))
@@ -669,20 +672,19 @@ var _ = Describe("Database Operations", func() {
 					WithArgs("testdb").
 					WillReturnError(fmt.Errorf("permission denied"))
 
-				err := dropDatabaseWithMock(ctx, mock, "testdb", types.DropDatabaseOptions{
-					Force: true,
-				})
+				err := dropDatabaseWithMock(ctx, mock, "testdb", types.DropDatabaseOptions{})
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("failed to terminate connections"))
 			})
 
 			It("should return error on drop failure", func() {
+				mock.ExpectExec("SELECT pg_terminate_backend").
+					WithArgs("testdb").
+					WillReturnResult(pgxmock.NewResult("SELECT", 0))
 				mock.ExpectExec(`DROP DATABASE IF EXISTS "testdb"`).
 					WillReturnError(fmt.Errorf("database in use"))
 
-				err := dropDatabaseWithMock(ctx, mock, "testdb", types.DropDatabaseOptions{
-					Force: false,
-				})
+				err := dropDatabaseWithMock(ctx, mock, "testdb", types.DropDatabaseOptions{})
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("failed to drop database"))
 			})
@@ -939,19 +941,17 @@ func createDatabaseWithMock(ctx context.Context, pool mockPool, opts types.Creat
 }
 
 func dropDatabaseWithMock(ctx context.Context, pool mockPool, name string, opts types.DropDatabaseOptions) error {
-	if opts.Force {
-		terminateQuery := `
-			SELECT pg_terminate_backend(pid)
-			FROM pg_stat_activity
-			WHERE datname = $1 AND pid <> pg_backend_pid()`
-		_, err := pool.Exec(ctx, terminateQuery, name)
-		if err != nil {
-			return fmt.Errorf("failed to terminate connections to database %s: %w", name, err)
-		}
+	terminateQuery := `
+		SELECT pg_terminate_backend(pid)
+		FROM pg_stat_activity
+		WHERE datname = $1 AND pid <> pg_backend_pid()`
+	_, err := pool.Exec(ctx, terminateQuery, name)
+	if err != nil {
+		return fmt.Errorf("failed to terminate connections to database %s: %w", name, err)
 	}
 
 	query := buildDropDatabaseSQL(name)
-	_, err := pool.Exec(ctx, query)
+	_, err = pool.Exec(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to drop database %s: %w", name, err)
 	}
