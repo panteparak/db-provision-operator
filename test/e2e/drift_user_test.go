@@ -244,10 +244,30 @@ var _ = Describe("drift/user", Ordered, func() {
 		if verifier != nil {
 			_ = verifier.Close()
 		}
+
+		deletionTimeout := getDeletionTimeout()
+
+		// Sweep any leftover child resources (handles test-failure scenarios)
+		By("sweeping leftover child resources")
+		_ = dynamicClient.Resource(databaseGrantGVR).Namespace(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
+		_ = dynamicClient.Resource(databaseRoleGVR).Namespace(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
+		_ = dynamicClient.Resource(databaseUserGVR).Namespace(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
+		_ = dynamicClient.Resource(databaseGVR).Namespace(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
+
+		By("waiting for child resources to be removed")
+		Eventually(func() bool {
+			grants, _ := dynamicClient.Resource(databaseGrantGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+			roles, _ := dynamicClient.Resource(databaseRoleGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+			users, _ := dynamicClient.Resource(databaseUserGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+			dbs, _ := dynamicClient.Resource(databaseGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+			return len(grants.Items) == 0 && len(roles.Items) == 0 && len(users.Items) == 0 && len(dbs.Items) == 0
+		}, deletionTimeout, driftPollingInterval).Should(BeTrue(), "child resources should be deleted")
+
+		By("deleting DatabaseInstance and waiting")
 		_ = dynamicClient.Resource(databaseInstanceGVR).Namespace(namespace).Delete(ctx, instanceName, metav1.DeleteOptions{})
 		Eventually(func() bool {
 			_, err := dynamicClient.Resource(databaseInstanceGVR).Namespace(namespace).Get(ctx, instanceName, metav1.GetOptions{})
 			return err != nil
-		}, getDeletionTimeout(), driftPollingInterval).Should(BeTrue())
+		}, deletionTimeout, driftPollingInterval).Should(BeTrue(), "DatabaseInstance should be deleted")
 	})
 })

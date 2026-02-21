@@ -484,23 +484,26 @@ var _ = Describe("clusterdatabaseinstance", Ordered, func() {
 			_ = verifier.Close()
 		}
 
-		By("cleaning up test resources")
+		deletionTimeout := getDeletionTimeout()
 
-		// Delete in reverse order of creation
-		By("deleting DatabaseUser")
+		// Level 1: Delete child resources (User, Database — no grants in this test)
+		By("deleting DatabaseUser and Database")
 		_ = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Delete(ctx, userName, metav1.DeleteOptions{})
-
-		By("deleting Database")
 		_ = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, databaseName, metav1.DeleteOptions{})
 
-		By("deleting ClusterDatabaseInstance")
-		_ = dynamicClient.Resource(clusterDatabaseInstanceGVR).Delete(ctx, clusterInstanceName, metav1.DeleteOptions{})
+		By("waiting for child resources to be deleted")
+		Eventually(func() bool {
+			_, e1 := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Get(ctx, userName, metav1.GetOptions{})
+			_, e2 := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, databaseName, metav1.GetOptions{})
+			return e1 != nil && e2 != nil
+		}, deletionTimeout, interval).Should(BeTrue(), "User and Database should be deleted")
 
-		// Wait for resources to be deleted
-		By("waiting for ClusterDatabaseInstance to be deleted")
+		// Level 2: Delete root resource (its children are now gone)
+		By("deleting ClusterDatabaseInstance and waiting")
+		_ = dynamicClient.Resource(clusterDatabaseInstanceGVR).Delete(ctx, clusterInstanceName, metav1.DeleteOptions{})
 		Eventually(func() bool {
 			_, err := dynamicClient.Resource(clusterDatabaseInstanceGVR).Get(ctx, clusterInstanceName, metav1.GetOptions{})
-			return err != nil // Should return error (not found) when deleted
-		}, getDeletionTimeout(), interval).Should(BeTrue(), "ClusterDatabaseInstance should be deleted")
+			return err != nil
+		}, deletionTimeout, interval).Should(BeTrue(), "ClusterDatabaseInstance should be deleted")
 	})
 })

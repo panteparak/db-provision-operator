@@ -20,6 +20,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/db-provision-operator/test/e2e/testutil"
 )
@@ -571,22 +573,43 @@ func (cfg *DatabaseTestConfig) RunGrantEnforcementTest(ctx context.Context) {
 
 // ===== Cleanup Helpers =====
 
-// CleanupTestResources removes all test resources created during tests.
-func (cfg *DatabaseTestConfig) CleanupTestResources(ctx context.Context) {
-	By("cleaning up test resources")
+// deleteAndWait issues a delete for a namespaced resource and waits for it to be fully removed.
+func deleteAndWait(ctx context.Context, gvr schema.GroupVersionResource, namespace, name string, timeout, interval time.Duration) {
+	_ = dynamicClient.Resource(gvr).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	Eventually(func() bool {
+		_, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+		return err != nil
+	}, timeout, interval).Should(BeTrue(), fmt.Sprintf("%s/%s should be deleted", gvr.Resource, name))
+}
 
-	// Delete in reverse order of creation (to handle dependencies)
-	_ = dynamicClient.Resource(databaseGrantGVR).Namespace(cfg.TestNamespace).Delete(ctx, cfg.GrantName, metav1.DeleteOptions{})
+// CleanupTestResources removes all test resources created during tests.
+// Resources are deleted level-by-level respecting the dependency graph:
+// Level 1: Grant (leaf) → Level 2: Role, User, Database (middle) → Level 3: Instance (root)
+func (cfg *DatabaseTestConfig) CleanupTestResources(ctx context.Context) {
+	deletionTimeout := getDeletionTimeout()
+	interval := cfg.DefaultInterval()
+
+	// Level 1: Delete leaf resources (grants have no children)
+	By("deleting DatabaseGrant and waiting")
+	deleteAndWait(ctx, databaseGrantGVR, cfg.TestNamespace, cfg.GrantName, deletionTimeout, interval)
+
+	// Level 2: Delete middle resources (their grant children are now gone)
+	By("deleting DatabaseRole, DatabaseUser, Database")
 	_ = dynamicClient.Resource(databaseRoleGVR).Namespace(cfg.TestNamespace).Delete(ctx, cfg.RoleName, metav1.DeleteOptions{})
 	_ = dynamicClient.Resource(databaseUserGVR).Namespace(cfg.TestNamespace).Delete(ctx, cfg.UserName, metav1.DeleteOptions{})
 	_ = dynamicClient.Resource(databaseGVR).Namespace(cfg.TestNamespace).Delete(ctx, cfg.DatabaseName, metav1.DeleteOptions{})
-	_ = dynamicClient.Resource(databaseInstanceGVR).Namespace(cfg.TestNamespace).Delete(ctx, cfg.InstanceName, metav1.DeleteOptions{})
 
-	By("waiting for resources to be deleted")
+	By("waiting for middle-level resources to be deleted")
 	Eventually(func() bool {
-		_, err := dynamicClient.Resource(databaseInstanceGVR).Namespace(cfg.TestNamespace).Get(ctx, cfg.InstanceName, metav1.GetOptions{})
-		return err != nil // Should return error (not found) when deleted
-	}, getDeletionTimeout(), cfg.DefaultInterval()).Should(BeTrue(), "DatabaseInstance should be deleted")
+		_, e1 := dynamicClient.Resource(databaseRoleGVR).Namespace(cfg.TestNamespace).Get(ctx, cfg.RoleName, metav1.GetOptions{})
+		_, e2 := dynamicClient.Resource(databaseUserGVR).Namespace(cfg.TestNamespace).Get(ctx, cfg.UserName, metav1.GetOptions{})
+		_, e3 := dynamicClient.Resource(databaseGVR).Namespace(cfg.TestNamespace).Get(ctx, cfg.DatabaseName, metav1.GetOptions{})
+		return e1 != nil && e2 != nil && e3 != nil
+	}, deletionTimeout, interval).Should(BeTrue(), "Role, User, and Database should be deleted")
+
+	// Level 3: Delete root resource (its children are now gone)
+	By("deleting DatabaseInstance and waiting")
+	deleteAndWait(ctx, databaseInstanceGVR, cfg.TestNamespace, cfg.InstanceName, deletionTimeout, interval)
 }
 
 // ===== Engine-Specific Configurations =====

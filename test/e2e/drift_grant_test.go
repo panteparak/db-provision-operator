@@ -269,15 +269,36 @@ var _ = Describe("drift/grant", Ordered, func() {
 			_ = verifier.Close()
 		}
 
-		By("cleaning up grant test resources")
+		deletionTimeout := getDeletionTimeout()
+
+		// Level 1: Delete leaf resources (grants)
+		By("deleting all DatabaseGrants and waiting")
 		_ = dynamicClient.Resource(databaseGrantGVR).Namespace(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
+		Eventually(func() bool {
+			list, _ := dynamicClient.Resource(databaseGrantGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+			return len(list.Items) == 0
+		}, deletionTimeout, driftPollingInterval).Should(BeTrue(), "all DatabaseGrants should be deleted")
+
+		// Level 2: Delete middle resources (roles, database)
+		By("deleting DatabaseRoles and Database")
 		_ = dynamicClient.Resource(databaseRoleGVR).Namespace(namespace).Delete(ctx, memberRoleCRName, metav1.DeleteOptions{})
 		_ = dynamicClient.Resource(databaseRoleGVR).Namespace(namespace).Delete(ctx, grantRoleCRName, metav1.DeleteOptions{})
 		_ = dynamicClient.Resource(databaseGVR).Namespace(namespace).Delete(ctx, grantDbCRName, metav1.DeleteOptions{})
+
+		By("waiting for middle-level resources to be deleted")
+		Eventually(func() bool {
+			_, e1 := dynamicClient.Resource(databaseRoleGVR).Namespace(namespace).Get(ctx, memberRoleCRName, metav1.GetOptions{})
+			_, e2 := dynamicClient.Resource(databaseRoleGVR).Namespace(namespace).Get(ctx, grantRoleCRName, metav1.GetOptions{})
+			_, e3 := dynamicClient.Resource(databaseGVR).Namespace(namespace).Get(ctx, grantDbCRName, metav1.GetOptions{})
+			return e1 != nil && e2 != nil && e3 != nil
+		}, deletionTimeout, driftPollingInterval).Should(BeTrue(), "Roles and Database should be deleted")
+
+		// Level 3: Delete root resource (instance)
+		By("deleting DatabaseInstance and waiting")
 		_ = dynamicClient.Resource(databaseInstanceGVR).Namespace(namespace).Delete(ctx, instanceName, metav1.DeleteOptions{})
 		Eventually(func() bool {
 			_, err := dynamicClient.Resource(databaseInstanceGVR).Namespace(namespace).Get(ctx, instanceName, metav1.GetOptions{})
 			return err != nil
-		}, getDeletionTimeout(), driftPollingInterval).Should(BeTrue())
+		}, deletionTimeout, driftPollingInterval).Should(BeTrue(), "DatabaseInstance should be deleted")
 	})
 })

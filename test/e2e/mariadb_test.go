@@ -611,29 +611,28 @@ var _ = Describe("mariadb", Ordered, func() {
 			_ = verifier.Close()
 		}
 
-		By("cleaning up test resources")
+		deletionTimeout := getDeletionTimeout()
 
-		// Delete in reverse order of creation
-		By("deleting DatabaseGrant")
-		_ = dynamicClient.Resource(databaseGrantGVR).Namespace(testNamespace).Delete(ctx, "testgrant", metav1.DeleteOptions{})
+		// Level 1: Delete leaf resources (grants have no children)
+		By("deleting DatabaseGrant and waiting")
+		deleteAndWait(ctx, databaseGrantGVR, testNamespace, "testgrant", deletionTimeout, interval)
 
-		By("deleting DatabaseRole")
+		// Level 2: Delete middle resources (their grant children are now gone)
+		By("deleting DatabaseRole, DatabaseUser, Database")
 		_ = dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Delete(ctx, "testrole", metav1.DeleteOptions{})
-
-		By("deleting DatabaseUser")
 		_ = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Delete(ctx, userName, metav1.DeleteOptions{})
-
-		By("deleting Database")
 		_ = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, databaseName, metav1.DeleteOptions{})
 
-		By("deleting DatabaseInstance")
-		_ = dynamicClient.Resource(databaseInstanceGVR).Namespace(testNamespace).Delete(ctx, instanceName, metav1.DeleteOptions{})
-
-		// Wait for resources to be deleted
-		By("waiting for resources to be deleted")
+		By("waiting for middle-level resources to be deleted")
 		Eventually(func() bool {
-			_, err := dynamicClient.Resource(databaseInstanceGVR).Namespace(testNamespace).Get(ctx, instanceName, metav1.GetOptions{})
-			return err != nil // Should return error (not found) when deleted
-		}, timeout, interval).Should(BeTrue(), "DatabaseInstance should be deleted")
+			_, e1 := dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Get(ctx, "testrole", metav1.GetOptions{})
+			_, e2 := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Get(ctx, userName, metav1.GetOptions{})
+			_, e3 := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, databaseName, metav1.GetOptions{})
+			return e1 != nil && e2 != nil && e3 != nil
+		}, deletionTimeout, interval).Should(BeTrue(), "Role, User, and Database should be deleted")
+
+		// Level 3: Delete root resource (its children are now gone)
+		By("deleting DatabaseInstance and waiting")
+		deleteAndWait(ctx, databaseInstanceGVR, testNamespace, instanceName, deletionTimeout, interval)
 	})
 })
