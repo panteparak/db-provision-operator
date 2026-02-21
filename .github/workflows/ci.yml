@@ -837,7 +837,7 @@ jobs:
       # Multi-operator E2E tests (PostgreSQL only)
       - name: Deploy second operator (multi-instance test)
         if: matrix.database == 'postgresql'
-        run: make e2e-deploy-second-operator
+        run: make e2e-deploy-second-operator E2E_IMG=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.short-sha.outputs.sha }}
 
       - name: Run multi-operator E2E tests
         if: matrix.database == 'postgresql'

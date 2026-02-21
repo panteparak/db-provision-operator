@@ -182,6 +182,8 @@ setup-precommit: ## Install pre-commit and its dependencies
 # E2E Testing with k3d
 E2E_K3D_CLUSTER ?= dbprov-e2e
 E2E_IMG ?= db-provision-operator:e2e
+E2E_IMG_REPO = $(firstword $(subst :, ,$(E2E_IMG)))
+E2E_IMG_TAG  = $(or $(word 2,$(subst :, ,$(E2E_IMG))),latest)
 
 .PHONY: e2e-logs
 e2e-logs: ## Show operator logs from E2E cluster
@@ -385,8 +387,8 @@ e2e-deploy-second-operator: ## Deploy a second operator instance (instance-id=is
 	$(HELM) install db-provision-operator-isolated $(CHART_DIR) \
 		--namespace db-provision-operator-isolated \
 		--create-namespace \
-		--set image.repository=db-provision-operator \
-		--set image.tag=e2e \
+		--set image.repository=$(E2E_IMG_REPO) \
+		--set image.tag=$(E2E_IMG_TAG) \
 		--set image.pullPolicy=IfNotPresent \
 		--set instanceId=isolated \
 		--set leaderElect=true \
