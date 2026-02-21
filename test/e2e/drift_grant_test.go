@@ -280,7 +280,9 @@ var _ = Describe("drift/grant", Ordered, func() {
 		}, deletionTimeout, driftPollingInterval).Should(BeTrue(), "all DatabaseGrants should be deleted")
 
 		// Level 2: Delete middle resources (roles, database)
+		// Database CRs default to deletionProtection=true, so add force-delete annotation first.
 		By("deleting DatabaseRoles and Database")
+		addForceDeleteAnnotation(ctx, databaseGVR, namespace, grantDbCRName)
 		_ = dynamicClient.Resource(databaseRoleGVR).Namespace(namespace).Delete(ctx, memberRoleCRName, metav1.DeleteOptions{})
 		_ = dynamicClient.Resource(databaseRoleGVR).Namespace(namespace).Delete(ctx, grantRoleCRName, metav1.DeleteOptions{})
 		_ = dynamicClient.Resource(databaseGVR).Namespace(namespace).Delete(ctx, grantDbCRName, metav1.DeleteOptions{})

@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/db-provision-operator/test/e2e/testutil"
 )
@@ -441,6 +442,7 @@ func (cfg *DatabaseTestConfig) RunNonExistentInstanceRefTest(ctx context.Context
 	), "Database should fail or stay pending with missing instance reference")
 
 	By("cleaning up invalid database")
+	addForceDeleteAnnotation(ctx, databaseGVR, cfg.TestNamespace, invalidDbName)
 	_ = dynamicClient.Resource(databaseGVR).Namespace(cfg.TestNamespace).Delete(ctx, invalidDbName, metav1.DeleteOptions{})
 }
 
@@ -573,6 +575,30 @@ func (cfg *DatabaseTestConfig) RunGrantEnforcementTest(ctx context.Context) {
 
 // ===== Cleanup Helpers =====
 
+// forceDeletePatch is a JSON merge patch that adds the force-delete annotation.
+var forceDeletePatch = []byte(`{"metadata":{"annotations":{"dbops.dbprovision.io/force-delete":"true"}}}`)
+
+// addForceDeleteAnnotation adds the force-delete annotation to a resource so that
+// deletion protection is bypassed during cleanup. Uses MergePatch to avoid
+// resource version conflicts with concurrent controller status updates.
+func addForceDeleteAnnotation(ctx context.Context, gvr schema.GroupVersionResource, namespace, name string) {
+	_, _ = dynamicClient.Resource(gvr).Namespace(namespace).Patch(
+		ctx, name, types.MergePatchType, forceDeletePatch, metav1.PatchOptions{},
+	)
+}
+
+// addForceDeleteToAll adds the force-delete annotation to all resources of the given type
+// in the namespace. Used in cleanup to bypass deletion protection on Database CRs.
+func addForceDeleteToAll(ctx context.Context, gvr schema.GroupVersionResource, namespace string) {
+	list, err := dynamicClient.Resource(gvr).Namespace(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return
+	}
+	for i := range list.Items {
+		addForceDeleteAnnotation(ctx, gvr, namespace, list.Items[i].GetName())
+	}
+}
+
 // deleteAndWait issues a delete for a namespaced resource and waits for it to be fully removed.
 func deleteAndWait(ctx context.Context, gvr schema.GroupVersionResource, namespace, name string, timeout, interval time.Duration) {
 	_ = dynamicClient.Resource(gvr).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
@@ -594,7 +620,9 @@ func (cfg *DatabaseTestConfig) CleanupTestResources(ctx context.Context) {
 	deleteAndWait(ctx, databaseGrantGVR, cfg.TestNamespace, cfg.GrantName, deletionTimeout, interval)
 
 	// Level 2: Delete middle resources (their grant children are now gone)
+	// Database CRs default to deletionProtection=true, so we must add force-delete annotation first.
 	By("deleting DatabaseRole, DatabaseUser, Database")
+	addForceDeleteAnnotation(ctx, databaseGVR, cfg.TestNamespace, cfg.DatabaseName)
 	_ = dynamicClient.Resource(databaseRoleGVR).Namespace(cfg.TestNamespace).Delete(ctx, cfg.RoleName, metav1.DeleteOptions{})
 	_ = dynamicClient.Resource(databaseUserGVR).Namespace(cfg.TestNamespace).Delete(ctx, cfg.UserName, metav1.DeleteOptions{})
 	_ = dynamicClient.Resource(databaseGVR).Namespace(cfg.TestNamespace).Delete(ctx, cfg.DatabaseName, metav1.DeleteOptions{})

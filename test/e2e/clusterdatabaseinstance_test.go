@@ -376,6 +376,7 @@ var _ = Describe("clusterdatabaseinstance", Ordered, func() {
 			}, timeout, interval).Should(Equal("Ready"), "DatabaseUser should become Ready")
 
 			By("cleaning up alt-namespace resources")
+			addForceDeleteAnnotation(ctx, databaseGVR, altNamespace, crossNsDbName)
 			_ = dynamicClient.Resource(databaseUserGVR).Namespace(altNamespace).Delete(ctx, crossNsUserName, metav1.DeleteOptions{})
 			_ = dynamicClient.Resource(databaseGVR).Namespace(altNamespace).Delete(ctx, crossNsDbName, metav1.DeleteOptions{})
 		})
@@ -487,7 +488,9 @@ var _ = Describe("clusterdatabaseinstance", Ordered, func() {
 		deletionTimeout := getDeletionTimeout()
 
 		// Level 1: Delete child resources (User, Database — no grants in this test)
+		// Database CRs default to deletionProtection=true, so add force-delete annotation first.
 		By("deleting DatabaseUser and Database")
+		addForceDeleteAnnotation(ctx, databaseGVR, testNamespace, databaseName)
 		_ = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Delete(ctx, userName, metav1.DeleteOptions{})
 		_ = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, databaseName, metav1.DeleteOptions{})
 

@@ -248,7 +248,9 @@ var _ = Describe("drift/user", Ordered, func() {
 		deletionTimeout := getDeletionTimeout()
 
 		// Sweep any leftover child resources (handles test-failure scenarios)
+		// Database CRs default to deletionProtection=true, so add force-delete annotation first.
 		By("sweeping leftover child resources")
+		addForceDeleteToAll(ctx, databaseGVR, namespace)
 		_ = dynamicClient.Resource(databaseGrantGVR).Namespace(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
 		_ = dynamicClient.Resource(databaseRoleGVR).Namespace(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
 		_ = dynamicClient.Resource(databaseUserGVR).Namespace(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})

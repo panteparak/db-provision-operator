@@ -990,7 +990,9 @@ var _ = Describe("postgresql", Ordered, func() {
 		}, deletionTimeout, pollingInterval).Should(BeTrue(), "All DatabaseGrants should be deleted")
 
 		// Level 2: Delete middle resources (their grant children are now gone)
+		// Database CRs default to deletionProtection=true, so add force-delete annotation first.
 		By("deleting DatabaseRole, all DatabaseUsers, Database")
+		addForceDeleteToAll(ctx, databaseGVR, testNamespace)
 		_ = dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Delete(ctx, "testrole", metav1.DeleteOptions{})
 		_ = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
 		_ = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, databaseName, metav1.DeleteOptions{})
