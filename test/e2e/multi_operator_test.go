@@ -86,7 +86,7 @@ var _ = Describe("multi-operator instance partitioning", Ordered, Label("multi-o
 
 		instance := testutil.BuildDatabaseInstance(
 			"isolated-instance", isolatedNS,
-			"postgresql", instanceHost, port,
+			"postgres", instanceHost, port,
 			testutil.SecretRef{Name: secretName, Namespace: secretNamespace},
 		)
 		testutil.WithLabels(instance, map[string]string{
@@ -128,7 +128,7 @@ var _ = Describe("multi-operator instance partitioning", Ordered, Label("multi-o
 
 		instance := testutil.BuildDatabaseInstance(
 			"default-instance", defaultNS,
-			"postgresql", instanceHost, port,
+			"postgres", instanceHost, port,
 			testutil.SecretRef{Name: secretName, Namespace: secretNamespace},
 		)
 		// No label — default operator should pick this up
@@ -152,7 +152,7 @@ var _ = Describe("multi-operator instance partitioning", Ordered, Label("multi-o
 
 		instance := testutil.BuildDatabaseInstance(
 			"cross-instance", defaultNS,
-			"postgresql", instanceHost, port,
+			"postgres", instanceHost, port,
 			testutil.SecretRef{Name: secretName, Namespace: secretNamespace},
 		)
 		testutil.WithLabels(instance, map[string]string{
