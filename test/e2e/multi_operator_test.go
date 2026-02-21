@@ -99,7 +99,8 @@ var _ = Describe("multi-operator instance partitioning", Ordered, Label("multi-o
 
 		By("waiting for the instance to reach Ready phase")
 		Eventually(func() string {
-			return getResourcePhase(ctx, databaseInstanceGVR, isolatedNS, "isolated-instance")
+			phase, _ := getResourcePhase(ctx, databaseInstanceGVR, "isolated-instance", isolatedNS)
+			return phase
 		}, timeout, interval).Should(Equal("Ready"),
 			"Isolated operator should reconcile instance labeled operator-instance-id=isolated")
 
@@ -114,7 +115,8 @@ var _ = Describe("multi-operator instance partitioning", Ordered, Label("multi-o
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(func() string {
-			return getResourcePhase(ctx, databaseGVR, isolatedNS, "isolated-db")
+			phase, _ := getResourcePhase(ctx, databaseGVR, "isolated-db", isolatedNS)
+			return phase
 		}, timeout, interval).Should(Equal("Ready"),
 			"Database under isolated operator should reach Ready")
 	})
@@ -137,7 +139,8 @@ var _ = Describe("multi-operator instance partitioning", Ordered, Label("multi-o
 
 		By("waiting for the unlabeled instance to reach Ready via the default operator")
 		Eventually(func() string {
-			return getResourcePhase(ctx, databaseInstanceGVR, defaultNS, "default-instance")
+			phase, _ := getResourcePhase(ctx, databaseInstanceGVR, "default-instance", defaultNS)
+			return phase
 		}, timeout, interval).Should(Equal("Ready"),
 			"Default operator should reconcile unlabeled resources")
 	})
@@ -164,7 +167,8 @@ var _ = Describe("multi-operator instance partitioning", Ordered, Label("multi-o
 		// Both operators are cluster-scoped. The isolated operator should reconcile
 		// this resource because it has the matching label, regardless of namespace.
 		Eventually(func() string {
-			return getResourcePhase(ctx, databaseInstanceGVR, defaultNS, "cross-instance")
+			phase, _ := getResourcePhase(ctx, databaseInstanceGVR, "cross-instance", defaultNS)
+			return phase
 		}, timeout, interval).Should(Equal("Ready"),
 			"Isolated operator should reconcile resources with its label in any namespace")
 	})
