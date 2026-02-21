@@ -699,17 +699,14 @@ var _ = Describe("Role Operations", func() {
 				Expect(err.Error()).To(ContainSubstring("database is required"))
 			})
 
-			It("should handle empty privileges with USAGE", func() {
-				mock.ExpectExec(`GRANT USAGE ON ` + "`mydb`" + `\.\* TO 'testrole'`).
-					WillReturnResult(sqlmock.NewResult(0, 0))
-
+			It("should reject empty privileges", func() {
 				err := adapter.applyGrantToRole(ctx, "testrole", types.GrantOptions{
 					Database:   "mydb",
 					Privileges: []string{},
 					Level:      "database",
 				})
-				Expect(err).NotTo(HaveOccurred())
-				Expect(mock.ExpectationsWereMet()).NotTo(HaveOccurred())
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("no privileges specified"))
 			})
 		})
 	})
@@ -782,25 +779,4 @@ var _ = Describe("Role Operations", func() {
 		})
 	})
 
-	Describe("formatPrivileges", func() {
-		It("should return USAGE for empty privileges", func() {
-			result := formatPrivileges([]string{})
-			Expect(result).To(Equal("USAGE"))
-		})
-
-		It("should return USAGE for nil privileges", func() {
-			result := formatPrivileges(nil)
-			Expect(result).To(Equal("USAGE"))
-		})
-
-		It("should join multiple privileges", func() {
-			result := formatPrivileges([]string{"SELECT", "INSERT", "UPDATE"})
-			Expect(result).To(Equal("SELECT, INSERT, UPDATE"))
-		})
-
-		It("should return single privilege", func() {
-			result := formatPrivileges([]string{"ALL PRIVILEGES"})
-			Expect(result).To(Equal("ALL PRIVILEGES"))
-		})
-	})
 })

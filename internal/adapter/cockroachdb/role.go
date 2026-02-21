@@ -19,8 +19,8 @@ package cockroachdb
 import (
 	"context"
 	"fmt"
-	"strings"
 
+	"github.com/db-provision-operator/internal/adapter/sqlbuilder"
 	"github.com/db-provision-operator/internal/adapter/types"
 )
 
@@ -38,50 +38,25 @@ func (a *Adapter) CreateRole(ctx context.Context, opts types.CreateRoleOptions) 
 		return err
 	}
 
-	var sb strings.Builder
-	sb.WriteString("CREATE ROLE ")
-	sb.WriteString(escapeIdentifier(opts.RoleName))
-
-	var roleOpts []string
-
-	// Roles default to NOLOGIN (unlike users which default to LOGIN)
-	if opts.Login {
-		roleOpts = append(roleOpts, "LOGIN")
-	} else {
-		roleOpts = append(roleOpts, "NOLOGIN")
-	}
-
-	// CockroachDB-supported attributes with least-privilege defaults
-	if opts.CreateDB {
-		roleOpts = append(roleOpts, "CREATEDB")
-	} else {
-		roleOpts = append(roleOpts, "NOCREATEDB")
-	}
-
-	if opts.CreateRole {
-		roleOpts = append(roleOpts, "CREATEROLE")
-	} else {
-		roleOpts = append(roleOpts, "NOCREATEROLE")
-	}
-
 	// Note: CockroachDB does NOT support INHERIT/NOINHERIT or IN ROLE in CREATE ROLE
-	// The Inherit field is silently ignored for CockroachDB compatibility
-	// Role membership is handled via GRANT after role creation
+	b := sqlbuilder.PgCreateRole(opts.RoleName).
+		Login(opts.Login).
+		CreateDB(opts.CreateDB).
+		CreateRoleOpt(opts.CreateRole)
 
-	if len(roleOpts) > 0 {
-		sb.WriteString(" WITH ")
-		sb.WriteString(strings.Join(roleOpts, " "))
-	}
-
-	_, err = pool.Exec(ctx, sb.String())
+	query := b.Build()
+	_, err = pool.Exec(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to create role %s: %w", opts.RoleName, err)
 	}
 
 	// Grant role memberships (CockroachDB doesn't support IN ROLE in CREATE ROLE)
 	for _, role := range opts.InRoles {
-		grantQuery := fmt.Sprintf("GRANT %s TO %s", escapeIdentifier(role), escapeIdentifier(opts.RoleName))
-		if _, err := pool.Exec(ctx, grantQuery); err != nil {
+		q, buildErr := sqlbuilder.NewPg().GrantRole(role).To(opts.RoleName).Build()
+		if buildErr != nil {
+			return fmt.Errorf("failed to build grant role query: %w", buildErr)
+		}
+		if _, err := pool.Exec(ctx, q); err != nil {
 			return fmt.Errorf("failed to grant role %s to role %s: %w", role, opts.RoleName, err)
 		}
 	}
@@ -109,7 +84,7 @@ func (a *Adapter) DropRole(ctx context.Context, roleName string) error {
 	_, _ = pool.Exec(ctx, fmt.Sprintf("REASSIGN OWNED BY %s TO CURRENT_USER", escapeIdentifier(roleName)))
 	_, _ = pool.Exec(ctx, fmt.Sprintf("DROP OWNED BY %s", escapeIdentifier(roleName)))
 
-	query := fmt.Sprintf("DROP ROLE IF EXISTS %s", escapeIdentifier(roleName))
+	query := sqlbuilder.PgDropRole(roleName).IfExists().Build()
 	_, err = pool.Exec(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to drop role %s: %w", roleName, err)
@@ -144,39 +119,25 @@ func (a *Adapter) UpdateRole(ctx context.Context, roleName string, opts types.Up
 		return err
 	}
 
-	var alterOpts []string
+	b := sqlbuilder.PgAlterRole(roleName)
+	hasOpts := false
 
 	if opts.Login != nil {
-		if *opts.Login {
-			alterOpts = append(alterOpts, "LOGIN")
-		} else {
-			alterOpts = append(alterOpts, "NOLOGIN")
-		}
+		b.Login(*opts.Login)
+		hasOpts = true
 	}
-
 	if opts.CreateDB != nil {
-		if *opts.CreateDB {
-			alterOpts = append(alterOpts, "CREATEDB")
-		} else {
-			alterOpts = append(alterOpts, "NOCREATEDB")
-		}
+		b.CreateDB(*opts.CreateDB)
+		hasOpts = true
 	}
-
 	if opts.CreateRole != nil {
-		if *opts.CreateRole {
-			alterOpts = append(alterOpts, "CREATEROLE")
-		} else {
-			alterOpts = append(alterOpts, "NOCREATEROLE")
-		}
+		b.CreateRoleOpt(*opts.CreateRole)
+		hasOpts = true
 	}
-
 	// Note: CockroachDB does NOT support INHERIT/NOINHERIT
-	// The Inherit field is silently ignored for CockroachDB compatibility
 
-	if len(alterOpts) > 0 {
-		query := fmt.Sprintf("ALTER ROLE %s WITH %s",
-			escapeIdentifier(roleName),
-			strings.Join(alterOpts, " "))
+	if hasOpts {
+		query := b.Build()
 		if _, err := pool.Exec(ctx, query); err != nil {
 			return fmt.Errorf("failed to update role %s: %w", roleName, err)
 		}
@@ -184,8 +145,11 @@ func (a *Adapter) UpdateRole(ctx context.Context, roleName string, opts types.Up
 
 	// Handle role membership changes
 	for _, role := range opts.InRoles {
-		query := fmt.Sprintf("GRANT %s TO %s", escapeIdentifier(role), escapeIdentifier(roleName))
-		if _, err := pool.Exec(ctx, query); err != nil {
+		q, buildErr := sqlbuilder.NewPg().GrantRole(role).To(roleName).Build()
+		if buildErr != nil {
+			return fmt.Errorf("failed to build grant role query: %w", buildErr)
+		}
+		if _, err := pool.Exec(ctx, q); err != nil {
 			return fmt.Errorf("failed to grant role %s to %s: %w", role, roleName, err)
 		}
 	}
@@ -260,73 +224,57 @@ func (a *Adapter) applyGrant(ctx context.Context, grantee string, grant types.Gr
 
 	// Database-level privileges
 	if grant.Schema == "" && len(grant.Tables) == 0 {
-		queries = append(queries, fmt.Sprintf(
-			"GRANT %s ON DATABASE %s TO %s",
-			strings.Join(grant.Privileges, ", "),
-			escapeIdentifier(grant.Database),
-			escapeIdentifier(grantee)))
+		q, err := sqlbuilder.NewPg().Grant(grant.Privileges...).OnDatabase(grant.Database).To(grantee).Build()
+		if err != nil {
+			return fmt.Errorf("failed to build grant query: %w", err)
+		}
+		queries = append(queries, q)
 	}
 
 	// Schema-level privileges
 	if grant.Schema != "" && len(grant.Tables) == 0 {
-		queries = append(queries, fmt.Sprintf(
-			"GRANT %s ON SCHEMA %s TO %s",
-			strings.Join(grant.Privileges, ", "),
-			escapeIdentifier(grant.Schema),
-			escapeIdentifier(grantee)))
+		q, err := sqlbuilder.NewPg().Grant(grant.Privileges...).OnSchema(grant.Schema).To(grantee).Build()
+		if err != nil {
+			return fmt.Errorf("failed to build grant query: %w", err)
+		}
+		queries = append(queries, q)
 	}
 
 	// Table-level privileges
 	for _, table := range grant.Tables {
-		tableName := table
-		if grant.Schema != "" {
-			tableName = fmt.Sprintf("%s.%s", escapeIdentifier(grant.Schema), escapeIdentifier(table))
-		} else {
-			tableName = escapeIdentifier(table)
-		}
-
-		q := fmt.Sprintf("GRANT %s ON TABLE %s TO %s",
-			strings.Join(grant.Privileges, ", "),
-			tableName,
-			escapeIdentifier(grantee))
+		b := sqlbuilder.NewPg().Grant(grant.Privileges...).OnTable(grant.Schema, table).To(grantee)
 		if grant.WithGrantOption {
-			q += " WITH GRANT OPTION"
+			b.WithGrantOption()
+		}
+		q, err := b.Build()
+		if err != nil {
+			return fmt.Errorf("failed to build grant query: %w", err)
 		}
 		queries = append(queries, q)
 	}
 
 	// Sequence-level privileges
 	for _, seq := range grant.Sequences {
-		seqName := seq
-		if grant.Schema != "" {
-			seqName = fmt.Sprintf("%s.%s", escapeIdentifier(grant.Schema), escapeIdentifier(seq))
-		} else {
-			seqName = escapeIdentifier(seq)
-		}
-
-		q := fmt.Sprintf("GRANT %s ON SEQUENCE %s TO %s",
-			strings.Join(grant.Privileges, ", "),
-			seqName,
-			escapeIdentifier(grantee))
+		b := sqlbuilder.NewPg().Grant(grant.Privileges...).OnSequence(grant.Schema, seq).To(grantee)
 		if grant.WithGrantOption {
-			q += " WITH GRANT OPTION"
+			b.WithGrantOption()
+		}
+		q, err := b.Build()
+		if err != nil {
+			return fmt.Errorf("failed to build grant query: %w", err)
 		}
 		queries = append(queries, q)
 	}
 
 	// Function-level privileges
 	for _, fn := range grant.Functions {
-		fnName := fn
-		if grant.Schema != "" {
-			fnName = fmt.Sprintf("%s.%s", escapeIdentifier(grant.Schema), fn)
-		}
-
-		q := fmt.Sprintf("GRANT %s ON FUNCTION %s TO %s",
-			strings.Join(grant.Privileges, ", "),
-			fnName,
-			escapeIdentifier(grantee))
+		b := sqlbuilder.NewPg().Grant(grant.Privileges...).OnFunction(grant.Schema, fn).To(grantee)
 		if grant.WithGrantOption {
-			q += " WITH GRANT OPTION"
+			b.WithGrantOption()
+		}
+		q, err := b.Build()
+		if err != nil {
+			return fmt.Errorf("failed to build grant query: %w", err)
 		}
 		queries = append(queries, q)
 	}

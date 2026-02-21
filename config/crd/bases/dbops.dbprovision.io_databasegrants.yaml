@@ -139,7 +139,9 @@ spec:
                           description: Privileges to grant (SELECT, INSERT, UPDATE,
                             DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER, etc.)
                           items:
+                            pattern: ^[A-Z][A-Z ]*$
                             type: string
+                          maxItems: 20
                           minItems: 1
                           type: array
                         procedure:
@@ -193,7 +195,9 @@ spec:
                         privileges:
                           description: Privileges to grant
                           items:
+                            pattern: ^[A-Z][A-Z ]*$
                             type: string
+                          maxItems: 20
                           minItems: 1
                           type: array
                         schema:
@@ -226,7 +230,9 @@ spec:
                             DELETE, TRUNCATE, REFERENCES, TRIGGER, CREATE, CONNECT,
                             TEMPORARY, EXECUTE, USAGE)
                           items:
+                            pattern: ^[A-Z][A-Z ]*$
                             type: string
+                          maxItems: 20
                           minItems: 1
                           type: array
                         schema:

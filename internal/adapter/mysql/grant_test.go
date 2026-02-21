@@ -557,7 +557,8 @@ var _ = Describe("Grant Operations", func() {
 
 			for _, tc := range testCases {
 				By(tc.name)
-				result := adapter.buildGrantQuery(tc.grantee, tc.opt)
+				result, err := adapter.buildGrantQuery(tc.grantee, tc.opt)
+				Expect(err).NotTo(HaveOccurred())
 				Expect(result).To(Equal(tc.expected))
 			}
 		})
@@ -649,7 +650,8 @@ var _ = Describe("Grant Operations", func() {
 
 			for _, tc := range testCases {
 				By(tc.name)
-				result := adapter.buildRevokeQuery(tc.grantee, tc.opt)
+				result, err := adapter.buildRevokeQuery(tc.grantee, tc.opt)
+				Expect(err).NotTo(HaveOccurred())
 				Expect(result).To(Equal(tc.expected))
 			}
 		})

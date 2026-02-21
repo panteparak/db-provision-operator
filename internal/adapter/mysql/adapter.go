@@ -132,7 +132,7 @@ func (a *Adapter) buildDSN() (string, error) {
 	cfg.Addr = fmt.Sprintf("%s:%d", a.config.Host, a.config.Port)
 	cfg.DBName = a.config.Database
 	cfg.ParseTime = a.config.ParseTime
-	cfg.MultiStatements = true
+	cfg.MultiStatements = false
 
 	// Timeouts
 	if a.config.Timeout != "" {

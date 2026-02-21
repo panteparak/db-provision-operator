@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/db-provision-operator/internal/adapter/sqlbuilder"
 	"github.com/db-provision-operator/internal/adapter/types"
 )
 
@@ -31,50 +32,34 @@ func (a *Adapter) CreateDatabase(ctx context.Context, opts types.CreateDatabaseO
 		return err
 	}
 
-	// Build CREATE DATABASE statement
-	var sb strings.Builder
-	sb.WriteString("CREATE DATABASE ")
-	sb.WriteString(escapeIdentifier(opts.Name))
-
-	// Add options
-	var options []string
-
+	b := sqlbuilder.PgCreateDatabase(opts.Name)
 	if opts.Owner != "" {
-		options = append(options, fmt.Sprintf("OWNER = %s", escapeIdentifier(opts.Owner)))
+		b.Owner(opts.Owner)
 	}
 	if opts.Template != "" {
-		options = append(options, fmt.Sprintf("TEMPLATE = %s", escapeIdentifier(opts.Template)))
+		b.Template(opts.Template)
 	}
 	if opts.Encoding != "" {
-		options = append(options, fmt.Sprintf("ENCODING = %s", escapeLiteral(opts.Encoding)))
+		b.Encoding(opts.Encoding)
 	}
 	if opts.LCCollate != "" {
-		options = append(options, fmt.Sprintf("LC_COLLATE = %s", escapeLiteral(opts.LCCollate)))
+		b.LCCollate(opts.LCCollate)
 	}
 	if opts.LCCtype != "" {
-		options = append(options, fmt.Sprintf("LC_CTYPE = %s", escapeLiteral(opts.LCCtype)))
+		b.LCCtype(opts.LCCtype)
 	}
 	if opts.Tablespace != "" {
-		options = append(options, fmt.Sprintf("TABLESPACE = %s", escapeIdentifier(opts.Tablespace)))
+		b.Tablespace(opts.Tablespace)
 	}
 	if opts.ConnectionLimit != 0 {
-		options = append(options, fmt.Sprintf("CONNECTION LIMIT = %d", opts.ConnectionLimit))
+		b.ConnectionLimit(int(opts.ConnectionLimit))
 	}
 	if opts.IsTemplate {
-		options = append(options, "IS_TEMPLATE = TRUE")
-	}
-	// Note: ALLOW_CONNECTIONS defaults to TRUE in PostgreSQL.
-	// We intentionally do NOT add ALLOW_CONNECTIONS = FALSE here because:
-	// - The AllowConnections field is a bool (defaults to false)
-	// - Adding this option would prevent ALL newly created databases from accepting connections
-	// - If this feature is needed in the future, use a pointer type (*bool) or inverted field name
-
-	if len(options) > 0 {
-		sb.WriteString(" WITH ")
-		sb.WriteString(strings.Join(options, " "))
+		b.IsTemplate(true)
 	}
 
-	_, err = pool.Exec(ctx, sb.String())
+	query := b.Build()
+	_, err = pool.Exec(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to create database %s: %w", opts.Name, err)
 	}
@@ -90,7 +75,6 @@ func (a *Adapter) DropDatabase(ctx context.Context, name string, opts types.Drop
 	}
 
 	// Terminate active connections before dropping.
-	// PostgreSQL does not allow DROP DATABASE while there are active sessions.
 	terminateQuery := `
 		SELECT pg_terminate_backend(pid)
 		FROM pg_stat_activity
@@ -100,7 +84,7 @@ func (a *Adapter) DropDatabase(ctx context.Context, name string, opts types.Drop
 		return fmt.Errorf("failed to terminate connections to database %s: %w", name, err)
 	}
 
-	query := fmt.Sprintf("DROP DATABASE IF EXISTS %s", escapeIdentifier(name))
+	query := sqlbuilder.PgDropDatabase(name).IfExists().Build()
 	_, err = pool.Exec(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to drop database %s: %w", name, err)
@@ -158,7 +142,6 @@ func (a *Adapter) GetDatabaseInfo(ctx context.Context, name string) (*types.Data
 	// Get extensions (requires connection to the specific database)
 	extensions, err := a.getDatabaseExtensions(ctx, name)
 	if err != nil {
-		// Log but don't fail - extensions query requires connection to the database
 		extensions = nil
 	}
 	info.Extensions = extensions
@@ -166,7 +149,6 @@ func (a *Adapter) GetDatabaseInfo(ctx context.Context, name string) (*types.Data
 	// Get schemas (requires connection to the specific database)
 	schemas, err := a.getDatabaseSchemas(ctx, name)
 	if err != nil {
-		// Log but don't fail
 		schemas = nil
 	}
 	info.Schemas = schemas
@@ -278,47 +260,32 @@ func (a *Adapter) createSchema(ctx context.Context, database string, schema type
 }
 
 // VerifyDatabaseAccess verifies that a database is accepting connections.
-// This is important for PostgreSQL where a newly created database may temporarily
-// not accept connections while being initialized from a template (SQLSTATE 55000).
 func (a *Adapter) VerifyDatabaseAccess(ctx context.Context, name string) error {
-	// Try to execute a simple query on the target database
 	return a.execWithNewConnection(ctx, name, "SELECT 1")
 }
 
 // setDefaultPrivileges sets default privileges in a database
 func (a *Adapter) setDefaultPrivileges(ctx context.Context, database string, dp types.DefaultPrivilegeOptions) error {
-	var sb strings.Builder
-	sb.WriteString("ALTER DEFAULT PRIVILEGES")
-
-	if dp.Role != "" {
-		sb.WriteString(" FOR ROLE ")
-		sb.WriteString(escapeIdentifier(dp.Role))
-	}
-
-	if dp.Schema != "" {
-		sb.WriteString(" IN SCHEMA ")
-		sb.WriteString(escapeIdentifier(dp.Schema))
-	}
-
-	sb.WriteString(" GRANT ")
-	sb.WriteString(strings.Join(dp.Privileges, ", "))
-	sb.WriteString(" ON ")
+	b := sqlbuilder.NewPg().AlterDefaultPrivileges(dp.Role, dp.Schema).
+		Grant(dp.Privileges...).To(dp.Role)
 
 	switch dp.ObjectType {
 	case "tables":
-		sb.WriteString("TABLES")
+		b.OnTables()
 	case "sequences":
-		sb.WriteString("SEQUENCES")
+		b.OnSequences()
 	case "functions":
-		sb.WriteString("FUNCTIONS")
+		b.OnFunctions()
 	case "types":
-		sb.WriteString("TYPES")
+		b.OnTypes()
 	default:
 		return fmt.Errorf("unsupported object type: %s", dp.ObjectType)
 	}
 
-	sb.WriteString(" TO ")
-	sb.WriteString(escapeIdentifier(dp.Role))
+	q, err := b.Build()
+	if err != nil {
+		return fmt.Errorf("failed to build alter default privileges: %w", err)
+	}
 
-	return a.execWithNewConnection(ctx, database, sb.String())
+	return a.execWithNewConnection(ctx, database, q)
 }

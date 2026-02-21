@@ -19,8 +19,8 @@ package mysql
 import (
 	"context"
 	"fmt"
-	"strings"
 
+	"github.com/db-provision-operator/internal/adapter/sqlbuilder"
 	"github.com/db-provision-operator/internal/adapter/types"
 )
 
@@ -31,19 +31,16 @@ func (a *Adapter) CreateDatabase(ctx context.Context, opts types.CreateDatabaseO
 		return err
 	}
 
-	var sb strings.Builder
-	sb.WriteString("CREATE DATABASE IF NOT EXISTS ")
-	sb.WriteString(escapeIdentifier(opts.Name))
-
-	// Add charset and collation
+	b := sqlbuilder.MySQLCreateDatabase(opts.Name)
 	if opts.Charset != "" {
-		sb.WriteString(fmt.Sprintf(" CHARACTER SET %s", opts.Charset))
+		b.Charset(opts.Charset)
 	}
 	if opts.Collation != "" {
-		sb.WriteString(fmt.Sprintf(" COLLATE %s", opts.Collation))
+		b.Collation(opts.Collation)
 	}
 
-	_, err = db.ExecContext(ctx, sb.String())
+	query := b.Build()
+	_, err = db.ExecContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to create database %s: %w", opts.Name, err)
 	}
@@ -76,7 +73,7 @@ func (a *Adapter) DropDatabase(ctx context.Context, name string, opts types.Drop
 		}
 	}
 
-	query := fmt.Sprintf("DROP DATABASE IF EXISTS %s", escapeIdentifier(name))
+	query := sqlbuilder.MySQLDropDatabase(name).IfExists().Build()
 	_, err = db.ExecContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to drop database %s: %w", name, err)
@@ -170,17 +167,16 @@ func (a *Adapter) UpdateDatabase(ctx context.Context, name string, opts types.Up
 
 	// Update charset and collation if specified
 	if opts.Charset != "" || opts.Collation != "" {
-		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf("ALTER DATABASE %s", escapeIdentifier(name)))
-
+		b := sqlbuilder.MySQLAlterDatabase(name)
 		if opts.Charset != "" {
-			sb.WriteString(fmt.Sprintf(" CHARACTER SET %s", opts.Charset))
+			b.Charset(opts.Charset)
 		}
 		if opts.Collation != "" {
-			sb.WriteString(fmt.Sprintf(" COLLATE %s", opts.Collation))
+			b.Collation(opts.Collation)
 		}
 
-		_, err = db.ExecContext(ctx, sb.String())
+		query := b.Build()
+		_, err = db.ExecContext(ctx, query)
 		if err != nil {
 			return fmt.Errorf("failed to update database %s: %w", name, err)
 		}

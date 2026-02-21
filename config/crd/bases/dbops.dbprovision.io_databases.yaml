@@ -132,10 +132,12 @@ spec:
                   charset:
                     default: utf8mb4
                     description: Charset sets the database character set
+                    pattern: ^[a-zA-Z0-9_]+$
                     type: string
                   collation:
                     default: utf8mb4_unicode_ci
                     description: Collation sets the database collation
+                    pattern: ^[a-zA-Z0-9_]+$
                     type: string
                   defaultStorageEngine:
                     default: InnoDB
@@ -198,7 +200,9 @@ spec:
                         privileges:
                           description: Privileges to grant
                           items:
+                            pattern: ^[A-Z][A-Z ]*$
                             type: string
+                          maxItems: 20
                           minItems: 1
                           type: array
                         role:

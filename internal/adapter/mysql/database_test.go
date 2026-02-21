@@ -71,7 +71,7 @@ var _ = Describe("Database Operations", func() {
 				adapter = NewAdapter(testutil.DefaultConnectionConfig())
 				adapter.db = db
 
-				mock.ExpectExec("CREATE DATABASE IF NOT EXISTS `testdb` CHARACTER SET utf8mb4").
+				mock.ExpectExec("CREATE DATABASE IF NOT EXISTS `testdb` CHARACTER SET `utf8mb4`").
 					WillReturnResult(sqlmock.NewResult(0, 0))
 
 				opts := testutil.CreateDatabaseOptsWithCharset("testdb", "utf8mb4")
@@ -86,7 +86,7 @@ var _ = Describe("Database Operations", func() {
 				adapter = NewAdapter(testutil.DefaultConnectionConfig())
 				adapter.db = db
 
-				mock.ExpectExec("CREATE DATABASE IF NOT EXISTS `testdb` COLLATE utf8mb4_unicode_ci").
+				mock.ExpectExec("CREATE DATABASE IF NOT EXISTS `testdb` COLLATE `utf8mb4_unicode_ci`").
 					WillReturnResult(sqlmock.NewResult(0, 0))
 
 				opts := testutil.CreateDatabaseOptsWithCollation("testdb", "utf8mb4_unicode_ci")
@@ -101,7 +101,7 @@ var _ = Describe("Database Operations", func() {
 				adapter = NewAdapter(testutil.DefaultConnectionConfig())
 				adapter.db = db
 
-				mock.ExpectExec("CREATE DATABASE IF NOT EXISTS `testdb` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci").
+				mock.ExpectExec("CREATE DATABASE IF NOT EXISTS `testdb` CHARACTER SET `utf8mb4` COLLATE `utf8mb4_unicode_ci`").
 					WillReturnResult(sqlmock.NewResult(0, 0))
 
 				opts := testutil.CreateDatabaseOptsWithCharsetAndCollation("testdb", "utf8mb4", "utf8mb4_unicode_ci")
@@ -426,7 +426,7 @@ var _ = Describe("Database Operations", func() {
 				adapter = NewAdapter(testutil.DefaultConnectionConfig())
 				adapter.db = db
 
-				mock.ExpectExec("ALTER DATABASE `testdb` CHARACTER SET utf8mb4").
+				mock.ExpectExec("ALTER DATABASE `testdb` CHARACTER SET `utf8mb4`").
 					WillReturnResult(sqlmock.NewResult(0, 0))
 
 				opts := testutil.UpdateDatabaseOptsWithCharset("utf8mb4")
@@ -441,7 +441,7 @@ var _ = Describe("Database Operations", func() {
 				adapter = NewAdapter(testutil.DefaultConnectionConfig())
 				adapter.db = db
 
-				mock.ExpectExec("ALTER DATABASE `testdb` COLLATE utf8mb4_unicode_ci").
+				mock.ExpectExec("ALTER DATABASE `testdb` COLLATE `utf8mb4_unicode_ci`").
 					WillReturnResult(sqlmock.NewResult(0, 0))
 
 				opts := testutil.UpdateDatabaseOptsWithCollation("utf8mb4_unicode_ci")
@@ -456,7 +456,7 @@ var _ = Describe("Database Operations", func() {
 				adapter = NewAdapter(testutil.DefaultConnectionConfig())
 				adapter.db = db
 
-				mock.ExpectExec("ALTER DATABASE `testdb` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci").
+				mock.ExpectExec("ALTER DATABASE `testdb` CHARACTER SET `utf8mb4` COLLATE `utf8mb4_unicode_ci`").
 					WillReturnResult(sqlmock.NewResult(0, 0))
 
 				opts := testutil.UpdateDatabaseOpts("utf8mb4", "utf8mb4_unicode_ci")
@@ -496,7 +496,7 @@ var _ = Describe("Database Operations", func() {
 				adapter = NewAdapter(testutil.DefaultConnectionConfig())
 				adapter.db = db
 
-				mock.ExpectExec("ALTER DATABASE `testdb` CHARACTER SET utf8mb4").
+				mock.ExpectExec("ALTER DATABASE `testdb` CHARACTER SET `utf8mb4`").
 					WillReturnError(fmt.Errorf("access denied"))
 
 				opts := testutil.UpdateDatabaseOptsWithCharset("utf8mb4")

@@ -23,6 +23,7 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/db-provision-operator/internal/adapter/sqlbuilder"
 	"github.com/db-provision-operator/internal/adapter/types"
 )
 
@@ -41,7 +42,11 @@ func (a *Adapter) Grant(ctx context.Context, grantee string, opts []types.GrantO
 	}
 
 	for i, opt := range opts {
-		query := a.buildGrantQuery(grantee, opt)
+		query, buildErr := a.buildGrantQuery(grantee, opt)
+		if buildErr != nil {
+			log.Error(buildErr, "Failed to build grant query", "index", i)
+			return fmt.Errorf("failed to build grant query: %w", buildErr)
+		}
 		log.V(2).Info("Executing grant query", "index", i, "query", query, "level", opt.Level, "database", opt.Database)
 		_, err = db.ExecContext(ctx, query)
 		if err != nil {
@@ -74,7 +79,11 @@ func (a *Adapter) Revoke(ctx context.Context, grantee string, opts []types.Grant
 	}
 
 	for i, opt := range opts {
-		query := a.buildRevokeQuery(grantee, opt)
+		query, buildErr := a.buildRevokeQuery(grantee, opt)
+		if buildErr != nil {
+			log.Error(buildErr, "Failed to build revoke query", "index", i)
+			return fmt.Errorf("failed to build revoke query: %w", buildErr)
+		}
 		log.V(2).Info("Executing revoke query", "index", i, "query", query, "level", opt.Level, "database", opt.Database)
 		_, err = db.ExecContext(ctx, query)
 		if err != nil {
@@ -120,11 +129,11 @@ func (a *Adapter) GrantRole(ctx context.Context, grantee string, roles []string)
 
 	for _, role := range roles {
 		for _, host := range hosts {
-			// Role names are identifiers (use backticks), user@host uses string literals (quotes)
-			query := fmt.Sprintf("GRANT %s TO %s@%s",
-				escapeIdentifier(role),
-				escapeLiteral(grantee),
-				escapeLiteral(host))
+			query, buildErr := sqlbuilder.NewMySQL().GrantRole(role).ToUser(grantee, host).Build()
+			if buildErr != nil {
+				log.Error(buildErr, "Failed to build grant role query", "role", role, "host", host)
+				return fmt.Errorf("failed to build grant role query: %w", buildErr)
+			}
 			log.Info("Executing role grant", "role", role, "host", host, "query", query)
 			_, err = db.ExecContext(ctx, query)
 			if err != nil {
@@ -164,11 +173,11 @@ func (a *Adapter) RevokeRole(ctx context.Context, grantee string, roles []string
 
 	for _, role := range roles {
 		for _, host := range hosts {
-			// Role names are identifiers (use backticks), user@host uses string literals (quotes)
-			query := fmt.Sprintf("REVOKE %s FROM %s@%s",
-				escapeIdentifier(role),
-				escapeLiteral(grantee),
-				escapeLiteral(host))
+			query, buildErr := sqlbuilder.NewMySQL().RevokeRole(role).FromUser(grantee, host).Build()
+			if buildErr != nil {
+				log.Error(buildErr, "Failed to build revoke role query", "role", role, "host", host)
+				return fmt.Errorf("failed to build revoke role query: %w", buildErr)
+			}
 			log.Info("Executing role revoke", "role", role, "host", host, "query", query)
 			_, err = db.ExecContext(ctx, query)
 			if err != nil {
@@ -247,84 +256,92 @@ func (a *Adapter) GetGrants(ctx context.Context, grantee string) ([]types.GrantI
 	return grants, nil
 }
 
-// buildGrantQuery builds a GRANT query
-func (a *Adapter) buildGrantQuery(grantee string, opt types.GrantOptions) string {
-	privileges := formatPrivileges(opt.Privileges)
-
-	var target string
-	switch opt.Level {
-	case "global":
-		target = "*.*"
-	case "database":
-		target = fmt.Sprintf("%s.*", escapeIdentifier(opt.Database))
-	case "table":
-		target = fmt.Sprintf("%s.%s", escapeIdentifier(opt.Database), escapeIdentifier(opt.Table))
-	case "column":
-		// Column-level privileges
-		if len(opt.Columns) > 0 {
-			var cols []string
-			for _, col := range opt.Columns {
-				cols = append(cols, escapeIdentifier(col))
-			}
-			privileges = fmt.Sprintf("%s (%s)", privileges, strings.Join(cols, ", "))
-		}
-		target = fmt.Sprintf("%s.%s", escapeIdentifier(opt.Database), escapeIdentifier(opt.Table))
-	case "procedure":
-		target = fmt.Sprintf("PROCEDURE %s.%s", escapeIdentifier(opt.Database), escapeIdentifier(opt.Procedure))
-	case "function":
-		target = fmt.Sprintf("FUNCTION %s.%s", escapeIdentifier(opt.Database), escapeIdentifier(opt.Function))
-	default:
-		// Default to database level if database is specified
-		if opt.Database != "" {
-			target = fmt.Sprintf("%s.*", escapeIdentifier(opt.Database))
-		} else {
-			target = "*.*"
-		}
+// buildGrantQuery builds a GRANT query using the SQL builder.
+func (a *Adapter) buildGrantQuery(grantee string, opt types.GrantOptions) (string, error) {
+	// Column-level grants need special handling: GRANT priv (col1, col2) ON db.table TO user
+	if opt.Level == "column" && len(opt.Columns) > 0 {
+		return a.buildColumnGrantQuery("GRANT", "TO", grantee, opt)
 	}
 
-	query := fmt.Sprintf("GRANT %s ON %s TO %s", privileges, target, escapeLiteral(grantee))
-
+	b := sqlbuilder.NewMySQL().Grant(opt.Privileges...)
+	a.setMySQLTarget(b, opt)
+	b.ToLiteral(grantee)
 	if opt.WithGrantOption {
+		b.WithGrantOption()
+	}
+	return b.Build()
+}
+
+// buildRevokeQuery builds a REVOKE query using the SQL builder.
+func (a *Adapter) buildRevokeQuery(grantee string, opt types.GrantOptions) (string, error) {
+	// Column-level revokes need special handling
+	if opt.Level == "column" && len(opt.Columns) > 0 {
+		return a.buildColumnGrantQuery("REVOKE", "FROM", grantee, opt)
+	}
+
+	b := sqlbuilder.NewMySQL().Revoke(opt.Privileges...)
+	a.setMySQLTarget(b, opt)
+	b.FromLiteral(grantee)
+	return b.Build()
+}
+
+// buildColumnGrantQuery builds column-level GRANT/REVOKE with escaped columns.
+func (a *Adapter) buildColumnGrantQuery(verb, preposition, grantee string, opt types.GrantOptions) (string, error) {
+	d := sqlbuilder.MySQLDialect{}
+
+	if err := sqlbuilder.ValidatePrivileges(opt.Privileges, d.ValidPrivileges()); err != nil {
+		return "", err
+	}
+
+	privList := make([]string, len(opt.Privileges))
+	for i, p := range opt.Privileges {
+		privList[i] = strings.ToUpper(strings.TrimSpace(p))
+	}
+
+	cols := make([]string, len(opt.Columns))
+	for i, c := range opt.Columns {
+		cols[i] = d.EscapeIdentifier(c)
+	}
+
+	target := fmt.Sprintf("%s.%s",
+		d.EscapeIdentifier(opt.Database),
+		d.EscapeIdentifier(opt.Table))
+
+	query := fmt.Sprintf("%s %s (%s) ON %s %s %s",
+		verb,
+		strings.Join(privList, ", "),
+		strings.Join(cols, ", "),
+		target,
+		preposition,
+		d.EscapeLiteral(grantee))
+
+	if opt.WithGrantOption && verb == "GRANT" {
 		query += " WITH GRANT OPTION"
 	}
 
-	return query
+	return query, nil
 }
 
-// buildRevokeQuery builds a REVOKE query
-func (a *Adapter) buildRevokeQuery(grantee string, opt types.GrantOptions) string {
-	privileges := formatPrivileges(opt.Privileges)
-
-	var target string
+// setMySQLTarget sets the target object on a GrantBuilder based on GrantOptions.
+func (a *Adapter) setMySQLTarget(b *sqlbuilder.GrantBuilder, opt types.GrantOptions) {
 	switch opt.Level {
 	case "global":
-		target = "*.*"
+		b.OnGlobal()
 	case "database":
-		target = fmt.Sprintf("%s.*", escapeIdentifier(opt.Database))
+		b.OnDatabase(opt.Database)
 	case "table":
-		target = fmt.Sprintf("%s.%s", escapeIdentifier(opt.Database), escapeIdentifier(opt.Table))
-	case "column":
-		if len(opt.Columns) > 0 {
-			var cols []string
-			for _, col := range opt.Columns {
-				cols = append(cols, escapeIdentifier(col))
-			}
-			privileges = fmt.Sprintf("%s (%s)", privileges, strings.Join(cols, ", "))
-		}
-		target = fmt.Sprintf("%s.%s", escapeIdentifier(opt.Database), escapeIdentifier(opt.Table))
+		b.OnMySQLTable(opt.Database, opt.Table)
 	case "procedure":
-		target = fmt.Sprintf("PROCEDURE %s.%s", escapeIdentifier(opt.Database), escapeIdentifier(opt.Procedure))
+		b.OnProcedure(opt.Database, opt.Procedure)
 	case "function":
-		target = fmt.Sprintf("FUNCTION %s.%s", escapeIdentifier(opt.Database), escapeIdentifier(opt.Function))
+		b.OnMySQLFunction(opt.Database, opt.Function)
 	default:
 		if opt.Database != "" {
-			target = fmt.Sprintf("%s.*", escapeIdentifier(opt.Database))
+			b.OnDatabase(opt.Database)
 		} else {
-			target = "*.*"
+			b.OnGlobal()
 		}
 	}
-
-	return fmt.Sprintf("REVOKE %s ON %s FROM %s", privileges, target, escapeLiteral(grantee))
 }
 
 // parseGrantString parses a MySQL GRANT string into a GrantInfo

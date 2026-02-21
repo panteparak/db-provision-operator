@@ -63,10 +63,12 @@ type MySQLInstanceConfig struct {
 type MySQLDatabaseConfig struct {
 	// Charset sets the database character set
 	// +kubebuilder:default=utf8mb4
+	// +kubebuilder:validation:Pattern=`^[a-zA-Z0-9_]+$`
 	Charset string `json:"charset,omitempty"`
 
 	// Collation sets the database collation
 	// +kubebuilder:default=utf8mb4_unicode_ci
+	// +kubebuilder:validation:Pattern=`^[a-zA-Z0-9_]+$`
 	Collation string `json:"collation,omitempty"`
 
 	// SQLMode sets the SQL mode for the database
@@ -194,6 +196,8 @@ type MySQLGrant struct {
 
 	// Privileges to grant (SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER, etc.)
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=20
+	// +kubebuilder:validation:items:Pattern=`^[A-Z][A-Z ]*$`
 	Privileges []string `json:"privileges"`
 
 	// WithGrantOption allows the grantee to grant these privileges to others

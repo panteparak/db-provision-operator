@@ -19,8 +19,8 @@ package postgres
 import (
 	"context"
 	"fmt"
-	"strings"
 
+	"github.com/db-provision-operator/internal/adapter/sqlbuilder"
 	"github.com/db-provision-operator/internal/adapter/types"
 )
 
@@ -31,93 +31,38 @@ func (a *Adapter) CreateUser(ctx context.Context, opts types.CreateUserOptions) 
 		return err
 	}
 
-	var sb strings.Builder
-	sb.WriteString("CREATE ROLE ")
-	sb.WriteString(escapeIdentifier(opts.Username))
-
-	// Build options
-	var roleOpts []string
-
-	// Login is required for users
-	if opts.Login {
-		roleOpts = append(roleOpts, "LOGIN")
-	} else {
-		roleOpts = append(roleOpts, "LOGIN") // Default to LOGIN for users
-	}
+	b := sqlbuilder.PgCreateRole(opts.Username).
+		Login(true). // Users always get LOGIN
+		Superuser(opts.Superuser).
+		CreateDB(opts.CreateDB).
+		CreateRoleOpt(opts.CreateRole).
+		Inherit(opts.Inherit).
+		Replication(opts.Replication).
+		BypassRLS(opts.BypassRLS)
 
 	if opts.Password != "" {
-		roleOpts = append(roleOpts, fmt.Sprintf("PASSWORD %s", escapeLiteral(opts.Password)))
+		b.WithPassword(opts.Password)
 	}
-
-	if opts.Superuser {
-		roleOpts = append(roleOpts, "SUPERUSER")
-	} else {
-		roleOpts = append(roleOpts, "NOSUPERUSER")
-	}
-
-	if opts.CreateDB {
-		roleOpts = append(roleOpts, "CREATEDB")
-	} else {
-		roleOpts = append(roleOpts, "NOCREATEDB")
-	}
-
-	if opts.CreateRole {
-		roleOpts = append(roleOpts, "CREATEROLE")
-	} else {
-		roleOpts = append(roleOpts, "NOCREATEROLE")
-	}
-
-	if opts.Inherit {
-		roleOpts = append(roleOpts, "INHERIT")
-	} else {
-		roleOpts = append(roleOpts, "NOINHERIT")
-	}
-
-	if opts.Replication {
-		roleOpts = append(roleOpts, "REPLICATION")
-	} else {
-		roleOpts = append(roleOpts, "NOREPLICATION")
-	}
-
-	if opts.BypassRLS {
-		roleOpts = append(roleOpts, "BYPASSRLS")
-	} else {
-		roleOpts = append(roleOpts, "NOBYPASSRLS")
-	}
-
 	if opts.ConnectionLimit != 0 {
-		roleOpts = append(roleOpts, fmt.Sprintf("CONNECTION LIMIT %d", opts.ConnectionLimit))
+		b.ConnectionLimit(int(opts.ConnectionLimit))
 	}
-
 	if opts.ValidUntil != "" {
-		roleOpts = append(roleOpts, fmt.Sprintf("VALID UNTIL %s", escapeLiteral(opts.ValidUntil)))
+		b.ValidUntil(opts.ValidUntil)
 	}
-
 	if len(opts.InRoles) > 0 {
-		var roles []string
-		for _, r := range opts.InRoles {
-			roles = append(roles, escapeIdentifier(r))
-		}
-		roleOpts = append(roleOpts, fmt.Sprintf("IN ROLE %s", strings.Join(roles, ", ")))
+		b.InRoles(opts.InRoles...)
 	}
 
-	if len(roleOpts) > 0 {
-		sb.WriteString(" WITH ")
-		sb.WriteString(strings.Join(roleOpts, " "))
-	}
-
-	_, err = pool.Exec(ctx, sb.String())
+	query := b.Build()
+	_, err = pool.Exec(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to create user %s: %w", opts.Username, err)
 	}
 
 	// Set configuration parameters
 	for param, value := range opts.ConfigParams {
-		query := fmt.Sprintf("ALTER ROLE %s SET %s = %s",
-			escapeIdentifier(opts.Username),
-			escapeIdentifier(param),
-			escapeLiteral(value))
-		if _, err := pool.Exec(ctx, query); err != nil {
+		q := sqlbuilder.PgAlterRole(opts.Username).Set(param, value).Build()
+		if _, err := pool.Exec(ctx, q); err != nil {
 			return fmt.Errorf("failed to set config param %s for user %s: %w", param, opts.Username, err)
 		}
 	}
@@ -137,7 +82,7 @@ func (a *Adapter) DropUser(ctx context.Context, username string) error {
 	_, _ = pool.Exec(ctx, fmt.Sprintf("REASSIGN OWNED BY %s TO CURRENT_USER", escapeIdentifier(username)))
 	_, _ = pool.Exec(ctx, fmt.Sprintf("DROP OWNED BY %s", escapeIdentifier(username)))
 
-	query := fmt.Sprintf("DROP ROLE IF EXISTS %s", escapeIdentifier(username))
+	query := sqlbuilder.PgDropRole(username).IfExists().Build()
 	_, err = pool.Exec(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to drop user %s: %w", username, err)
@@ -171,76 +116,48 @@ func (a *Adapter) UpdateUser(ctx context.Context, username string, opts types.Up
 		return err
 	}
 
-	var alterOpts []string
-
-	if opts.Superuser != nil {
-		if *opts.Superuser {
-			alterOpts = append(alterOpts, "SUPERUSER")
-		} else {
-			alterOpts = append(alterOpts, "NOSUPERUSER")
-		}
-	}
-
-	if opts.CreateDB != nil {
-		if *opts.CreateDB {
-			alterOpts = append(alterOpts, "CREATEDB")
-		} else {
-			alterOpts = append(alterOpts, "NOCREATEDB")
-		}
-	}
-
-	if opts.CreateRole != nil {
-		if *opts.CreateRole {
-			alterOpts = append(alterOpts, "CREATEROLE")
-		} else {
-			alterOpts = append(alterOpts, "NOCREATEROLE")
-		}
-	}
-
-	if opts.Inherit != nil {
-		if *opts.Inherit {
-			alterOpts = append(alterOpts, "INHERIT")
-		} else {
-			alterOpts = append(alterOpts, "NOINHERIT")
-		}
-	}
+	b := sqlbuilder.PgAlterRole(username)
+	hasOpts := false
 
 	if opts.Login != nil {
-		if *opts.Login {
-			alterOpts = append(alterOpts, "LOGIN")
-		} else {
-			alterOpts = append(alterOpts, "NOLOGIN")
-		}
+		b.Login(*opts.Login)
+		hasOpts = true
 	}
-
+	if opts.Superuser != nil {
+		b.Superuser(*opts.Superuser)
+		hasOpts = true
+	}
+	if opts.CreateDB != nil {
+		b.CreateDB(*opts.CreateDB)
+		hasOpts = true
+	}
+	if opts.CreateRole != nil {
+		b.CreateRoleOpt(*opts.CreateRole)
+		hasOpts = true
+	}
+	if opts.Inherit != nil {
+		b.Inherit(*opts.Inherit)
+		hasOpts = true
+	}
 	if opts.Replication != nil {
-		if *opts.Replication {
-			alterOpts = append(alterOpts, "REPLICATION")
-		} else {
-			alterOpts = append(alterOpts, "NOREPLICATION")
-		}
+		b.Replication(*opts.Replication)
+		hasOpts = true
 	}
-
 	if opts.BypassRLS != nil {
-		if *opts.BypassRLS {
-			alterOpts = append(alterOpts, "BYPASSRLS")
-		} else {
-			alterOpts = append(alterOpts, "NOBYPASSRLS")
-		}
+		b.BypassRLS(*opts.BypassRLS)
+		hasOpts = true
 	}
-
 	if opts.ConnectionLimit != nil {
-		alterOpts = append(alterOpts, fmt.Sprintf("CONNECTION LIMIT %d", *opts.ConnectionLimit))
+		b.ConnectionLimit(int(*opts.ConnectionLimit))
+		hasOpts = true
 	}
-
 	if opts.ValidUntil != nil {
-		alterOpts = append(alterOpts, fmt.Sprintf("VALID UNTIL %s", escapeLiteral(*opts.ValidUntil)))
+		b.ValidUntil(*opts.ValidUntil)
+		hasOpts = true
 	}
 
-	if len(alterOpts) > 0 {
-		query := fmt.Sprintf("ALTER ROLE %s WITH %s",
-			escapeIdentifier(username),
-			strings.Join(alterOpts, " "))
+	if hasOpts {
+		query := b.Build()
 		if _, err := pool.Exec(ctx, query); err != nil {
 			return fmt.Errorf("failed to update user %s: %w", username, err)
 		}
@@ -248,19 +165,19 @@ func (a *Adapter) UpdateUser(ctx context.Context, username string, opts types.Up
 
 	// Handle role membership changes
 	for _, role := range opts.InRoles {
-		query := fmt.Sprintf("GRANT %s TO %s", escapeIdentifier(role), escapeIdentifier(username))
-		if _, err := pool.Exec(ctx, query); err != nil {
+		q, buildErr := sqlbuilder.NewPg().GrantRole(role).To(username).Build()
+		if buildErr != nil {
+			return fmt.Errorf("failed to build grant role query: %w", buildErr)
+		}
+		if _, err := pool.Exec(ctx, q); err != nil {
 			return fmt.Errorf("failed to grant role %s to user %s: %w", role, username, err)
 		}
 	}
 
 	// Set configuration parameters
 	for param, value := range opts.ConfigParams {
-		query := fmt.Sprintf("ALTER ROLE %s SET %s = %s",
-			escapeIdentifier(username),
-			escapeIdentifier(param),
-			escapeLiteral(value))
-		if _, err := pool.Exec(ctx, query); err != nil {
+		q := sqlbuilder.PgAlterRole(username).Set(param, value).Build()
+		if _, err := pool.Exec(ctx, q); err != nil {
 			return fmt.Errorf("failed to set config param %s for user %s: %w", param, username, err)
 		}
 	}
@@ -275,9 +192,7 @@ func (a *Adapter) UpdatePassword(ctx context.Context, username, password string)
 		return err
 	}
 
-	query := fmt.Sprintf("ALTER ROLE %s WITH PASSWORD %s",
-		escapeIdentifier(username),
-		escapeLiteral(password))
+	query := sqlbuilder.PgAlterRole(username).WithPassword(password).Build()
 	_, err = pool.Exec(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to update password for user %s: %w", username, err)

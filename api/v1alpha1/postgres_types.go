@@ -140,6 +140,8 @@ type PostgresDefaultPrivilege struct {
 
 	// Privileges to grant
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=20
+	// +kubebuilder:validation:items:Pattern=`^[A-Z][A-Z ]*$`
 	Privileges []string `json:"privileges"`
 }
 
@@ -260,6 +262,8 @@ type PostgresGrant struct {
 
 	// Privileges to grant (SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER, CREATE, CONNECT, TEMPORARY, EXECUTE, USAGE)
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=20
+	// +kubebuilder:validation:items:Pattern=`^[A-Z][A-Z ]*$`
 	Privileges []string `json:"privileges"`
 
 	// WithGrantOption allows the grantee to grant these privileges to others
@@ -302,6 +306,8 @@ type PostgresDefaultPrivilegeGrant struct {
 
 	// Privileges to grant
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=20
+	// +kubebuilder:validation:items:Pattern=`^[A-Z][A-Z ]*$`
 	Privileges []string `json:"privileges"`
 }
 

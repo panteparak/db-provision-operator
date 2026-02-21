@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/db-provision-operator/internal/adapter/sqlbuilder"
 	"github.com/db-provision-operator/internal/adapter/types"
 )
 
@@ -51,17 +52,9 @@ func (a *Adapter) CreateUser(ctx context.Context, opts types.CreateUserOptions) 
 		// Check if this is an insecure mode error - CockroachDB doesn't support passwords in insecure mode
 		if hasPassword && isInsecureModeError(err) {
 			// Retry without password for insecure mode compatibility
-			queryNoPassword, _ := a.buildCreateUserQuery(types.CreateUserOptions{
-				Username:        opts.Username,
-				Password:        "", // No password
-				CreateDB:        opts.CreateDB,
-				CreateRole:      opts.CreateRole,
-				Inherit:         opts.Inherit,
-				ConnectionLimit: opts.ConnectionLimit,
-				ValidUntil:      opts.ValidUntil,
-				InRoles:         opts.InRoles,
-				ConfigParams:    opts.ConfigParams,
-			})
+			noPassOpts := opts
+			noPassOpts.Password = ""
+			queryNoPassword, _ := a.buildCreateUserQuery(noPassOpts)
 			if _, retryErr := pool.Exec(ctx, queryNoPassword); retryErr != nil {
 				return fmt.Errorf("failed to create user %s (insecure mode, no password): %w", opts.Username, retryErr)
 			}
@@ -73,19 +66,19 @@ func (a *Adapter) CreateUser(ctx context.Context, opts types.CreateUserOptions) 
 
 	// Grant role memberships (CockroachDB doesn't support IN ROLE in CREATE ROLE)
 	for _, role := range opts.InRoles {
-		grantQuery := fmt.Sprintf("GRANT %s TO %s", escapeIdentifier(role), escapeIdentifier(opts.Username))
-		if _, err := pool.Exec(ctx, grantQuery); err != nil {
+		q, buildErr := sqlbuilder.NewPg().GrantRole(role).To(opts.Username).Build()
+		if buildErr != nil {
+			return fmt.Errorf("failed to build grant role query: %w", buildErr)
+		}
+		if _, err := pool.Exec(ctx, q); err != nil {
 			return fmt.Errorf("failed to grant role %s to user %s: %w", role, opts.Username, err)
 		}
 	}
 
 	// Set configuration parameters if any
 	for param, value := range opts.ConfigParams {
-		query := fmt.Sprintf("ALTER ROLE %s SET %s = %s",
-			escapeIdentifier(opts.Username),
-			escapeIdentifier(param),
-			escapeLiteral(value))
-		if _, err := pool.Exec(ctx, query); err != nil {
+		q := sqlbuilder.PgAlterRole(opts.Username).Set(param, value).Build()
+		if _, err := pool.Exec(ctx, q); err != nil {
 			return fmt.Errorf("failed to set config param %s for user %s: %w", param, opts.Username, err)
 		}
 	}
@@ -96,54 +89,27 @@ func (a *Adapter) CreateUser(ctx context.Context, opts types.CreateUserOptions) 
 // buildCreateUserQuery constructs the CREATE ROLE query for a user.
 // Returns the query string and whether a password was included.
 func (a *Adapter) buildCreateUserQuery(opts types.CreateUserOptions) (string, bool) {
-	var sb strings.Builder
-	sb.WriteString("CREATE ROLE ")
-	sb.WriteString(escapeIdentifier(opts.Username))
+	b := sqlbuilder.PgCreateRole(opts.Username).
+		Login(true). // Users always get LOGIN
+		CreateDB(opts.CreateDB).
+		CreateRoleOpt(opts.CreateRole)
+	// Note: CockroachDB does NOT support INHERIT/NOINHERIT — silently ignored
 
-	var roleOpts []string
 	hasPassword := false
-
-	// Users always get LOGIN (this is what distinguishes them from roles)
-	roleOpts = append(roleOpts, "LOGIN")
-
 	if opts.Password != "" {
-		roleOpts = append(roleOpts, fmt.Sprintf("PASSWORD %s", escapeLiteral(opts.Password)))
+		b.WithPassword(opts.Password)
 		hasPassword = true
 	}
-
-	// CockroachDB-supported role attributes with least-privilege defaults
-	if opts.CreateDB {
-		roleOpts = append(roleOpts, "CREATEDB")
-	} else {
-		roleOpts = append(roleOpts, "NOCREATEDB")
-	}
-
-	if opts.CreateRole {
-		roleOpts = append(roleOpts, "CREATEROLE")
-	} else {
-		roleOpts = append(roleOpts, "NOCREATEROLE")
-	}
-
-	// Note: CockroachDB does NOT support INHERIT/NOINHERIT
-	// The Inherit field is silently ignored for CockroachDB compatibility
-
 	if opts.ConnectionLimit != 0 {
-		roleOpts = append(roleOpts, fmt.Sprintf("CONNECTION LIMIT %d", opts.ConnectionLimit))
+		b.ConnectionLimit(int(opts.ConnectionLimit))
 	}
-
 	if opts.ValidUntil != "" {
-		roleOpts = append(roleOpts, fmt.Sprintf("VALID UNTIL %s", escapeLiteral(opts.ValidUntil)))
+		b.ValidUntil(opts.ValidUntil)
 	}
-
 	// Note: CockroachDB does NOT support IN ROLE in CREATE ROLE statements.
 	// Role membership is handled separately via GRANT after user creation.
 
-	if len(roleOpts) > 0 {
-		sb.WriteString(" WITH ")
-		sb.WriteString(strings.Join(roleOpts, " "))
-	}
-
-	return sb.String(), hasPassword
+	return b.Build(), hasPassword
 }
 
 // isInsecureModeError checks if the error indicates CockroachDB is running in insecure mode
@@ -196,7 +162,7 @@ func (a *Adapter) DropUser(ctx context.Context, username string) error {
 	_, _ = pool.Exec(ctx, fmt.Sprintf("REASSIGN OWNED BY %s TO CURRENT_USER", escapeIdentifier(username)))
 	_, _ = pool.Exec(ctx, fmt.Sprintf("DROP OWNED BY %s", escapeIdentifier(username)))
 
-	query := fmt.Sprintf("DROP ROLE IF EXISTS %s", escapeIdentifier(username))
+	query := sqlbuilder.PgDropRole(username).IfExists().Build()
 	_, err = pool.Exec(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to drop user %s: %w", username, err)
@@ -233,47 +199,33 @@ func (a *Adapter) UpdateUser(ctx context.Context, username string, opts types.Up
 		return err
 	}
 
-	var alterOpts []string
+	b := sqlbuilder.PgAlterRole(username)
+	hasOpts := false
 
 	if opts.CreateDB != nil {
-		if *opts.CreateDB {
-			alterOpts = append(alterOpts, "CREATEDB")
-		} else {
-			alterOpts = append(alterOpts, "NOCREATEDB")
-		}
+		b.CreateDB(*opts.CreateDB)
+		hasOpts = true
 	}
-
 	if opts.CreateRole != nil {
-		if *opts.CreateRole {
-			alterOpts = append(alterOpts, "CREATEROLE")
-		} else {
-			alterOpts = append(alterOpts, "NOCREATEROLE")
-		}
+		b.CreateRoleOpt(*opts.CreateRole)
+		hasOpts = true
 	}
-
-	// Note: CockroachDB does NOT support INHERIT/NOINHERIT
-	// The Inherit field is silently ignored for CockroachDB compatibility
-
+	// Note: CockroachDB does NOT support INHERIT/NOINHERIT — silently ignored
 	if opts.Login != nil {
-		if *opts.Login {
-			alterOpts = append(alterOpts, "LOGIN")
-		} else {
-			alterOpts = append(alterOpts, "NOLOGIN")
-		}
+		b.Login(*opts.Login)
+		hasOpts = true
 	}
-
 	if opts.ConnectionLimit != nil {
-		alterOpts = append(alterOpts, fmt.Sprintf("CONNECTION LIMIT %d", *opts.ConnectionLimit))
+		b.ConnectionLimit(int(*opts.ConnectionLimit))
+		hasOpts = true
 	}
-
 	if opts.ValidUntil != nil {
-		alterOpts = append(alterOpts, fmt.Sprintf("VALID UNTIL %s", escapeLiteral(*opts.ValidUntil)))
+		b.ValidUntil(*opts.ValidUntil)
+		hasOpts = true
 	}
 
-	if len(alterOpts) > 0 {
-		query := fmt.Sprintf("ALTER ROLE %s WITH %s",
-			escapeIdentifier(username),
-			strings.Join(alterOpts, " "))
+	if hasOpts {
+		query := b.Build()
 		if _, err := pool.Exec(ctx, query); err != nil {
 			return fmt.Errorf("failed to update user %s: %w", username, err)
 		}
@@ -281,19 +233,19 @@ func (a *Adapter) UpdateUser(ctx context.Context, username string, opts types.Up
 
 	// Handle role membership changes
 	for _, role := range opts.InRoles {
-		query := fmt.Sprintf("GRANT %s TO %s", escapeIdentifier(role), escapeIdentifier(username))
-		if _, err := pool.Exec(ctx, query); err != nil {
+		q, buildErr := sqlbuilder.NewPg().GrantRole(role).To(username).Build()
+		if buildErr != nil {
+			return fmt.Errorf("failed to build grant role query: %w", buildErr)
+		}
+		if _, err := pool.Exec(ctx, q); err != nil {
 			return fmt.Errorf("failed to grant role %s to user %s: %w", role, username, err)
 		}
 	}
 
 	// Set configuration parameters
 	for param, value := range opts.ConfigParams {
-		query := fmt.Sprintf("ALTER ROLE %s SET %s = %s",
-			escapeIdentifier(username),
-			escapeIdentifier(param),
-			escapeLiteral(value))
-		if _, err := pool.Exec(ctx, query); err != nil {
+		q := sqlbuilder.PgAlterRole(username).Set(param, value).Build()
+		if _, err := pool.Exec(ctx, q); err != nil {
 			return fmt.Errorf("failed to set config param %s for user %s: %w", param, username, err)
 		}
 	}
@@ -309,9 +261,7 @@ func (a *Adapter) UpdatePassword(ctx context.Context, username, password string)
 		return err
 	}
 
-	query := fmt.Sprintf("ALTER ROLE %s WITH PASSWORD %s",
-		escapeIdentifier(username),
-		escapeLiteral(password))
+	query := sqlbuilder.PgAlterRole(username).WithPassword(password).Build()
 	_, err = pool.Exec(ctx, query)
 	if err != nil {
 		// In insecure mode, password updates are not supported - silently ignore

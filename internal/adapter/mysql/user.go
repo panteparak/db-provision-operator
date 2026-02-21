@@ -19,8 +19,8 @@ package mysql
 import (
 	"context"
 	"fmt"
-	"strings"
 
+	"github.com/db-provision-operator/internal/adapter/sqlbuilder"
 	"github.com/db-provision-operator/internal/adapter/types"
 )
 
@@ -38,20 +38,16 @@ func (a *Adapter) CreateUser(ctx context.Context, opts types.CreateUserOptions) 
 	}
 
 	for _, host := range hosts {
-		var sb strings.Builder
-		sb.WriteString("CREATE USER IF NOT EXISTS ")
-		sb.WriteString(fmt.Sprintf("%s@%s", escapeLiteral(opts.Username), escapeLiteral(host)))
-
-		// Add authentication
+		b := sqlbuilder.MySQLCreateUser(opts.Username, host)
 		if opts.Password != "" {
-			sb.WriteString(fmt.Sprintf(" IDENTIFIED BY %s", escapeLiteral(opts.Password)))
+			b.IdentifiedBy(opts.Password)
 		}
-
 		if opts.AuthPlugin != "" {
-			sb.WriteString(fmt.Sprintf(" WITH %s", opts.AuthPlugin))
+			b.AuthPlugin(opts.AuthPlugin)
 		}
 
-		_, err = db.ExecContext(ctx, sb.String())
+		query := b.Build()
+		_, err = db.ExecContext(ctx, query)
 		if err != nil {
 			return fmt.Errorf("failed to create user %s@%s: %w", opts.Username, host, err)
 		}
@@ -72,27 +68,28 @@ func (a *Adapter) applyUserOptions(ctx context.Context, username, host string, o
 		return err
 	}
 
-	var alterParts []string
-
 	// Resource limits
+	b := sqlbuilder.MySQLAlterUser(username, host)
+	hasResourceOpts := false
 	if opts.MaxQueriesPerHour > 0 {
-		alterParts = append(alterParts, fmt.Sprintf("MAX_QUERIES_PER_HOUR %d", opts.MaxQueriesPerHour))
+		b.ResourceOption(fmt.Sprintf("MAX_QUERIES_PER_HOUR %d", opts.MaxQueriesPerHour))
+		hasResourceOpts = true
 	}
 	if opts.MaxUpdatesPerHour > 0 {
-		alterParts = append(alterParts, fmt.Sprintf("MAX_UPDATES_PER_HOUR %d", opts.MaxUpdatesPerHour))
+		b.ResourceOption(fmt.Sprintf("MAX_UPDATES_PER_HOUR %d", opts.MaxUpdatesPerHour))
+		hasResourceOpts = true
 	}
 	if opts.MaxConnectionsPerHour > 0 {
-		alterParts = append(alterParts, fmt.Sprintf("MAX_CONNECTIONS_PER_HOUR %d", opts.MaxConnectionsPerHour))
+		b.ResourceOption(fmt.Sprintf("MAX_CONNECTIONS_PER_HOUR %d", opts.MaxConnectionsPerHour))
+		hasResourceOpts = true
 	}
 	if opts.MaxUserConnections > 0 {
-		alterParts = append(alterParts, fmt.Sprintf("MAX_USER_CONNECTIONS %d", opts.MaxUserConnections))
+		b.ResourceOption(fmt.Sprintf("MAX_USER_CONNECTIONS %d", opts.MaxUserConnections))
+		hasResourceOpts = true
 	}
 
-	if len(alterParts) > 0 {
-		query := fmt.Sprintf("ALTER USER %s@%s WITH %s",
-			escapeLiteral(username),
-			escapeLiteral(host),
-			strings.Join(alterParts, " "))
+	if hasResourceOpts {
+		query := b.Build()
 		_, err = db.ExecContext(ctx, query)
 		if err != nil {
 			return fmt.Errorf("failed to set user options: %w", err)
@@ -101,16 +98,13 @@ func (a *Adapter) applyUserOptions(ctx context.Context, username, host string, o
 
 	// SSL requirements
 	if opts.RequireSSL || opts.RequireX509 {
-		var require string
+		sslBuilder := sqlbuilder.MySQLAlterUser(username, host)
 		if opts.RequireX509 {
-			require = "REQUIRE X509"
+			sslBuilder.RequireX509()
 		} else {
-			require = "REQUIRE SSL"
+			sslBuilder.RequireSSL()
 		}
-		query := fmt.Sprintf("ALTER USER %s@%s %s",
-			escapeLiteral(username),
-			escapeLiteral(host),
-			require)
+		query := sslBuilder.Build()
 		_, err = db.ExecContext(ctx, query)
 		if err != nil {
 			return fmt.Errorf("failed to set SSL requirement: %w", err)
@@ -119,9 +113,7 @@ func (a *Adapter) applyUserOptions(ctx context.Context, username, host string, o
 
 	// Account lock
 	if opts.AccountLocked {
-		query := fmt.Sprintf("ALTER USER %s@%s ACCOUNT LOCK",
-			escapeLiteral(username),
-			escapeLiteral(host))
+		query := sqlbuilder.MySQLAlterUser(username, host).AccountLock().Build()
 		_, err = db.ExecContext(ctx, query)
 		if err != nil {
 			return fmt.Errorf("failed to lock account: %w", err)
@@ -158,9 +150,7 @@ func (a *Adapter) DropUser(ctx context.Context, username string) error {
 
 	// Drop user for each host
 	for _, host := range hosts {
-		query := fmt.Sprintf("DROP USER IF EXISTS %s@%s",
-			escapeLiteral(username),
-			escapeLiteral(host))
+		query := sqlbuilder.MySQLDropUser(username, host).IfExists().Build()
 		_, err = db.ExecContext(ctx, query)
 		if err != nil {
 			return fmt.Errorf("failed to drop user %s@%s: %w", username, host, err)
@@ -215,26 +205,28 @@ func (a *Adapter) UpdateUser(ctx context.Context, username string, opts types.Up
 
 	// Apply updates for each host
 	for _, host := range hosts {
-		var alterParts []string
+		b := sqlbuilder.MySQLAlterUser(username, host)
+		hasResourceOpts := false
 
 		if opts.MaxQueriesPerHour != nil {
-			alterParts = append(alterParts, fmt.Sprintf("MAX_QUERIES_PER_HOUR %d", *opts.MaxQueriesPerHour))
+			b.ResourceOption(fmt.Sprintf("MAX_QUERIES_PER_HOUR %d", *opts.MaxQueriesPerHour))
+			hasResourceOpts = true
 		}
 		if opts.MaxUpdatesPerHour != nil {
-			alterParts = append(alterParts, fmt.Sprintf("MAX_UPDATES_PER_HOUR %d", *opts.MaxUpdatesPerHour))
+			b.ResourceOption(fmt.Sprintf("MAX_UPDATES_PER_HOUR %d", *opts.MaxUpdatesPerHour))
+			hasResourceOpts = true
 		}
 		if opts.MaxConnectionsPerHour != nil {
-			alterParts = append(alterParts, fmt.Sprintf("MAX_CONNECTIONS_PER_HOUR %d", *opts.MaxConnectionsPerHour))
+			b.ResourceOption(fmt.Sprintf("MAX_CONNECTIONS_PER_HOUR %d", *opts.MaxConnectionsPerHour))
+			hasResourceOpts = true
 		}
 		if opts.MaxUserConnections != nil {
-			alterParts = append(alterParts, fmt.Sprintf("MAX_USER_CONNECTIONS %d", *opts.MaxUserConnections))
+			b.ResourceOption(fmt.Sprintf("MAX_USER_CONNECTIONS %d", *opts.MaxUserConnections))
+			hasResourceOpts = true
 		}
 
-		if len(alterParts) > 0 {
-			query := fmt.Sprintf("ALTER USER %s@%s WITH %s",
-				escapeLiteral(username),
-				escapeLiteral(host),
-				strings.Join(alterParts, " "))
+		if hasResourceOpts {
+			query := b.Build()
 			_, err = db.ExecContext(ctx, query)
 			if err != nil {
 				return fmt.Errorf("failed to update user %s@%s: %w", username, host, err)
@@ -243,18 +235,15 @@ func (a *Adapter) UpdateUser(ctx context.Context, username string, opts types.Up
 
 		// SSL requirements
 		if opts.RequireSSL != nil || opts.RequireX509 != nil {
-			var require string
+			sslBuilder := sqlbuilder.MySQLAlterUser(username, host)
 			if opts.RequireX509 != nil && *opts.RequireX509 {
-				require = "REQUIRE X509"
+				sslBuilder.RequireX509()
 			} else if opts.RequireSSL != nil && *opts.RequireSSL {
-				require = "REQUIRE SSL"
+				sslBuilder.RequireSSL()
 			} else {
-				require = "REQUIRE NONE"
+				sslBuilder.RequireNone()
 			}
-			query := fmt.Sprintf("ALTER USER %s@%s %s",
-				escapeLiteral(username),
-				escapeLiteral(host),
-				require)
+			query := sslBuilder.Build()
 			_, err = db.ExecContext(ctx, query)
 			if err != nil {
 				return fmt.Errorf("failed to set SSL requirement: %w", err)
@@ -263,16 +252,13 @@ func (a *Adapter) UpdateUser(ctx context.Context, username string, opts types.Up
 
 		// Account lock
 		if opts.AccountLocked != nil {
-			var lock string
+			lockBuilder := sqlbuilder.MySQLAlterUser(username, host)
 			if *opts.AccountLocked {
-				lock = "ACCOUNT LOCK"
+				lockBuilder.AccountLock()
 			} else {
-				lock = "ACCOUNT UNLOCK"
+				lockBuilder.AccountUnlock()
 			}
-			query := fmt.Sprintf("ALTER USER %s@%s %s",
-				escapeLiteral(username),
-				escapeLiteral(host),
-				lock)
+			query := lockBuilder.Build()
 			_, err = db.ExecContext(ctx, query)
 			if err != nil {
 				return fmt.Errorf("failed to set account lock: %w", err)
@@ -310,10 +296,7 @@ func (a *Adapter) UpdatePassword(ctx context.Context, username, password string)
 
 	// Update password for each host
 	for _, host := range hosts {
-		query := fmt.Sprintf("ALTER USER %s@%s IDENTIFIED BY %s",
-			escapeLiteral(username),
-			escapeLiteral(host),
-			escapeLiteral(password))
+		query := sqlbuilder.MySQLAlterUser(username, host).IdentifiedBy(password).Build()
 		_, err = db.ExecContext(ctx, query)
 		if err != nil {
 			return fmt.Errorf("failed to update password for %s@%s: %w", username, host, err)

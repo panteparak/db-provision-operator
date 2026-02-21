@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/db-provision-operator/internal/adapter/sqlbuilder"
 	"github.com/db-provision-operator/internal/adapter/types"
 )
 
@@ -38,28 +39,19 @@ func (a *Adapter) CreateDatabase(ctx context.Context, opts types.CreateDatabaseO
 		return err
 	}
 
-	var sb strings.Builder
-	sb.WriteString("CREATE DATABASE ")
-	sb.WriteString(escapeIdentifier(opts.Name))
-
-	var options []string
-
+	b := sqlbuilder.PgCreateDatabase(opts.Name)
 	if opts.Owner != "" {
-		options = append(options, fmt.Sprintf("OWNER = %s", escapeIdentifier(opts.Owner)))
+		b.Owner(opts.Owner)
 	}
 	if opts.Encoding != "" {
-		options = append(options, fmt.Sprintf("ENCODING = %s", escapeLiteral(opts.Encoding)))
+		b.Encoding(opts.Encoding)
 	}
 	if opts.ConnectionLimit != 0 {
-		options = append(options, fmt.Sprintf("CONNECTION LIMIT = %d", opts.ConnectionLimit))
+		b.ConnectionLimit(int(opts.ConnectionLimit))
 	}
 
-	if len(options) > 0 {
-		sb.WriteString(" WITH ")
-		sb.WriteString(strings.Join(options, " "))
-	}
-
-	_, err = pool.Exec(ctx, sb.String())
+	query := b.Build()
+	_, err = pool.Exec(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to create database %s: %w", opts.Name, err)
 	}
@@ -80,7 +72,7 @@ func (a *Adapter) DropDatabase(ctx context.Context, name string, opts types.Drop
 	// Unlike PostgreSQL, we don't need to explicitly terminate sessions first.
 	// The Force option is honored by using CASCADE which handles all dependencies.
 
-	query := fmt.Sprintf("DROP DATABASE IF EXISTS %s CASCADE", escapeIdentifier(name))
+	query := sqlbuilder.PgDropDatabase(name).IfExists().Cascade().Build()
 	_, err = pool.Exec(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to drop database %s: %w", name, err)
@@ -228,38 +220,26 @@ func (a *Adapter) VerifyDatabaseAccess(ctx context.Context, name string) error {
 // setDefaultPrivileges sets default privileges in a CockroachDB database.
 // CockroachDB supports ALTER DEFAULT PRIVILEGES with the same syntax as PostgreSQL.
 func (a *Adapter) setDefaultPrivileges(ctx context.Context, database string, dp types.DefaultPrivilegeOptions) error {
-	var sb strings.Builder
-	sb.WriteString("ALTER DEFAULT PRIVILEGES")
-
-	if dp.Role != "" {
-		sb.WriteString(" FOR ROLE ")
-		sb.WriteString(escapeIdentifier(dp.Role))
-	}
-
-	if dp.Schema != "" {
-		sb.WriteString(" IN SCHEMA ")
-		sb.WriteString(escapeIdentifier(dp.Schema))
-	}
-
-	sb.WriteString(" GRANT ")
-	sb.WriteString(strings.Join(dp.Privileges, ", "))
-	sb.WriteString(" ON ")
+	b := sqlbuilder.NewPg().AlterDefaultPrivileges(dp.Role, dp.Schema).
+		Grant(dp.Privileges...).To(dp.Role)
 
 	switch dp.ObjectType {
 	case "tables":
-		sb.WriteString("TABLES")
+		b.OnTables()
 	case "sequences":
-		sb.WriteString("SEQUENCES")
+		b.OnSequences()
 	case "functions":
-		sb.WriteString("FUNCTIONS")
+		b.OnFunctions()
 	case "types":
-		sb.WriteString("TYPES")
+		b.OnTypes()
 	default:
 		return fmt.Errorf("unsupported object type: %s", dp.ObjectType)
 	}
 
-	sb.WriteString(" TO ")
-	sb.WriteString(escapeIdentifier(dp.Role))
+	q, err := b.Build()
+	if err != nil {
+		return fmt.Errorf("failed to build alter default privileges: %w", err)
+	}
 
-	return a.execWithNewConnection(ctx, database, sb.String())
+	return a.execWithNewConnection(ctx, database, q)
 }

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/db-provision-operator/internal/adapter/sqlbuilder"
 	"github.com/db-provision-operator/internal/adapter/types"
 )
 
@@ -52,9 +53,10 @@ func (a *Adapter) GrantRole(ctx context.Context, grantee string, roles []string)
 	}
 
 	for _, role := range roles {
-		query := fmt.Sprintf("GRANT %s TO %s",
-			escapeIdentifier(role),
-			escapeIdentifier(grantee))
+		query, buildErr := sqlbuilder.NewPg().GrantRole(role).To(grantee).Build()
+		if buildErr != nil {
+			return fmt.Errorf("failed to build grant role query: %w", buildErr)
+		}
 		if _, err := pool.Exec(ctx, query); err != nil {
 			return fmt.Errorf("failed to grant role %s to %s: %w", role, grantee, err)
 		}
@@ -71,9 +73,10 @@ func (a *Adapter) RevokeRole(ctx context.Context, grantee string, roles []string
 	}
 
 	for _, role := range roles {
-		query := fmt.Sprintf("REVOKE %s FROM %s",
-			escapeIdentifier(role),
-			escapeIdentifier(grantee))
+		query, buildErr := sqlbuilder.NewPg().RevokeRole(role).From(grantee).Build()
+		if buildErr != nil {
+			return fmt.Errorf("failed to build revoke role query: %w", buildErr)
+		}
 		if _, err := pool.Exec(ctx, query); err != nil {
 			return fmt.Errorf("failed to revoke role %s from %s: %w", role, grantee, err)
 		}
@@ -178,12 +181,13 @@ func (a *Adapter) grantPrivileges(ctx context.Context, grantee string, opt types
 
 	// Handle database-level grants when no schema/table/sequence/function is specified
 	if opt.Schema == "" && len(opt.Tables) == 0 && len(opt.Sequences) == 0 && len(opt.Functions) == 0 && len(opt.Privileges) > 0 {
-		q := fmt.Sprintf("GRANT %s ON DATABASE %s TO %s",
-			strings.Join(opt.Privileges, ", "),
-			escapeIdentifier(database),
-			escapeIdentifier(grantee))
+		b := sqlbuilder.NewPg().Grant(opt.Privileges...).OnDatabase(database).To(grantee)
 		if opt.WithGrantOption {
-			q += " WITH GRANT OPTION"
+			b.WithGrantOption()
+		}
+		q, buildErr := b.Build()
+		if buildErr != nil {
+			return fmt.Errorf("failed to build grant query: %w", buildErr)
 		}
 		// Database-level grants are executed on the default database
 		if _, err := pool.Exec(ctx, q); err != nil {
@@ -205,73 +209,60 @@ func (a *Adapter) grantPrivileges(ctx context.Context, grantee string, opt types
 		}
 
 		if hasTablePrivs {
-			q := fmt.Sprintf("GRANT %s ON ALL TABLES IN SCHEMA %s TO %s",
-				strings.Join(opt.Privileges, ", "),
-				escapeIdentifier(opt.Schema),
-				escapeIdentifier(grantee))
+			b := sqlbuilder.NewPg().Grant(opt.Privileges...).OnAllTablesInSchema(opt.Schema).To(grantee)
 			if opt.WithGrantOption {
-				q += " WITH GRANT OPTION"
+				b.WithGrantOption()
+			}
+			q, buildErr := b.Build()
+			if buildErr != nil {
+				return fmt.Errorf("failed to build grant query: %w", buildErr)
 			}
 			queries = append(queries, q)
 		}
 
 		// Schema usage grant
-		queries = append(queries, fmt.Sprintf("GRANT USAGE ON SCHEMA %s TO %s",
-			escapeIdentifier(opt.Schema),
-			escapeIdentifier(grantee)))
+		q, buildErr := sqlbuilder.NewPg().Grant("USAGE").OnSchema(opt.Schema).To(grantee).Build()
+		if buildErr != nil {
+			return fmt.Errorf("failed to build schema usage grant: %w", buildErr)
+		}
+		queries = append(queries, q)
 	}
 
 	// Specific tables
 	for _, table := range opt.Tables {
-		tableName := table
-		if opt.Schema != "" {
-			tableName = fmt.Sprintf("%s.%s", escapeIdentifier(opt.Schema), escapeIdentifier(table))
-		} else {
-			tableName = escapeIdentifier(table)
-		}
-
-		q := fmt.Sprintf("GRANT %s ON TABLE %s TO %s",
-			strings.Join(opt.Privileges, ", "),
-			tableName,
-			escapeIdentifier(grantee))
+		b := sqlbuilder.NewPg().Grant(opt.Privileges...).OnTable(opt.Schema, table).To(grantee)
 		if opt.WithGrantOption {
-			q += " WITH GRANT OPTION"
+			b.WithGrantOption()
+		}
+		q, buildErr := b.Build()
+		if buildErr != nil {
+			return fmt.Errorf("failed to build grant query: %w", buildErr)
 		}
 		queries = append(queries, q)
 	}
 
 	// Specific sequences
 	for _, seq := range opt.Sequences {
-		seqName := seq
-		if opt.Schema != "" {
-			seqName = fmt.Sprintf("%s.%s", escapeIdentifier(opt.Schema), escapeIdentifier(seq))
-		} else {
-			seqName = escapeIdentifier(seq)
-		}
-
-		q := fmt.Sprintf("GRANT %s ON SEQUENCE %s TO %s",
-			strings.Join(opt.Privileges, ", "),
-			seqName,
-			escapeIdentifier(grantee))
+		b := sqlbuilder.NewPg().Grant(opt.Privileges...).OnSequence(opt.Schema, seq).To(grantee)
 		if opt.WithGrantOption {
-			q += " WITH GRANT OPTION"
+			b.WithGrantOption()
+		}
+		q, buildErr := b.Build()
+		if buildErr != nil {
+			return fmt.Errorf("failed to build grant query: %w", buildErr)
 		}
 		queries = append(queries, q)
 	}
 
 	// Specific functions
 	for _, fn := range opt.Functions {
-		fnName := fn
-		if opt.Schema != "" {
-			fnName = fmt.Sprintf("%s.%s", escapeIdentifier(opt.Schema), fn)
-		}
-
-		q := fmt.Sprintf("GRANT %s ON FUNCTION %s TO %s",
-			strings.Join(opt.Privileges, ", "),
-			fnName,
-			escapeIdentifier(grantee))
+		b := sqlbuilder.NewPg().Grant(opt.Privileges...).OnFunction(opt.Schema, fn).To(grantee)
 		if opt.WithGrantOption {
-			q += " WITH GRANT OPTION"
+			b.WithGrantOption()
+		}
+		q, buildErr := b.Build()
+		if buildErr != nil {
+			return fmt.Errorf("failed to build grant query: %w", buildErr)
 		}
 		queries = append(queries, q)
 	}
@@ -302,10 +293,10 @@ func (a *Adapter) revokePrivileges(ctx context.Context, grantee string, opt type
 
 	// Handle database-level revokes when no schema/table/sequence/function is specified
 	if opt.Schema == "" && len(opt.Tables) == 0 && len(opt.Sequences) == 0 && len(opt.Functions) == 0 && len(opt.Privileges) > 0 {
-		q := fmt.Sprintf("REVOKE %s ON DATABASE %s FROM %s",
-			strings.Join(opt.Privileges, ", "),
-			escapeIdentifier(database),
-			escapeIdentifier(grantee))
+		q, buildErr := sqlbuilder.NewPg().Revoke(opt.Privileges...).OnDatabase(database).From(grantee).Build()
+		if buildErr != nil {
+			return fmt.Errorf("failed to build revoke query: %w", buildErr)
+		}
 		// Database-level revokes are executed on the default database
 		if _, err := pool.Exec(ctx, q); err != nil {
 			return fmt.Errorf("failed to revoke database privileges: %w", err)
@@ -315,56 +306,37 @@ func (a *Adapter) revokePrivileges(ctx context.Context, grantee string, opt type
 
 	// Handle ALL TABLES IN SCHEMA
 	if opt.Schema != "" && len(opt.Tables) == 0 {
-		q := fmt.Sprintf("REVOKE %s ON ALL TABLES IN SCHEMA %s FROM %s",
-			strings.Join(opt.Privileges, ", "),
-			escapeIdentifier(opt.Schema),
-			escapeIdentifier(grantee))
+		q, buildErr := sqlbuilder.NewPg().Revoke(opt.Privileges...).OnAllTablesInSchema(opt.Schema).From(grantee).Build()
+		if buildErr != nil {
+			return fmt.Errorf("failed to build revoke query: %w", buildErr)
+		}
 		queries = append(queries, q)
 	}
 
 	// Specific tables
 	for _, table := range opt.Tables {
-		tableName := table
-		if opt.Schema != "" {
-			tableName = fmt.Sprintf("%s.%s", escapeIdentifier(opt.Schema), escapeIdentifier(table))
-		} else {
-			tableName = escapeIdentifier(table)
+		q, buildErr := sqlbuilder.NewPg().Revoke(opt.Privileges...).OnTable(opt.Schema, table).From(grantee).Build()
+		if buildErr != nil {
+			return fmt.Errorf("failed to build revoke query: %w", buildErr)
 		}
-
-		q := fmt.Sprintf("REVOKE %s ON TABLE %s FROM %s",
-			strings.Join(opt.Privileges, ", "),
-			tableName,
-			escapeIdentifier(grantee))
 		queries = append(queries, q)
 	}
 
 	// Specific sequences
 	for _, seq := range opt.Sequences {
-		seqName := seq
-		if opt.Schema != "" {
-			seqName = fmt.Sprintf("%s.%s", escapeIdentifier(opt.Schema), escapeIdentifier(seq))
-		} else {
-			seqName = escapeIdentifier(seq)
+		q, buildErr := sqlbuilder.NewPg().Revoke(opt.Privileges...).OnSequence(opt.Schema, seq).From(grantee).Build()
+		if buildErr != nil {
+			return fmt.Errorf("failed to build revoke query: %w", buildErr)
 		}
-
-		q := fmt.Sprintf("REVOKE %s ON SEQUENCE %s FROM %s",
-			strings.Join(opt.Privileges, ", "),
-			seqName,
-			escapeIdentifier(grantee))
 		queries = append(queries, q)
 	}
 
 	// Specific functions
 	for _, fn := range opt.Functions {
-		fnName := fn
-		if opt.Schema != "" {
-			fnName = fmt.Sprintf("%s.%s", escapeIdentifier(opt.Schema), fn)
+		q, buildErr := sqlbuilder.NewPg().Revoke(opt.Privileges...).OnFunction(opt.Schema, fn).From(grantee).Build()
+		if buildErr != nil {
+			return fmt.Errorf("failed to build revoke query: %w", buildErr)
 		}
-
-		q := fmt.Sprintf("REVOKE %s ON FUNCTION %s FROM %s",
-			strings.Join(opt.Privileges, ", "),
-			fnName,
-			escapeIdentifier(grantee))
 		queries = append(queries, q)
 	}
 
@@ -385,40 +357,28 @@ func (a *Adapter) setDefaultPrivilege(ctx context.Context, grantee string, opt t
 		database = a.config.Database
 	}
 
-	var sb strings.Builder
-	sb.WriteString("ALTER DEFAULT PRIVILEGES")
-
-	if opt.GrantedBy != "" {
-		sb.WriteString(" FOR ROLE ")
-		sb.WriteString(escapeIdentifier(opt.GrantedBy))
-	}
-
-	if opt.Schema != "" {
-		sb.WriteString(" IN SCHEMA ")
-		sb.WriteString(escapeIdentifier(opt.Schema))
-	}
-
-	sb.WriteString(" GRANT ")
-	sb.WriteString(strings.Join(opt.Privileges, ", "))
-	sb.WriteString(" ON ")
+	b := sqlbuilder.NewPg().AlterDefaultPrivileges(opt.GrantedBy, opt.Schema).
+		Grant(opt.Privileges...).To(grantee)
 
 	switch strings.ToLower(opt.ObjectType) {
 	case "tables":
-		sb.WriteString("TABLES")
+		b.OnTables()
 	case "sequences":
-		sb.WriteString("SEQUENCES")
+		b.OnSequences()
 	case "functions":
-		sb.WriteString("FUNCTIONS")
+		b.OnFunctions()
 	case "types":
-		sb.WriteString("TYPES")
+		b.OnTypes()
 	case "schemas":
-		sb.WriteString("SCHEMAS")
+		b.OnSchemas()
 	default:
 		return fmt.Errorf("unsupported object type: %s", opt.ObjectType)
 	}
 
-	sb.WriteString(" TO ")
-	sb.WriteString(escapeIdentifier(grantee))
+	q, err := b.Build()
+	if err != nil {
+		return fmt.Errorf("failed to build alter default privileges: %w", err)
+	}
 
-	return a.execWithNewConnection(ctx, database, sb.String())
+	return a.execWithNewConnection(ctx, database, q)
 }
