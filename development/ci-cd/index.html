@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
     
     
       
@@ -2069,25 +2069,14 @@
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#workflows" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Workflows
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Workflows">
+    <nav class="md-nav" aria-label="Overview">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#ci-workflow-githubworkflowsciyml" class="md-nav__link">
+  <a href="#triggers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        CI Workflow (.github/workflows/ci.yml)
+        Triggers
       
     </span>
   </a>
@@ -2095,10 +2084,38 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#release-workflow-githubworkflowsreleaseyml" class="md-nav__link">
+  <a href="#release-flow" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Release Workflow (.github/workflows/release.yml)
+        Release Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ci-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI Workflow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CI Workflow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stage-1-parallel-jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 1: Parallel Jobs
       
     </span>
   </a>
@@ -2106,10 +2123,187 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#documentation-workflow-githubworkflowsdocsyml" class="md-nav__link">
+  <a href="#stage-2-gate" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Documentation Workflow (.github/workflows/docs.yml)
+        Stage 2: Gate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-3-integration-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 3: Integration Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-4-e2e-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 4: E2E Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-5-ci-success" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 5: CI Success
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security-scan-push-events-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security Scan (Push Events Only)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#release-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Release Workflow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Release Workflow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#guard-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guard Job
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker Release
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#github-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub Release
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#helm-oci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Helm OCI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#documentation-deploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation Deploy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-dispatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual Dispatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#docker-image-build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker Image Build
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Docker Image Build">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multi-stage-dockerfile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Stage Dockerfile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#image-tags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Image Tags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cache-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cache Strategy
       
     </span>
   </a>
@@ -2156,10 +2350,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#release-assets" class="md-nav__link">
+  <a href="#sbom" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Release Assets
+        SBOM
       
     </span>
   </a>
@@ -2195,10 +2389,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#variables" class="md-nav__link">
+  <a href="#global-environment" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Variables
+        Global Environment
       
     </span>
   </a>
@@ -2218,212 +2412,6 @@
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Local CI Simulation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#run-ci-locally" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Run CI Locally
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#act-github-actions-locally" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Act (GitHub Actions Locally)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pipeline-stages" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pipeline Stages
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Pipeline Stages">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#test-stage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Test Stage
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#build-stage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Build Stage
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#release-stage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Release Stage
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#quality-gates" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quality Gates
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Quality Gates">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#required-checks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Required Checks
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#branch-protection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Branch Protection
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Troubleshooting">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#failed-tests" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Failed Tests
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#failed-docker-build" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Failed Docker Build
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#failed-release" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Failed Release
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#metrics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Metrics
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Metrics">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#pipeline-duration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pipeline Duration
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#success-rate" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Success Rate
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -2534,25 +2522,14 @@
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#workflows" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Workflows
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Workflows">
+    <nav class="md-nav" aria-label="Overview">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#ci-workflow-githubworkflowsciyml" class="md-nav__link">
+  <a href="#triggers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        CI Workflow (.github/workflows/ci.yml)
+        Triggers
       
     </span>
   </a>
@@ -2560,10 +2537,38 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#release-workflow-githubworkflowsreleaseyml" class="md-nav__link">
+  <a href="#release-flow" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Release Workflow (.github/workflows/release.yml)
+        Release Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ci-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI Workflow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CI Workflow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stage-1-parallel-jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 1: Parallel Jobs
       
     </span>
   </a>
@@ -2571,10 +2576,187 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#documentation-workflow-githubworkflowsdocsyml" class="md-nav__link">
+  <a href="#stage-2-gate" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Documentation Workflow (.github/workflows/docs.yml)
+        Stage 2: Gate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-3-integration-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 3: Integration Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-4-e2e-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 4: E2E Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-5-ci-success" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 5: CI Success
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security-scan-push-events-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security Scan (Push Events Only)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#release-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Release Workflow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Release Workflow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#guard-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guard Job
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker Release
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#github-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub Release
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#helm-oci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Helm OCI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#documentation-deploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation Deploy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-dispatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual Dispatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#docker-image-build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker Image Build
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Docker Image Build">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multi-stage-dockerfile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Stage Dockerfile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#image-tags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Image Tags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cache-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cache Strategy
       
     </span>
   </a>
@@ -2621,10 +2803,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#release-assets" class="md-nav__link">
+  <a href="#sbom" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Release Assets
+        SBOM
       
     </span>
   </a>
@@ -2660,10 +2842,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#variables" class="md-nav__link">
+  <a href="#global-environment" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Variables
+        Global Environment
       
     </span>
   </a>
@@ -2683,212 +2865,6 @@
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Local CI Simulation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#run-ci-locally" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Run CI Locally
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#act-github-actions-locally" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Act (GitHub Actions Locally)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pipeline-stages" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pipeline Stages
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Pipeline Stages">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#test-stage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Test Stage
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#build-stage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Build Stage
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#release-stage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Release Stage
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#quality-gates" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quality Gates
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Quality Gates">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#required-checks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Required Checks
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#branch-protection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Branch Protection
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Troubleshooting">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#failed-tests" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Failed Tests
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#failed-docker-build" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Failed Docker Build
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#failed-release" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Failed Release
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#metrics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Metrics
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Metrics">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#pipeline-duration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pipeline Duration
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#success-rate" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Success Rate
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -2913,273 +2889,361 @@
 
 
 <h1 id="cicd">CI/CD<a class="headerlink" href="#cicd" title="Permanent link">&para;</a></h1>
-<p>Continuous integration and deployment pipeline documentation.</p>
+<p>Continuous integration and deployment pipeline for the DB Provision Operator.</p>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>┌─────────────────────────────────────────────────────────────────┐
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>│                        CI/CD Pipeline                           │
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│                                                                 │
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│  ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────────┐  │
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│  │  Push   │───▶│  Test   │───▶│  Build  │───▶│   Deploy    │  │
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│  │         │    │  &amp; Lint │    │  Image  │    │   (Release) │  │
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│  └─────────┘    └─────────┘    └─────────┘    └─────────────┘  │
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│       │              │              │               │           │
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>│       │              │              │               │           │
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>│  ┌────┴────┐    ┌────┴────┐   ┌────┴────┐    ┌────┴────────┐  │
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>│  │  PR     │    │  Unit   │   │  Docker │    │  GitHub     │  │
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>│  │  Main   │    │  E2E    │   │  Multi- │    │  Release    │  │
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>│  │  Tags   │    │  Lint   │   │  arch   │    │  Helm Chart │  │
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│  └─────────┘    └─────────┘   └─────────┘    │  Docs       │  │
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>│                                              └─────────────┘  │
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>└─────────────────────────────────────────────────────────────────┘
-</span></code></pre></div>
-<h2 id="workflows">Workflows<a class="headerlink" href="#workflows" title="Permanent link">&para;</a></h2>
-<h3 id="ci-workflow-githubworkflowsciyml">CI Workflow (<code>.github/workflows/ci.yml</code>)<a class="headerlink" href="#ci-workflow-githubworkflowsciyml" title="Permanent link">&para;</a></h3>
-<p>Runs on:
-- Pull requests to main
-- Push to main</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CI</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">on</span><span class="p">:</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">push</span><span class="p">:</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">main</span><span class="p p-Indicator">]</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">pull_request</span><span class="p">:</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">main</span><span class="p p-Indicator">]</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="nt">jobs</span><span class="p">:</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span><span class="nt">test</span><span class="p">:</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v4</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/setup-go@v5</span>
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">          </span><span class="nt">go-version</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;1.21&#39;</span>
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Run tests</span>
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make test</span>
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Upload coverage</span>
-</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">codecov/codecov-action@v3</span>
-</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>
-</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="w">  </span><span class="nt">lint</span><span class="p">:</span>
-</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
-</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v4</span>
-</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>
-</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">golangci/golangci-lint-action@v3</span>
-</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
-</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a><span class="w">          </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">latest</span>
-</span><span id="__span-1-33"><a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>
-</span><span id="__span-1-34"><a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-1-35"><a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
-</span><span id="__span-1-36"><a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-</span><span id="__span-1-37"><a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v4</span>
-</span><span id="__span-1-38"><a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a>
-</span><span id="__span-1-39"><a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Build</span>
-</span><span id="__span-1-40"><a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make build</span>
-</span><span id="__span-1-41"><a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a>
-</span><span id="__span-1-42"><a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Build Docker image</span>
-</span><span id="__span-1-43"><a id="__codelineno-1-43" name="__codelineno-1-43" href="#__codelineno-1-43"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make docker-build</span>
-</span><span id="__span-1-44"><a id="__codelineno-1-44" name="__codelineno-1-44" href="#__codelineno-1-44"></a>
-</span><span id="__span-1-45"><a id="__codelineno-1-45" name="__codelineno-1-45" href="#__codelineno-1-45"></a><span class="w">  </span><span class="nt">e2e</span><span class="p">:</span>
-</span><span id="__span-1-46"><a id="__codelineno-1-46" name="__codelineno-1-46" href="#__codelineno-1-46"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
-</span><span id="__span-1-47"><a id="__codelineno-1-47" name="__codelineno-1-47" href="#__codelineno-1-47"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-</span><span id="__span-1-48"><a id="__codelineno-1-48" name="__codelineno-1-48" href="#__codelineno-1-48"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v4</span>
-</span><span id="__span-1-49"><a id="__codelineno-1-49" name="__codelineno-1-49" href="#__codelineno-1-49"></a>
-</span><span id="__span-1-50"><a id="__codelineno-1-50" name="__codelineno-1-50" href="#__codelineno-1-50"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Create kind cluster</span>
-</span><span id="__span-1-51"><a id="__codelineno-1-51" name="__codelineno-1-51" href="#__codelineno-1-51"></a><span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">helm/kind-action@v1</span>
-</span><span id="__span-1-52"><a id="__codelineno-1-52" name="__codelineno-1-52" href="#__codelineno-1-52"></a>
-</span><span id="__span-1-53"><a id="__codelineno-1-53" name="__codelineno-1-53" href="#__codelineno-1-53"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Run E2E tests</span>
-</span><span id="__span-1-54"><a id="__codelineno-1-54" name="__codelineno-1-54" href="#__codelineno-1-54"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make test-e2e</span>
-</span></code></pre></div>
-<h3 id="release-workflow-githubworkflowsreleaseyml">Release Workflow (<code>.github/workflows/release.yml</code>)<a class="headerlink" href="#release-workflow-githubworkflowsreleaseyml" title="Permanent link">&para;</a></h3>
-<p>Runs on:
-- Git tags matching <code>v*</code></p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Release</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">on</span><span class="p">:</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">push</span><span class="p">:</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">tags</span><span class="p">:</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;v*&#39;</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="nt">jobs</span><span class="p">:</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">  </span><span class="nt">release</span><span class="p">:</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="nt">permissions</span><span class="p">:</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">      </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">      </span><span class="nt">packages</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v4</span>
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">          </span><span class="nt">fetch-depth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
-</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>
-</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/setup-go@v5</span>
-</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
-</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="w">          </span><span class="nt">go-version</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;1.21&#39;</span>
-</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>
-</span><span id="__span-2-24"><a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Run tests</span>
-</span><span id="__span-2-25"><a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make test</span>
-</span><span id="__span-2-26"><a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>
-</span><span id="__span-2-27"><a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Login to GHCR</span>
-</span><span id="__span-2-28"><a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a><span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker/login-action@v3</span>
-</span><span id="__span-2-29"><a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
-</span><span id="__span-2-30"><a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a><span class="w">          </span><span class="nt">registry</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ghcr.io</span>
-</span><span id="__span-2-31"><a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a><span class="w">          </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.actor }}</span>
-</span><span id="__span-2-32"><a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a><span class="w">          </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ secrets.GITHUB_TOKEN }}</span>
-</span><span id="__span-2-33"><a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a>
-</span><span id="__span-2-34"><a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Build and push image</span>
-</span><span id="__span-2-35"><a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-</span><span id="__span-2-36"><a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a><span class="w">          </span><span class="no">make docker-build docker-push \</span>
-</span><span id="__span-2-37"><a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a><span class="w">            </span><span class="no">IMG=ghcr.io/${{ github.repository }}:${{ github.ref_name }}</span>
-</span><span id="__span-2-38"><a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a>
-</span><span id="__span-2-39"><a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Create GitHub Release</span>
-</span><span id="__span-2-40"><a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a><span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">softprops/action-gh-release@v1</span>
-</span><span id="__span-2-41"><a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
-</span><span id="__span-2-42"><a id="__codelineno-2-42" name="__codelineno-2-42" href="#__codelineno-2-42"></a><span class="w">          </span><span class="nt">generate_release_notes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span><span id="__span-2-43"><a id="__codelineno-2-43" name="__codelineno-2-43" href="#__codelineno-2-43"></a><span class="w">          </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-</span><span id="__span-2-44"><a id="__codelineno-2-44" name="__codelineno-2-44" href="#__codelineno-2-44"></a><span class="w">            </span><span class="no">dist/*.yaml</span>
-</span><span id="__span-2-45"><a id="__codelineno-2-45" name="__codelineno-2-45" href="#__codelineno-2-45"></a>
-</span><span id="__span-2-46"><a id="__codelineno-2-46" name="__codelineno-2-46" href="#__codelineno-2-46"></a><span class="w">  </span><span class="nt">helm-release</span><span class="p">:</span>
-</span><span id="__span-2-47"><a id="__codelineno-2-47" name="__codelineno-2-47" href="#__codelineno-2-47"></a><span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">release</span><span class="p p-Indicator">]</span>
-</span><span id="__span-2-48"><a id="__codelineno-2-48" name="__codelineno-2-48" href="#__codelineno-2-48"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
-</span><span id="__span-2-49"><a id="__codelineno-2-49" name="__codelineno-2-49" href="#__codelineno-2-49"></a><span class="w">    </span><span class="nt">permissions</span><span class="p">:</span>
-</span><span id="__span-2-50"><a id="__codelineno-2-50" name="__codelineno-2-50" href="#__codelineno-2-50"></a><span class="w">      </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
-</span><span id="__span-2-51"><a id="__codelineno-2-51" name="__codelineno-2-51" href="#__codelineno-2-51"></a>
-</span><span id="__span-2-52"><a id="__codelineno-2-52" name="__codelineno-2-52" href="#__codelineno-2-52"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-</span><span id="__span-2-53"><a id="__codelineno-2-53" name="__codelineno-2-53" href="#__codelineno-2-53"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v4</span>
-</span><span id="__span-2-54"><a id="__codelineno-2-54" name="__codelineno-2-54" href="#__codelineno-2-54"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
-</span><span id="__span-2-55"><a id="__codelineno-2-55" name="__codelineno-2-55" href="#__codelineno-2-55"></a><span class="w">          </span><span class="nt">fetch-depth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
-</span><span id="__span-2-56"><a id="__codelineno-2-56" name="__codelineno-2-56" href="#__codelineno-2-56"></a>
-</span><span id="__span-2-57"><a id="__codelineno-2-57" name="__codelineno-2-57" href="#__codelineno-2-57"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Configure Git</span>
-</span><span id="__span-2-58"><a id="__codelineno-2-58" name="__codelineno-2-58" href="#__codelineno-2-58"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-</span><span id="__span-2-59"><a id="__codelineno-2-59" name="__codelineno-2-59" href="#__codelineno-2-59"></a><span class="w">          </span><span class="no">git config user.name &quot;github-actions[bot]&quot;</span>
-</span><span id="__span-2-60"><a id="__codelineno-2-60" name="__codelineno-2-60" href="#__codelineno-2-60"></a><span class="w">          </span><span class="no">git config user.email &quot;github-actions[bot]@users.noreply.github.com&quot;</span>
-</span><span id="__span-2-61"><a id="__codelineno-2-61" name="__codelineno-2-61" href="#__codelineno-2-61"></a>
-</span><span id="__span-2-62"><a id="__codelineno-2-62" name="__codelineno-2-62" href="#__codelineno-2-62"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Package Helm chart</span>
-</span><span id="__span-2-63"><a id="__codelineno-2-63" name="__codelineno-2-63" href="#__codelineno-2-63"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-</span><span id="__span-2-64"><a id="__codelineno-2-64" name="__codelineno-2-64" href="#__codelineno-2-64"></a><span class="w">          </span><span class="no">helm package charts/db-provision-operator \</span>
-</span><span id="__span-2-65"><a id="__codelineno-2-65" name="__codelineno-2-65" href="#__codelineno-2-65"></a><span class="w">            </span><span class="no">--version ${{ github.ref_name }} \</span>
-</span><span id="__span-2-66"><a id="__codelineno-2-66" name="__codelineno-2-66" href="#__codelineno-2-66"></a><span class="w">            </span><span class="no">--app-version ${{ github.ref_name }}</span>
-</span><span id="__span-2-67"><a id="__codelineno-2-67" name="__codelineno-2-67" href="#__codelineno-2-67"></a>
-</span><span id="__span-2-68"><a id="__codelineno-2-68" name="__codelineno-2-68" href="#__codelineno-2-68"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Update Helm repo</span>
-</span><span id="__span-2-69"><a id="__codelineno-2-69" name="__codelineno-2-69" href="#__codelineno-2-69"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-</span><span id="__span-2-70"><a id="__codelineno-2-70" name="__codelineno-2-70" href="#__codelineno-2-70"></a><span class="w">          </span><span class="no">git checkout gh-pages</span>
-</span><span id="__span-2-71"><a id="__codelineno-2-71" name="__codelineno-2-71" href="#__codelineno-2-71"></a><span class="w">          </span><span class="no">mv *.tgz charts/</span>
-</span><span id="__span-2-72"><a id="__codelineno-2-72" name="__codelineno-2-72" href="#__codelineno-2-72"></a><span class="w">          </span><span class="no">helm repo index charts/ --url https://panteparak.github.io/db-provision-operator/charts</span>
-</span><span id="__span-2-73"><a id="__codelineno-2-73" name="__codelineno-2-73" href="#__codelineno-2-73"></a><span class="w">          </span><span class="no">git add charts/</span>
-</span><span id="__span-2-74"><a id="__codelineno-2-74" name="__codelineno-2-74" href="#__codelineno-2-74"></a><span class="w">          </span><span class="no">git commit -m &quot;Release Helm chart ${{ github.ref_name }}&quot;</span>
-</span><span id="__span-2-75"><a id="__codelineno-2-75" name="__codelineno-2-75" href="#__codelineno-2-75"></a><span class="w">          </span><span class="no">git push</span>
-</span><span id="__span-2-76"><a id="__codelineno-2-76" name="__codelineno-2-76" href="#__codelineno-2-76"></a>
-</span><span id="__span-2-77"><a id="__codelineno-2-77" name="__codelineno-2-77" href="#__codelineno-2-77"></a><span class="w">  </span><span class="nt">docs</span><span class="p">:</span>
-</span><span id="__span-2-78"><a id="__codelineno-2-78" name="__codelineno-2-78" href="#__codelineno-2-78"></a><span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">release</span><span class="p p-Indicator">]</span>
-</span><span id="__span-2-79"><a id="__codelineno-2-79" name="__codelineno-2-79" href="#__codelineno-2-79"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
-</span><span id="__span-2-80"><a id="__codelineno-2-80" name="__codelineno-2-80" href="#__codelineno-2-80"></a><span class="w">    </span><span class="nt">permissions</span><span class="p">:</span>
-</span><span id="__span-2-81"><a id="__codelineno-2-81" name="__codelineno-2-81" href="#__codelineno-2-81"></a><span class="w">      </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
-</span><span id="__span-2-82"><a id="__codelineno-2-82" name="__codelineno-2-82" href="#__codelineno-2-82"></a>
-</span><span id="__span-2-83"><a id="__codelineno-2-83" name="__codelineno-2-83" href="#__codelineno-2-83"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-</span><span id="__span-2-84"><a id="__codelineno-2-84" name="__codelineno-2-84" href="#__codelineno-2-84"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v4</span>
-</span><span id="__span-2-85"><a id="__codelineno-2-85" name="__codelineno-2-85" href="#__codelineno-2-85"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
-</span><span id="__span-2-86"><a id="__codelineno-2-86" name="__codelineno-2-86" href="#__codelineno-2-86"></a><span class="w">          </span><span class="nt">fetch-depth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
-</span><span id="__span-2-87"><a id="__codelineno-2-87" name="__codelineno-2-87" href="#__codelineno-2-87"></a>
-</span><span id="__span-2-88"><a id="__codelineno-2-88" name="__codelineno-2-88" href="#__codelineno-2-88"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/setup-python@v5</span>
-</span><span id="__span-2-89"><a id="__codelineno-2-89" name="__codelineno-2-89" href="#__codelineno-2-89"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
-</span><span id="__span-2-90"><a id="__codelineno-2-90" name="__codelineno-2-90" href="#__codelineno-2-90"></a><span class="w">          </span><span class="nt">python-version</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;3.11&#39;</span>
-</span><span id="__span-2-91"><a id="__codelineno-2-91" name="__codelineno-2-91" href="#__codelineno-2-91"></a>
-</span><span id="__span-2-92"><a id="__codelineno-2-92" name="__codelineno-2-92" href="#__codelineno-2-92"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Install dependencies</span>
-</span><span id="__span-2-93"><a id="__codelineno-2-93" name="__codelineno-2-93" href="#__codelineno-2-93"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pip install -r docs/requirements.txt</span>
-</span><span id="__span-2-94"><a id="__codelineno-2-94" name="__codelineno-2-94" href="#__codelineno-2-94"></a>
-</span><span id="__span-2-95"><a id="__codelineno-2-95" name="__codelineno-2-95" href="#__codelineno-2-95"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deploy docs</span>
-</span><span id="__span-2-96"><a id="__codelineno-2-96" name="__codelineno-2-96" href="#__codelineno-2-96"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mkdocs gh-deploy --force</span>
-</span></code></pre></div>
-<h3 id="documentation-workflow-githubworkflowsdocsyml">Documentation Workflow (<code>.github/workflows/docs.yml</code>)<a class="headerlink" href="#documentation-workflow-githubworkflowsdocsyml" title="Permanent link">&para;</a></h3>
-<p>Runs on:
-- Push to main (docs changes)
-- Pull requests (docs changes)</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Documentation</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">on</span><span class="p">:</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">push</span><span class="p">:</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">main</span><span class="p p-Indicator">]</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">paths</span><span class="p">:</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;docs/**&#39;</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;mkdocs.yml&#39;</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="nt">pull_request</span><span class="p">:</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nt">paths</span><span class="p">:</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;docs/**&#39;</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;mkdocs.yml&#39;</span>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="nt">jobs</span><span class="p">:</span>
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v4</span>
-</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>
-</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/setup-python@v5</span>
-</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
-</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="w">          </span><span class="nt">python-version</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;3.11&#39;</span>
-</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>
-</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pip install -r docs/requirements.txt</span>
-</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>
-</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Build docs</span>
-</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mkdocs build --strict</span>
-</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>
-</span><span id="__span-3-29"><a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a><span class="w">  </span><span class="nt">deploy</span><span class="p">:</span>
-</span><span id="__span-3-30"><a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a><span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">build</span><span class="p p-Indicator">]</span>
-</span><span id="__span-3-31"><a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
-</span><span id="__span-3-32"><a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a><span class="w">    </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">github.event_name == &#39;push&#39; &amp;&amp; github.ref == &#39;refs/heads/main&#39;</span>
-</span><span id="__span-3-33"><a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a><span class="w">    </span><span class="nt">permissions</span><span class="p">:</span>
-</span><span id="__span-3-34"><a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a><span class="w">      </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
-</span><span id="__span-3-35"><a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a>
-</span><span id="__span-3-36"><a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-</span><span id="__span-3-37"><a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v4</span>
-</span><span id="__span-3-38"><a id="__codelineno-3-38" name="__codelineno-3-38" href="#__codelineno-3-38"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
-</span><span id="__span-3-39"><a id="__codelineno-3-39" name="__codelineno-3-39" href="#__codelineno-3-39"></a><span class="w">          </span><span class="nt">fetch-depth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
-</span><span id="__span-3-40"><a id="__codelineno-3-40" name="__codelineno-3-40" href="#__codelineno-3-40"></a>
-</span><span id="__span-3-41"><a id="__codelineno-3-41" name="__codelineno-3-41" href="#__codelineno-3-41"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/setup-python@v5</span>
-</span><span id="__span-3-42"><a id="__codelineno-3-42" name="__codelineno-3-42" href="#__codelineno-3-42"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
-</span><span id="__span-3-43"><a id="__codelineno-3-43" name="__codelineno-3-43" href="#__codelineno-3-43"></a><span class="w">          </span><span class="nt">python-version</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;3.11&#39;</span>
-</span><span id="__span-3-44"><a id="__codelineno-3-44" name="__codelineno-3-44" href="#__codelineno-3-44"></a>
-</span><span id="__span-3-45"><a id="__codelineno-3-45" name="__codelineno-3-45" href="#__codelineno-3-45"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pip install -r docs/requirements.txt</span>
-</span><span id="__span-3-46"><a id="__codelineno-3-46" name="__codelineno-3-46" href="#__codelineno-3-46"></a>
-</span><span id="__span-3-47"><a id="__codelineno-3-47" name="__codelineno-3-47" href="#__codelineno-3-47"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deploy</span>
-</span><span id="__span-3-48"><a id="__codelineno-3-48" name="__codelineno-3-48" href="#__codelineno-3-48"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mkdocs gh-deploy --force</span>
-</span></code></pre></div>
-<h2 id="build-artifacts">Build Artifacts<a class="headerlink" href="#build-artifacts" title="Permanent link">&para;</a></h2>
-<h3 id="container-images">Container Images<a class="headerlink" href="#container-images" title="Permanent link">&para;</a></h3>
+<p>The pipeline uses two workflows:</p>
+<ol>
+<li><strong>CI</strong> (<code>ci.yml</code>) — Runs the full test suite on every push to <code>main</code>, every PR, and every tag push (<code>v*</code>)</li>
+<li><strong>Release</strong> (<code>release.yml</code>) — Triggered automatically when CI completes on a <code>v*</code> tag, or manually via <code>workflow_dispatch</code></li>
+</ol>
+<pre class="mermaid"><code>graph LR
+    subgraph CI["CI Pipeline"]
+        S0[Setup] --&gt; S1["8 Parallel Jobs"]
+        S1 --&gt; S2[Gate]
+        S2 --&gt; S3[Integration Tests]
+        S3 --&gt; S4[E2E Tests]
+        S4 --&gt; S5[CI Done]
+    end
+    S5 --&gt;|"on v* tag"| R
+    subgraph Release["Release Pipeline"]
+        R[Guard] --&gt; DR[Docker Release]
+        DR --&gt; GR[GitHub Release]
+        GR --&gt; HO[Helm OCI]
+        HO --&gt; DO[Docs]
+        DO --&gt; SM[Summary]
+    end</code></pre>
+<h3 id="triggers">Triggers<a class="headerlink" href="#triggers" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
-<th>Tag</th>
+<th>Event</th>
+<th>Branches/Tags</th>
+<th>What Runs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pull request</td>
+<td><code>main</code></td>
+<td>CI Stages 0–5 (Docker build without push)</td>
+</tr>
+<tr>
+<td>Push</td>
+<td><code>main</code></td>
+<td>CI Stages 0–5 + Docker push + Security scan</td>
+</tr>
+<tr>
+<td>Tag</td>
+<td><code>v*</code></td>
+<td>CI Stages 0–5 (full pipeline) → Release (automatic)</td>
+</tr>
+<tr>
+<td>Manual</td>
+<td><code>workflow_dispatch</code></td>
+<td>Release only (with tag input)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="release-flow">Release Flow<a class="headerlink" href="#release-flow" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git tag v0.1.8 &amp;&amp; git push origin v0.1.8
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  └─► CI runs full pipeline (lint, test, envtest, integration, E2E)
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>       └─► CI succeeds → workflow_run triggers Release
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>            └─► Guard validates tag + Chart.yaml version match
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                 └─► Docker retag (sha-xxx → version + latest)
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>                 └─► GitHub Release (install.yaml, CRDs, Helm chart, checksums, SBOMs)
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>                 └─► Helm OCI push (oci://ghcr.io/&lt;owner&gt;/charts/db-provision-operator)
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>                 └─► Documentation deploy (GitHub Pages)
+</span></code></pre></div>
+<h2 id="ci-workflow">CI Workflow<a class="headerlink" href="#ci-workflow" title="Permanent link">&para;</a></h2>
+<h3 id="stage-1-parallel-jobs">Stage 1: Parallel Jobs<a class="headerlink" href="#stage-1-parallel-jobs" title="Permanent link">&para;</a></h3>
+<p>Eight jobs run concurrently after setup:</p>
+<h4 id="1-lint">1. Lint<a class="headerlink" href="#1-lint" title="Permanent link">&para;</a></h4>
+<p>Runs <code>golangci-lint</code> (v2.1.0) via the official GitHub Action.</p>
+<h4 id="2-unit-tests">2. Unit Tests<a class="headerlink" href="#2-unit-tests" title="Permanent link">&para;</a></h4>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>make<span class="w"> </span><span class="nb">test</span><span class="w">  </span><span class="c1"># go test (excludes /e2e), outputs cover.out</span>
+</span></code></pre></div>
+<p>Uploads coverage to Codecov.</p>
+<h4 id="3-controller-tests-envtest">3. Controller Tests (envtest)<a class="headerlink" href="#3-controller-tests-envtest" title="Permanent link">&para;</a></h4>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>make<span class="w"> </span>test-envtest<span class="w">  </span><span class="c1"># Runs controller + CRD validation tests with envtest</span>
+</span></code></pre></div>
+<p>Uses <code>KUBEBUILDER_ASSETS</code> from <code>setup-envtest</code>. Envtest binaries (~100MB) are cached by Kubernetes version.</p>
+<h4 id="4-template-comparison">4. Template Comparison<a class="headerlink" href="#4-template-comparison" title="Permanent link">&para;</a></h4>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>make<span class="w"> </span>test-templates<span class="w">  </span><span class="c1"># Verifies Helm ≡ Kustomize template equivalence</span>
+</span></code></pre></div>
+<p>Ensures the Helm chart and Kustomize overlays produce equivalent manifests.</p>
+<h4 id="5-docker-build">5. Docker Build<a class="headerlink" href="#5-docker-build" title="Permanent link">&para;</a></h4>
+<p>Builds the operator image per platform (currently <code>linux/amd64</code>). Uses a multi-layer cache strategy:</p>
+<ul>
+<li><strong>GHA cache</strong> (fast, per-platform, workflow-local)</li>
+<li><strong>Registry cache</strong> (persistent fallback when GHA cache is evicted)</li>
+</ul>
+<p>On <strong>push events</strong>: Pushes by digest, uploads digest artifact for manifest merging.
+On <strong>PRs</strong>: Builds locally, saves as tarball artifact for E2E tests.</p>
+<h4 id="6-verify-manifests">6. Verify Manifests<a class="headerlink" href="#6-verify-manifests" title="Permanent link">&para;</a></h4>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>make<span class="w"> </span>manifests<span class="w">  </span><span class="c1"># Generates CRDs, RBAC, webhook configs</span>
+</span></code></pre></div>
+<p>On <code>main</code> push: auto-commits if manifests are outdated.
+On PRs: fails the check so the developer runs <code>make manifests</code> locally.</p>
+<p>Also runs Helm chart linting, template rendering, and strict YAML validation (duplicate key detection).</p>
+<h4 id="7-verify-generated-code">7. Verify Generated Code<a class="headerlink" href="#7-verify-generated-code" title="Permanent link">&para;</a></h4>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>make<span class="w"> </span>generate<span class="w">  </span><span class="c1"># Generates DeepCopy methods</span>
+</span></code></pre></div>
+<p>Fails if generated code is outdated.</p>
+<h4 id="8-docs-build">8. Docs Build<a class="headerlink" href="#8-docs-build" title="Permanent link">&para;</a></h4>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>mkdocs<span class="w"> </span>build<span class="w"> </span>--strict<span class="w">  </span><span class="c1"># Builds documentation, fails on warnings</span>
+</span></code></pre></div>
+<h3 id="stage-2-gate">Stage 2: Gate<a class="headerlink" href="#stage-2-gate" title="Permanent link">&para;</a></h3>
+<p>Waits for all Stage 1 jobs to succeed before allowing integration tests. Checks each job's result and fails with a clear error message identifying which job(s) failed.</p>
+<p>For PRs, <code>docker-merge</code> is skipped (no push), so the gate only checks <code>docker-build</code>.</p>
+<h3 id="stage-3-integration-tests">Stage 3: Integration Tests<a class="headerlink" href="#stage-3-integration-tests" title="Permanent link">&para;</a></h3>
+<p>Runs after the gate passes. Uses a matrix strategy across all four database engines:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">matrix</span><span class="p">:</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">database</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">postgresql</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">mysql</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">mariadb</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">cockroachdb</span><span class="p p-Indicator">]</span>
+</span></code></pre></div>
+<p>Each job uses <strong>testcontainers-go</strong> to manage Docker containers programmatically — no manual container setup needed. The tests run against real database instances with envtest providing the Kubernetes API.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>make<span class="w"> </span>test-integration<span class="w"> </span><span class="nv">INTEGRATION_TEST_DATABASE</span><span class="o">=</span><span class="si">${</span><span class="p">{ matrix.database </span><span class="si">}</span><span class="o">}</span>
+</span></code></pre></div>
+<h3 id="stage-4-e2e-tests">Stage 4: E2E Tests<a class="headerlink" href="#stage-4-e2e-tests" title="Permanent link">&para;</a></h3>
+<p>Runs after integration tests pass. Full end-to-end validation using Docker Compose + k3d + Helm.</p>
+<h4 id="pipeline-per-database-16-steps">Pipeline Per Database (16 Steps)<a class="headerlink" href="#pipeline-per-database-16-steps" title="Permanent link">&para;</a></h4>
+<p>Each database engine runs in parallel with this sequence:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Step</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>v1.2.3</code></td>
-<td>Release version</td>
+<td>1</td>
+<td>Checkout</td>
+<td>Clone repository</td>
 </tr>
 <tr>
-<td><code>latest</code></td>
-<td>Latest release</td>
+<td>2</td>
+<td>Setup Go</td>
+<td>Install Go from <code>go.mod</code> version</td>
 </tr>
 <tr>
-<td><code>main</code></td>
-<td>Latest main branch</td>
+<td>3</td>
+<td>Get SHA</td>
+<td>Short commit SHA for image tagging</td>
 </tr>
 <tr>
-<td><code>sha-abc123</code></td>
-<td>Specific commit</td>
+<td>4</td>
+<td>Install k3d</td>
+<td>Install k3d CLI</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Start database</td>
+<td><code>make e2e-db-up E2E_DATABASE=&lt;engine&gt;</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Create cluster</td>
+<td><code>make e2e-cluster-create</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Get operator image</td>
+<td>Pull from registry (push) or load from artifact (PR)</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Load into k3d</td>
+<td><code>make e2e-image-load E2E_IMG=&lt;image&gt;</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Install CRDs</td>
+<td><code>make e2e-install-crds</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td>Install Helm</td>
+<td>Setup Helm v3.14.0</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Deploy operator</td>
+<td><code>helm install</code> with the chart (not Kustomize)</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Wait for ready</td>
+<td><code>kubectl wait --for=condition=Available</code></td>
+</tr>
+<tr>
+<td>13</td>
+<td>Create instance</td>
+<td><code>make e2e-create-db-instance E2E_DATABASE=&lt;engine&gt;</code></td>
+</tr>
+<tr>
+<td>14</td>
+<td>Run tests</td>
+<td><code>make e2e-local-run-tests E2E_DATABASE=&lt;engine&gt;</code></td>
+</tr>
+<tr>
+<td>15</td>
+<td>Collect logs</td>
+<td>On failure: operator logs, pod descriptions, Docker Compose logs, CR YAML, events</td>
+</tr>
+<tr>
+<td>16</td>
+<td>Cleanup</td>
+<td><code>make e2e-local-cleanup</code> (always runs)</td>
 </tr>
 </tbody>
 </table>
+<h4 id="helm-deployment-not-kustomize">Helm Deployment (Not Kustomize)<a class="headerlink" href="#helm-deployment-not-kustomize" title="Permanent link">&para;</a></h4>
+<p>CI intentionally deploys the operator via the <strong>Helm chart</strong> (<code>charts/db-provision-operator/</code>) rather than Kustomize. This validates the Helm chart in a real cluster as part of every CI run. Local development uses <code>make e2e-deploy-operator</code> (Kustomize) for faster iteration.</p>
+<h4 id="log-collection-on-failure">Log Collection on Failure<a class="headerlink" href="#log-collection-on-failure" title="Permanent link">&para;</a></h4>
+<p>When any E2E step fails, CI collects:</p>
+<ul>
+<li>Operator pod logs (last 500 lines)</li>
+<li>Operator pod description</li>
+<li>Docker Compose database logs (last 100 lines)</li>
+<li>All database-related CR YAML dumps</li>
+<li>Kubernetes events (last 100)</li>
+<li>Pod list across all namespaces</li>
+</ul>
+<h3 id="stage-5-ci-success">Stage 5: CI Success<a class="headerlink" href="#stage-5-ci-success" title="Permanent link">&para;</a></h3>
+<p>A summary job that runs after all E2E tests pass. Confirms the full pipeline succeeded.</p>
+<h3 id="security-scan-push-events-only">Security Scan (Push Events Only)<a class="headerlink" href="#security-scan-push-events-only" title="Permanent link">&para;</a></h3>
+<p>After <code>docker-merge</code>, Trivy scans each platform image:</p>
+<ol>
+<li><strong>Generate CycloneDX SBOM</strong> from the container image</li>
+<li><strong>Scan for vulnerabilities</strong> — outputs JSON (all severities) + table (MEDIUM+ with unfixed ignored)</li>
+<li><strong>Generate SARIF report</strong> — uploaded to GitHub Security tab via CodeQL</li>
+<li><strong>Upload artifacts</strong> — SBOM, vulnerability reports retained for 30 days</li>
+</ol>
+<h2 id="release-workflow">Release Workflow<a class="headerlink" href="#release-workflow" title="Permanent link">&para;</a></h2>
+<p>The release workflow uses the <code>workflow_run</code> pattern: it triggers automatically when the CI workflow completes, but only proceeds if CI succeeded and the trigger was a <code>v*</code> semver tag.</p>
+<h3 id="guard-job">Guard Job<a class="headerlink" href="#guard-job" title="Permanent link">&para;</a></h3>
+<p>The guard job gates all downstream release jobs:</p>
+<ol>
+<li><strong>Checks CI conclusion</strong> — fails immediately if CI didn't succeed</li>
+<li><strong>Extracts tag</strong> — from <code>workflow_run.head_branch</code> (automatic) or <code>inputs.tag</code> (manual dispatch)</li>
+<li><strong>Validates semver</strong> — skips release for non-version tags (e.g., plain push to main)</li>
+<li><strong>Validates Chart.yaml</strong> — ensures chart version matches the tag version</li>
+<li><strong>Computes image tag</strong> — derives the <code>sha-&lt;short&gt;</code> tag used by CI for Docker retagging</li>
+<li><strong>Stores CI run ID</strong> — used for cross-workflow artifact download (SBOMs)</li>
+</ol>
+<h3 id="docker-release">Docker Release<a class="headerlink" href="#docker-release" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Automatic (workflow_run)</strong>: Retags the CI-built <code>sha-xxx</code> image to <code>&lt;version&gt;</code> and <code>latest</code> using <code>docker buildx imagetools create</code>. This is a manifest-only operation — no rebuild, bit-for-bit identical to what CI tested.</li>
+<li><strong>Manual (workflow_dispatch)</strong>: Rebuilds from source as a fallback when no CI-built image exists.</li>
+</ul>
+<h3 id="github-release">GitHub Release<a class="headerlink" href="#github-release" title="Permanent link">&para;</a></h3>
+<p>Creates a GitHub Release with the following assets:</p>
+<table>
+<thead>
+<tr>
+<th>Asset</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>db-provision-operator-&lt;ver&gt;.yaml</code></td>
+<td>Versioned Kustomize install manifest</td>
+</tr>
+<tr>
+<td><code>crds-&lt;ver&gt;.tar.gz</code></td>
+<td>CRD definitions tarball</td>
+</tr>
+<tr>
+<td><code>db-provision-operator-&lt;ver&gt;.tgz</code></td>
+<td>Helm chart package</td>
+</tr>
+<tr>
+<td><code>checksums.txt</code></td>
+<td>SHA-256 checksums for all artifacts</td>
+</tr>
+<tr>
+<td><code>sbom.spdx.json</code></td>
+<td>SBOM from CI (when available)</td>
+</tr>
+</tbody>
+</table>
+<p>Tags containing <code>-rc</code>, <code>-alpha</code>, or <code>-beta</code> are marked as pre-releases.</p>
+<h3 id="helm-oci">Helm OCI<a class="headerlink" href="#helm-oci" title="Permanent link">&para;</a></h3>
+<p>Pushes the Helm chart as an OCI artifact to the GitHub Container Registry:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Install the operator via OCI</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>helm<span class="w"> </span>install<span class="w"> </span>db-provision-operator<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span>oci://ghcr.io/&lt;owner&gt;/charts/db-provision-operator<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span>--version<span class="w"> </span>&lt;version&gt;
+</span></code></pre></div>
+<p>No gh-pages Helm repository is needed — images and charts use the same container registry.</p>
+<h3 id="documentation-deploy">Documentation Deploy<a class="headerlink" href="#documentation-deploy" title="Permanent link">&para;</a></h3>
+<p>Builds documentation with mkdocs-material and deploys to GitHub Pages via <code>mkdocs gh-deploy --force</code>.</p>
+<h3 id="manual-dispatch">Manual Dispatch<a class="headerlink" href="#manual-dispatch" title="Permanent link">&para;</a></h3>
+<p>The release can be triggered manually via <code>workflow_dispatch</code> with a tag input. This bypasses the <code>workflow_run</code> trigger and rebuilds Docker images from source. Useful for re-releasing or releasing from an existing tag when CI artifacts have expired.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>release.yml<span class="w"> </span>-f<span class="w"> </span><span class="nv">tag</span><span class="o">=</span>v0.1.8
+</span></code></pre></div>
+<h2 id="docker-image-build">Docker Image Build<a class="headerlink" href="#docker-image-build" title="Permanent link">&para;</a></h2>
+<h3 id="multi-stage-dockerfile">Multi-Stage Dockerfile<a class="headerlink" href="#multi-stage-dockerfile" title="Permanent link">&para;</a></h3>
+<p>The operator image uses a multi-stage build:</p>
+<ol>
+<li><strong>Builder stage</strong>: Compiles the Go binary</li>
+<li><strong>Runtime stage</strong>: Alpine-based minimal image with database client tools</li>
+</ol>
+<h3 id="image-tags">Image Tags<a class="headerlink" href="#image-tags" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Tag Pattern</th>
+<th>When</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sha-&lt;short&gt;</code></td>
+<td>Every build</td>
+<td><code>sha-abc1234</code></td>
+</tr>
+<tr>
+<td><code>latest</code></td>
+<td>Push to main / release</td>
+<td><code>latest</code></td>
+</tr>
+<tr>
+<td><code>main</code></td>
+<td>Push to main</td>
+<td><code>main</code></td>
+</tr>
+<tr>
+<td><code>&lt;version&gt;</code></td>
+<td>Semver tag</td>
+<td><code>1.2.3</code></td>
+</tr>
+<tr>
+<td><code>&lt;major&gt;.&lt;minor&gt;</code></td>
+<td>Semver tag</td>
+<td><code>1.2</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="cache-strategy">Cache Strategy<a class="headerlink" href="#cache-strategy" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>GHA cache (fast, per-platform)
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>  └── fallback: Registry cache (persistent, cross-workflow)
+</span></code></pre></div>
+<p>PRs share cache from the <code>main</code> branch via registry cache, enabling fast builds even on new branches.</p>
+<h2 id="build-artifacts">Build Artifacts<a class="headerlink" href="#build-artifacts" title="Permanent link">&para;</a></h2>
+<h3 id="container-images">Container Images<a class="headerlink" href="#container-images" title="Permanent link">&para;</a></h3>
+<p>Published to: <code>ghcr.io/&lt;owner&gt;/db-provision-operator</code></p>
 <h3 id="helm-charts">Helm Charts<a class="headerlink" href="#helm-charts" title="Permanent link">&para;</a></h3>
-<p>Published to: <code>https://panteparak.github.io/db-provision-operator/charts</code></p>
-<h3 id="release-assets">Release Assets<a class="headerlink" href="#release-assets" title="Permanent link">&para;</a></h3>
-<p>Each release includes:
-- <code>install.yaml</code> - Full installation manifest
-- <code>crds.yaml</code> - CRD definitions only
-- <code>db-provision-operator-*.tgz</code> - Helm chart package</p>
+<p>Published as OCI artifacts to: <code>oci://ghcr.io/&lt;owner&gt;/charts/db-provision-operator</code></p>
+<h3 id="sbom">SBOM<a class="headerlink" href="#sbom" title="Permanent link">&para;</a></h3>
+<p>Generated in two formats:</p>
+<ul>
+<li><strong>SPDX</strong> (via <code>anchore/sbom-action</code>) — uploaded as artifact, attached to GitHub releases</li>
+<li><strong>CycloneDX</strong> (via Trivy) — used for vulnerability scanning</li>
+</ul>
 <h2 id="environment-configuration">Environment Configuration<a class="headerlink" href="#environment-configuration" title="Permanent link">&para;</a></h2>
 <h3 id="secrets">Secrets<a class="headerlink" href="#secrets" title="Permanent link">&para;</a></h3>
 <table>
@@ -3192,140 +3256,76 @@
 <tbody>
 <tr>
 <td><code>GITHUB_TOKEN</code></td>
-<td>Auto-provided, GitHub API access</td>
+<td>Auto-provided — registry login, release creation</td>
 </tr>
 <tr>
 <td><code>CODECOV_TOKEN</code></td>
-<td>Code coverage reporting</td>
+<td>Coverage reporting</td>
 </tr>
 </tbody>
 </table>
-<h3 id="variables">Variables<a class="headerlink" href="#variables" title="Permanent link">&para;</a></h3>
+<h3 id="global-environment">Global Environment<a class="headerlink" href="#global-environment" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
 <th>Variable</th>
-<th>Default</th>
+<th>Value</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>GO_VERSION</code></td>
-<td><code>1.21</code></td>
-<td>Go version for builds</td>
+<td><code>GO_VERSION_FILE</code></td>
+<td><code>go.mod</code></td>
+<td>Go version source of truth</td>
 </tr>
 <tr>
 <td><code>REGISTRY</code></td>
 <td><code>ghcr.io</code></td>
 <td>Container registry</td>
 </tr>
+<tr>
+<td><code>IMAGE_NAME</code></td>
+<td><code>${{ github.repository }}</code></td>
+<td>Image name</td>
+</tr>
 </tbody>
 </table>
 <h2 id="local-ci-simulation">Local CI Simulation<a class="headerlink" href="#local-ci-simulation" title="Permanent link">&para;</a></h2>
-<h3 id="run-ci-locally">Run CI Locally<a class="headerlink" href="#run-ci-locally" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Lint</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>make<span class="w"> </span>lint
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Test</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>make<span class="w"> </span><span class="nb">test</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># Build</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>make<span class="w"> </span>build
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="c1"># Docker build</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>make<span class="w"> </span>docker-build
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="c1"># E2E (requires cluster)</span>
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>make<span class="w"> </span>test-e2e
+<p>Reproduce each CI stage locally:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Stage 1: Lint</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>make<span class="w"> </span>lint
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1"># Stage 1: Unit tests</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>make<span class="w"> </span><span class="nb">test</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="c1"># Stage 1: Controller tests (envtest)</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>make<span class="w"> </span>test-envtest
+</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>
+</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="c1"># Stage 1: Template comparison</span>
+</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>make<span class="w"> </span>test-templates
+</span><span id="__span-12-12"><a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>
+</span><span id="__span-12-13"><a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a><span class="c1"># Stage 1: Docker build</span>
+</span><span id="__span-12-14"><a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>make<span class="w"> </span>docker-build
+</span><span id="__span-12-15"><a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a>
+</span><span id="__span-12-16"><a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a><span class="c1"># Stage 1: Manifests</span>
+</span><span id="__span-12-17"><a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a>make<span class="w"> </span>manifests<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>diff<span class="w"> </span>--exit-code
+</span><span id="__span-12-18"><a id="__codelineno-12-18" name="__codelineno-12-18" href="#__codelineno-12-18"></a>
+</span><span id="__span-12-19"><a id="__codelineno-12-19" name="__codelineno-12-19" href="#__codelineno-12-19"></a><span class="c1"># Stage 1: Generated code</span>
+</span><span id="__span-12-20"><a id="__codelineno-12-20" name="__codelineno-12-20" href="#__codelineno-12-20"></a>make<span class="w"> </span>generate<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>diff<span class="w"> </span>--exit-code
+</span><span id="__span-12-21"><a id="__codelineno-12-21" name="__codelineno-12-21" href="#__codelineno-12-21"></a>
+</span><span id="__span-12-22"><a id="__codelineno-12-22" name="__codelineno-12-22" href="#__codelineno-12-22"></a><span class="c1"># Stage 1: Docs</span>
+</span><span id="__span-12-23"><a id="__codelineno-12-23" name="__codelineno-12-23" href="#__codelineno-12-23"></a>mkdocs<span class="w"> </span>build<span class="w"> </span>--strict
+</span><span id="__span-12-24"><a id="__codelineno-12-24" name="__codelineno-12-24" href="#__codelineno-12-24"></a>
+</span><span id="__span-12-25"><a id="__codelineno-12-25" name="__codelineno-12-25" href="#__codelineno-12-25"></a><span class="c1"># Stage 3: Integration tests (single engine)</span>
+</span><span id="__span-12-26"><a id="__codelineno-12-26" name="__codelineno-12-26" href="#__codelineno-12-26"></a>make<span class="w"> </span>test-integration<span class="w"> </span><span class="nv">INTEGRATION_TEST_DATABASE</span><span class="o">=</span>postgresql
+</span><span id="__span-12-27"><a id="__codelineno-12-27" name="__codelineno-12-27" href="#__codelineno-12-27"></a>
+</span><span id="__span-12-28"><a id="__codelineno-12-28" name="__codelineno-12-28" href="#__codelineno-12-28"></a><span class="c1"># Stage 4: E2E tests (single engine)</span>
+</span><span id="__span-12-29"><a id="__codelineno-12-29" name="__codelineno-12-29" href="#__codelineno-12-29"></a>make<span class="w"> </span>e2e-local-postgresql
+</span><span id="__span-12-30"><a id="__codelineno-12-30" name="__codelineno-12-30" href="#__codelineno-12-30"></a>
+</span><span id="__span-12-31"><a id="__codelineno-12-31" name="__codelineno-12-31" href="#__codelineno-12-31"></a><span class="c1"># Full E2E (all engines)</span>
+</span><span id="__span-12-32"><a id="__codelineno-12-32" name="__codelineno-12-32" href="#__codelineno-12-32"></a>make<span class="w"> </span>e2e-local-all
 </span></code></pre></div>
-<h3 id="act-github-actions-locally">Act (GitHub Actions Locally)<a class="headerlink" href="#act-github-actions-locally" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Install act</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>brew<span class="w"> </span>install<span class="w"> </span>act
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Run CI workflow</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>act<span class="w"> </span>-j<span class="w"> </span><span class="nb">test</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># Run with secrets</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>act<span class="w"> </span>-j<span class="w"> </span>release<span class="w"> </span>--secret-file<span class="w"> </span>.secrets
-</span></code></pre></div>
-<h2 id="pipeline-stages">Pipeline Stages<a class="headerlink" href="#pipeline-stages" title="Permanent link">&para;</a></h2>
-<h3 id="test-stage">Test Stage<a class="headerlink" href="#test-stage" title="Permanent link">&para;</a></h3>
-<ol>
-<li><strong>Unit tests</strong> - Fast, isolated tests</li>
-<li><strong>Integration tests</strong> - Tests with envtest</li>
-<li><strong>E2E tests</strong> - Full cluster tests</li>
-<li><strong>Lint</strong> - Code quality checks</li>
-</ol>
-<h3 id="build-stage">Build Stage<a class="headerlink" href="#build-stage" title="Permanent link">&para;</a></h3>
-<ol>
-<li><strong>Go build</strong> - Compile binary</li>
-<li><strong>Docker build</strong> - Create image</li>
-<li><strong>Multi-arch</strong> - AMD64 and ARM64</li>
-</ol>
-<h3 id="release-stage">Release Stage<a class="headerlink" href="#release-stage" title="Permanent link">&para;</a></h3>
-<ol>
-<li><strong>Tag validation</strong> - Verify semver</li>
-<li><strong>Image push</strong> - Push to registry</li>
-<li><strong>GitHub release</strong> - Create release</li>
-<li><strong>Helm publish</strong> - Update chart repo</li>
-<li><strong>Docs deploy</strong> - Update documentation</li>
-</ol>
-<h2 id="quality-gates">Quality Gates<a class="headerlink" href="#quality-gates" title="Permanent link">&para;</a></h2>
-<h3 id="required-checks">Required Checks<a class="headerlink" href="#required-checks" title="Permanent link">&para;</a></h3>
-<ul>
-<li>All tests pass</li>
-<li>Lint passes</li>
-<li>Build succeeds</li>
-<li>Coverage meets threshold</li>
-</ul>
-<h3 id="branch-protection">Branch Protection<a class="headerlink" href="#branch-protection" title="Permanent link">&para;</a></h3>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># .github/settings.yml</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nt">branches</span><span class="p">:</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">main</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="nt">protection</span><span class="p">:</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">      </span><span class="nt">required_status_checks</span><span class="p">:</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">        </span><span class="nt">strict</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">        </span><span class="nt">contexts</span><span class="p">:</span>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test</span>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lint</span>
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build</span>
-</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">      </span><span class="nt">required_pull_request_reviews</span><span class="p">:</span>
-</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">        </span><span class="nt">required_approving_review_count</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-</span></code></pre></div>
-<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
-<h3 id="failed-tests">Failed Tests<a class="headerlink" href="#failed-tests" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># View test logs in Actions</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="c1"># Click on failed job &gt; View raw logs</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># Reproduce locally</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>make<span class="w"> </span><span class="nb">test</span>
-</span></code></pre></div>
-<h3 id="failed-docker-build">Failed Docker Build<a class="headerlink" href="#failed-docker-build" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Check Dockerfile syntax</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>docker<span class="w"> </span>build<span class="w"> </span>--no-cache<span class="w"> </span>.
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># Check multi-arch</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>docker<span class="w"> </span>buildx<span class="w"> </span>build<span class="w"> </span>--platform<span class="w"> </span>linux/amd64,linux/arm64<span class="w"> </span>.
-</span></code></pre></div>
-<h3 id="failed-release">Failed Release<a class="headerlink" href="#failed-release" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Verify tag format</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>git<span class="w"> </span>tag<span class="w"> </span>-l<span class="w"> </span><span class="s1">&#39;v*&#39;</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># Ensure tag is pushed</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v1.2.3
-</span></code></pre></div>
-<h2 id="metrics">Metrics<a class="headerlink" href="#metrics" title="Permanent link">&para;</a></h2>
-<h3 id="pipeline-duration">Pipeline Duration<a class="headerlink" href="#pipeline-duration" title="Permanent link">&para;</a></h3>
-<p>Target times:
-- CI: &lt; 10 minutes
-- Release: &lt; 15 minutes
-- Docs: &lt; 5 minutes</p>
-<h3 id="success-rate">Success Rate<a class="headerlink" href="#success-rate" title="Permanent link">&para;</a></h3>
-<p>Monitor in GitHub Actions insights:
-- Workflow runs
-- Success/failure rate
-- Duration trends</p>
 
 
 
