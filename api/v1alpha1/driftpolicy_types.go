@@ -39,6 +39,12 @@ const (
 
 	// LabelInstance indicates which instance owns this resource
 	LabelInstance = "dbops.dbprovision.io/instance"
+
+	// LabelOperatorInstanceID partitions resources across multiple operator instances.
+	// The default operator (instance-id="default") manages unlabeled resources and
+	// resources explicitly labeled "default". Named operators manage only resources
+	// with a matching label value.
+	LabelOperatorInstanceID = "dbops.dbprovision.io/operator-instance-id"
 )
 
 // DriftMode defines how drift is handled
@@ -67,7 +73,7 @@ type DriftPolicy struct {
 
 	// Interval specifies how often to check for drift (Go duration string)
 	// This is only meaningful when mode is "detect" or "correct"
-	// +kubebuilder:default="5m"
+	// +kubebuilder:default="8h"
 	// +optional
 	Interval string `json:"interval,omitempty"`
 }

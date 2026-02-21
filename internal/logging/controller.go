@@ -19,6 +19,7 @@ package logging
 import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -32,10 +33,11 @@ import (
 //	    Named("databaseinstance").
 //	    Complete(c)
 type ControllerBuilder struct {
-	mgr  ctrl.Manager
-	obj  client.Object
-	name string
-	owns []client.Object
+	mgr        ctrl.Manager
+	obj        client.Object
+	name       string
+	owns       []client.Object
+	predicates []predicate.Predicate
 }
 
 // BuildController creates a builder that auto-applies all standard middleware.
@@ -64,6 +66,18 @@ func (b *ControllerBuilder) Owns(obj client.Object) *ControllerBuilder {
 	return b
 }
 
+// WithPredicates adds event predicates that filter which events trigger reconciliation.
+func (b *ControllerBuilder) WithPredicates(predicates ...predicate.Predicate) *ControllerBuilder {
+	b.predicates = append(b.predicates, predicates...)
+	return b
+}
+
+// WithEventFilter adds a single event predicate that filters which events trigger reconciliation.
+func (b *ControllerBuilder) WithEventFilter(p predicate.Predicate) *ControllerBuilder {
+	b.predicates = append(b.predicates, p)
+	return b
+}
+
 // Complete registers the controller with all standard middleware applied.
 // Middleware chain (applied in order):
 //  1. ReconcileID injection — unique correlation ID per reconciliation cycle
@@ -75,6 +89,9 @@ func (b *ControllerBuilder) Complete(r reconcile.Reconciler) error {
 		Named(b.name)
 	for _, o := range b.owns {
 		builder = builder.Owns(o)
+	}
+	for _, p := range b.predicates {
+		builder = builder.WithEventFilter(p)
 	}
 	return builder.Complete(&withReconcileID{inner: r})
 }

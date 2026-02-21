@@ -18,12 +18,14 @@ package clusterrole
 
 import (
 	"context"
+	"time"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/db-provision-operator/internal/secret"
 	"github.com/db-provision-operator/internal/shared/eventbus"
@@ -40,12 +42,14 @@ type Module struct {
 
 // ModuleConfig holds dependencies for the cluster role module.
 type ModuleConfig struct {
-	Client        client.Client
-	Scheme        *runtime.Scheme
-	Recorder      record.EventRecorder
-	EventBus      eventbus.Bus
-	SecretManager *secret.Manager
-	Logger        logr.Logger
+	Client               client.Client
+	Scheme               *runtime.Scheme
+	Recorder             record.EventRecorder
+	EventBus             eventbus.Bus
+	SecretManager        *secret.Manager
+	DefaultDriftInterval time.Duration
+	Predicates           []predicate.Predicate
+	Logger               logr.Logger
 }
 
 // NewModule creates and wires the cluster role module.
@@ -68,11 +72,13 @@ func NewModule(cfg ModuleConfig) (*Module, error) {
 
 	// Create controller (K8s reconciliation)
 	controller := NewController(ControllerConfig{
-		Client:   cfg.Client,
-		Scheme:   cfg.Scheme,
-		Recorder: cfg.Recorder,
-		Handler:  handler,
-		Logger:   logger.WithName("controller"),
+		Client:               cfg.Client,
+		Scheme:               cfg.Scheme,
+		Recorder:             cfg.Recorder,
+		Handler:              handler,
+		DefaultDriftInterval: cfg.DefaultDriftInterval,
+		Predicates:           cfg.Predicates,
+		Logger:               logger.WithName("controller"),
 	})
 
 	m := &Module{

@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/db-provision-operator/internal/secret"
 	"github.com/db-provision-operator/internal/shared/eventbus"
@@ -46,6 +47,7 @@ type ModuleConfig struct {
 	EventBus      eventbus.Bus
 	SecretManager *secret.Manager
 	Logger        logr.Logger
+	Predicates    []predicate.Predicate
 }
 
 // NewModule creates and wires the backupschedule module.
@@ -67,11 +69,12 @@ func NewModule(cfg ModuleConfig) (*Module, error) {
 
 	// Create controller (K8s reconciliation)
 	controller := NewController(ControllerConfig{
-		Client:   cfg.Client,
-		Scheme:   cfg.Scheme,
-		Recorder: cfg.Recorder,
-		Handler:  handler,
-		Logger:   logger.WithName("controller"),
+		Client:     cfg.Client,
+		Scheme:     cfg.Scheme,
+		Recorder:   cfg.Recorder,
+		Handler:    handler,
+		Logger:     logger.WithName("controller"),
+		Predicates: cfg.Predicates,
 	})
 
 	m := &Module{

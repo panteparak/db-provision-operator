@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/logging"
@@ -40,7 +41,6 @@ import (
 )
 
 const (
-	RequeueAfterReady   = 5 * time.Minute
 	RequeueAfterError   = 30 * time.Second
 	RequeueAfterPending = 10 * time.Second
 
@@ -54,29 +54,35 @@ const (
 // Controller handles K8s reconciliation for ClusterDatabaseRole resources.
 type Controller struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
-	handler  *Handler
-	logger   logr.Logger
+	Scheme               *runtime.Scheme
+	Recorder             record.EventRecorder
+	handler              *Handler
+	defaultDriftInterval time.Duration
+	predicates           []predicate.Predicate
+	logger               logr.Logger
 }
 
 // ControllerConfig holds dependencies for the controller.
 type ControllerConfig struct {
-	Client   client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
-	Handler  *Handler
-	Logger   logr.Logger
+	Client               client.Client
+	Scheme               *runtime.Scheme
+	Recorder             record.EventRecorder
+	Handler              *Handler
+	DefaultDriftInterval time.Duration
+	Predicates           []predicate.Predicate
+	Logger               logr.Logger
 }
 
 // NewController creates a new cluster role controller.
 func NewController(cfg ControllerConfig) *Controller {
 	return &Controller{
-		Client:   cfg.Client,
-		Scheme:   cfg.Scheme,
-		Recorder: cfg.Recorder,
-		handler:  cfg.Handler,
-		logger:   cfg.Logger,
+		Client:               cfg.Client,
+		Scheme:               cfg.Scheme,
+		Recorder:             cfg.Recorder,
+		handler:              cfg.Handler,
+		defaultDriftInterval: cfg.DefaultDriftInterval,
+		predicates:           cfg.Predicates,
+		logger:               cfg.Logger,
 	}
 }
 
@@ -298,6 +304,7 @@ func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
 	return logging.BuildController(mgr).
 		For(&dbopsv1alpha1.ClusterDatabaseRole{}).
 		Named("clusterdatabaserole-feature").
+		WithPredicates(c.predicates...).
 		Complete(c)
 }
 
@@ -412,7 +419,7 @@ func (c *Controller) correctDrift(ctx context.Context, role *dbopsv1alpha1.Clust
 // getRequeueInterval returns the requeue interval based on the effective drift policy.
 func (c *Controller) getRequeueInterval(role *dbopsv1alpha1.ClusterDatabaseRole, instance *dbopsv1alpha1.ClusterDatabaseInstance) time.Duration {
 	policy := c.getEffectiveDriftPolicy(role, instance)
-	return util.ParseDriftRequeueInterval(policy, RequeueAfterReady)
+	return util.ParseDriftRequeueInterval(policy, c.defaultDriftInterval)
 }
 
 // getEffectiveDriftPolicy returns the effective drift policy for a cluster role.
@@ -428,10 +435,10 @@ func (c *Controller) getEffectiveDriftPolicy(role *dbopsv1alpha1.ClusterDatabase
 		return *instance.Spec.DriftPolicy
 	}
 
-	// Default policy: detect mode, 5 minute interval
+	// Default policy: detect mode, operator-configured interval
 	return dbopsv1alpha1.DriftPolicy{
 		Mode:     dbopsv1alpha1.DriftModeDetect,
-		Interval: "5m",
+		Interval: c.defaultDriftInterval.String(),
 	}
 }
 

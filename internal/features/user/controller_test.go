@@ -40,6 +40,10 @@ import (
 	"github.com/db-provision-operator/internal/util"
 )
 
+// testDefaultDriftInterval is used as the default drift interval for controllers
+// in unit tests. It must match the value used by the production default.
+const testDefaultDriftInterval = 8 * time.Hour
+
 func newTestScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 	_ = dbopsv1alpha1.AddToScheme(scheme)
@@ -115,12 +119,13 @@ func TestController_Reconcile_NewUser(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -172,12 +177,13 @@ func TestController_Reconcile_ExistingUser(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -210,12 +216,13 @@ func TestController_Reconcile_UserNotFound(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -250,12 +257,13 @@ func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -307,12 +315,13 @@ func TestController_Reconcile_Deletion(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -353,12 +362,13 @@ func TestController_Reconcile_DeletionProtected(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	_, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -411,12 +421,13 @@ func TestController_Reconcile_DeletionProtectedWithForceDelete(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -492,12 +503,13 @@ func TestController_Reconcile_SecretTemplateLabelsAndAnnotations(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -583,12 +595,13 @@ func TestController_Reconcile_SecretTemplateOverridesDefaultLabels(t *testing.T)
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	_, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -650,12 +663,13 @@ func TestController_Reconcile_DeletionBlockedByOwnership(t *testing.T) {
 
 	recorder := record.NewFakeRecorder(10)
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      recorder,
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             recorder,
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -734,12 +748,13 @@ func TestController_Reconcile_DeletionProceedsNoOwnership(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -801,12 +816,13 @@ func TestController_Reconcile_DeletionWithForceBypassesOwnership(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -861,12 +877,13 @@ func TestController_Reconcile_SetsReconcileID(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	_, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -917,12 +934,13 @@ func TestController_Reconcile_ExistsError(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	_, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -978,12 +996,13 @@ func TestController_Reconcile_CreateError(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	_, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -1040,12 +1059,13 @@ func TestController_Reconcile_DeletionDeleteError(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -1104,12 +1124,13 @@ func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -1120,7 +1141,7 @@ func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, RequeueAfterReady, result.RequeueAfter, "Should requeue after ready interval")
+	assert.Equal(t, testDefaultDriftInterval, result.RequeueAfter, "Should requeue after ready interval")
 
 	// Fetch the updated user to verify all status fields
 	var updatedUser dbopsv1alpha1.DatabaseUser
@@ -1205,12 +1226,13 @@ func TestController_Reconcile_DeletionDeleteError_WithForce(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -1271,12 +1293,13 @@ func TestController_Reconcile_DriftDetected_DetectMode(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	_, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -1346,12 +1369,13 @@ func TestController_Reconcile_DriftDetected_CorrectMode(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	_, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -1424,12 +1448,13 @@ func TestController_Reconcile_DriftCorrection_PartialFail(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	_, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -1501,12 +1526,13 @@ func TestController_Reconcile_DriftCorrection_AllFailed(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	_, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -1563,12 +1589,13 @@ func TestController_Reconcile_DriftDetected_IgnoreMode(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	_, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -1617,12 +1644,13 @@ func TestController_Reconcile_DriftDetection_Error(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	_, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -1702,12 +1730,13 @@ func TestController_Reconcile_DriftCorrection_Destructive(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	_, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -1779,12 +1808,13 @@ func TestController_Reconcile_DriftCorrection_NoDestructive(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        client,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(client),
-		Logger:        logr.Discard(),
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(client),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	_, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -1844,12 +1874,13 @@ func TestController_Reconcile_DeletionBlockedByGrantDependencies(t *testing.T) {
 
 	recorder := record.NewFakeRecorder(10)
 	controller := NewController(ControllerConfig{
-		Client:        fakeClient,
-		Scheme:        scheme,
-		Recorder:      recorder,
-		Handler:       handler,
-		SecretManager: secret.NewManager(fakeClient),
-		Logger:        logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             recorder,
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -1901,12 +1932,13 @@ func TestController_Reconcile_DeletionSucceedsWhenNoGrants(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        fakeClient,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(fakeClient),
-		Logger:        logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -1978,12 +2010,13 @@ func TestController_Reconcile_ForceDeleteBypassesGrantCheck(t *testing.T) {
 	}
 
 	controller := NewController(ControllerConfig{
-		Client:        fakeClient,
-		Scheme:        scheme,
-		Recorder:      record.NewFakeRecorder(10),
-		Handler:       handler,
-		SecretManager: secret.NewManager(fakeClient),
-		Logger:        logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{

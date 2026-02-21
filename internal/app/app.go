@@ -20,6 +20,7 @@ package app
 import (
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/db-provision-operator/internal/features/backup"
 	"github.com/db-provision-operator/internal/features/backupschedule"
@@ -50,7 +51,7 @@ type Application struct {
 }
 
 // NewApplication creates a new Application with all feature modules wired together.
-func NewApplication(mgr ctrl.Manager) (*Application, error) {
+func NewApplication(mgr ctrl.Manager, cfg OperatorConfig) (*Application, error) {
 	logger := mgr.GetLogger().WithName("app")
 
 	// Create shared infrastructure
@@ -65,6 +66,10 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 	// Create secret manager
 	secretManager := secret.NewManager(mgr.GetClient())
 
+	// Create instance ID predicate for multi-operator partitioning
+	instancePred := NewInstanceIDPredicate(cfg.InstanceID)
+	predicates := []predicate.Predicate{instancePred}
+
 	// Create feature modules
 	var modules []Module
 
@@ -74,6 +79,7 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 		Recorder:      mgr.GetEventRecorderFor("databaseinstance-controller"),
 		EventBus:      eventBus,
 		SecretManager: secretManager,
+		Predicates:    predicates,
 	})
 	if err != nil {
 		return nil, err
@@ -86,6 +92,7 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 		Recorder:      mgr.GetEventRecorderFor("clusterdatabaseinstance-controller"),
 		EventBus:      eventBus,
 		SecretManager: secretManager,
+		Predicates:    predicates,
 	})
 	if err != nil {
 		return nil, err
@@ -94,9 +101,11 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 
 	// Database module (depends on Instance)
 	databaseMod, err := database.NewModule(database.Config{
-		Manager:       mgr,
-		EventBus:      eventBus,
-		SecretManager: secretManager,
+		Manager:              mgr,
+		EventBus:             eventBus,
+		SecretManager:        secretManager,
+		DefaultDriftInterval: cfg.DefaultDriftInterval,
+		Predicates:           predicates,
 	})
 	if err != nil {
 		return nil, err
@@ -105,12 +114,14 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 
 	// User module (depends on Instance)
 	userMod, err := user.NewModule(user.ModuleConfig{
-		Client:        mgr.GetClient(),
-		Scheme:        mgr.GetScheme(),
-		Recorder:      mgr.GetEventRecorderFor("databaseuser-controller"),
-		EventBus:      eventBus,
-		SecretManager: secretManager,
-		Logger:        logger,
+		Client:               mgr.GetClient(),
+		Scheme:               mgr.GetScheme(),
+		Recorder:             mgr.GetEventRecorderFor("databaseuser-controller"),
+		EventBus:             eventBus,
+		SecretManager:        secretManager,
+		Logger:               logger,
+		DefaultDriftInterval: cfg.DefaultDriftInterval,
+		Predicates:           predicates,
 	})
 	if err != nil {
 		return nil, err
@@ -119,12 +130,14 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 
 	// Role module (depends on Instance)
 	roleMod, err := role.NewModule(role.ModuleConfig{
-		Client:        mgr.GetClient(),
-		Scheme:        mgr.GetScheme(),
-		Recorder:      mgr.GetEventRecorderFor("databaserole-controller"),
-		EventBus:      eventBus,
-		SecretManager: secretManager,
-		Logger:        logger,
+		Client:               mgr.GetClient(),
+		Scheme:               mgr.GetScheme(),
+		Recorder:             mgr.GetEventRecorderFor("databaserole-controller"),
+		EventBus:             eventBus,
+		SecretManager:        secretManager,
+		Logger:               logger,
+		DefaultDriftInterval: cfg.DefaultDriftInterval,
+		Predicates:           predicates,
 	})
 	if err != nil {
 		return nil, err
@@ -133,12 +146,14 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 
 	// ClusterRole module (cluster-scoped roles - depends on ClusterInstance)
 	clusterRoleMod, err := clusterrole.NewModule(clusterrole.ModuleConfig{
-		Client:        mgr.GetClient(),
-		Scheme:        mgr.GetScheme(),
-		Recorder:      mgr.GetEventRecorderFor("clusterdatabaserole-controller"),
-		EventBus:      eventBus,
-		SecretManager: secretManager,
-		Logger:        logger,
+		Client:               mgr.GetClient(),
+		Scheme:               mgr.GetScheme(),
+		Recorder:             mgr.GetEventRecorderFor("clusterdatabaserole-controller"),
+		EventBus:             eventBus,
+		SecretManager:        secretManager,
+		Logger:               logger,
+		DefaultDriftInterval: cfg.DefaultDriftInterval,
+		Predicates:           predicates,
 	})
 	if err != nil {
 		return nil, err
@@ -147,12 +162,14 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 
 	// Grant module (depends on User and Database)
 	grantMod, err := grant.NewModule(grant.ModuleConfig{
-		Client:        mgr.GetClient(),
-		Scheme:        mgr.GetScheme(),
-		Recorder:      mgr.GetEventRecorderFor("databasegrant-controller"),
-		EventBus:      eventBus,
-		SecretManager: secretManager,
-		Logger:        logger,
+		Client:               mgr.GetClient(),
+		Scheme:               mgr.GetScheme(),
+		Recorder:             mgr.GetEventRecorderFor("databasegrant-controller"),
+		EventBus:             eventBus,
+		SecretManager:        secretManager,
+		Logger:               logger,
+		DefaultDriftInterval: cfg.DefaultDriftInterval,
+		Predicates:           predicates,
 	})
 	if err != nil {
 		return nil, err
@@ -161,12 +178,14 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 
 	// ClusterGrant module (cluster-scoped grants - depends on ClusterInstance, User, and ClusterRole)
 	clusterGrantMod, err := clustergrant.NewModule(clustergrant.ModuleConfig{
-		Client:        mgr.GetClient(),
-		Scheme:        mgr.GetScheme(),
-		Recorder:      mgr.GetEventRecorderFor("clusterdatabasegrant-controller"),
-		EventBus:      eventBus,
-		SecretManager: secretManager,
-		Logger:        logger,
+		Client:               mgr.GetClient(),
+		Scheme:               mgr.GetScheme(),
+		Recorder:             mgr.GetEventRecorderFor("clusterdatabasegrant-controller"),
+		EventBus:             eventBus,
+		SecretManager:        secretManager,
+		Logger:               logger,
+		DefaultDriftInterval: cfg.DefaultDriftInterval,
+		Predicates:           predicates,
 	})
 	if err != nil {
 		return nil, err
@@ -181,6 +200,7 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 		EventBus:      eventBus,
 		SecretManager: secretManager,
 		Logger:        logger,
+		Predicates:    predicates,
 	})
 	if err != nil {
 		return nil, err
@@ -195,6 +215,7 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 		EventBus:      eventBus,
 		SecretManager: secretManager,
 		Logger:        logger,
+		Predicates:    predicates,
 	})
 	if err != nil {
 		return nil, err
@@ -209,6 +230,7 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 		EventBus:      eventBus,
 		SecretManager: secretManager,
 		Logger:        logger,
+		Predicates:    predicates,
 	})
 	if err != nil {
 		return nil, err
@@ -216,7 +238,9 @@ func NewApplication(mgr ctrl.Manager) (*Application, error) {
 	modules = append(modules, restoreMod)
 
 	logger.Info("Application created with feature modules",
-		"moduleCount", len(modules))
+		"moduleCount", len(modules),
+		"instanceID", cfg.InstanceID,
+		"defaultDriftInterval", cfg.DefaultDriftInterval)
 
 	return &Application{
 		eventBus:      eventBus,

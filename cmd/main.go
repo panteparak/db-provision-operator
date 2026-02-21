@@ -19,8 +19,10 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -63,6 +65,8 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
+	var defaultDriftIntervalStr string
+	var instanceID string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -70,6 +74,11 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&defaultDriftIntervalStr, "default-drift-interval", "8h",
+		"Default drift detection interval for resources without an explicit DriftPolicy.Interval (Go duration string).")
+	flag.StringVar(&instanceID, "instance-id", "default",
+		"Operator instance ID for multi-operator partitioning. Resources are matched by the "+
+			"dbops.dbprovision.io/operator-instance-id label. The default value also manages unlabeled resources.")
 	flag.BoolVar(&secureMetrics, "metrics-secure", true,
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	flag.StringVar(&webhookCertPath, "webhook-cert-path", "", "The directory that contains the webhook certificate.")
@@ -88,6 +97,28 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	// Parse operator config flags
+	defaultDriftInterval, err := time.ParseDuration(defaultDriftIntervalStr)
+	if err != nil {
+		setupLog.Error(err, "invalid --default-drift-interval", "value", defaultDriftIntervalStr)
+		os.Exit(1)
+	}
+	operatorCfg := app.OperatorConfig{
+		DefaultDriftInterval: defaultDriftInterval,
+		InstanceID:           instanceID,
+	}
+
+	// Compute leader election ID — unique per instance-id to avoid conflicts
+	leaderElectionID := "b0f91929.dbprovision.io"
+	if operatorCfg.InstanceID != "default" {
+		leaderElectionID = fmt.Sprintf("b0f91929-%s.dbprovision.io", operatorCfg.InstanceID)
+	}
+
+	setupLog.Info("Operator configuration",
+		"defaultDriftInterval", operatorCfg.DefaultDriftInterval,
+		"instanceID", operatorCfg.InstanceID,
+		"leaderElectionID", leaderElectionID)
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -184,7 +215,7 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "b0f91929.dbprovision.io",
+		LeaderElectionID:       leaderElectionID,
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -204,7 +235,7 @@ func main() {
 
 	// Create and setup the application with feature modules
 	// This includes all controllers: Instance, Database, User, Role, Grant, Backup, BackupSchedule, Restore
-	application, err := app.NewApplication(mgr)
+	application, err := app.NewApplication(mgr, operatorCfg)
 	if err != nil {
 		setupLog.Error(err, "unable to create application")
 		os.Exit(1)

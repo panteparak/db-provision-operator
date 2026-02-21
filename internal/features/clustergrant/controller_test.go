@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
@@ -35,6 +36,10 @@ import (
 	"github.com/db-provision-operator/internal/service/drift"
 	"github.com/db-provision-operator/internal/util"
 )
+
+// testDefaultDriftInterval is used as the default drift interval for controllers
+// in unit tests. It must match the value used by the production default.
+const testDefaultDriftInterval = 8 * time.Hour
 
 func newTestScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
@@ -90,11 +95,12 @@ func newTestController(clientBuilder *fake.ClientBuilder, mockRepo *MockReposito
 	})
 
 	return NewController(ControllerConfig{
-		Client:   c,
-		Scheme:   newTestScheme(),
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               c,
+		Scheme:               newTestScheme(),
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
 	})
 }
 

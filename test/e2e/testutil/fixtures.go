@@ -35,6 +35,21 @@ const (
 	APIVersion = "dbops.dbprovision.io/v1alpha1"
 )
 
+// WithLabels sets labels on an unstructured resource and returns it for chaining.
+func WithLabels(obj *unstructured.Unstructured, labels map[string]string) *unstructured.Unstructured {
+	if len(labels) > 0 {
+		existing := obj.GetLabels()
+		if existing == nil {
+			existing = make(map[string]string)
+		}
+		for k, v := range labels {
+			existing[k] = v
+		}
+		obj.SetLabels(existing)
+	}
+	return obj
+}
+
 // BuildDatabaseInstance creates an unstructured DatabaseInstance resource.
 func BuildDatabaseInstance(name, namespace, engine, host string, port int64, secretRef SecretRef) *unstructured.Unstructured {
 	obj := &unstructured.Unstructured{

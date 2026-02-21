@@ -38,6 +38,8 @@ spec:
             - --leader-elect
             {{- end }}
             - --health-probe-bind-address={{ .Values.healthProbeBindAddress }}
+            - --default-drift-interval={{ .Values.defaultDriftInterval }}
+            - --instance-id={{ .Values.instanceId | default "default" }}
           ports:
             - containerPort: 8081
               name: health

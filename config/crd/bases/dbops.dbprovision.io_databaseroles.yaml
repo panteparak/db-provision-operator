@@ -71,7 +71,7 @@ spec:
                   If not specified, the instance's drift policy is used.
                 properties:
                   interval:
-                    default: 5m
+                    default: 8h
                     description: |-
                       Interval specifies how often to check for drift (Go duration string)
                       This is only meaningful when mode is "detect" or "correct"

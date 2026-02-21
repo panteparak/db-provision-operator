@@ -18,9 +18,11 @@ package database
 
 import (
 	"context"
+	"time"
 
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/db-provision-operator/internal/secret"
 	"github.com/db-provision-operator/internal/shared/eventbus"
@@ -38,9 +40,11 @@ type Module struct {
 
 // Config holds dependencies for the database module.
 type Config struct {
-	Manager       ctrl.Manager
-	EventBus      eventbus.Bus
-	SecretManager *secret.Manager
+	Manager              ctrl.Manager
+	EventBus             eventbus.Bus
+	SecretManager        *secret.Manager
+	DefaultDriftInterval time.Duration
+	Predicates           []predicate.Predicate
 }
 
 // NewModule creates and wires the database module.
@@ -69,11 +73,13 @@ func NewModule(cfg Config) (*Module, error) {
 
 	// Create controller (K8s reconciliation)
 	controller := NewController(ControllerConfig{
-		Client:   cfg.Manager.GetClient(),
-		Scheme:   cfg.Manager.GetScheme(),
-		Recorder: cfg.Manager.GetEventRecorderFor("database-controller"),
-		Handler:  handler,
-		Logger:   logger.WithName("controller"),
+		Client:               cfg.Manager.GetClient(),
+		Scheme:               cfg.Manager.GetScheme(),
+		Recorder:             cfg.Manager.GetEventRecorderFor("database-controller"),
+		Handler:              handler,
+		Logger:               logger.WithName("controller"),
+		DefaultDriftInterval: cfg.DefaultDriftInterval,
+		Predicates:           cfg.Predicates,
 	})
 
 	// Subscribe to events from other modules

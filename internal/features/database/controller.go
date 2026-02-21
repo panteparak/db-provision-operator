@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/logging"
@@ -41,9 +42,6 @@ import (
 )
 
 const (
-	// RequeueAfterReady is the requeue duration after a successful reconcile.
-	RequeueAfterReady = 5 * time.Minute
-
 	// RequeueAfterError is the requeue duration after an error.
 	RequeueAfterError = 30 * time.Second
 
@@ -58,29 +56,35 @@ const (
 // It is a thin wrapper that delegates business logic to the Handler.
 type Controller struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
-	handler  *Handler
-	logger   logr.Logger
+	Scheme               *runtime.Scheme
+	Recorder             record.EventRecorder
+	handler              *Handler
+	logger               logr.Logger
+	defaultDriftInterval time.Duration
+	predicates           []predicate.Predicate
 }
 
 // ControllerConfig holds dependencies for the controller.
 type ControllerConfig struct {
-	Client   client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
-	Handler  *Handler
-	Logger   logr.Logger
+	Client               client.Client
+	Scheme               *runtime.Scheme
+	Recorder             record.EventRecorder
+	Handler              *Handler
+	Logger               logr.Logger
+	DefaultDriftInterval time.Duration
+	Predicates           []predicate.Predicate
 }
 
 // NewController creates a new database controller.
 func NewController(cfg ControllerConfig) *Controller {
 	return &Controller{
-		Client:   cfg.Client,
-		Scheme:   cfg.Scheme,
-		Recorder: cfg.Recorder,
-		handler:  cfg.Handler,
-		logger:   cfg.Logger,
+		Client:               cfg.Client,
+		Scheme:               cfg.Scheme,
+		Recorder:             cfg.Recorder,
+		handler:              cfg.Handler,
+		logger:               cfg.Logger,
+		defaultDriftInterval: cfg.DefaultDriftInterval,
+		predicates:           cfg.Predicates,
 	}
 }
 
@@ -339,6 +343,7 @@ func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
 	return logging.BuildController(mgr).
 		For(&dbopsv1alpha1.Database{}).
 		Named("database").
+		WithPredicates(c.predicates...).
 		Complete(c)
 }
 
@@ -453,7 +458,7 @@ func (c *Controller) correctDrift(ctx context.Context, database *dbopsv1alpha1.D
 // getRequeueInterval returns the requeue interval based on the effective drift policy.
 func (c *Controller) getRequeueInterval(database *dbopsv1alpha1.Database, resolved *instanceresolver.ResolvedInstance) time.Duration {
 	policy := c.getEffectiveDriftPolicy(database, resolved)
-	return util.ParseDriftRequeueInterval(policy, RequeueAfterReady)
+	return util.ParseDriftRequeueInterval(policy, c.defaultDriftInterval)
 }
 
 // getEffectiveDriftPolicy returns the effective drift policy for a database.
@@ -469,10 +474,10 @@ func (c *Controller) getEffectiveDriftPolicy(database *dbopsv1alpha1.Database, r
 		return *resolved.Spec.DriftPolicy
 	}
 
-	// Default policy: detect mode, 5 minute interval
+	// Default policy: detect mode, operator-configured interval
 	return dbopsv1alpha1.DriftPolicy{
 		Mode:     dbopsv1alpha1.DriftModeDetect,
-		Interval: "5m",
+		Interval: c.defaultDriftInterval.String(),
 	}
 }
 

@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/logging"
@@ -50,29 +51,32 @@ const (
 // Controller handles K8s reconciliation for DatabaseInstance resources.
 type Controller struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
-	handler  *Handler
-	logger   logr.Logger
+	Scheme     *runtime.Scheme
+	Recorder   record.EventRecorder
+	handler    *Handler
+	logger     logr.Logger
+	predicates []predicate.Predicate
 }
 
 // ControllerConfig holds dependencies for the controller.
 type ControllerConfig struct {
-	Client   client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
-	Handler  *Handler
-	Logger   logr.Logger
+	Client     client.Client
+	Scheme     *runtime.Scheme
+	Recorder   record.EventRecorder
+	Handler    *Handler
+	Logger     logr.Logger
+	Predicates []predicate.Predicate
 }
 
 // NewController creates a new instance controller.
 func NewController(cfg ControllerConfig) *Controller {
 	return &Controller{
-		Client:   cfg.Client,
-		Scheme:   cfg.Scheme,
-		Recorder: cfg.Recorder,
-		handler:  cfg.Handler,
-		logger:   cfg.Logger,
+		Client:     cfg.Client,
+		Scheme:     cfg.Scheme,
+		Recorder:   cfg.Recorder,
+		handler:    cfg.Handler,
+		logger:     cfg.Logger,
+		predicates: cfg.Predicates,
 	}
 }
 
@@ -275,6 +279,7 @@ func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
 	return logging.BuildController(mgr).
 		For(&dbopsv1alpha1.DatabaseInstance{}).
 		Named("databaseinstance").
+		WithPredicates(c.predicates...).
 		Complete(c)
 }
 

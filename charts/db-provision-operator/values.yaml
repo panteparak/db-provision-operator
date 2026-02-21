@@ -67,6 +67,14 @@ tolerations: []
 # -- Affinity rules for pod scheduling
 affinity: {}
 
+# -- Default drift detection interval for resources without an explicit DriftPolicy.Interval
+defaultDriftInterval: "8h"
+
+# -- Operator instance ID for multi-operator partitioning.
+# Resources are matched by the dbops.dbprovision.io/operator-instance-id label.
+# Empty string or "default" manages unlabeled resources (backward compatible).
+instanceId: ""
+
 # -- Leader election configuration (simple flag for deployment args)
 leaderElect: true
 

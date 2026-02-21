@@ -41,6 +41,10 @@ import (
 	"github.com/db-provision-operator/internal/util"
 )
 
+// testDefaultDriftInterval is used as the default drift interval for controllers
+// created in tests. It mirrors the production default of 8h.
+const testDefaultDriftInterval = 8 * time.Hour
+
 func newTestScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 	_ = dbopsv1alpha1.AddToScheme(scheme)
@@ -124,11 +128,12 @@ func TestController_Reconcile_NewDatabase(t *testing.T) {
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -189,11 +194,12 @@ func TestController_Reconcile_ExistingDatabase(t *testing.T) {
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -226,11 +232,12 @@ func TestController_Reconcile_DatabaseNotFound(t *testing.T) {
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -265,11 +272,12 @@ func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -319,11 +327,12 @@ func TestController_Reconcile_Deletion(t *testing.T) {
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -362,11 +371,12 @@ func TestController_Reconcile_DeletionProtected(t *testing.T) {
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	_, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -446,7 +456,7 @@ func TestController_GetEffectiveDriftPolicy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			controller := &Controller{}
+			controller := &Controller{defaultDriftInterval: testDefaultDriftInterval}
 			policy := controller.getEffectiveDriftPolicy(tt.database, tt.resolved)
 			assert.Equal(t, tt.expectedMode, policy.Mode)
 		})
@@ -522,11 +532,12 @@ func TestController_Reconcile_ExistsError(t *testing.T) {
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -580,11 +591,12 @@ func TestController_Reconcile_CreateError(t *testing.T) {
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -636,11 +648,12 @@ func TestController_Reconcile_VerifyAccessError(t *testing.T) {
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -694,11 +707,12 @@ func TestController_Reconcile_DeletionDeleteError(t *testing.T) {
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -757,11 +771,12 @@ func TestController_Reconcile_DeletionDeleteError_WithForce(t *testing.T) {
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -821,11 +836,12 @@ func TestController_Reconcile_DeletionProtectedWithForceDelete(t *testing.T) {
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -887,11 +903,12 @@ func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -902,7 +919,7 @@ func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, RequeueAfterReady, result.RequeueAfter)
+	assert.Equal(t, testDefaultDriftInterval, result.RequeueAfter)
 
 	// Fetch the updated database
 	var updatedDB dbopsv1alpha1.Database
@@ -989,11 +1006,12 @@ func TestController_Reconcile_StatusTransition_PendingToReady(t *testing.T) {
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	// Verify initial state has no phase
@@ -1011,7 +1029,7 @@ func TestController_Reconcile_StatusTransition_PendingToReady(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, RequeueAfterReady, result.RequeueAfter)
+	assert.Equal(t, testDefaultDriftInterval, result.RequeueAfter)
 
 	// Verify the database transitioned to Ready
 	var updatedDB dbopsv1alpha1.Database
@@ -1048,11 +1066,12 @@ func TestController_Reconcile_StatusTransition_ReadyToFailed(t *testing.T) {
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -1122,11 +1141,12 @@ func TestController_Reconcile_StatusTransition_FailedToReady(t *testing.T) {
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -1137,7 +1157,7 @@ func TestController_Reconcile_StatusTransition_FailedToReady(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, RequeueAfterReady, result.RequeueAfter)
+	assert.Equal(t, testDefaultDriftInterval, result.RequeueAfter)
 
 	// Verify transition: Failed -> Ready
 	var updatedDB dbopsv1alpha1.Database
@@ -1185,11 +1205,12 @@ func setupDriftTest(t *testing.T, database *dbopsv1alpha1.Database, mockRepo *Mo
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	return controller, fakeClient
@@ -1246,7 +1267,7 @@ func TestController_Reconcile_DriftDetected_DetectMode(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, RequeueAfterReady, result.RequeueAfter)
+	assert.Equal(t, testDefaultDriftInterval, result.RequeueAfter)
 
 	// Verify drift status is set
 	var updatedDB dbopsv1alpha1.Database
@@ -1294,7 +1315,7 @@ func TestController_Reconcile_DriftDetected_CorrectMode(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, RequeueAfterReady, result.RequeueAfter)
+	assert.Equal(t, testDefaultDriftInterval, result.RequeueAfter)
 
 	// Verify CorrectDrift was called
 	assert.True(t, mockRepo.WasCalled("CorrectDrift"))
@@ -1346,7 +1367,7 @@ func TestController_Reconcile_DriftCorrection_PartialFail(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, RequeueAfterReady, result.RequeueAfter)
+	assert.Equal(t, testDefaultDriftInterval, result.RequeueAfter)
 
 	// Verify CorrectDrift was called
 	assert.True(t, mockRepo.WasCalled("CorrectDrift"))
@@ -1386,7 +1407,7 @@ func TestController_Reconcile_DriftCorrection_AllFailed(t *testing.T) {
 
 	// Reconcile itself should still succeed (drift correction errors are non-fatal)
 	require.NoError(t, err)
-	assert.Equal(t, RequeueAfterReady, result.RequeueAfter)
+	assert.Equal(t, testDefaultDriftInterval, result.RequeueAfter)
 
 	// Verify the database is still Ready
 	var updatedDB dbopsv1alpha1.Database
@@ -1418,7 +1439,7 @@ func TestController_Reconcile_DriftDetected_IgnoreMode(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, RequeueAfterReady, result.RequeueAfter)
+	assert.Equal(t, testDefaultDriftInterval, result.RequeueAfter)
 
 	// In ignore mode, DetectDrift should NOT be called by performDriftDetection
 	// (although handler.DetectDrift may still be called during the normal reconcile flow
@@ -1454,7 +1475,7 @@ func TestController_Reconcile_DriftDetection_Error(t *testing.T) {
 
 	// Drift detection errors are non-fatal; reconcile should still succeed
 	require.NoError(t, err)
-	assert.Equal(t, RequeueAfterReady, result.RequeueAfter)
+	assert.Equal(t, testDefaultDriftInterval, result.RequeueAfter)
 
 	// Database should still be Ready
 	var updatedDB dbopsv1alpha1.Database
@@ -1501,7 +1522,7 @@ func TestController_Reconcile_DriftCorrection_Destructive(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, RequeueAfterReady, result.RequeueAfter)
+	assert.Equal(t, testDefaultDriftInterval, result.RequeueAfter)
 
 	// Verify CorrectDrift was called
 	assert.True(t, mockRepo.WasCalled("CorrectDrift"))
@@ -1546,7 +1567,7 @@ func TestController_Reconcile_DriftCorrection_NoDestructive(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, RequeueAfterReady, result.RequeueAfter)
+	assert.Equal(t, testDefaultDriftInterval, result.RequeueAfter)
 
 	// Verify CorrectDrift was called (it attempts correction but skips destructive ones)
 	assert.True(t, mockRepo.WasCalled("CorrectDrift"))
@@ -1605,11 +1626,12 @@ func TestController_Reconcile_DeletionBlockedByGrantDependencies(t *testing.T) {
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -1666,11 +1688,12 @@ func TestController_Reconcile_DeletionSucceedsWhenNoGrants(t *testing.T) {
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -1735,11 +1758,12 @@ func TestController_Reconcile_ForceDeleteBypassesGrantCheck(t *testing.T) {
 	})
 
 	controller := NewController(ControllerConfig{
-		Client:   fakeClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
-		Handler:  handler,
-		Logger:   logr.Discard(),
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{

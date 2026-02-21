@@ -376,6 +376,39 @@ e2e-local-all: ## Run all local E2E tests (starts all DBs)
 	$(MAKE) e2e-create-db-instance E2E_DATABASE=cockroachdb
 	$(MAKE) e2e-local-run-tests E2E_DATABASE=cockroachdb
 
+# ─────────────────────────────────────────────────────────────────────────────
+# MULTI-OPERATOR E2E TESTING
+# ─────────────────────────────────────────────────────────────────────────────
+
+.PHONY: e2e-deploy-second-operator
+e2e-deploy-second-operator: ## Deploy a second operator instance (instance-id=isolated) for multi-operator E2E testing
+	$(HELM) install db-provision-operator-isolated $(CHART_DIR) \
+		--namespace db-provision-operator-isolated \
+		--create-namespace \
+		--set image.repository=db-provision-operator \
+		--set image.tag=e2e \
+		--set image.pullPolicy=IfNotPresent \
+		--set instanceId=isolated \
+		--set leaderElect=true \
+		--set crds.install=false \
+		--wait --timeout 2m
+
+.PHONY: e2e-undeploy-second-operator
+e2e-undeploy-second-operator: ## Remove the second operator instance
+	-$(HELM) uninstall db-provision-operator-isolated --namespace db-provision-operator-isolated
+	-kubectl delete namespace db-provision-operator-isolated --ignore-not-found
+
+.PHONY: e2e-run-multi-operator-tests
+e2e-run-multi-operator-tests: ## Run multi-operator E2E tests (PostgreSQL only)
+	@echo "Running multi-operator E2E tests..."
+	E2E_DATABASE_ENGINE=postgresql \
+	E2E_DATABASE_HOST=127.0.0.1 \
+	E2E_DATABASE_PORT=$(E2E_POSTGRES_PORT) \
+	E2E_INSTANCE_HOST=host.k3d.internal \
+	E2E_INSTANCE_PORT=$(E2E_POSTGRES_PORT) \
+	go test ./test/e2e/... -v -tags=e2e \
+		-ginkgo.label-filter="multi-operator" -ginkgo.v -timeout=5m
+
 .PHONY: e2e-local-cleanup
 e2e-local-cleanup: ## Clean up local E2E environment. Use E2E_DATABASE to cleanup specific DB only
 	$(MAKE) e2e-cluster-delete
