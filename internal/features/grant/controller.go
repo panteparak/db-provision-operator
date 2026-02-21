@@ -18,12 +18,13 @@ package grant
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -121,7 +122,7 @@ func (c *Controller) reconcile(ctx context.Context, grant *dbopsv1alpha1.Databas
 	// Check if the referenced user exists and is ready
 	user, err := c.getUser(ctx, grant)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return c.handlePending(ctx, grant, fmt.Sprintf("Waiting for DatabaseUser %s", grant.Spec.UserRef.Name))
 		}
 		return c.handleError(ctx, grant, err, "get user")
@@ -134,7 +135,7 @@ func (c *Controller) reconcile(ctx context.Context, grant *dbopsv1alpha1.Databas
 	// Check if the referenced instance is ready
 	instance, err := c.getInstance(ctx, user)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return c.handlePending(ctx, grant, fmt.Sprintf("Waiting for DatabaseInstance %s", user.Spec.InstanceRef.Name))
 		}
 		return c.handleError(ctx, grant, err, "get instance")
@@ -254,14 +255,25 @@ func (c *Controller) handleDeletion(ctx context.Context, grant *dbopsv1alpha1.Da
 		force := util.HasForceDeleteAnnotation(grant)
 
 		if err := c.handler.Revoke(ctx, &grant.Spec, grant.Namespace); err != nil {
-			log.Error(err, "Failed to revoke grants")
-			c.Recorder.Eventf(grant, corev1.EventTypeWarning, "RevokeFailed", "Failed to revoke grants: %v", err)
-			if !force {
-				// Don't remove finalizer if revoke fails — prevents privilege leaks.
-				// The resource will be retried until the revoke succeeds.
-				return ctrl.Result{RequeueAfter: RequeueAfterError}, err
+			// If the target user/role is not found or not ready, treat as
+			// success during deletion — the target is gone or being deleted,
+			// and any granted privileges will be implicitly revoked when the
+			// database user/role is dropped.
+			var targetErr *TargetResolutionError
+			if errors.As(err, &targetErr) {
+				log.Info("Target not resolvable during deletion, skipping revocation", "reason", targetErr.Error())
+				c.Recorder.Eventf(grant, corev1.EventTypeNormal, "RevokeSkipped",
+					"Skipped revocation: target not resolvable (%s)", targetErr.Error())
+			} else {
+				log.Error(err, "Failed to revoke grants")
+				c.Recorder.Eventf(grant, corev1.EventTypeWarning, "RevokeFailed", "Failed to revoke grants: %v", err)
+				if !force {
+					// Don't remove finalizer if revoke fails — prevents privilege leaks.
+					// The resource will be retried until the revoke succeeds.
+					return ctrl.Result{RequeueAfter: RequeueAfterError}, err
+				}
+				// Force delete: continue with finalizer removal despite failure
 			}
-			// Force delete: continue with finalizer removal despite failure
 		} else {
 			log.Info("Grants revoked successfully")
 			c.Recorder.Eventf(grant, corev1.EventTypeNormal, "Revoked", "Grants revoked successfully")

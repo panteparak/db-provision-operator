@@ -596,11 +596,11 @@ var _ = Describe("mariadb", Ordered, func() {
 				return isMember
 			}, timeout, interval).Should(BeTrue(), "User '%s' should be a member of role '%s'", memberUser, roleName)
 
-			By("cleaning up role grant")
-			_ = dynamicClient.Resource(databaseGrantGVR).Namespace(testNamespace).Delete(ctx, roleGrantName, metav1.DeleteOptions{})
+			By("cleaning up role grant and waiting")
+			deleteAndWait(ctx, databaseGrantGVR, testNamespace, roleGrantName, timeout, interval)
 
-			By("cleaning up member user")
-			_ = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Delete(ctx, memberUser, metav1.DeleteOptions{})
+			By("cleaning up member user and waiting")
+			deleteAndWait(ctx, databaseUserGVR, testNamespace, memberUser, timeout, interval)
 		})
 	})
 
@@ -613,23 +613,28 @@ var _ = Describe("mariadb", Ordered, func() {
 
 		deletionTimeout := getDeletionTimeout()
 
-		// Level 1: Delete leaf resources (grants have no children)
-		By("deleting DatabaseGrant and waiting")
-		deleteAndWait(ctx, databaseGrantGVR, testNamespace, "testgrant", deletionTimeout, interval)
+		// Level 1: Delete ALL leaf resources (grants have no children)
+		By("deleting all DatabaseGrants and waiting")
+		_ = dynamicClient.Resource(databaseGrantGVR).Namespace(testNamespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
+		Eventually(func() bool {
+			list, err := dynamicClient.Resource(databaseGrantGVR).Namespace(testNamespace).List(ctx, metav1.ListOptions{})
+			return err == nil && len(list.Items) == 0
+		}, deletionTimeout, interval).Should(BeTrue(), "All DatabaseGrants should be deleted")
 
 		// Level 2: Delete middle resources (their grant children are now gone)
-		By("deleting DatabaseRole, DatabaseUser, Database")
+		By("deleting DatabaseRole, all DatabaseUsers, Database")
 		_ = dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Delete(ctx, "testrole", metav1.DeleteOptions{})
-		_ = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Delete(ctx, userName, metav1.DeleteOptions{})
+		_ = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
 		_ = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, databaseName, metav1.DeleteOptions{})
 
 		By("waiting for middle-level resources to be deleted")
 		Eventually(func() bool {
 			_, e1 := dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Get(ctx, "testrole", metav1.GetOptions{})
-			_, e2 := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Get(ctx, userName, metav1.GetOptions{})
+			userList, e2 := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).List(ctx, metav1.ListOptions{})
+			usersGone := e2 == nil && len(userList.Items) == 0
 			_, e3 := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, databaseName, metav1.GetOptions{})
-			return e1 != nil && e2 != nil && e3 != nil
-		}, deletionTimeout, interval).Should(BeTrue(), "Role, User, and Database should be deleted")
+			return e1 != nil && usersGone && e3 != nil
+		}, deletionTimeout, interval).Should(BeTrue(), "Role, Users, and Database should be deleted")
 
 		// Level 3: Delete root resource (its children are now gone)
 		By("deleting DatabaseInstance and waiting")

@@ -32,6 +32,23 @@ import (
 	"github.com/db-provision-operator/internal/shared/instanceresolver"
 )
 
+// TargetResolutionError indicates that the grant target (user/role) could not
+// be resolved because it was not found or not in Ready phase. During deletion,
+// controllers can treat this as a no-op since the target is gone or being
+// deleted, and any granted privileges will be implicitly revoked when the
+// database user/role is dropped.
+type TargetResolutionError struct {
+	Err error
+}
+
+func (e *TargetResolutionError) Error() string {
+	return e.Err.Error()
+}
+
+func (e *TargetResolutionError) Unwrap() error {
+	return e.Err
+}
+
 // Repository handles grant operations via the service layer.
 type Repository struct {
 	client           client.Client
@@ -79,11 +96,11 @@ func (r *Repository) ResolveTarget(ctx context.Context, spec *dbopsv1alpha1.Data
 			Namespace: userNamespace,
 			Name:      spec.UserRef.Name,
 		}, user); err != nil {
-			return nil, fmt.Errorf("get user: %w", err)
+			return nil, &TargetResolutionError{Err: fmt.Errorf("get user: %w", err)}
 		}
 
 		if user.Status.Phase != dbopsv1alpha1.PhaseReady {
-			return nil, fmt.Errorf("user not ready: phase is %s", user.Status.Phase)
+			return nil, &TargetResolutionError{Err: fmt.Errorf("user not ready: phase is %s", user.Status.Phase)}
 		}
 
 		return &TargetInfo{
@@ -105,11 +122,11 @@ func (r *Repository) ResolveTarget(ctx context.Context, spec *dbopsv1alpha1.Data
 		Namespace: roleNamespace,
 		Name:      spec.RoleRef.Name,
 	}, role); err != nil {
-		return nil, fmt.Errorf("get role: %w", err)
+		return nil, &TargetResolutionError{Err: fmt.Errorf("get role: %w", err)}
 	}
 
 	if role.Status.Phase != dbopsv1alpha1.PhaseReady {
-		return nil, fmt.Errorf("role not ready: phase is %s", role.Status.Phase)
+		return nil, &TargetResolutionError{Err: fmt.Errorf("role not ready: phase is %s", role.Status.Phase)}
 	}
 
 	return &TargetInfo{

@@ -702,6 +702,124 @@ func TestController_Reconcile_RevokeError_WithForce(t *testing.T) {
 	assert.True(t, mockRepo.WasCalled("Revoke"))
 }
 
+func TestController_Reconcile_Deletion_TargetNotReady(t *testing.T) {
+	// When the target user/role is not ready (e.g., being deleted with DependenciesExist),
+	// the grant controller should treat the revoke as a no-op and proceed with deletion.
+	scheme := newTestScheme()
+	grant := newTestGrant("testgrant", "default")
+	grant.Finalizers = []string{util.FinalizerDatabaseGrant}
+	now := metav1.Now()
+	grant.DeletionTimestamp = &now
+
+	user := newTestUser("test-user", "default")
+	instance := newTestInstance("test-instance", "default")
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(grant, user, instance).
+		WithStatusSubresource(grant, user, instance).
+		Build()
+
+	mockRepo := NewMockRepository()
+	// Simulate: withService → ResolveTarget fails because user is not ready
+	mockRepo.RevokeFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) error {
+		return fmt.Errorf("resolve target: %w", &TargetResolutionError{
+			Err: fmt.Errorf("user not ready: phase is Failed"),
+		})
+	}
+	mockRepo.ResolveTargetFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*TargetInfo, error) {
+		return nil, &TargetResolutionError{Err: fmt.Errorf("user not ready: phase is Failed")}
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   client,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testgrant",
+			Namespace: "default",
+		},
+	})
+
+	// TargetResolutionError should be treated as success — finalizer removed
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+	assert.True(t, mockRepo.WasCalled("Revoke"))
+}
+
+func TestController_Reconcile_Deletion_TargetNotFound(t *testing.T) {
+	// When the target user/role has already been deleted, the grant controller
+	// should treat the revoke as a no-op and proceed with deletion.
+	scheme := newTestScheme()
+	grant := newTestGrant("testgrant", "default")
+	grant.Finalizers = []string{util.FinalizerDatabaseGrant}
+	now := metav1.Now()
+	grant.DeletionTimestamp = &now
+
+	// Note: no user object — simulates the user already being deleted
+	instance := newTestInstance("test-instance", "default")
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(grant, instance).
+		WithStatusSubresource(grant, instance).
+		Build()
+
+	mockRepo := NewMockRepository()
+	// Simulate: withService → ResolveTarget fails because user is not found
+	mockRepo.RevokeFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) error {
+		return fmt.Errorf("resolve target: %w", &TargetResolutionError{
+			Err: fmt.Errorf("get user: not found"),
+		})
+	}
+	mockRepo.ResolveTargetFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*TargetInfo, error) {
+		return nil, &TargetResolutionError{Err: fmt.Errorf("get user: not found")}
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   client,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testgrant",
+			Namespace: "default",
+		},
+	})
+
+	// TargetResolutionError should be treated as success — finalizer removed
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+	assert.True(t, mockRepo.WasCalled("Revoke"))
+}
+
 // --- Phase 2: Status validation tests ---
 
 func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
