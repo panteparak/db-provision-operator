@@ -342,7 +342,7 @@ jobs:
     if: github.event_name != 'pull_request'
     needs: [docker-build]
     permissions:
-      contents: read
+      contents: write
       packages: write
     outputs:
       image-sha: sha-${{ steps.short-sha.outputs.sha }}
