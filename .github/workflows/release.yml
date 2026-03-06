@@ -6,9 +6,10 @@ on:
     types: [completed]
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Release tag (e.g., v0.1.8)'
-        required: true
+      version:
+        description: 'Release version (e.g., 0.5.0). Leave empty to auto-compute from conventional commits.'
+        required: false
+        default: ''
         type: string
 
 permissions:
@@ -31,9 +32,10 @@ jobs:
     name: Guard
     runs-on: ubuntu-latest
     outputs:
-      should-release: ${{ steps.version.outputs.should-release }}
-      version: ${{ steps.version.outputs.version }}
-      tag: ${{ steps.version.outputs.tag }}
+      should-release: ${{ steps.final-version.outputs.should-release }}
+      version: ${{ steps.final-version.outputs.version }}
+      tag: ${{ steps.final-version.outputs.tag }}
+      checkout-ref: ${{ steps.final-version.outputs.checkout-ref }}
       image-tag: ${{ steps.image-tag.outputs.image-tag }}
       ci-run-id: ${{ steps.ci-run.outputs.run-id }}
     steps:
@@ -47,18 +49,14 @@ jobs:
             exit 1
           fi
 
+      # --- workflow_run: extract version from tag ---
       - name: Extract tag and version
+        if: github.event_name == 'workflow_run'
         id: version
         env:
           WR_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
-          WD_TAG: ${{ inputs.tag }}
-          EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
-            TAG="$WR_HEAD_BRANCH"
-          else
-            TAG="$WD_TAG"
-          fi
+          TAG="$WR_HEAD_BRANCH"
 
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9] ]]; then
             echo "::notice::Not a version tag ($TAG), skipping release"
@@ -72,25 +70,68 @@ jobs:
           echo "should-release=true" >> $GITHUB_OUTPUT
           echo "Release: $TAG (version $VERSION)"
 
+      # --- workflow_dispatch: resolve version via commitizen or override ---
       - uses: actions/checkout@v4
-        if: steps.version.outputs.should-release == 'true'
+        if: github.event_name == 'workflow_dispatch'
         with:
-          ref: ${{ steps.version.outputs.tag }}
+          fetch-depth: 0
 
-      - name: Validate Chart.yaml version
-        if: steps.version.outputs.should-release == 'true'
+      - name: Resolve dispatch version
+        if: github.event_name == 'workflow_dispatch'
+        id: dispatch
+        uses: commitizen-tools/commitizen-action@master
+        with:
+          dry_run: true
+          commit: "false"
+          push: "false"
+          changelog: "false"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set dispatch version
+        if: github.event_name == 'workflow_dispatch'
+        id: dispatch-version
         env:
-          TAG_VERSION: ${{ steps.version.outputs.version }}
+          INPUT_VERSION: ${{ inputs.version }}
+          CZ_VERSION: ${{ steps.dispatch.outputs.version }}
         run: |
-          CHART_VERSION=$(grep '^version:' charts/db-provision-operator/Chart.yaml | awk '{print $2}')
-          if [[ "${CHART_VERSION}" != "${TAG_VERSION}" ]]; then
-            echo "::error::Chart.yaml version (${CHART_VERSION}) does not match tag version (${TAG_VERSION})"
+          if [[ -n "$INPUT_VERSION" ]]; then
+            VERSION="$INPUT_VERSION"
+          elif [[ -n "$CZ_VERSION" ]]; then
+            VERSION="$CZ_VERSION"
+          else
+            echo "::error::Could not determine version. Provide explicit version or ensure conventional commits exist."
             exit 1
           fi
-          echo "Chart version matches tag: ${CHART_VERSION}"
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "should-release=true" >> $GITHUB_OUTPUT
+          echo "Dispatch release: v${VERSION}"
+
+      # --- Merge version outputs from either path ---
+      - name: Merge version outputs
+        id: final-version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          TAG="${{ steps.version.outputs.tag || steps.dispatch-version.outputs.tag }}"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${{ steps.version.outputs.version || steps.dispatch-version.outputs.version }}" >> $GITHUB_OUTPUT
+          echo "should-release=${{ steps.version.outputs.should-release || steps.dispatch-version.outputs.should-release || 'false' }}" >> $GITHUB_OUTPUT
+          # For workflow_run, checkout the tag; for dispatch, use default branch (empty ref)
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            echo "checkout-ref=${TAG}" >> $GITHUB_OUTPUT
+          else
+            echo "checkout-ref=" >> $GITHUB_OUTPUT
+          fi
+
+      # --- Checkout tag for workflow_run path ---
+      - uses: actions/checkout@v4
+        if: github.event_name == 'workflow_run' && steps.final-version.outputs.should-release == 'true'
+        with:
+          ref: ${{ steps.final-version.outputs.tag }}
 
       - name: Compute image tag
-        if: steps.version.outputs.should-release == 'true'
+        if: steps.final-version.outputs.should-release == 'true'
         id: image-tag
         env:
           WR_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -106,7 +147,7 @@ jobs:
           echo "Image tag: sha-${SHORT_SHA}"
 
       - name: Set CI run ID
-        if: steps.version.outputs.should-release == 'true'
+        if: steps.final-version.outputs.should-release == 'true'
         id: ci-run
         env:
           WR_RUN_ID: ${{ github.event.workflow_run.id }}
@@ -157,7 +198,7 @@ jobs:
       - uses: actions/checkout@v4
         if: needs.guard.outputs.ci-run-id == ''
         with:
-          ref: ${{ needs.guard.outputs.tag }}
+          ref: ${{ needs.guard.outputs.checkout-ref }}
 
       - uses: docker/setup-qemu-action@v3
         if: needs.guard.outputs.ci-run-id == ''
@@ -187,7 +228,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.guard.outputs.tag }}
+          ref: ${{ needs.guard.outputs.checkout-ref }}
           fetch-depth: 0
 
       # Download SBOMs from CI run (only available via workflow_run)
@@ -300,7 +341,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.guard.outputs.tag }}
+          ref: ${{ needs.guard.outputs.checkout-ref }}
 
       - uses: azure/setup-helm@v4
         with:
@@ -343,7 +384,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.guard.outputs.tag }}
+          ref: ${{ needs.guard.outputs.checkout-ref }}
           fetch-depth: 0
 
       - uses: actions/setup-python@v5
