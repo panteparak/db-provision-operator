@@ -4,17 +4,17 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
-  name: databaseinstances.dbops.dbprovision.io
+  name: clusterdatabaseinstances.dbops.dbprovision.io
 spec:
   group: dbops.dbprovision.io
   names:
-    kind: DatabaseInstance
-    listKind: DatabaseInstanceList
-    plural: databaseinstances
+    kind: ClusterDatabaseInstance
+    listKind: ClusterDatabaseInstanceList
+    plural: clusterdatabaseinstances
     shortNames:
-    - dbi
-    singular: databaseinstance
-  scope: Namespaced
+    - cdbi
+    singular: clusterdatabaseinstance
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
     - jsonPath: .spec.engine
@@ -38,7 +38,11 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: DatabaseInstance is the Schema for the databaseinstances API.
+        description: |-
+          ClusterDatabaseInstance is the Schema for the clusterdatabaseinstances API.
+          It represents a cluster-scoped database instance that can be referenced by
+          resources in any namespace. Use this for shared database infrastructure
+          managed by platform teams.
         properties:
           apiVersion:
             description: |-
@@ -58,7 +62,9 @@ spec:
           metadata:
             type: object
           spec:
-            description: DatabaseInstanceSpec defines the desired state of DatabaseInstance.
+            description: |-
+              Spec defines the desired state of the ClusterDatabaseInstance.
+              Uses the same spec as DatabaseInstance.
             properties:
               connection:
                 description: Connection configuration
@@ -382,7 +388,9 @@ spec:
             - engine
             type: object
           status:
-            description: DatabaseInstanceStatus defines the observed state of DatabaseInstance.
+            description: |-
+              Status defines the observed state of the ClusterDatabaseInstance.
+              Uses the same status as DatabaseInstance.
             properties:
               conditions:
                 description: Conditions represent the latest available observations

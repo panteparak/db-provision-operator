@@ -4,24 +4,24 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
-  name: databasegrants.dbops.dbprovision.io
+  name: clusterdatabaseroles.dbops.dbprovision.io
 spec:
   group: dbops.dbprovision.io
   names:
-    kind: DatabaseGrant
-    listKind: DatabaseGrantList
-    plural: databasegrants
+    kind: ClusterDatabaseRole
+    listKind: ClusterDatabaseRoleList
+    plural: clusterdatabaseroles
     shortNames:
-    - dbg
-    singular: databasegrant
-  scope: Namespaced
+    - cdbr
+    singular: clusterdatabaserole
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.userRef.name
-      name: User
+    - jsonPath: .spec.clusterInstanceRef.name
+      name: Instance
       type: string
-    - jsonPath: .spec.databaseRef.name
-      name: Database
+    - jsonPath: .spec.roleName
+      name: Role
       type: string
     - jsonPath: .status.phase
       name: Phase
@@ -32,7 +32,10 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: DatabaseGrant is the Schema for the databasegrants API.
+        description: |-
+          ClusterDatabaseRole is the Schema for the clusterdatabaseroles API.
+          It represents a cluster-scoped database role for shared service accounts
+          and cross-namespace access patterns.
         properties:
           apiVersion:
             description: |-
@@ -52,28 +55,23 @@ spec:
           metadata:
             type: object
           spec:
-            description: DatabaseGrantSpec defines the desired state of DatabaseGrant.
+            description: |-
+              ClusterDatabaseRoleSpec defines the desired state of ClusterDatabaseRole.
+              This is a cluster-scoped role for shared service accounts and cross-namespace access.
             properties:
-              databaseRef:
-                description: DatabaseRef references the Database for context (optional)
+              clusterInstanceRef:
+                description: ClusterInstanceRef references a cluster-scoped ClusterDatabaseInstance
                 properties:
                   name:
-                    description: Name of the Database resource
+                    description: Name of the ClusterDatabaseInstance
                     minLength: 1
-                    type: string
-                  namespace:
-                    description: Namespace of the Database (defaults to the resource
-                      namespace)
                     type: string
                 required:
                 - name
                 type: object
-              deletionProtection:
-                description: DeletionProtection prevents accidental deletion
-                type: boolean
               driftPolicy:
                 description: |-
-                  DriftPolicy overrides the instance-level drift policy for this grant.
+                  DriftPolicy overrides the instance-level drift policy for this role.
                   If not specified, the instance's drift policy is used.
                 properties:
                   interval:
@@ -96,11 +94,17 @@ spec:
                     description: Mode determines how drift is handled
                     type: string
                 type: object
+              managedResourceComment:
+                description: |-
+                  ManagedResourceComment is an informational comment applied to the role in the database.
+                  This helps identify operator-managed resources at the database level.
+                  Example: "managed-by:db-provision-operator,cr:orders-service"
+                type: string
               mysql:
-                description: MySQL-specific grants
+                description: MySQL-specific configuration
                 properties:
                   grants:
-                    description: Grants defines direct privilege grants
+                    description: Grants defines the permissions this role grants
                     items:
                       description: MySQLGrant defines a MySQL privilege grant
                       properties:
@@ -161,58 +165,25 @@ spec:
                       - privileges
                       type: object
                     type: array
-                  roles:
-                    description: Roles to assign to the user (MySQL 8.0+)
-                    items:
-                      type: string
-                    type: array
+                  useNativeRoles:
+                    default: true
+                    description: UseNativeRoles enables MySQL 8.0+ native roles
+                    type: boolean
                 type: object
               postgres:
-                description: PostgreSQL-specific grants
+                description: PostgreSQL-specific configuration
                 properties:
-                  defaultPrivileges:
-                    description: DefaultPrivileges sets default privileges for future
-                      objects
-                    items:
-                      description: PostgresDefaultPrivilegeGrant defines a default
-                        privilege grant
-                      properties:
-                        database:
-                          description: Database is the target database
-                          type: string
-                        grantedBy:
-                          description: GrantedBy is the role that creates the objects
-                          type: string
-                        objectType:
-                          description: ObjectType is the type of objects (tables,
-                            sequences, functions, types)
-                          enum:
-                          - tables
-                          - sequences
-                          - functions
-                          - types
-                          type: string
-                        privileges:
-                          description: Privileges to grant
-                          items:
-                            pattern: ^[A-Z][A-Z ]*$
-                            type: string
-                          maxItems: 20
-                          minItems: 1
-                          type: array
-                        schema:
-                          description: Schema is the target schema
-                          type: string
-                      required:
-                      - database
-                      - grantedBy
-                      - objectType
-                      - privileges
-                      - schema
-                      type: object
-                    type: array
+                  bypassRLS:
+                    description: BypassRLS allows bypassing row-level security
+                    type: boolean
+                  createDB:
+                    description: CreateDB allows the role to create databases
+                    type: boolean
+                  createRole:
+                    description: CreateRole allows the role to create other roles
+                    type: boolean
                   grants:
-                    description: Grants defines direct privilege grants
+                    description: Grants defines the permissions this role grants
                     items:
                       description: PostgresGrant defines a PostgreSQL privilege grant
                       properties:
@@ -260,69 +231,43 @@ spec:
                       - privileges
                       type: object
                     type: array
-                  roles:
-                    description: Roles to assign to the user
+                  inRoles:
+                    description: InRoles lists roles this role should inherit from
                     items:
                       type: string
                     type: array
+                  inherit:
+                    default: true
+                    description: Inherit enables privilege inheritance
+                    type: boolean
+                  login:
+                    description: Login enables login capability (usually false for
+                      group roles)
+                    type: boolean
+                  replication:
+                    description: Replication enables replication privileges
+                    type: boolean
+                  superuser:
+                    description: Superuser grants superuser privileges
+                    type: boolean
                 type: object
-              roleRef:
-                description: RoleRef references a DatabaseRole to grant permissions
-                  to (mutually exclusive with UserRef)
-                properties:
-                  name:
-                    description: Name of the DatabaseRole resource
-                    minLength: 1
-                    type: string
-                  namespace:
-                    description: Namespace of the DatabaseRole (defaults to the resource
-                      namespace)
-                    type: string
-                required:
-                - name
-                type: object
-              userRef:
-                description: UserRef references the DatabaseUser to grant permissions
-                  to (mutually exclusive with RoleRef)
-                properties:
-                  name:
-                    description: Name of the DatabaseUser resource
-                    minLength: 1
-                    type: string
-                  namespace:
-                    description: Namespace of the DatabaseUser (defaults to the resource
-                      namespace)
-                    type: string
-                required:
-                - name
-                type: object
+              roleName:
+                description: RoleName is the role name in the database (immutable
+                  after creation)
+                maxLength: 63
+                minLength: 1
+                pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+                type: string
+                x-kubernetes-validations:
+                - message: roleName is immutable
+                  rule: self == oldSelf
+            required:
+            - clusterInstanceRef
+            - roleName
             type: object
-            x-kubernetes-validations:
-            - message: either userRef or roleRef must be specified
-              rule: has(self.userRef) || has(self.roleRef)
-            - message: userRef and roleRef are mutually exclusive
-              rule: '!(has(self.userRef) && has(self.roleRef))'
           status:
-            description: DatabaseGrantStatus defines the observed state of DatabaseGrant.
+            description: ClusterDatabaseRoleStatus defines the observed state of ClusterDatabaseRole.
             properties:
-              appliedGrants:
-                description: AppliedGrants contains information about applied grants
-                properties:
-                  defaultPrivileges:
-                    description: DefaultPrivileges is the count of default privileges
-                      applied
-                    format: int32
-                    type: integer
-                  directGrants:
-                    description: DirectGrants is the count of direct grants applied
-                    format: int32
-                    type: integer
-                  roles:
-                    description: Roles lists assigned roles
-                    items:
-                      type: string
-                    type: array
-                type: object
               conditions:
                 description: Conditions represent the latest available observations
                 items:
@@ -422,7 +367,7 @@ spec:
                     type: string
                 type: object
               lastReconcileTime:
-                description: LastReconcileTime is when the last reconciliation occurred
+                description: LastReconcileTime is the timestamp of the last reconciliation
                 format: date-time
                 type: string
               message:
@@ -445,9 +390,20 @@ spec:
                 type: string
               reconcileID:
                 description: |-
-                  ReconcileID is the unique identifier for the last reconciliation.
-                  Used for end-to-end tracing across logs, events, and status updates.
+                  ReconcileID is a unique identifier for the current reconciliation cycle.
+                  Used for tracing through logs, events, and APM systems.
                 type: string
+              role:
+                description: Role contains role-specific status information
+                properties:
+                  createdAt:
+                    description: CreatedAt is the role creation timestamp
+                    format: date-time
+                    type: string
+                  name:
+                    description: Name is the actual role name
+                    type: string
+                type: object
             type: object
         type: object
     served: true

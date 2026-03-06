@@ -69,6 +69,7 @@ spec:
                 properties:
                   name:
                     description: Name of the DatabaseBackup resource
+                    minLength: 1
                     type: string
                   namespace:
                     description: Namespace of the DatabaseBackup (defaults to the
@@ -389,6 +390,17 @@ spec:
               target:
                 description: Target defines where to restore the backup
                 properties:
+                  clusterInstanceRef:
+                    description: ClusterInstanceRef references the target cluster-scoped
+                      ClusterDatabaseInstance (mutually exclusive with InstanceRef)
+                    properties:
+                      name:
+                        description: Name of the ClusterDatabaseInstance
+                        minLength: 1
+                        type: string
+                    required:
+                    - name
+                    type: object
                   databaseName:
                     description: DatabaseName is the target database name (for restore
                       to new database)
@@ -399,6 +411,7 @@ spec:
                     properties:
                       name:
                         description: Name of the Database resource
+                        minLength: 1
                         type: string
                       namespace:
                         description: Namespace of the Database (defaults to the resource
@@ -411,10 +424,12 @@ spec:
                     description: InPlace enables in-place restore (destructive!)
                     type: boolean
                   instanceRef:
-                    description: InstanceRef references the target DatabaseInstance
+                    description: InstanceRef references the target namespaced DatabaseInstance
+                      (mutually exclusive with ClusterInstanceRef)
                     properties:
                       name:
                         description: Name of the DatabaseInstance
+                        minLength: 1
                         type: string
                       namespace:
                         description: Namespace of the DatabaseInstance (defaults to
@@ -424,6 +439,9 @@ spec:
                     - name
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: instanceRef and clusterInstanceRef are mutually exclusive
+                  rule: '!(has(self.instanceRef) && has(self.clusterInstanceRef))'
             required:
             - target
             type: object

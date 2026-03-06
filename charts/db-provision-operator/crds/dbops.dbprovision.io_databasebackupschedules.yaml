@@ -74,6 +74,9 @@ spec:
                 default: Forbid
                 description: ConcurrencyPolicy defines how to handle concurrent backups
                 type: string
+              deletionProtection:
+                description: DeletionProtection prevents accidental deletion
+                type: boolean
               failedBackupsHistoryLimit:
                 default: 3
                 description: FailedBackupsHistoryLimit is the number of failed backups
@@ -194,6 +197,7 @@ spec:
                         properties:
                           name:
                             description: Name of the Database resource
+                            minLength: 1
                             type: string
                           namespace:
                             description: Namespace of the Database (defaults to the

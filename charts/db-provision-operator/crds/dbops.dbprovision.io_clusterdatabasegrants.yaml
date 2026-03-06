@@ -4,25 +4,28 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
-  name: databasegrants.dbops.dbprovision.io
+  name: clusterdatabasegrants.dbops.dbprovision.io
 spec:
   group: dbops.dbprovision.io
   names:
-    kind: DatabaseGrant
-    listKind: DatabaseGrantList
-    plural: databasegrants
+    kind: ClusterDatabaseGrant
+    listKind: ClusterDatabaseGrantList
+    plural: clusterdatabasegrants
     shortNames:
-    - dbg
-    singular: databasegrant
-  scope: Namespaced
+    - cdbg
+    singular: clusterdatabasegrant
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.userRef.name
-      name: User
+    - jsonPath: .status.targetInfo.name
+      name: Target
       type: string
-    - jsonPath: .spec.databaseRef.name
-      name: Database
+    - jsonPath: .status.targetInfo.type
+      name: Type
       type: string
+    - jsonPath: .status.appliedGrants.applied
+      name: Applied
+      type: integer
     - jsonPath: .status.phase
       name: Phase
       type: string
@@ -32,7 +35,9 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: DatabaseGrant is the Schema for the databasegrants API.
+        description: |-
+          ClusterDatabaseGrant is the Schema for the clusterdatabasegrants API.
+          It provides cluster-scoped grant management for cross-namespace database access control.
         properties:
           apiVersion:
             description: |-
@@ -52,18 +57,18 @@ spec:
           metadata:
             type: object
           spec:
-            description: DatabaseGrantSpec defines the desired state of DatabaseGrant.
+            description: |-
+              ClusterDatabaseGrantSpec defines the desired state of ClusterDatabaseGrant.
+              ClusterDatabaseGrant is a cluster-scoped grant resource for cross-namespace access control.
             properties:
-              databaseRef:
-                description: DatabaseRef references the Database for context (optional)
+              clusterInstanceRef:
+                description: |-
+                  ClusterInstanceRef references the ClusterDatabaseInstance.
+                  Only ClusterDatabaseInstance is supported (cluster-scoped grants require cluster-scoped instances).
                 properties:
                   name:
-                    description: Name of the Database resource
+                    description: Name of the ClusterDatabaseInstance
                     minLength: 1
-                    type: string
-                  namespace:
-                    description: Namespace of the Database (defaults to the resource
-                      namespace)
                     type: string
                 required:
                 - name
@@ -267,58 +272,101 @@ spec:
                     type: array
                 type: object
               roleRef:
-                description: RoleRef references a DatabaseRole to grant permissions
-                  to (mutually exclusive with UserRef)
+                description: |-
+                  RoleRef references a ClusterDatabaseRole or DatabaseRole to grant permissions to.
+                  If namespace is empty, it refers to a ClusterDatabaseRole.
+                  If namespace is specified, it refers to a DatabaseRole in that namespace.
+                  Either userRef or roleRef must be specified, but not both.
                 properties:
                   name:
-                    description: Name of the DatabaseRole resource
-                    minLength: 1
+                    description: Name of the role resource
                     type: string
                   namespace:
-                    description: Namespace of the DatabaseRole (defaults to the resource
-                      namespace)
+                    description: |-
+                      Namespace of the role.
+                      If empty, refers to a ClusterDatabaseRole (cluster-scoped).
+                      If provided, refers to a DatabaseRole in the specified namespace.
                     type: string
                 required:
                 - name
                 type: object
               userRef:
-                description: UserRef references the DatabaseUser to grant permissions
-                  to (mutually exclusive with RoleRef)
+                description: |-
+                  UserRef references the DatabaseUser to grant permissions to.
+                  The namespace field enables cross-namespace access.
+                  Either userRef or roleRef must be specified, but not both.
                 properties:
                   name:
                     description: Name of the DatabaseUser resource
-                    minLength: 1
                     type: string
                   namespace:
-                    description: Namespace of the DatabaseUser (defaults to the resource
-                      namespace)
+                    description: Namespace of the DatabaseUser (required for cross-namespace
+                      access)
                     type: string
                 required:
                 - name
+                - namespace
                 type: object
+            required:
+            - clusterInstanceRef
             type: object
-            x-kubernetes-validations:
-            - message: either userRef or roleRef must be specified
-              rule: has(self.userRef) || has(self.roleRef)
-            - message: userRef and roleRef are mutually exclusive
-              rule: '!(has(self.userRef) && has(self.roleRef))'
           status:
-            description: DatabaseGrantStatus defines the observed state of DatabaseGrant.
+            description: ClusterDatabaseGrantStatus defines the observed state of
+              ClusterDatabaseGrant.
             properties:
               appliedGrants:
                 description: AppliedGrants contains information about applied grants
                 properties:
+                  applied:
+                    description: Applied is the count of grants successfully applied
+                    format: int32
+                    type: integer
                   defaultPrivileges:
                     description: DefaultPrivileges is the count of default privileges
                       applied
                     format: int32
                     type: integer
+                  details:
+                    description: Details contains detailed information about each
+                      grant
+                    items:
+                      description: GrantDetail contains information about a specific
+                        grant.
+                      properties:
+                        appliedAt:
+                          description: AppliedAt is when the grant was applied
+                          format: date-time
+                          type: string
+                        database:
+                          description: Database is the target database
+                          type: string
+                        message:
+                          description: Message provides details about this grant
+                          type: string
+                        privileges:
+                          description: Privileges lists the granted privileges
+                          items:
+                            type: string
+                          type: array
+                        schema:
+                          description: Schema is the target schema
+                          type: string
+                        status:
+                          description: Status indicates if this specific grant succeeded
+                          type: string
+                      type: object
+                    type: array
                   directGrants:
-                    description: DirectGrants is the count of direct grants applied
+                    description: DirectGrants is the count of direct privilege grants
+                      applied
+                    format: int32
+                    type: integer
+                  failed:
+                    description: Failed is the count of grants that failed to apply
                     format: int32
                     type: integer
                   roles:
-                    description: Roles lists assigned roles
+                    description: Roles lists assigned roles (if granting role membership)
                     items:
                       type: string
                     type: array
@@ -422,7 +470,7 @@ spec:
                     type: string
                 type: object
               lastReconcileTime:
-                description: LastReconcileTime is when the last reconciliation occurred
+                description: LastReconcileTime is the timestamp of the last reconciliation.
                 format: date-time
                 type: string
               message:
@@ -445,9 +493,28 @@ spec:
                 type: string
               reconcileID:
                 description: |-
-                  ReconcileID is the unique identifier for the last reconciliation.
-                  Used for end-to-end tracing across logs, events, and status updates.
+                  ReconcileID is the unique ID for the current reconciliation.
+                  Used for observability and tracing.
                 type: string
+              targetInfo:
+                description: TargetInfo contains resolved information about the target
+                  user or role.
+                properties:
+                  name:
+                    description: Name is the resolved name of the target
+                    type: string
+                  namespace:
+                    description: Namespace is the namespace of the target (empty for
+                      cluster-scoped roles)
+                    type: string
+                  resolvedUsername:
+                    description: ResolvedUsername is the actual database username
+                      (may differ from K8s resource name)
+                    type: string
+                  type:
+                    description: 'Type is the target type: "user" or "role"'
+                    type: string
+                type: object
             type: object
         type: object
     served: true

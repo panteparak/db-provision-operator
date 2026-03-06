@@ -54,11 +54,49 @@ spec:
           spec:
             description: DatabaseRoleSpec defines the desired state of DatabaseRole.
             properties:
+              clusterInstanceRef:
+                description: ClusterInstanceRef references a cluster-scoped ClusterDatabaseInstance
+                  (mutually exclusive with InstanceRef)
+                properties:
+                  name:
+                    description: Name of the ClusterDatabaseInstance
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              driftPolicy:
+                description: |-
+                  DriftPolicy overrides the instance-level drift policy for this role.
+                  If not specified, the instance's drift policy is used.
+                properties:
+                  interval:
+                    default: 8h
+                    description: |-
+                      Interval specifies how often to check for drift (Go duration string)
+                      This is only meaningful when mode is "detect" or "correct"
+                    type: string
+                  mode:
+                    allOf:
+                    - enum:
+                      - ignore
+                      - detect
+                      - correct
+                    - enum:
+                      - ignore
+                      - detect
+                      - correct
+                    default: detect
+                    description: Mode determines how drift is handled
+                    type: string
+                type: object
               instanceRef:
-                description: InstanceRef references the DatabaseInstance to use
+                description: InstanceRef references a namespaced DatabaseInstance
+                  (mutually exclusive with ClusterInstanceRef)
                 properties:
                   name:
                     description: Name of the DatabaseInstance
+                    minLength: 1
                     type: string
                   namespace:
                     description: Namespace of the DatabaseInstance (defaults to the
@@ -110,7 +148,9 @@ spec:
                           description: Privileges to grant (SELECT, INSERT, UPDATE,
                             DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER, etc.)
                           items:
+                            pattern: ^[A-Z][A-Z ]*$
                             type: string
+                          maxItems: 20
                           minItems: 1
                           type: array
                         procedure:
@@ -166,7 +206,9 @@ spec:
                             DELETE, TRUNCATE, REFERENCES, TRIGGER, CREATE, CONNECT,
                             TEMPORARY, EXECUTE, USAGE)
                           items:
+                            pattern: ^[A-Z][A-Z ]*$
                             type: string
+                          maxItems: 20
                           minItems: 1
                           type: array
                         schema:
@@ -225,9 +267,13 @@ spec:
                 - message: roleName is immutable
                   rule: self == oldSelf
             required:
-            - instanceRef
             - roleName
             type: object
+            x-kubernetes-validations:
+            - message: either instanceRef or clusterInstanceRef must be specified
+              rule: has(self.instanceRef) || has(self.clusterInstanceRef)
+            - message: instanceRef and clusterInstanceRef are mutually exclusive
+              rule: '!(has(self.instanceRef) && has(self.clusterInstanceRef))'
           status:
             description: DatabaseRoleStatus defines the observed state of DatabaseRole.
             properties:
@@ -288,6 +334,51 @@ spec:
                   - type
                   type: object
                 type: array
+              drift:
+                description: Drift contains drift detection status information
+                properties:
+                  detected:
+                    description: Detected indicates if drift was detected
+                    type: boolean
+                  diffs:
+                    description: Diffs contains the specific differences found
+                    items:
+                      description: DriftDiff represents a single difference between
+                        desired and actual state.
+                      properties:
+                        actual:
+                          description: Actual is the actual value in the database
+                          type: string
+                        destructive:
+                          description: Destructive indicates if correcting this drift
+                            would be destructive
+                          type: boolean
+                        expected:
+                          description: Expected is the expected value from the CR
+                            spec
+                          type: string
+                        field:
+                          description: Field is the name of the field that differs
+                          type: string
+                        immutable:
+                          description: Immutable indicates if this field cannot be
+                            changed after creation
+                          type: boolean
+                      required:
+                      - actual
+                      - expected
+                      - field
+                      type: object
+                    type: array
+                  lastChecked:
+                    description: LastChecked is when drift was last checked
+                    format: date-time
+                    type: string
+                type: object
+              lastReconcileTime:
+                description: LastReconcileTime is when the last reconciliation occurred
+                format: date-time
+                type: string
               message:
                 description: Message provides additional information about the current
                   state
@@ -305,6 +396,11 @@ spec:
                 - Ready
                 - Failed
                 - Deleting
+                type: string
+              reconcileID:
+                description: |-
+                  ReconcileID is the unique identifier for the last reconciliation.
+                  Used for end-to-end tracing across logs, events, and status updates.
                 type: string
               role:
                 description: Role contains role-specific status information

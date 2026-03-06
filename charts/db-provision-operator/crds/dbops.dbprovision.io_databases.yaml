@@ -57,6 +57,17 @@ spec:
           spec:
             description: DatabaseSpec defines the desired state of Database.
             properties:
+              clusterInstanceRef:
+                description: ClusterInstanceRef references a cluster-scoped ClusterDatabaseInstance
+                  (mutually exclusive with InstanceRef)
+                properties:
+                  name:
+                    description: Name of the ClusterDatabaseInstance
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
               deletionPolicy:
                 allOf:
                 - enum:
@@ -74,11 +85,38 @@ spec:
                 default: true
                 description: DeletionProtection prevents accidental deletion
                 type: boolean
+              driftPolicy:
+                description: |-
+                  DriftPolicy overrides the instance-level drift policy for this database.
+                  If not specified, the instance's drift policy is used.
+                properties:
+                  interval:
+                    default: 8h
+                    description: |-
+                      Interval specifies how often to check for drift (Go duration string)
+                      This is only meaningful when mode is "detect" or "correct"
+                    type: string
+                  mode:
+                    allOf:
+                    - enum:
+                      - ignore
+                      - detect
+                      - correct
+                    - enum:
+                      - ignore
+                      - detect
+                      - correct
+                    default: detect
+                    description: Mode determines how drift is handled
+                    type: string
+                type: object
               instanceRef:
-                description: InstanceRef references the DatabaseInstance to use
+                description: InstanceRef references a namespaced DatabaseInstance
+                  (mutually exclusive with ClusterInstanceRef)
                 properties:
                   name:
                     description: Name of the DatabaseInstance
+                    minLength: 1
                     type: string
                   namespace:
                     description: Namespace of the DatabaseInstance (defaults to the
@@ -94,10 +132,12 @@ spec:
                   charset:
                     default: utf8mb4
                     description: Charset sets the database character set
+                    pattern: ^[a-zA-Z0-9_]+$
                     type: string
                   collation:
                     default: utf8mb4_unicode_ci
                     description: Collation sets the database collation
+                    pattern: ^[a-zA-Z0-9_]+$
                     type: string
                   defaultStorageEngine:
                     default: InnoDB
@@ -117,6 +157,14 @@ spec:
                 x-kubernetes-validations:
                 - message: database name is immutable
                   rule: self == oldSelf
+              owner:
+                description: |-
+                  Owner specifies the database owner (role name). For role-based ownership patterns,
+                  set this to a service role rather than a user to enable safe credential rotation.
+                  If not specified, the database is owned by the connection user.
+                maxLength: 63
+                pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+                type: string
               postgres:
                 description: PostgreSQL-specific configuration (required when instance
                   engine is "postgres")
@@ -152,7 +200,9 @@ spec:
                         privileges:
                           description: Privileges to grant
                           items:
+                            pattern: ^[A-Z][A-Z ]*$
                             type: string
+                          maxItems: 20
                           minItems: 1
                           type: array
                         role:
@@ -228,9 +278,13 @@ spec:
                     type: string
                 type: object
             required:
-            - instanceRef
             - name
             type: object
+            x-kubernetes-validations:
+            - message: either instanceRef or clusterInstanceRef must be specified
+              rule: has(self.instanceRef) || has(self.clusterInstanceRef)
+            - message: instanceRef and clusterInstanceRef are mutually exclusive
+              rule: '!(has(self.instanceRef) && has(self.clusterInstanceRef))'
           status:
             description: DatabaseStatus defines the observed state of Database.
             properties:
@@ -309,6 +363,51 @@ spec:
                     format: int64
                     type: integer
                 type: object
+              drift:
+                description: Drift contains drift detection status information
+                properties:
+                  detected:
+                    description: Detected indicates if drift was detected
+                    type: boolean
+                  diffs:
+                    description: Diffs contains the specific differences found
+                    items:
+                      description: DriftDiff represents a single difference between
+                        desired and actual state.
+                      properties:
+                        actual:
+                          description: Actual is the actual value in the database
+                          type: string
+                        destructive:
+                          description: Destructive indicates if correcting this drift
+                            would be destructive
+                          type: boolean
+                        expected:
+                          description: Expected is the expected value from the CR
+                            spec
+                          type: string
+                        field:
+                          description: Field is the name of the field that differs
+                          type: string
+                        immutable:
+                          description: Immutable indicates if this field cannot be
+                            changed after creation
+                          type: boolean
+                      required:
+                      - actual
+                      - expected
+                      - field
+                      type: object
+                    type: array
+                  lastChecked:
+                    description: LastChecked is when drift was last checked
+                    format: date-time
+                    type: string
+                type: object
+              lastReconcileTime:
+                description: LastReconcileTime is when the last reconciliation occurred
+                format: date-time
+                type: string
               message:
                 description: Message provides additional information about the current
                   state
@@ -369,6 +468,11 @@ spec:
                       type: string
                     type: array
                 type: object
+              reconcileID:
+                description: |-
+                  ReconcileID is the unique identifier for the last reconciliation.
+                  Used for end-to-end tracing across logs, events, and status updates.
+                type: string
             type: object
         type: object
     served: true
