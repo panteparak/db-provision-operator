@@ -447,7 +447,7 @@ jobs:
 
       # Generate SBOM from image (scans the image once)
       - name: Generate SBOM
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.34.2
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.digest.outputs.digest }}
           scan-type: 'image'
@@ -456,7 +456,7 @@ jobs:
 
       # Scan SBOM for vulnerabilities - JSON output (all severities)
       - name: Scan SBOM for vulnerabilities (JSON)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.34.2
         with:
           scan-type: 'sbom'
           scan-ref: 'sbom-${{ steps.platform.outputs.pair }}.cyclonedx.json'
@@ -465,7 +465,7 @@ jobs:
 
       # Scan SBOM for vulnerabilities - Table output (MEDIUM+, ignore unfixed)
       - name: Scan SBOM for vulnerabilities (Table)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.34.2
         with:
           scan-type: 'sbom'
           scan-ref: 'sbom-${{ steps.platform.outputs.pair }}.cyclonedx.json'
@@ -476,7 +476,7 @@ jobs:
 
       # Scan SBOM for SARIF output (GitHub Security tab)
       - name: Scan SBOM for SARIF report
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.34.2
         with:
           scan-type: 'sbom'
           scan-ref: 'sbom-${{ steps.platform.outputs.pair }}.cyclonedx.json'
