@@ -257,12 +257,12 @@ func (c *Controller) handleDeletion(ctx context.Context, database *dbopsv1alpha1
 
 	// Check for child dependencies (skip if force-delete)
 	if !util.HasForceDeleteAnnotation(database) {
-		hasChildren, msg, err := c.hasChildDependencies(ctx, database)
+		hasChildren, msg, children, err := c.hasChildDependencies(ctx, database)
 		if err != nil {
 			log.Error(err, "Failed to check child dependencies")
 			// Don't block on check errors — proceed with deletion
 		} else if hasChildren {
-			log.Info("Deletion blocked by child dependencies", "message", msg)
+			log.Info("Deletion blocked by child dependencies", "children", children, "message", msg)
 			util.SetReadyCondition(&database.Status.Conditions, metav1.ConditionFalse,
 				util.ReasonDependenciesExist, msg)
 			database.Status.Phase = dbopsv1alpha1.PhaseFailed
@@ -491,12 +491,12 @@ func (c *Controller) hasDestructiveDriftAnnotation(database *dbopsv1alpha1.Datab
 
 // hasChildDependencies checks if any DatabaseGrant resources reference this database.
 // Returns true with a descriptive message if children exist.
-func (c *Controller) hasChildDependencies(ctx context.Context, database *dbopsv1alpha1.Database) (bool, string, error) {
+func (c *Controller) hasChildDependencies(ctx context.Context, database *dbopsv1alpha1.Database) (bool, string, []string, error) {
 	var childNames []string
 
 	var grants dbopsv1alpha1.DatabaseGrantList
 	if err := c.List(ctx, &grants, client.InNamespace(database.Namespace)); err != nil {
-		return false, "", fmt.Errorf("list grants: %w", err)
+		return false, "", nil, fmt.Errorf("list grants: %w", err)
 	}
 	for _, g := range grants.Items {
 		if g.Spec.DatabaseRef != nil && g.Spec.DatabaseRef.Name == database.Name {
@@ -508,10 +508,10 @@ func (c *Controller) hasChildDependencies(ctx context.Context, database *dbopsv1
 	}
 
 	if len(childNames) == 0 {
-		return false, "", nil
+		return false, "", nil, nil
 	}
 
 	msg := fmt.Sprintf("cannot delete: %d DatabaseGrant(s) still reference this database: %s. "+
 		"Delete grants first or use force-delete annotation", len(childNames), strings.Join(childNames, ", "))
-	return true, msg, nil
+	return true, msg, childNames, nil
 }

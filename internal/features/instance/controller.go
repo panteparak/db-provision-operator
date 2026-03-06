@@ -211,12 +211,12 @@ func (c *Controller) handleDeletion(ctx context.Context, instance *dbopsv1alpha1
 
 	// Check for child dependencies (skip if force-delete)
 	if !util.HasForceDeleteAnnotation(instance) {
-		hasChildren, msg, err := c.hasChildDependencies(ctx, instance)
+		hasChildren, msg, children, err := c.hasChildDependencies(ctx, instance)
 		if err != nil {
 			log.Error(err, "Failed to check child dependencies")
 			// Don't block on check errors — proceed with deletion
 		} else if hasChildren {
-			log.Info("Deletion blocked by child dependencies", "message", msg)
+			log.Info("Deletion blocked by child dependencies", "children", children, "message", msg)
 			util.SetReadyCondition(&instance.Status.Conditions, metav1.ConditionFalse,
 				util.ReasonDependenciesExist, msg)
 			instance.Status.Phase = dbopsv1alpha1.PhaseFailed
@@ -285,13 +285,13 @@ func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
 
 // hasChildDependencies checks if any child resources (Database, DatabaseUser, DatabaseRole)
 // reference this instance. Returns true with a descriptive message if children exist.
-func (c *Controller) hasChildDependencies(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance) (bool, string, error) {
+func (c *Controller) hasChildDependencies(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance) (bool, string, []string, error) {
 	var childTypes []string
 
 	// Check Databases referencing this instance
 	var databases dbopsv1alpha1.DatabaseList
 	if err := c.List(ctx, &databases, client.InNamespace(instance.Namespace)); err != nil {
-		return false, "", fmt.Errorf("list databases: %w", err)
+		return false, "", nil, fmt.Errorf("list databases: %w", err)
 	}
 	for _, db := range databases.Items {
 		if db.Spec.InstanceRef != nil && db.Spec.InstanceRef.Name == instance.Name {
@@ -305,7 +305,7 @@ func (c *Controller) hasChildDependencies(ctx context.Context, instance *dbopsv1
 	// Check DatabaseUsers referencing this instance
 	var users dbopsv1alpha1.DatabaseUserList
 	if err := c.List(ctx, &users, client.InNamespace(instance.Namespace)); err != nil {
-		return false, "", fmt.Errorf("list users: %w", err)
+		return false, "", nil, fmt.Errorf("list users: %w", err)
 	}
 	for _, u := range users.Items {
 		if u.Spec.InstanceRef != nil && u.Spec.InstanceRef.Name == instance.Name {
@@ -319,7 +319,7 @@ func (c *Controller) hasChildDependencies(ctx context.Context, instance *dbopsv1
 	// Check DatabaseRoles referencing this instance
 	var roles dbopsv1alpha1.DatabaseRoleList
 	if err := c.List(ctx, &roles, client.InNamespace(instance.Namespace)); err != nil {
-		return false, "", fmt.Errorf("list roles: %w", err)
+		return false, "", nil, fmt.Errorf("list roles: %w", err)
 	}
 	for _, r := range roles.Items {
 		if r.Spec.InstanceRef != nil && r.Spec.InstanceRef.Name == instance.Name {
@@ -331,12 +331,12 @@ func (c *Controller) hasChildDependencies(ctx context.Context, instance *dbopsv1
 	}
 
 	if len(childTypes) == 0 {
-		return false, "", nil
+		return false, "", nil, nil
 	}
 
 	msg := fmt.Sprintf("cannot delete: %d child resource(s) still reference this instance: %s. "+
 		"Delete children first or use force-delete annotation", len(childTypes), strings.Join(childTypes, ", "))
-	return true, msg, nil
+	return true, msg, childTypes, nil
 }
 
 // hasDeletionProtection checks if the instance has deletion protection enabled.

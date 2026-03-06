@@ -723,16 +723,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			}, 15*time.Second, 2*time.Second).Should(BeTrue(), "Resource should still exist due to deletion protection")
 
 			By("cleanup: adding force-delete annotation to bypass protection")
-			obj, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			annotations := obj.GetAnnotations()
-			if annotations == nil {
-				annotations = map[string]string{}
-			}
-			annotations["dbops.dbprovision.io/force-delete"] = "true"
-			obj.SetAnnotations(annotations)
-			_, err = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Update(ctx, obj, metav1.UpdateOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			addForceDeleteAnnotation(ctx, databaseGVR, testNamespace, crName)
 
 			By("waiting for CR to be deleted")
 			Eventually(func() bool {
@@ -764,16 +755,7 @@ var _ = Describe("postgresql", Ordered, func() {
 			}, reconcileTimeout, pollingInterval).Should(Equal("Ready"))
 
 			By("adding force-delete annotation before deletion")
-			obj, err := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, crName, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			annotations := obj.GetAnnotations()
-			if annotations == nil {
-				annotations = map[string]string{}
-			}
-			annotations["dbops.dbprovision.io/force-delete"] = "true"
-			obj.SetAnnotations(annotations)
-			_, err = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Update(ctx, obj, metav1.UpdateOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			addForceDeleteAnnotation(ctx, databaseGVR, testNamespace, crName)
 
 			By("deleting the CR")
 			err = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, crName, metav1.DeleteOptions{})
@@ -995,16 +977,17 @@ var _ = Describe("postgresql", Ordered, func() {
 		addForceDeleteToAll(ctx, databaseGVR, testNamespace)
 		_ = dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Delete(ctx, "testrole", metav1.DeleteOptions{})
 		_ = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
-		_ = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Delete(ctx, databaseName, metav1.DeleteOptions{})
+		_ = dynamicClient.Resource(databaseGVR).Namespace(testNamespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
 
 		By("waiting for middle-level resources to be deleted")
 		Eventually(func() bool {
 			_, e1 := dynamicClient.Resource(databaseRoleGVR).Namespace(testNamespace).Get(ctx, "testrole", metav1.GetOptions{})
 			userList, e2 := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).List(ctx, metav1.ListOptions{})
 			usersGone := e2 == nil && len(userList.Items) == 0
-			_, e3 := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).Get(ctx, databaseName, metav1.GetOptions{})
-			return e1 != nil && usersGone && e3 != nil
-		}, deletionTimeout, pollingInterval).Should(BeTrue(), "Role, Users, and Database should be deleted")
+			dbList, e3 := dynamicClient.Resource(databaseGVR).Namespace(testNamespace).List(ctx, metav1.ListOptions{})
+			dbsGone := e3 == nil && len(dbList.Items) == 0
+			return e1 != nil && usersGone && dbsGone
+		}, deletionTimeout, pollingInterval).Should(BeTrue(), "Role, Users, and all Databases should be deleted")
 
 		// Level 3: Delete root resource (its children are now gone)
 		By("deleting DatabaseInstance and waiting")

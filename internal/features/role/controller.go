@@ -226,12 +226,12 @@ func (c *Controller) handleDeletion(ctx context.Context, role *dbopsv1alpha1.Dat
 
 	// Check for grant dependencies (skip if force-delete)
 	if !util.HasForceDeleteAnnotation(role) {
-		hasGrants, msg, err := c.hasGrantDependencies(ctx, role)
+		hasGrants, msg, children, err := c.hasGrantDependencies(ctx, role)
 		if err != nil {
 			log.Error(err, "Failed to check grant dependencies")
 			// Don't block on check errors — proceed with deletion
 		} else if hasGrants {
-			log.Info("Deletion blocked by grant dependencies", "message", msg)
+			log.Info("Deletion blocked by grant dependencies", "children", children, "message", msg)
 			util.SetReadyCondition(&role.Status.Conditions, metav1.ConditionFalse,
 				util.ReasonDependenciesExist, msg)
 			role.Status.Phase = dbopsv1alpha1.PhaseFailed
@@ -477,12 +477,12 @@ func (c *Controller) hasDestructiveDriftAnnotation(role *dbopsv1alpha1.DatabaseR
 
 // hasGrantDependencies checks if any DatabaseGrant resources reference this role.
 // Returns true with a descriptive message if grants exist.
-func (c *Controller) hasGrantDependencies(ctx context.Context, role *dbopsv1alpha1.DatabaseRole) (bool, string, error) {
+func (c *Controller) hasGrantDependencies(ctx context.Context, role *dbopsv1alpha1.DatabaseRole) (bool, string, []string, error) {
 	var childNames []string
 
 	var grants dbopsv1alpha1.DatabaseGrantList
 	if err := c.List(ctx, &grants, client.InNamespace(role.Namespace)); err != nil {
-		return false, "", fmt.Errorf("list grants: %w", err)
+		return false, "", nil, fmt.Errorf("list grants: %w", err)
 	}
 	for _, g := range grants.Items {
 		if g.Spec.RoleRef != nil && g.Spec.RoleRef.Name == role.Name {
@@ -494,10 +494,10 @@ func (c *Controller) hasGrantDependencies(ctx context.Context, role *dbopsv1alph
 	}
 
 	if len(childNames) == 0 {
-		return false, "", nil
+		return false, "", nil, nil
 	}
 
 	msg := fmt.Sprintf("cannot delete: %d DatabaseGrant(s) still reference this role: %s. "+
 		"Delete grants first or use force-delete annotation", len(childNames), strings.Join(childNames, ", "))
-	return true, msg, nil
+	return true, msg, childNames, nil
 }
