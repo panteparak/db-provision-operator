@@ -1,134 +1,436 @@
-# db-provision-operator
-// TODO(user): Add simple overview of use/purpose
+# DB Provision Operator
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+[![CI](https://github.com/panteparak/db-provision-operator/actions/workflows/ci.yml/badge.svg)](https://github.com/panteparak/db-provision-operator/actions/workflows/ci.yml)
+[![Release](https://github.com/panteparak/db-provision-operator/actions/workflows/release.yml/badge.svg)](https://github.com/panteparak/db-provision-operator/actions/workflows/release.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/panteparak/db-provision-operator)](https://goreportcard.com/report/github.com/panteparak/db-provision-operator)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-%3E%3D1.26-blue)](https://kubernetes.io)
 
-## Getting Started
+A Kubernetes operator for declarative database lifecycle management across **PostgreSQL**, **MySQL**, **MariaDB**, and **CockroachDB**.
+
+## Overview
+
+Managing database resources (databases, users, roles, grants) manually is error-prone and doesn't fit GitOps workflows. DB Provision Operator solves this by exposing databases as Kubernetes Custom Resources — enabling teams to version-control their entire database topology alongside application manifests.
+
+## Features
+
+- **Multi-engine support** — PostgreSQL, MySQL, MariaDB, CockroachDB
+- **Full lifecycle management** — Databases, users, roles, grants via CRDs
+- **Automated credential generation** — Secret templates with Go template syntax
+- **Password rotation** — Rotate credentials declaratively
+- **Backup & restore** — Scheduled backups to S3, GCS, Azure Blob, or PVC with gzip/lz4/zstd compression and AES-256-GCM encryption
+- **Drift detection & correction** — Detect and optionally reconcile out-of-band changes
+- **Deletion protection** — Dependency-aware deletion prevents accidental data loss
+- **Cluster-scoped resources** — Share instances, roles, and grants across namespaces
+- **Observability** — 31 Prometheus metrics, 9 Grafana dashboards, OpenTelemetry tracing, structured logging
+- **Security** — Non-root containers, seccomp profiles, SQL injection prevention via centralized SQL builder
+
+## Architecture
+
+```mermaid
+graph LR
+    CR[Custom Resource] --> Controller
+    Controller --> Handler
+    Handler --> Repository
+    Repository --> Adapter
+    Adapter --> DB[(Database Engine)]
+
+    subgraph Adapters
+        Adapter --> PostgreSQL
+        Adapter --> MySQL
+        Adapter --> MariaDB
+        Adapter --> CockroachDB
+    end
+```
+
+### Resource Dependency Graph
+
+```
+DatabaseInstance / ClusterDatabaseInstance
+  ├── Database (via instanceRef / clusterInstanceRef)
+  ├── DatabaseUser (via instanceRef / clusterInstanceRef)
+  └── DatabaseRole (via instanceRef / clusterInstanceRef)
+        └── DatabaseGrant (via userRef / roleRef / databaseRef)
+```
+
+### Custom Resource Definitions
+
+| Kind | Short Name | Scope | Description |
+|------|-----------|-------|-------------|
+| DatabaseInstance | `dbi` | Namespace | Connection to a database server |
+| ClusterDatabaseInstance | `cdbi` | Cluster | Cluster-wide database server connection |
+| Database | `db` | Namespace | Database within an instance |
+| DatabaseUser | `dbu` | Namespace | Database user with credential management |
+| DatabaseRole | `dbr` | Namespace | Database role |
+| ClusterDatabaseRole | `cdbr` | Cluster | Cluster-wide database role |
+| DatabaseGrant | `dbg` | Namespace | Role-to-user grant |
+| ClusterDatabaseGrant | `cdbg` | Cluster | Cluster-wide grant |
+| DatabaseBackup | `dbbak` | Namespace | One-time database backup |
+| DatabaseBackupSchedule | `dbbaksched` | Namespace | Scheduled recurring backups |
+| DatabaseRestore | `dbrestore` | Namespace | Restore from a backup |
+
+## Supported Versions
+
+| Component | Version |
+|-----------|---------|
+| Kubernetes | >= 1.26.0 |
+| Go | 1.24+ |
+
+## Installation
+
+### Helm (Recommended)
+
+```bash
+helm install db-provision-operator \
+  oci://ghcr.io/panteparak/charts/db-provision-operator \
+  --namespace db-provision-system \
+  --create-namespace
+```
+
+### kubectl (Raw Manifests)
+
+```bash
+kubectl apply -f https://github.com/panteparak/db-provision-operator/releases/latest/download/install.yaml
+```
+
+### GitOps (ArgoCD)
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: db-provision-operator
+  namespace: argocd
+spec:
+  project: default
+  source:
+    chart: db-provision-operator
+    repoURL: ghcr.io/panteparak/charts
+    targetRevision: 0.4.1
+    helm:
+      values: |
+        metrics:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: db-provision-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+```
+
+## Quick Start
+
+**1. Create admin credentials**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-admin-credentials
+type: Opaque
+stringData:
+  username: postgres
+  password: change-me-in-production
+```
+
+**2. Register a database instance**
+
+```yaml
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseInstance
+metadata:
+  name: postgres-primary
+spec:
+  engine: postgres
+  connection:
+    host: postgres.database.svc.cluster.local
+    port: 5432
+    database: postgres
+    sslMode: prefer
+    secretRef:
+      name: postgres-admin-credentials
+  healthCheck:
+    enabled: true
+    intervalSeconds: 30
+    timeoutSeconds: 5
+```
+
+**3. Create a database**
+
+```yaml
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: Database
+metadata:
+  name: myapp-database
+spec:
+  instanceRef:
+    name: postgres-primary
+  name: myapp
+  deletionPolicy: Retain
+  postgres:
+    encoding: UTF8
+    extensions:
+      - name: uuid-ossp
+        schema: public
+      - name: pgcrypto
+        schema: public
+```
+
+**4. Create a user with auto-generated credentials**
+
+```yaml
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseUser
+metadata:
+  name: myapp-user
+spec:
+  instanceRef:
+    name: postgres-primary
+  username: myapp_user
+  passwordSecret:
+    generate: true
+    length: 32
+    secretName: myapp-user-credentials
+    secretTemplate:
+      labels:
+        app: myapp
+      data:
+        DATABASE_URL: "postgresql://{{ .Username }}:{{ .Password }}@{{ .Host }}:{{ .Port }}/myapp?sslmode=prefer"
+  postgres:
+    connectionLimit: 50
+```
+
+**5. Grant permissions**
+
+```yaml
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseGrant
+metadata:
+  name: myapp-user-grant
+spec:
+  userRef:
+    name: myapp-user
+  postgres:
+    roles:
+      - myapp_readwrite
+```
+
+See [`docs/examples/`](docs/examples/) for complete examples across all supported engines.
+
+## Configuration
+
+### Key Helm Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `replicaCount` | `1` | Number of operator replicas |
+| `image.repository` | `ghcr.io/panteparak/db-provision-operator` | Container image |
+| `defaultDriftInterval` | `"8h"` | Default drift detection interval |
+| `instanceId` | `""` | Operator instance ID (multi-operator) |
+| `leaderElect` | `true` | Enable leader election |
+| `metrics.enabled` | `false` | Enable metrics endpoint |
+| `metrics.serviceMonitor.enabled` | `false` | Create ServiceMonitor CR |
+| `grafanaDashboards.enabled` | `false` | Deploy Grafana dashboard ConfigMaps |
+| `crds.install` | `true` | Install CRDs with Helm |
+| `crds.keep` | `true` | Retain CRDs on uninstall |
+| `resources.limits.memory` | `128Mi` | Memory limit |
+| `resources.requests.cpu` | `10m` | CPU request |
+
+### Annotations
+
+| Annotation | Value | Effect |
+|------------|-------|--------|
+| `dbops.dbprovision.io/force-delete` | `"true"` | Bypass deletion protection and dependency checks |
+| `dbops.dbprovision.io/skip-reconcile` | `"true"` | Skip reconciliation entirely |
+| `dbops.dbprovision.io/deletion-policy` | `"Delete"` / `"Retain"` | Control external resource cleanup on CR deletion |
+| `dbops.dbprovision.io/deletion-protection` | `"true"` | Block deletion until annotation is removed |
+| `dbops.dbprovision.io/allow-destructive-drift` | `"true"` | Allow destructive drift corrections |
+
+## Upgrade Guide
+
+```bash
+# Upgrade CRDs first (Helm does not upgrade CRDs automatically)
+kubectl apply --server-side -f https://github.com/panteparak/db-provision-operator/releases/latest/download/crds.tar.gz
+
+# Upgrade the operator
+helm upgrade db-provision-operator \
+  oci://ghcr.io/panteparak/charts/db-provision-operator \
+  --namespace db-provision-system
+```
+
+## Security
+
+- Runs as non-root with `seccompProfile: RuntimeDefault` and `capabilities: drop: [ALL]`
+- SQL injection prevention via centralized SQL builder with dialect-specific escaping and privilege allowlists
+- MySQL `MultiStatements` disabled to prevent stacked query injection
+- Credentials stored in Kubernetes Secrets — never logged or exposed in status
+- Minimal RBAC: only the permissions needed for each controller
+
+## Observability
+
+### Prometheus Metrics
+
+All metrics use the `dbops_` prefix. 31 metrics cover connection health, CRUD operations, backup/restore durations, drift detection, and resource counts.
+
+Enable metrics collection:
+
+```yaml
+# values.yaml
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true  # Requires prometheus-operator
+```
+
+### Grafana Dashboards
+
+9 pre-built dashboards in [`dashboards/`](dashboards/):
+
+| Dashboard | Description |
+|-----------|-------------|
+| Overview | Cross-resource summary |
+| Instances | Connection health and latency |
+| Databases | Database operations and sizes |
+| Users | User operation metrics |
+| Roles | Role operation metrics |
+| Grants | Grant operation metrics |
+| Backups | Backup durations and sizes |
+| Schedules | Schedule adherence |
+| Restores | Restore operations |
+
+Deploy as Grafana sidecar ConfigMaps:
+
+```yaml
+grafanaDashboards:
+  enabled: true
+  folder: "Database Provisioning"
+```
+
+### Logging & Tracing
+
+- Structured JSON logging via Zap
+- OpenTelemetry tracing with `ReconcileID` propagation
+
+## Backup & Disaster Recovery
+
+```yaml
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseBackupSchedule
+metadata:
+  name: myapp-daily-backup
+spec:
+  databaseRef:
+    name: myapp-database
+  schedule: "0 2 * * *"
+  timezone: "UTC"
+  retention:
+    keepLast: 7
+    keepDaily: 7
+    keepWeekly: 4
+  backupTemplate:
+    storage:
+      type: pvc
+      pvc:
+        claimName: backup-storage
+        subPath: postgres/myapp
+    compression:
+      enabled: true
+      algorithm: gzip  # gzip, lz4, zstd
+    postgres:
+      format: custom
+      jobs: 4
+```
+
+**Storage backends:** S3, GCS, Azure Blob Storage, PVC
+
+**Compression:** gzip, lz4, zstd
+
+**Encryption:** AES-256-GCM
+
+## Development
 
 ### Prerequisites
-- go version v1.24.0+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
 
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
+- Go 1.24+
+- Docker
+- kubectl
+- Access to a Kubernetes cluster (or k3d for local development)
 
-```sh
-make docker-build docker-push IMG=<some-registry>/db-provision-operator:tag
+### Key Make Targets
+
+| Target | Description |
+|--------|-------------|
+| `make run` | Run operator locally against cluster |
+| `make test` | Unit tests |
+| `make test-envtest` | Controller tests with envtest |
+| `make test-integration` | Integration tests with testcontainers |
+| `make e2e-local-all` | Full E2E suite (k3d + all engines) |
+| `make generate` | Generate DeepCopy methods |
+| `make manifests` | Generate CRDs and RBAC |
+| `make lint` | Run golangci-lint |
+| `make helm-lint` | Lint Helm chart |
+| `make test-templates` | Verify Helm/Kustomize parity |
+| `make docs-serve` | Serve docs locally |
+
+### Code Generation
+
+After modifying API types or RBAC markers:
+
+```bash
+make generate && make manifests
 ```
 
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
+## CI/CD
 
-**Install the CRDs into the cluster:**
+**CI** (GitHub Actions) runs on every push/PR:
+- Linting (golangci-lint), unit tests, controller tests, template comparison
+- Multi-platform Docker build (linux/amd64)
+- Integration tests against PostgreSQL, MySQL, MariaDB, CockroachDB
+- Security scanning (Trivy) with SBOM generation
+- E2E tests with k3d
 
-```sh
-make install
-```
-
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
-
-```sh
-make deploy IMG=<some-registry>/db-provision-operator:tag
-```
-
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
-
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
-
-```sh
-kubectl apply -k config/samples/
-```
-
->**NOTE**: Ensure that the samples has default values to test it out.
-
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
-
-```sh
-kubectl delete -k config/samples/
-```
-
-**Delete the APIs(CRDs) from the cluster:**
-
-```sh
-make uninstall
-```
-
-**UnDeploy the controller from the cluster:**
-
-```sh
-make undeploy
-```
-
-## Project Distribution
-
-Following the options to release and provide this solution to the users.
-
-### By providing a bundle with all YAML files
-
-1. Build the installer for the image built and published in the registry:
-
-```sh
-make build-installer IMG=<some-registry>/db-provision-operator:tag
-```
-
-**NOTE:** The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without its
-dependencies.
-
-2. Using the installer
-
-Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
-the project, i.e.:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/db-provision-operator/<tag or branch>/dist/install.yaml
-```
-
-### By providing a Helm Chart
-
-1. Build the chart using the optional helm plugin
-
-```sh
-operator-sdk edit --plugins=helm/v1-alpha
-```
-
-2. See that a chart was generated under 'dist/chart', and users
-can obtain this solution from there.
-
-**NOTE:** If you change the project, you need to update the Helm Chart
-using the same command above to sync the latest changes. Furthermore,
-if you create webhooks, you need to use the above command with
-the '--force' flag and manually ensure that any custom configuration
-previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
-is manually re-applied afterwards.
+**Release** is triggered automatically on CI success for version tags or via manual dispatch:
+- Multi-arch container images published to `ghcr.io/panteparak/db-provision-operator`
+- Helm chart published to `oci://ghcr.io/panteparak/charts/db-provision-operator`
+- GitHub Release with changelog, installer manifests, CRD tarball, and SBOMs
+- Documentation deployed to GitHub Pages
 
 ## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
 
-**NOTE:** Run `make help` for more information on all potential `make` targets
+Contributions are welcome! The project enforces:
 
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+- **Pre-commit hooks** — golangci-lint, go test, envtest validation, helm lint
+- **Conventional commits** — commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/)
+- **Template parity** — Helm and Kustomize outputs must match (`make test-templates`)
+
+## Documentation
+
+Full documentation is available at **[panteparak.github.io/db-provision-operator](https://panteparak.github.io/db-provision-operator)**.
+
+## Roadmap
+
+Planned for future releases:
+
+- **Multi-cluster support** — Manage databases across clusters via hub-spoke model
+- **Database Migration CRD** — Schema migration management (Flyway/Liquibase integration)
+- **Audit logging** — Full operation audit trail with external sink support
+- **Policy enforcement** — OPA/Gatekeeper integration for naming conventions, password policies, and compliance rules
 
 ## License
 
-Copyright 2026.
+Copyright 2026. Licensed under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0).
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+## Maintainers
 
-    http://www.apache.org/licenses/LICENSE-2.0
+- [panteparak](https://github.com/panteparak)
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+## Community
+
+- [GitHub Issues](https://github.com/panteparak/db-provision-operator/issues) — Bug reports and feature requests
+- [GitHub Discussions](https://github.com/panteparak/db-provision-operator/discussions) — Questions and general discussion
