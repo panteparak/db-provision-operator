@@ -12,12 +12,7 @@ on:
         default: ''
         type: string
 
-permissions:
-  contents: write
-  packages: write
-  pages: write
-  id-token: write
-  actions: read  # Required for cross-workflow artifact download
+permissions: {}
 
 env:
   REGISTRY: ghcr.io
@@ -31,6 +26,9 @@ jobs:
   guard:
     name: Guard
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     outputs:
       should-release: ${{ steps.final-version.outputs.should-release }}
       version: ${{ steps.final-version.outputs.version }}
@@ -49,17 +47,25 @@ jobs:
             exit 1
           fi
 
-      # --- workflow_run: extract version from tag ---
+      # --- workflow_run: discover version tag on the CI-tested commit ---
+      # CI only triggers on branch pushes (not tags) to avoid duplicate runs.
+      # We discover version tags by checking git history of the tested SHA.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        if: github.event_name == 'workflow_run'
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 1
+          fetch-tags: true
+          persist-credentials: false
+
       - name: Extract tag and version
         if: github.event_name == 'workflow_run'
         id: version
-        env:
-          WR_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
-          TAG="$WR_HEAD_BRANCH"
+          TAG=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]' | head -1)
 
-          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9] ]]; then
-            echo "::notice::Not a version tag ($TAG), skipping release"
+          if [[ -z "$TAG" ]]; then
+            echo "::notice::No version tag found for SHA ${GITHUB_EVENT_WORKFLOW_RUN_HEAD_SHA}, skipping release"
             echo "should-release=false" >> $GITHUB_OUTPUT
             exit 0
           fi
@@ -69,17 +75,20 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "should-release=true" >> $GITHUB_OUTPUT
           echo "Release: $TAG (version $VERSION)"
+        env:
+          GITHUB_EVENT_WORKFLOW_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
 
       # --- workflow_dispatch: resolve version via commitizen or override ---
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         if: github.event_name == 'workflow_dispatch'
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Resolve dispatch version
         if: github.event_name == 'workflow_dispatch'
         id: dispatch
-        uses: commitizen-tools/commitizen-action@master
+        uses: commitizen-tools/commitizen-action@338bbd841b75aaee6bf5340e1fa12f6ab58ff9ff # master
         with:
           dry_run: true
           commit: "false"
@@ -117,18 +126,13 @@ jobs:
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "version=${{ steps.version.outputs.version || steps.dispatch-version.outputs.version }}" >> $GITHUB_OUTPUT
           echo "should-release=${{ steps.version.outputs.should-release || steps.dispatch-version.outputs.should-release || 'false' }}" >> $GITHUB_OUTPUT
-          # For workflow_run, checkout the tag; for dispatch, use default branch (empty ref)
+          # For workflow_run, use the tag as checkout ref for downstream jobs
+          # (guard already checked out the commit; downstream jobs need to checkout separately)
           if [[ "$EVENT_NAME" == "workflow_run" ]]; then
             echo "checkout-ref=${TAG}" >> $GITHUB_OUTPUT
           else
             echo "checkout-ref=" >> $GITHUB_OUTPUT
           fi
-
-      # --- Checkout tag for workflow_run path ---
-      - uses: actions/checkout@v4
-        if: github.event_name == 'workflow_run' && steps.final-version.outputs.should-release == 'true'
-        with:
-          ref: ${{ steps.final-version.outputs.tag }}
 
       - name: Compute image tag
         if: steps.final-version.outputs.should-release == 'true'
@@ -170,12 +174,15 @@ jobs:
   docker-release:
     name: Docker Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     needs: [guard]
     if: needs.guard.outputs.should-release == 'true'
     steps:
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -190,22 +197,23 @@ jobs:
         run: |
           echo "Retagging ${IMAGE_TAG} -> ${VERSION} and latest"
           docker buildx imagetools create \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION} \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}
+            -t ${{ env.REGISTRY }}/${IMAGE_NAME}:${VERSION} \
+            -t ${{ env.REGISTRY }}/${IMAGE_NAME}:latest \
+            ${{ env.REGISTRY }}/${IMAGE_NAME}:${IMAGE_TAG}
 
       # workflow_dispatch fallback: rebuild from source
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         if: needs.guard.outputs.ci-run-id == ''
         with:
           ref: ${{ needs.guard.outputs.checkout-ref }}
+          persist-credentials: false
 
-      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
         if: needs.guard.outputs.ci-run-id == ''
 
       - name: Build and push (manual dispatch)
         if: needs.guard.outputs.ci-run-id == ''
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6.15.0
         with:
           context: .
           platforms: linux/amd64
@@ -223,18 +231,22 @@ jobs:
   github-release:
     name: GitHub Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     needs: [guard, docker-release]
     if: needs.guard.outputs.should-release == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ needs.guard.outputs.checkout-ref }}
           fetch-depth: 0
 
+          persist-credentials: false
+
       # Download SBOMs from CI run (only available via workflow_run)
       - name: Download SBOM
         if: needs.guard.outputs.ci-run-id != ''
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           run-id: ${{ needs.guard.outputs.ci-run-id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -243,15 +255,16 @@ jobs:
         continue-on-error: true
 
       # Build versioned install manifest
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: go.mod
+          cache: false
 
       - name: Build install manifest
         env:
           VERSION: ${{ needs.guard.outputs.version }}
         run: |
-          make build-installer IMG=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}
+          make build-installer IMG=${{ env.REGISTRY }}/${IMAGE_NAME}:${VERSION}
           mv dist/install.yaml dist/db-provision-operator-${VERSION}.yaml
 
       # Package CRDs tarball
@@ -267,7 +280,7 @@ jobs:
       - name: Copy dashboards
         run: make copy-dashboards
 
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
         with:
           version: v3.14.0
 
@@ -317,7 +330,7 @@ jobs:
           echo "$CHANGELOG" > /tmp/changelog.txt
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2.2.2
         with:
           tag_name: ${{ needs.guard.outputs.tag }}
           name: ${{ needs.guard.outputs.tag }}
@@ -336,14 +349,18 @@ jobs:
   helm-oci:
     name: Helm Chart (OCI)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     needs: [guard, github-release]
     if: needs.guard.outputs.should-release == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ needs.guard.outputs.checkout-ref }}
+          persist-credentials: false
 
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
         with:
           version: v3.14.0
 
@@ -379,15 +396,19 @@ jobs:
   docs-release:
     name: Deploy Documentation
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
     needs: [guard, github-release]
     if: needs.guard.outputs.should-release == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ needs.guard.outputs.checkout-ref }}
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.11'
           cache: pip
@@ -411,6 +432,7 @@ jobs:
   release-summary:
     name: Release Summary
     runs-on: ubuntu-latest
+    permissions: {}
     needs: [guard, docker-release, github-release, helm-oci, docs-release]
     if: always() && needs.guard.outputs.should-release == 'true'
     env:

@@ -3,9 +3,11 @@ name: CI
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
     branches: [main]
+
+permissions:
+  contents: read
 
 env:
   GO_VERSION_FILE: go.mod
@@ -50,16 +52,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: ${{ env.GO_VERSION_FILE }}
           cache: true  # Enable Go module caching
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@25e2cdc5eb1d7a04fdc45ff538f1a00e960ae128 # v8.0.0
         with:
           version: v2.1.0
 
@@ -68,10 +72,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: ${{ env.GO_VERSION_FILE }}
           cache: true  # Enable Go module caching
@@ -80,7 +86,7 @@ jobs:
         run: make test
 
       - name: Upload coverage report
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@0f8570b1a125f4937846a11fcfa3bcd548bd8c97 # v4.6.0
         with:
           files: cover.out
           fail_ci_if_error: false
@@ -92,10 +98,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: ${{ env.GO_VERSION_FILE }}
           cache: true
@@ -110,7 +118,7 @@ jobs:
 
       # Cache envtest binaries (~100MB) to speed up CI
       - name: Cache envtest binaries
-        uses: actions/cache@v4
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: bin/k8s
           key: envtest-${{ runner.os }}-k8s-${{ steps.envtest-version.outputs.version }}
@@ -121,7 +129,7 @@ jobs:
         run: make test-envtest
 
       - name: Upload coverage report
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@0f8570b1a125f4937846a11fcfa3bcd548bd8c97 # v4.6.0
         with:
           files: cover-envtest.out
           flags: envtest
@@ -134,16 +142,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: ${{ env.GO_VERSION_FILE }}
           cache: true
 
       - name: Install Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
         with:
           version: v3.14.0
 
@@ -168,10 +178,12 @@ jobs:
         database: [postgresql, mysql, mariadb, cockroachdb]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: ${{ env.GO_VERSION_FILE }}
           cache: true  # Enable Go module caching
@@ -186,7 +198,7 @@ jobs:
 
       # Cache envtest binaries (~100MB) to speed up CI
       - name: Cache envtest binaries
-        uses: actions/cache@v4
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: bin/k8s
           key: envtest-${{ runner.os }}-k8s-${{ steps.envtest-version.outputs.version }}
@@ -203,7 +215,7 @@ jobs:
         run: make test-integration
 
       - name: Upload test reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: test-reports-${{ matrix.database }}
@@ -212,7 +224,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload integration coverage report
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@0f8570b1a125f4937846a11fcfa3bcd548bd8c97 # v4.6.0
         with:
           files: cover-integration.out
           flags: integration-${{ matrix.database }}
@@ -236,7 +248,9 @@ jobs:
     continue-on-error: ${{ !matrix.config.required }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Get short SHA
         id: short-sha
@@ -249,15 +263,15 @@ jobs:
           echo "pair=${platform//\//-}" >> $GITHUB_OUTPUT
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
       # Login for push events (full access) and PRs (read-only for cache)
       # PRs need read access to pull registry cache from main branch
       - name: Log in to Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -265,14 +279,14 @@ jobs:
 
       - name: Extract metadata (tags, labels)
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
       - name: Build and push by digest
         id: build
         if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6.15.0
         with:
           context: .
           platforms: ${{ matrix.config.platform }}
@@ -290,14 +304,15 @@ jobs:
 
       - name: Export digest
         if: github.event_name != 'pull_request'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
         run: |
           mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
+          touch "/tmp/digests/${DIGEST#sha256:}"
 
       - name: Upload digest
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: digests-${{ steps.platform.outputs.pair }}
           path: /tmp/digests/*
@@ -307,7 +322,7 @@ jobs:
       # For PRs, only build amd64 and export for E2E tests
       - name: Build image for PR (local)
         if: github.event_name == 'pull_request' && matrix.config.platform == 'linux/amd64'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6.15.0
         with:
           context: .
           platforms: linux/amd64
@@ -323,13 +338,15 @@ jobs:
 
       - name: Save image for PR
         if: github.event_name == 'pull_request' && matrix.config.platform == 'linux/amd64'
+        env:
+          IMAGE_TAG: sha-${{ steps.short-sha.outputs.sha }}
         run: |
-          docker save ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.short-sha.outputs.sha }} \
+          docker save "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}" \
             -o /tmp/operator-image.tar
 
       - name: Upload image artifact for PR
         if: github.event_name == 'pull_request' && matrix.config.platform == 'linux/amd64'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: operator-image
           path: /tmp/operator-image.tar
@@ -353,17 +370,17 @@ jobs:
         run: echo "sha=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
 
       - name: Download digests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: /tmp/digests
           pattern: digests-*
           merge-multiple: true
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
       - name: Log in to Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -371,7 +388,7 @@ jobs:
 
       - name: Extract metadata (tags, labels)
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -392,21 +409,23 @@ jobs:
         working-directory: /tmp/digests
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+            $(printf '${{ env.REGISTRY }}/${IMAGE_NAME}@sha256:%s ' *)
 
       - name: Inspect image
         run: |
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${IMAGE_NAME}:${STEPS_META_OUTPUTS_VERSION}
+        env:
+          STEPS_META_OUTPUTS_VERSION: ${{ steps.meta.outputs.version }}
 
       - name: Generate SBOM
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@f325610c9f50a54015d37c8d16cb3b0e2c8f4de0 # v0.18.0
         with:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.short-sha.outputs.sha }}
           format: spdx-json
           output-file: sbom.spdx.json
 
       - name: Upload SBOM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: sbom
           path: sbom.spdx.json
@@ -433,7 +452,7 @@ jobs:
 
       # Download the digest for this specific platform
       - name: Download digest
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: digests-${{ steps.platform.outputs.pair }}
           path: /tmp/digests
@@ -447,7 +466,7 @@ jobs:
 
       # Generate SBOM from image (scans the image once)
       - name: Generate SBOM
-        uses: aquasecurity/trivy-action@0.34.2
+        uses: aquasecurity/trivy-action@97e0b3872f55f89b95b2f65b3dbab56962816478 # 0.34.2
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.digest.outputs.digest }}
           scan-type: 'image'
@@ -456,7 +475,7 @@ jobs:
 
       # Scan SBOM for vulnerabilities - JSON output (all severities)
       - name: Scan SBOM for vulnerabilities (JSON)
-        uses: aquasecurity/trivy-action@0.34.2
+        uses: aquasecurity/trivy-action@97e0b3872f55f89b95b2f65b3dbab56962816478 # 0.34.2
         with:
           scan-type: 'sbom'
           scan-ref: 'sbom-${{ steps.platform.outputs.pair }}.cyclonedx.json'
@@ -465,7 +484,7 @@ jobs:
 
       # Scan SBOM for vulnerabilities - Table output (MEDIUM+, ignore unfixed)
       - name: Scan SBOM for vulnerabilities (Table)
-        uses: aquasecurity/trivy-action@0.34.2
+        uses: aquasecurity/trivy-action@97e0b3872f55f89b95b2f65b3dbab56962816478 # 0.34.2
         with:
           scan-type: 'sbom'
           scan-ref: 'sbom-${{ steps.platform.outputs.pair }}.cyclonedx.json'
@@ -476,7 +495,7 @@ jobs:
 
       # Scan SBOM for SARIF output (GitHub Security tab)
       - name: Scan SBOM for SARIF report
-        uses: aquasecurity/trivy-action@0.34.2
+        uses: aquasecurity/trivy-action@97e0b3872f55f89b95b2f65b3dbab56962816478 # 0.34.2
         with:
           scan-type: 'sbom'
           scan-ref: 'sbom-${{ steps.platform.outputs.pair }}.cyclonedx.json'
@@ -484,14 +503,14 @@ jobs:
           output: 'trivy-results-${{ steps.platform.outputs.pair }}.sarif'
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@f35333b910470a5408cb081b68f0701254a7d27b # v3.28.18
         with:
           sarif_file: 'trivy-results-${{ steps.platform.outputs.pair }}.sarif'
           category: 'trivy-${{ steps.platform.outputs.pair }}'
 
       # Upload all security scan artifacts for this platform
       - name: Upload security scan artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: security-scan-${{ steps.platform.outputs.pair }}
           path: |
@@ -508,13 +527,14 @@ jobs:
       contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           # Use a token with write access for auto-commit
           token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: false
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: ${{ env.GO_VERSION_FILE }}
           cache: true  # Enable Go module caching
@@ -554,7 +574,7 @@ jobs:
           exit 1
 
       - name: Install Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
         with:
           version: 'v3.14.0'
 
@@ -630,10 +650,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: ${{ env.GO_VERSION_FILE }}
           cache: true  # Enable Go module caching
@@ -654,10 +676,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.11'
           cache: pip
@@ -684,32 +708,32 @@ jobs:
       - name: Check job results
         run: |
           echo "Job results:"
-          echo "  setup: ${{ needs.setup.result }}"
-          echo "  lint: ${{ needs.lint.result }}"
-          echo "  unit-test: ${{ needs.unit-test.result }}"
-          echo "  envtest: ${{ needs.envtest.result }}"
-          echo "  template-comparison: ${{ needs.template-comparison.result }}"
-          echo "  docker-build: ${{ needs.docker-build.result }}"
-          echo "  docker-merge: ${{ needs.docker-merge.result }}"
-          echo "  manifests: ${{ needs.manifests.result }}"
-          echo "  generate: ${{ needs.generate.result }}"
-          echo "  docs: ${{ needs.docs.result }}"
+          echo "  setup: ${NEEDS_SETUP_RESULT}"
+          echo "  lint: ${NEEDS_LINT_RESULT}"
+          echo "  unit-test: ${NEEDS_UNIT_TEST_RESULT}"
+          echo "  envtest: ${NEEDS_ENVTEST_RESULT}"
+          echo "  template-comparison: ${NEEDS_TEMPLATE_COMPARISON_RESULT}"
+          echo "  docker-build: ${NEEDS_DOCKER_BUILD_RESULT}"
+          echo "  docker-merge: ${NEEDS_DOCKER_MERGE_RESULT}"
+          echo "  manifests: ${NEEDS_MANIFESTS_RESULT}"
+          echo "  generate: ${NEEDS_GENERATE_RESULT}"
+          echo "  docs: ${NEEDS_DOCS_RESULT}"
 
           # Check required jobs (must be success)
           FAILED=""
-          [[ "${{ needs.setup.result }}" != "success" ]] && FAILED="${FAILED} setup"
-          [[ "${{ needs.lint.result }}" != "success" ]] && FAILED="${FAILED} lint"
-          [[ "${{ needs.unit-test.result }}" != "success" ]] && FAILED="${FAILED} unit-test"
-          [[ "${{ needs.envtest.result }}" != "success" ]] && FAILED="${FAILED} envtest"
-          [[ "${{ needs.template-comparison.result }}" != "success" ]] && FAILED="${FAILED} template-comparison"
-          [[ "${{ needs.docker-build.result }}" != "success" ]] && FAILED="${FAILED} docker-build"
-          [[ "${{ needs.manifests.result }}" != "success" ]] && FAILED="${FAILED} manifests"
-          [[ "${{ needs.generate.result }}" != "success" ]] && FAILED="${FAILED} generate"
-          [[ "${{ needs.docs.result }}" != "success" ]] && FAILED="${FAILED} docs"
+          [[ "${NEEDS_SETUP_RESULT}" != "success" ]] && FAILED="${FAILED} setup"
+          [[ "${NEEDS_LINT_RESULT}" != "success" ]] && FAILED="${FAILED} lint"
+          [[ "${NEEDS_UNIT_TEST_RESULT}" != "success" ]] && FAILED="${FAILED} unit-test"
+          [[ "${NEEDS_ENVTEST_RESULT}" != "success" ]] && FAILED="${FAILED} envtest"
+          [[ "${NEEDS_TEMPLATE_COMPARISON_RESULT}" != "success" ]] && FAILED="${FAILED} template-comparison"
+          [[ "${NEEDS_DOCKER_BUILD_RESULT}" != "success" ]] && FAILED="${FAILED} docker-build"
+          [[ "${NEEDS_MANIFESTS_RESULT}" != "success" ]] && FAILED="${FAILED} manifests"
+          [[ "${NEEDS_GENERATE_RESULT}" != "success" ]] && FAILED="${FAILED} generate"
+          [[ "${NEEDS_DOCS_RESULT}" != "success" ]] && FAILED="${FAILED} docs"
 
           # docker-merge is only required for push events (skipped for PRs)
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
-            [[ "${{ needs.docker-merge.result }}" != "success" ]] && FAILED="${FAILED} docker-merge"
+            [[ "${NEEDS_DOCKER_MERGE_RESULT}" != "success" ]] && FAILED="${FAILED} docker-merge"
           fi
 
           if [[ -n "$FAILED" ]]; then
@@ -718,6 +742,27 @@ jobs:
           fi
 
           echo "All required checks passed successfully"
+
+        env:
+          NEEDS_SETUP_RESULT: ${{ needs.setup.result }}
+
+          NEEDS_LINT_RESULT: ${{ needs.lint.result }}
+
+          NEEDS_UNIT_TEST_RESULT: ${{ needs.unit-test.result }}
+
+          NEEDS_ENVTEST_RESULT: ${{ needs.envtest.result }}
+
+          NEEDS_TEMPLATE_COMPARISON_RESULT: ${{ needs.template-comparison.result }}
+
+          NEEDS_DOCKER_BUILD_RESULT: ${{ needs.docker-build.result }}
+
+          NEEDS_DOCKER_MERGE_RESULT: ${{ needs.docker-merge.result }}
+
+          NEEDS_MANIFESTS_RESULT: ${{ needs.manifests.result }}
+
+          NEEDS_GENERATE_RESULT: ${{ needs.generate.result }}
+
+          NEEDS_DOCS_RESULT: ${{ needs.docs.result }}
 
   # ============================================================================
   # Stage 3: Integration Tests (after Gate passes)
@@ -751,10 +796,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: go.mod
           cache: true
@@ -778,12 +825,15 @@ jobs:
       - name: Pull operator image from registry
         if: github.event_name != 'pull_request'
         run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.short-sha.outputs.sha }}
+          docker pull ${{ env.REGISTRY }}/${IMAGE_NAME}:sha-${STEPS_SHORT_SHA_OUTPUTS_SHA}
+
+        env:
+          STEPS_SHORT_SHA_OUTPUTS_SHA: ${{ steps.short-sha.outputs.sha }}
 
       # For PRs: Download and load operator image from artifact
       - name: Download operator image artifact
         if: github.event_name == 'pull_request'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: operator-image
           path: /tmp
@@ -794,7 +844,10 @@ jobs:
 
       # Load operator image into k3d (Makefile micro-step with custom image)
       - name: Load operator image into k3d
-        run: make e2e-image-load E2E_IMG=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.short-sha.outputs.sha }}
+        run: make e2e-image-load E2E_IMG=${{ env.REGISTRY }}/${IMAGE_NAME}:sha-${STEPS_SHORT_SHA_OUTPUTS_SHA}
+
+        env:
+          STEPS_SHORT_SHA_OUTPUTS_SHA: ${{ steps.short-sha.outputs.sha }}
 
       # Install CRDs (Makefile micro-step)
       - name: Install CRDs
@@ -802,7 +855,7 @@ jobs:
 
       # Deploy operator via Helm (intentionally uses Helm, not Kustomize)
       - name: Install Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
         with:
           version: 'v3.14.0'
 
@@ -811,11 +864,13 @@ jobs:
           helm install db-provision-operator ./charts/db-provision-operator \
             --namespace db-provision-operator-system \
             --create-namespace \
-            --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
-            --set image.tag=sha-${{ steps.short-sha.outputs.sha }} \
+            --set image.repository=${{ env.REGISTRY }}/${IMAGE_NAME} \
+            --set image.tag=sha-${STEPS_SHORT_SHA_OUTPUTS_SHA} \
             --set image.pullPolicy=IfNotPresent \
             --wait \
             --timeout 5m
+        env:
+          STEPS_SHORT_SHA_OUTPUTS_SHA: ${{ steps.short-sha.outputs.sha }}
 
       - name: Wait for operator ready
         run: |
@@ -837,7 +892,9 @@ jobs:
       # Multi-operator E2E tests (PostgreSQL only)
       - name: Deploy second operator (multi-instance test)
         if: matrix.database == 'postgresql'
-        run: make e2e-deploy-second-operator E2E_IMG=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.short-sha.outputs.sha }}
+        run: make e2e-deploy-second-operator E2E_IMG=${{ env.REGISTRY }}/${IMAGE_NAME}:sha-${STEPS_SHORT_SHA_OUTPUTS_SHA}
+        env:
+          STEPS_SHORT_SHA_OUTPUTS_SHA: ${{ steps.short-sha.outputs.sha }}
 
       - name: Run multi-operator E2E tests
         if: matrix.database == 'postgresql'
