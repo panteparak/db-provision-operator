@@ -253,6 +253,42 @@ spec:
                   lcCtype:
                     description: LCCtype sets the character classification
                     type: string
+                  ownership:
+                    description: |-
+                      Ownership configures automatic per-database role and user provisioning.
+                      When enabled, a dedicated group role and login user are created for the database.
+                      This is PostgreSQL/CockroachDB only; MySQL ignores this field.
+                    properties:
+                      autoOwnership:
+                        description: |-
+                          AutoOwnership enables automatic role and user provisioning for this database.
+                          When true, a dedicated group role and login user are created.
+                        type: boolean
+                      dropOnDelete:
+                        description: |-
+                          DropOnDelete controls whether the auto-created role and user are dropped
+                          when the Database CR is deleted. Defaults to false (retain).
+                        type: boolean
+                      roleName:
+                        description: 'RoleName overrides the derived group role name
+                          (default: db_<dbname>_owner).'
+                        maxLength: 63
+                        pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+                        type: string
+                      setDefaultPrivileges:
+                        default: true
+                        description: |-
+                          SetDefaultPrivileges controls whether ALTER DEFAULT PRIVILEGES are applied
+                          so objects created by the owner role are accessible to the app user.
+                          Applies to all specified schemas plus public.
+                        type: boolean
+                      userName:
+                        description: 'UserName overrides the derived login user name
+                          (default: db_<dbname>_app).'
+                        maxLength: 63
+                        pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+                        type: string
+                    type: object
                   schemas:
                     description: Schemas to create in the database
                     items:
@@ -462,6 +498,29 @@ spec:
                       - version
                       type: object
                     type: array
+                  ownership:
+                    description: Ownership contains the status of auto-provisioned
+                      ownership resources.
+                    properties:
+                      message:
+                        description: Message provides additional information about
+                          the ownership status.
+                        type: string
+                      phase:
+                        description: Phase is the ownership provisioning phase (Pending,
+                          Ready, Failed).
+                        enum:
+                        - Pending
+                        - Ready
+                        - Failed
+                        type: string
+                      roleName:
+                        description: RoleName is the auto-created group role name.
+                        type: string
+                      userName:
+                        description: UserName is the auto-created login user name.
+                        type: string
+                    type: object
                   schemas:
                     description: Schemas lists schemas in the database
                     items:

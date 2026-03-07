@@ -282,6 +282,137 @@ func (s *DatabaseService) Exists(ctx context.Context, name string) (bool, error)
 	return exists, nil
 }
 
+// CreateWithOwnership creates a database with automatic ownership provisioning.
+// It runs a ProvisionPipeline that:
+// 1. Creates the owner group role
+// 2. Creates the database (with owner set to the role)
+// 3. Verifies the database accepts connections
+// 4. Transfers ownership (idempotent for pre-existing databases)
+// 5. Creates the app login user with role membership
+// 6. Sets default privileges on all schemas
+//
+// Auto-defaults schema ownership: schemas without an explicit owner use the derived role.
+func (s *DatabaseService) CreateWithOwnership(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec) (*Result, *OwnershipResult, error) {
+	if spec == nil {
+		return nil, nil, &ValidationError{Field: "spec", Message: "spec is required"}
+	}
+	if !HasAutoOwnership(spec) {
+		return nil, nil, &ValidationError{Field: "ownership", Message: "autoOwnership is not enabled"}
+	}
+
+	ownershipCfg := spec.Postgres.Ownership
+	roleName := DeriveRoleName(ownershipCfg, spec.Name)
+	userName := DeriveUserName(ownershipCfg, spec.Name)
+
+	// Auto-default schema ownership: schemas without explicit owner get the derived role
+	for i := range spec.Postgres.Schemas {
+		if spec.Postgres.Schemas[i].Owner == "" {
+			spec.Postgres.Schemas[i].Owner = roleName
+		}
+	}
+
+	// Override the spec owner so CreateDatabase sets OWNER correctly
+	spec.Owner = roleName
+
+	ownerSvc := NewOwnershipService(s.ResourceService)
+
+	// Collect schema names for default privileges
+	var schemaNames []string
+	for _, schema := range spec.Postgres.Schemas {
+		schemaNames = append(schemaNames, schema.Name)
+	}
+
+	// Apply operation timeout
+	ctx, cancel := s.config.Timeouts.WithOperationTimeout(ctx)
+	defer cancel()
+
+	var createResult *Result
+
+	pipeline := &ProvisionPipeline{
+		Steps: []ProvisionStep{
+			{
+				Name: "create-owner-role",
+				Execute: func(ctx context.Context) error {
+					return ownerSvc.EnsureOwnerRole(ctx, roleName)
+				},
+			},
+			{
+				Name: "create-database",
+				Execute: func(ctx context.Context) error {
+					result, err := s.CreateOnly(ctx, spec)
+					if err != nil {
+						return err
+					}
+					createResult = result
+					return nil
+				},
+			},
+			{
+				Name: "verify-access",
+				Execute: func(ctx context.Context) error {
+					return s.adapter.VerifyDatabaseAccess(ctx, spec.Name)
+				},
+			},
+			{
+				Name: "transfer-ownership",
+				Execute: func(ctx context.Context) error {
+					return ownerSvc.TransferOwnership(ctx, spec.Name, roleName)
+				},
+			},
+			{
+				Name: "create-app-user",
+				Execute: func(ctx context.Context) error {
+					return ownerSvc.EnsureOwnerUser(ctx, userName, roleName)
+				},
+			},
+		},
+	}
+
+	// Add default privileges step if enabled
+	if ownershipCfg.ShouldSetDefaultPrivileges() {
+		pipeline.Steps = append(pipeline.Steps, ProvisionStep{
+			Name: "set-default-privileges",
+			Execute: func(ctx context.Context) error {
+				return ownerSvc.SetDefaultPrivileges(ctx, spec.Name, roleName, userName, schemaNames)
+			},
+		})
+	}
+
+	// Add update step (extensions, schemas, default privileges from spec)
+	pipeline.Steps = append(pipeline.Steps, ProvisionStep{
+		Name: "update-database",
+		Execute: func(ctx context.Context) error {
+			opts := s.specBuilder.BuildDatabaseUpdateOptions(spec)
+			if len(opts.Extensions) == 0 && len(opts.Schemas) == 0 && len(opts.DefaultPrivileges) == 0 {
+				return nil
+			}
+			return s.adapter.UpdateDatabase(ctx, spec.Name, opts)
+		},
+	})
+
+	_, err := pipeline.Run(ctx, s.ResourceService)
+	if err != nil {
+		return createResult, nil, err
+	}
+
+	if createResult == nil {
+		createResult = NewCreatedResult(fmt.Sprintf("Database '%s' created with ownership", spec.Name))
+	}
+
+	ownershipResult := &OwnershipResult{
+		RoleName: roleName,
+		UserName: userName,
+	}
+
+	return createResult, ownershipResult, nil
+}
+
+// DeleteOwnershipResources drops auto-created role and user during database deletion.
+func (s *DatabaseService) DeleteOwnershipResources(ctx context.Context, roleName, userName string) error {
+	ownerSvc := NewOwnershipService(s.ResourceService)
+	return ownerSvc.DropOwnershipResources(ctx, roleName, userName)
+}
+
 // VerifyAccess verifies that a database is accepting connections.
 func (s *DatabaseService) VerifyAccess(ctx context.Context, name string) error {
 	if name == "" {

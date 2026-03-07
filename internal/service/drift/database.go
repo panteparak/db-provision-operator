@@ -69,12 +69,26 @@ func (s *Service) DetectDatabaseDrift(ctx context.Context, spec *dbopsv1alpha1.D
 func (s *Service) detectPostgresDatabaseDrift(spec *dbopsv1alpha1.DatabaseSpec, info *types.DatabaseInfo, result *Result) {
 	pgSpec := spec.Postgres
 
-	// Owner comparison: Owner is typically from database info, not directly in spec
-	// The owner is determined at creation time and is tracked in status
-	// We compare with the actual owner from database info
-	if info.Owner != "" {
-		// Owner drift would be detected if spec had an owner field
-		// For now, we track owner in status but don't compare for drift
+	// Owner comparison
+	if pgSpec.Ownership != nil && pgSpec.Ownership.AutoOwnership {
+		// With auto-ownership, the expected owner is the derived role
+		expectedRole := deriveOwnershipRoleName(pgSpec.Ownership, spec.Name)
+		if info.Owner != expectedRole {
+			result.AddDiff(Diff{
+				Field:       "owner",
+				Expected:    expectedRole,
+				Actual:      info.Owner,
+				Destructive: true,
+			})
+		}
+	} else if spec.Owner != "" && info.Owner != spec.Owner {
+		// Explicit owner set in spec
+		result.AddDiff(Diff{
+			Field:       "owner",
+			Expected:    spec.Owner,
+			Actual:      info.Owner,
+			Destructive: true,
+		})
 	}
 
 	// Encoding comparison (immutable)
@@ -260,13 +274,9 @@ func (s *Service) applyDatabaseCorrection(ctx context.Context, spec *dbopsv1alph
 	}
 }
 
-// correctDatabaseOwner changes the database owner.
-// Note: Owner changes are destructive and require direct ALTER DATABASE command.
+// correctDatabaseOwner changes the database owner via ALTER DATABASE ... OWNER TO.
 func (s *Service) correctDatabaseOwner(ctx context.Context, dbName, newOwner string) error {
-	// The adapter's UpdateDatabase doesn't directly support owner changes
-	// This would need a direct SQL execution: ALTER DATABASE dbname OWNER TO newowner
-	// For now, we return an error indicating this needs special handling
-	return fmt.Errorf("owner change requires direct ALTER DATABASE command (not yet implemented)")
+	return s.adapter.TransferDatabaseOwnership(ctx, dbName, newOwner)
 }
 
 // installMissingExtensions installs missing PostgreSQL extensions.
@@ -327,4 +337,17 @@ func (s *Service) correctMySQLCharset(ctx context.Context, spec *dbopsv1alpha1.D
 		Charset:   spec.MySQL.Charset,
 		Collation: spec.MySQL.Collation,
 	})
+}
+
+// deriveOwnershipRoleName derives the group role name for ownership drift detection.
+// This mirrors the logic in service.DeriveRoleName but avoids a circular import.
+func deriveOwnershipRoleName(cfg *dbopsv1alpha1.PostgresOwnershipConfig, dbName string) string {
+	if cfg != nil && cfg.RoleName != "" {
+		return cfg.RoleName
+	}
+	name := fmt.Sprintf("db_%s_owner", dbName)
+	if len(name) > 63 {
+		return name[:63]
+	}
+	return name
 }

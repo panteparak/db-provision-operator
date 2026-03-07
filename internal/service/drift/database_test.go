@@ -322,7 +322,13 @@ func TestCorrectDatabaseDrift_SkipsDestructive(t *testing.T) {
 }
 
 func TestCorrectDatabaseDrift_AllowsDestructive(t *testing.T) {
+	var transferredDB, transferredOwner string
 	adapter := testutil.NewMockAdapter()
+	adapter.TransferDatabaseOwnershipFunc = func(ctx context.Context, dbName, newOwner string) error {
+		transferredDB = dbName
+		transferredOwner = newOwner
+		return nil
+	}
 	svc := newTestService(adapter, true) // AllowDestructive = true
 	spec := newTestDatabaseSpec("testdb")
 
@@ -336,9 +342,10 @@ func TestCorrectDatabaseDrift_AllowsDestructive(t *testing.T) {
 
 	corrResult, err := svc.CorrectDatabaseDrift(context.Background(), spec, driftResult)
 	require.NoError(t, err)
-	// Owner correction is not yet implemented, so it should fail
-	require.Len(t, corrResult.Failed, 1)
-	assert.Contains(t, corrResult.Failed[0].Error.Error(), "not yet implemented")
+	require.Len(t, corrResult.Corrected, 1)
+	assert.Equal(t, "owner", corrResult.Corrected[0].Diff.Field)
+	assert.Equal(t, "testdb", transferredDB)
+	assert.Equal(t, "newowner", transferredOwner)
 }
 
 func TestCorrectDatabaseDrift_ExtensionVersionMismatch(t *testing.T) {
@@ -469,4 +476,144 @@ func TestCorrectDatabaseDrift_AdapterError(t *testing.T) {
 	assert.Empty(t, corrResult.Corrected)
 	require.Len(t, corrResult.Failed, 1)
 	assert.Contains(t, corrResult.Failed[0].Error.Error(), "disk full")
+}
+
+// --- Owner drift detection with auto-ownership ---
+
+func TestDetectDatabaseDrift_AutoOwnershipDrift(t *testing.T) {
+	adapter := testutil.NewMockAdapter()
+	adapter.GetDatabaseInfoFunc = func(ctx context.Context, name string) (*types.DatabaseInfo, error) {
+		return &types.DatabaseInfo{
+			Name:     name,
+			Owner:    "postgres",
+			Encoding: "UTF8",
+		}, nil
+	}
+
+	svc := newTestService(adapter, false)
+	spec := &dbopsv1alpha1.DatabaseSpec{
+		Name: "testdb",
+		Postgres: &dbopsv1alpha1.PostgresDatabaseConfig{
+			Encoding: "UTF8",
+			Ownership: &dbopsv1alpha1.PostgresOwnershipConfig{
+				AutoOwnership: true,
+			},
+		},
+	}
+
+	result, err := svc.DetectDatabaseDrift(context.Background(), spec)
+	require.NoError(t, err)
+	require.True(t, result.HasDrift())
+	require.Len(t, result.Diffs, 1)
+	assert.Equal(t, "owner", result.Diffs[0].Field)
+	assert.Equal(t, "db_testdb_owner", result.Diffs[0].Expected)
+	assert.Equal(t, "postgres", result.Diffs[0].Actual)
+	assert.True(t, result.Diffs[0].Destructive)
+}
+
+func TestDetectDatabaseDrift_AutoOwnershipNoDrift(t *testing.T) {
+	adapter := testutil.NewMockAdapter()
+	adapter.GetDatabaseInfoFunc = func(ctx context.Context, name string) (*types.DatabaseInfo, error) {
+		return &types.DatabaseInfo{
+			Name:     name,
+			Owner:    "db_testdb_owner",
+			Encoding: "UTF8",
+		}, nil
+	}
+
+	svc := newTestService(adapter, false)
+	spec := &dbopsv1alpha1.DatabaseSpec{
+		Name: "testdb",
+		Postgres: &dbopsv1alpha1.PostgresDatabaseConfig{
+			Encoding: "UTF8",
+			Ownership: &dbopsv1alpha1.PostgresOwnershipConfig{
+				AutoOwnership: true,
+			},
+		},
+	}
+
+	result, err := svc.DetectDatabaseDrift(context.Background(), spec)
+	require.NoError(t, err)
+	assert.False(t, result.HasDrift())
+}
+
+func TestDetectDatabaseDrift_AutoOwnershipCustomRole(t *testing.T) {
+	adapter := testutil.NewMockAdapter()
+	adapter.GetDatabaseInfoFunc = func(ctx context.Context, name string) (*types.DatabaseInfo, error) {
+		return &types.DatabaseInfo{
+			Name:     name,
+			Owner:    "postgres",
+			Encoding: "UTF8",
+		}, nil
+	}
+
+	svc := newTestService(adapter, false)
+	spec := &dbopsv1alpha1.DatabaseSpec{
+		Name: "testdb",
+		Postgres: &dbopsv1alpha1.PostgresDatabaseConfig{
+			Encoding: "UTF8",
+			Ownership: &dbopsv1alpha1.PostgresOwnershipConfig{
+				AutoOwnership: true,
+				RoleName:      "custom_owner",
+			},
+		},
+	}
+
+	result, err := svc.DetectDatabaseDrift(context.Background(), spec)
+	require.NoError(t, err)
+	require.True(t, result.HasDrift())
+	assert.Equal(t, "custom_owner", result.Diffs[0].Expected)
+}
+
+func TestDetectDatabaseDrift_ExplicitOwnerDrift(t *testing.T) {
+	adapter := testutil.NewMockAdapter()
+	adapter.GetDatabaseInfoFunc = func(ctx context.Context, name string) (*types.DatabaseInfo, error) {
+		return &types.DatabaseInfo{
+			Name:     name,
+			Owner:    "postgres",
+			Encoding: "UTF8",
+		}, nil
+	}
+
+	svc := newTestService(adapter, false)
+	spec := &dbopsv1alpha1.DatabaseSpec{
+		Name:  "testdb",
+		Owner: "app_owner",
+		Postgres: &dbopsv1alpha1.PostgresDatabaseConfig{
+			Encoding: "UTF8",
+		},
+	}
+
+	result, err := svc.DetectDatabaseDrift(context.Background(), spec)
+	require.NoError(t, err)
+	require.True(t, result.HasDrift())
+	assert.Equal(t, "owner", result.Diffs[0].Field)
+	assert.Equal(t, "app_owner", result.Diffs[0].Expected)
+}
+
+func TestCorrectDatabaseDrift_OwnerTransfer(t *testing.T) {
+	var transferredDB, transferredOwner string
+	adapter := testutil.NewMockAdapter()
+	adapter.TransferDatabaseOwnershipFunc = func(ctx context.Context, dbName, newOwner string) error {
+		transferredDB = dbName
+		transferredOwner = newOwner
+		return nil
+	}
+
+	svc := newTestService(adapter, true) // allow destructive
+	spec := newTestDatabaseSpec("testdb")
+
+	driftResult := NewResult("database", "testdb")
+	driftResult.AddDiff(Diff{
+		Field:       "owner",
+		Expected:    "db_testdb_owner",
+		Actual:      "postgres",
+		Destructive: true,
+	})
+
+	corrResult, err := svc.CorrectDatabaseDrift(context.Background(), spec, driftResult)
+	require.NoError(t, err)
+	require.Len(t, corrResult.Corrected, 1)
+	assert.Equal(t, "testdb", transferredDB)
+	assert.Equal(t, "db_testdb_owner", transferredOwner)
 }

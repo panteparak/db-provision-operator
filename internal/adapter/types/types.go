@@ -71,6 +71,11 @@ type DatabaseManager interface {
 	// This is particularly important for PostgreSQL where a newly created database
 	// may temporarily not accept connections while being initialized from a template.
 	VerifyDatabaseAccess(ctx context.Context, name string) error
+
+	// TransferDatabaseOwnership changes the owner of an existing database.
+	// On PostgreSQL/CockroachDB this executes ALTER DATABASE ... OWNER TO.
+	// On MySQL this is a no-op since MySQL does not support database ownership.
+	TransferDatabaseOwnership(ctx context.Context, dbName, newOwner string) error
 }
 
 // CreateDatabaseOptions contains options for creating a database
@@ -103,6 +108,7 @@ type DropDatabaseOptions struct {
 // UpdateDatabaseOptions contains options for updating a database
 type UpdateDatabaseOptions struct {
 	// PostgreSQL-specific
+	Owner             string // New owner for the database (ALTER DATABASE ... OWNER TO)
 	Extensions        []ExtensionOptions
 	Schemas           []SchemaOptions
 	DefaultPrivileges []DefaultPrivilegeOptions

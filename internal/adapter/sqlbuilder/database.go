@@ -54,6 +54,11 @@ func PgCreateDatabase(name string) *DatabaseBuilder {
 	return &DatabaseBuilder{dialect: PgDialect{}, action: "CREATE", name: name}
 }
 
+// PgAlterDatabase starts an ALTER DATABASE statement for PostgreSQL.
+func PgAlterDatabase(name string) *DatabaseBuilder {
+	return &DatabaseBuilder{dialect: PgDialect{}, action: "ALTER", name: name}
+}
+
 // PgDropDatabase starts a DROP DATABASE statement for PostgreSQL.
 func PgDropDatabase(name string) *DatabaseBuilder {
 	return &DatabaseBuilder{dialect: PgDialect{}, action: "DROP", name: name}

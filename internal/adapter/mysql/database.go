@@ -158,6 +158,11 @@ func (a *Adapter) VerifyDatabaseAccess(ctx context.Context, name string) error {
 	return nil
 }
 
+// TransferDatabaseOwnership is a no-op for MySQL as MySQL does not support database ownership.
+func (a *Adapter) TransferDatabaseOwnership(_ context.Context, _, _ string) error {
+	return nil
+}
+
 // UpdateDatabase updates MySQL database settings
 func (a *Adapter) UpdateDatabase(ctx context.Context, name string, opts types.UpdateDatabaseOptions) error {
 	db, err := a.getDB()

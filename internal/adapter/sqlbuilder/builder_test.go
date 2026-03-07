@@ -425,6 +425,22 @@ func TestPgCreateDatabaseMinimal(t *testing.T) {
 	}
 }
 
+func TestPgAlterDatabaseOwner(t *testing.T) {
+	q := PgAlterDatabase("mydb").Owner("newowner").Build()
+	want := `ALTER DATABASE "mydb" OWNER TO "newowner"`
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}
+
+func TestPgAlterDatabaseOwnerEscapes(t *testing.T) {
+	q := PgAlterDatabase("my-db").Owner(`role"with"quotes`).Build()
+	want := `ALTER DATABASE "my-db" OWNER TO "role""with""quotes"`
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}
+
 func TestPgDropDatabase(t *testing.T) {
 	q := PgDropDatabase("mydb").IfExists().Build()
 	want := `DROP DATABASE IF EXISTS "mydb"`

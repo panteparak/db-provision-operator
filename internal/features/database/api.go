@@ -78,6 +78,18 @@ type Result struct {
 
 	// Message provides additional information about the operation.
 	Message string
+
+	// Ownership contains the result of ownership provisioning (nil if not applicable).
+	Ownership *OwnershipResult
+}
+
+// OwnershipResult contains the result of per-database ownership provisioning.
+type OwnershipResult struct {
+	// RoleName is the auto-created group role name.
+	RoleName string
+
+	// UserName is the auto-created login user name.
+	UserName string
 }
 
 // Info contains information about a database.
@@ -105,6 +117,7 @@ type Info struct {
 // This interface enables dependency injection and testing with mocks.
 type RepositoryInterface interface {
 	// Create creates a new database.
+	// When auto-ownership is enabled, this also provisions the owner role and app user.
 	Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (*Result, error)
 
 	// Exists checks if a database exists.
@@ -114,6 +127,7 @@ type RepositoryInterface interface {
 	Update(ctx context.Context, name string, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (*Result, error)
 
 	// Delete deletes a database.
+	// When auto-ownership with dropOnDelete is enabled, this also drops the owner role and app user.
 	Delete(ctx context.Context, name string, spec *dbopsv1alpha1.DatabaseSpec, namespace string, force bool) error
 
 	// VerifyAccess verifies that a database is accepting connections.

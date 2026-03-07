@@ -128,6 +128,13 @@ func (h *Handler) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, 
 		))
 	}
 
+	// 5. Log ownership provisioning result
+	if result.Ownership != nil {
+		log.Info("Database ownership provisioned",
+			"roleName", result.Ownership.RoleName,
+			"userName", result.Ownership.UserName)
+	}
+
 	return result, nil
 }
 

@@ -32,12 +32,13 @@ type MockAdapter struct {
 	GetVersionFunc func(ctx context.Context) (string, error)
 
 	// Database operations
-	CreateDatabaseFunc       func(ctx context.Context, opts types.CreateDatabaseOptions) error
-	DropDatabaseFunc         func(ctx context.Context, name string, opts types.DropDatabaseOptions) error
-	DatabaseExistsFunc       func(ctx context.Context, name string) (bool, error)
-	GetDatabaseInfoFunc      func(ctx context.Context, name string) (*types.DatabaseInfo, error)
-	UpdateDatabaseFunc       func(ctx context.Context, name string, opts types.UpdateDatabaseOptions) error
-	VerifyDatabaseAccessFunc func(ctx context.Context, name string) error
+	CreateDatabaseFunc            func(ctx context.Context, opts types.CreateDatabaseOptions) error
+	DropDatabaseFunc              func(ctx context.Context, name string, opts types.DropDatabaseOptions) error
+	DatabaseExistsFunc            func(ctx context.Context, name string) (bool, error)
+	GetDatabaseInfoFunc           func(ctx context.Context, name string) (*types.DatabaseInfo, error)
+	UpdateDatabaseFunc            func(ctx context.Context, name string, opts types.UpdateDatabaseOptions) error
+	VerifyDatabaseAccessFunc      func(ctx context.Context, name string) error
+	TransferDatabaseOwnershipFunc func(ctx context.Context, dbName, newOwner string) error
 
 	// User operations
 	CreateUserFunc      func(ctx context.Context, opts types.CreateUserOptions) error
@@ -103,6 +104,7 @@ func NewMockAdapter() *MockAdapter {
 	}
 	m.UpdateDatabaseFunc = func(ctx context.Context, name string, opts types.UpdateDatabaseOptions) error { return nil }
 	m.VerifyDatabaseAccessFunc = func(ctx context.Context, name string) error { return nil }
+	m.TransferDatabaseOwnershipFunc = func(ctx context.Context, dbName, newOwner string) error { return nil }
 
 	m.CreateUserFunc = func(ctx context.Context, opts types.CreateUserOptions) error { return nil }
 	m.DropUserFunc = func(ctx context.Context, username string) error { return nil }
@@ -244,6 +246,11 @@ func (m *MockAdapter) UpdateDatabase(ctx context.Context, name string, opts type
 func (m *MockAdapter) VerifyDatabaseAccess(ctx context.Context, name string) error {
 	m.record("VerifyDatabaseAccess", name)
 	return m.VerifyDatabaseAccessFunc(ctx, name)
+}
+
+func (m *MockAdapter) TransferDatabaseOwnership(ctx context.Context, dbName, newOwner string) error {
+	m.record("TransferDatabaseOwnership", dbName, newOwner)
+	return m.TransferDatabaseOwnershipFunc(ctx, dbName, newOwner)
 }
 
 // User operations implementations

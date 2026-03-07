@@ -217,6 +217,22 @@ func (a *Adapter) VerifyDatabaseAccess(ctx context.Context, name string) error {
 	return a.execWithNewConnection(ctx, name, "SELECT 1")
 }
 
+// TransferDatabaseOwnership changes the owner of a CockroachDB database.
+func (a *Adapter) TransferDatabaseOwnership(ctx context.Context, dbName, newOwner string) error {
+	pool, err := a.getPool()
+	if err != nil {
+		return err
+	}
+
+	query := sqlbuilder.PgAlterDatabase(dbName).Owner(newOwner).Build()
+	_, err = pool.Exec(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to transfer ownership of database %s to %s: %w", dbName, newOwner, err)
+	}
+
+	return nil
+}
+
 // setDefaultPrivileges sets default privileges in a CockroachDB database.
 // CockroachDB supports ALTER DEFAULT PRIVILEGES with the same syntax as PostgreSQL.
 func (a *Adapter) setDefaultPrivileges(ctx context.Context, database string, dp types.DefaultPrivilegeOptions) error {

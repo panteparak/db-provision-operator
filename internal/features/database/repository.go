@@ -112,10 +112,35 @@ func (r *Repository) withService(ctx context.Context, spec *dbopsv1alpha1.Databa
 }
 
 // Create creates a new database.
+// When auto-ownership is enabled on a supported engine, this delegates to
+// CreateWithOwnership which provisions the owner role, app user, and default privileges.
 func (r *Repository) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (*Result, error) {
 	var result *Result
 
-	err := r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
+	err := r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, instanceSpec *dbopsv1alpha1.DatabaseInstanceSpec) error {
+		engine := string(instanceSpec.Engine)
+
+		// Branch to ownership-aware creation if enabled and supported
+		if service.IsOwnershipSupported(engine) && service.HasAutoOwnership(spec) {
+			svcResult, ownershipResult, err := svc.CreateWithOwnership(ctx, spec)
+			if err != nil {
+				return fmt.Errorf("create database with ownership: %w", err)
+			}
+
+			result = &Result{
+				Created: svcResult != nil && svcResult.Created,
+				Message: "database created with ownership provisioning",
+			}
+			if ownershipResult != nil {
+				result.Ownership = &OwnershipResult{
+					RoleName: ownershipResult.RoleName,
+					UserName: ownershipResult.UserName,
+				}
+			}
+			return nil
+		}
+
+		// Standard creation path
 		svcResult, err := svc.CreateOnly(ctx, spec)
 		if err != nil {
 			return fmt.Errorf("create database: %w", err)
@@ -165,9 +190,33 @@ func (r *Repository) Update(ctx context.Context, name string, spec *dbopsv1alpha
 }
 
 // Delete deletes a database.
+// When auto-ownership with dropOnDelete is enabled, this also drops the ownership resources
+// after the database is dropped.
 func (r *Repository) Delete(ctx context.Context, name string, spec *dbopsv1alpha1.DatabaseSpec, namespace string, force bool) error {
-	return r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
+	return r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, instanceSpec *dbopsv1alpha1.DatabaseInstanceSpec) error {
+		// Drop the database first
 		_, err := svc.Delete(ctx, name, force)
+		if err != nil && !force {
+			return err
+		}
+
+		// Clean up ownership resources if applicable
+		engine := string(instanceSpec.Engine)
+		if service.IsOwnershipSupported(engine) && service.HasAutoOwnership(spec) &&
+			spec.Postgres.Ownership.DropOnDelete {
+			roleName := service.DeriveRoleName(spec.Postgres.Ownership, spec.Name)
+			userName := service.DeriveUserName(spec.Postgres.Ownership, spec.Name)
+
+			if cleanupErr := svc.DeleteOwnershipResources(ctx, roleName, userName); cleanupErr != nil {
+				if force {
+					// Log but continue on force delete
+					logf.FromContext(ctx).Error(cleanupErr, "Failed to cleanup ownership resources (force-delete, continuing)")
+				} else {
+					return fmt.Errorf("cleanup ownership resources: %w", cleanupErr)
+				}
+			}
+		}
+
 		return err
 	})
 }

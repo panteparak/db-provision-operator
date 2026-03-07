@@ -96,6 +96,12 @@ type PostgresDatabaseConfig struct {
 	// DefaultPrivileges sets default privileges for new objects
 	// +optional
 	DefaultPrivileges []PostgresDefaultPrivilege `json:"defaultPrivileges,omitempty"`
+
+	// Ownership configures automatic per-database role and user provisioning.
+	// When enabled, a dedicated group role and login user are created for the database.
+	// This is PostgreSQL/CockroachDB only; MySQL ignores this field.
+	// +optional
+	Ownership *PostgresOwnershipConfig `json:"ownership,omitempty"`
 }
 
 // PostgresExtension defines a PostgreSQL extension to install
@@ -143,6 +149,67 @@ type PostgresDefaultPrivilege struct {
 	// +kubebuilder:validation:MaxItems=20
 	// +kubebuilder:validation:items:Pattern=`^[A-Z][A-Z ]*$`
 	Privileges []string `json:"privileges"`
+}
+
+// PostgresOwnershipConfig configures automatic per-database role and user provisioning.
+// When autoOwnership is true, the operator creates:
+// - A group role (default: db_<dbname>_owner) that owns the database
+// - A login user (default: db_<dbname>_app) that inherits the group role
+// - Default privileges so objects created by the owner role are accessible to the app user
+type PostgresOwnershipConfig struct {
+	// AutoOwnership enables automatic role and user provisioning for this database.
+	// When true, a dedicated group role and login user are created.
+	// +optional
+	AutoOwnership bool `json:"autoOwnership,omitempty"`
+
+	// RoleName overrides the derived group role name (default: db_<dbname>_owner).
+	// +optional
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern=`^[a-zA-Z_][a-zA-Z0-9_]*$`
+	RoleName string `json:"roleName,omitempty"`
+
+	// UserName overrides the derived login user name (default: db_<dbname>_app).
+	// +optional
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern=`^[a-zA-Z_][a-zA-Z0-9_]*$`
+	UserName string `json:"userName,omitempty"`
+
+	// DropOnDelete controls whether the auto-created role and user are dropped
+	// when the Database CR is deleted. Defaults to false (retain).
+	// +optional
+	DropOnDelete bool `json:"dropOnDelete,omitempty"`
+
+	// SetDefaultPrivileges controls whether ALTER DEFAULT PRIVILEGES are applied
+	// so objects created by the owner role are accessible to the app user.
+	// Applies to all specified schemas plus public.
+	// +kubebuilder:default=true
+	// +optional
+	SetDefaultPrivileges *bool `json:"setDefaultPrivileges,omitempty"`
+}
+
+// ShouldSetDefaultPrivileges returns whether default privileges should be set.
+// Defaults to true when not explicitly set.
+func (c *PostgresOwnershipConfig) ShouldSetDefaultPrivileges() bool {
+	if c.SetDefaultPrivileges == nil {
+		return true
+	}
+	return *c.SetDefaultPrivileges
+}
+
+// PostgresOwnershipStatus contains the status of auto-provisioned ownership resources.
+type PostgresOwnershipStatus struct {
+	// RoleName is the auto-created group role name.
+	RoleName string `json:"roleName,omitempty"`
+
+	// UserName is the auto-created login user name.
+	UserName string `json:"userName,omitempty"`
+
+	// Phase is the ownership provisioning phase (Pending, Ready, Failed).
+	// +kubebuilder:validation:Enum=Pending;Ready;Failed
+	Phase string `json:"phase,omitempty"`
+
+	// Message provides additional information about the ownership status.
+	Message string `json:"message,omitempty"`
 }
 
 // PostgresUserConfig defines PostgreSQL-specific user configuration
@@ -458,6 +525,10 @@ type PostgresDatabaseStatus struct {
 
 	// Schemas lists schemas in the database
 	Schemas []string `json:"schemas,omitempty"`
+
+	// Ownership contains the status of auto-provisioned ownership resources.
+	// +optional
+	Ownership *PostgresOwnershipStatus `json:"ownership,omitempty"`
 }
 
 // PostgresExtensionStatus contains extension status information

@@ -152,9 +152,21 @@ func (c *Controller) reconcile(ctx context.Context, database *dbopsv1alpha1.Data
 		log.Info("Creating database", "name", database.Spec.Name)
 		c.updatePhase(ctx, database, dbopsv1alpha1.PhaseCreating, "Creating database")
 
-		_, err := c.handler.Create(ctx, &database.Spec, database.Namespace)
+		createResult, err := c.handler.Create(ctx, &database.Spec, database.Namespace)
 		if err != nil {
 			return c.handleError(ctx, database, err, "create database")
+		}
+
+		// Store ownership status if provisioned
+		if createResult != nil && createResult.Ownership != nil {
+			if database.Status.Postgres == nil {
+				database.Status.Postgres = &dbopsv1alpha1.PostgresDatabaseStatus{}
+			}
+			database.Status.Postgres.Ownership = &dbopsv1alpha1.PostgresOwnershipStatus{
+				RoleName: createResult.Ownership.RoleName,
+				UserName: createResult.Ownership.UserName,
+				Phase:    "Ready",
+			}
 		}
 	}
 
