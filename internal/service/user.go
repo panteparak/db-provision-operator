@@ -29,74 +29,23 @@ import (
 // It extracts business logic from controllers and can be used both by
 // Kubernetes controllers and the CLI tool.
 type UserService struct {
-	baseService
-	adapter     adapter.DatabaseAdapter
-	config      *Config
-	specBuilder SpecBuilder
+	*ResourceService
 }
 
 // NewUserService creates a new UserService with the given configuration.
 func NewUserService(cfg *Config) (*UserService, error) {
-	if cfg == nil {
-		return nil, &ValidationError{Field: "config", Message: "config is required"}
-	}
-
-	// Create adapter
-	dbAdapter, err := adapter.NewAdapter(cfg.GetEngineType(), cfg.ToAdapterConfig())
+	rs, err := NewResourceService(cfg, "UserService")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create adapter: %w", err)
+		return nil, err
 	}
-
-	return &UserService{
-		baseService: newBaseService(cfg, "UserService"),
-		adapter:     dbAdapter,
-		config:      cfg,
-		specBuilder: GetSpecBuilder(cfg.GetEngineType()),
-	}, nil
+	return &UserService{ResourceService: rs}, nil
 }
 
 // NewUserServiceWithAdapter creates a UserService with a pre-created adapter.
 func NewUserServiceWithAdapter(adp adapter.DatabaseAdapter, cfg *Config) *UserService {
 	return &UserService{
-		baseService: newBaseService(cfg, "UserService"),
-		adapter:     adp,
-		config:      cfg,
-		specBuilder: GetSpecBuilder(cfg.GetEngineType()),
+		ResourceService: NewResourceServiceWithAdapter(adp, cfg, "UserService"),
 	}
-}
-
-// Connect establishes a connection to the database server.
-func (s *UserService) Connect(ctx context.Context) error {
-	op := s.startOp("Connect", s.config.Host)
-
-	ctx, cancel := s.config.Timeouts.WithConnectTimeout(ctx)
-	defer cancel()
-
-	if err := s.adapter.Connect(ctx); err != nil {
-		op.Error(err, "failed to connect")
-		if ctx.Err() == context.DeadlineExceeded {
-			return NewTimeoutError("connect", s.config.Host, s.config.Timeouts.ConnectTimeout.String(), err)
-		}
-		return NewConnectionError(s.config.Host, s.config.Port, err)
-	}
-
-	op.Success("connected successfully")
-	return nil
-}
-
-// Close closes the database connection.
-func (s *UserService) Close() error {
-	if s.adapter != nil {
-		return s.adapter.Close()
-	}
-	return nil
-}
-
-// Adapter returns the underlying database adapter.
-// This is useful for drift detection and other operations that need
-// direct adapter access.
-func (s *UserService) Adapter() adapter.DatabaseAdapter {
-	return s.adapter
 }
 
 // CreateOptions contains options for creating a user via the service.

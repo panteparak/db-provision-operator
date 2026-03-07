@@ -28,71 +28,23 @@ import (
 // It extracts business logic from controllers and can be used both by
 // Kubernetes controllers and the CLI tool.
 type InstanceService struct {
-	baseService
-	adapter adapter.DatabaseAdapter
-	config  *Config
+	*ResourceService
 }
 
 // NewInstanceService creates a new InstanceService with the given configuration.
 func NewInstanceService(cfg *Config) (*InstanceService, error) {
-	if cfg == nil {
-		return nil, &ValidationError{Field: "config", Message: "config is required"}
-	}
-
-	// Create adapter
-	dbAdapter, err := adapter.NewAdapter(cfg.GetEngineType(), cfg.ToAdapterConfig())
+	rs, err := NewResourceService(cfg, "InstanceService")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create adapter: %w", err)
+		return nil, err
 	}
-
-	return &InstanceService{
-		baseService: newBaseService(cfg, "InstanceService"),
-		adapter:     dbAdapter,
-		config:      cfg,
-	}, nil
+	return &InstanceService{ResourceService: rs}, nil
 }
 
 // NewInstanceServiceWithAdapter creates an InstanceService with a pre-created adapter.
 func NewInstanceServiceWithAdapter(adp adapter.DatabaseAdapter, cfg *Config) *InstanceService {
 	return &InstanceService{
-		baseService: newBaseService(cfg, "InstanceService"),
-		adapter:     adp,
-		config:      cfg,
+		ResourceService: NewResourceServiceWithAdapter(adp, cfg, "InstanceService"),
 	}
-}
-
-// Connect establishes a connection to the database server.
-func (s *InstanceService) Connect(ctx context.Context) error {
-	op := s.startOp("Connect", s.config.Host)
-
-	ctx, cancel := s.config.Timeouts.WithConnectTimeout(ctx)
-	defer cancel()
-
-	if err := s.adapter.Connect(ctx); err != nil {
-		op.Error(err, "failed to connect")
-		if ctx.Err() == context.DeadlineExceeded {
-			return NewTimeoutError("connect", s.config.Host, s.config.Timeouts.ConnectTimeout.String(), err)
-		}
-		return NewConnectionError(s.config.Host, s.config.Port, err)
-	}
-
-	op.Success("connected successfully")
-	return nil
-}
-
-// Close closes the database connection.
-func (s *InstanceService) Close() error {
-	if s.adapter != nil {
-		return s.adapter.Close()
-	}
-	return nil
-}
-
-// Adapter returns the underlying database adapter.
-// This is useful for operations that need direct adapter access,
-// such as resource discovery.
-func (s *InstanceService) Adapter() adapter.DatabaseAdapter {
-	return s.adapter
 }
 
 // HealthCheckResult contains the result of a health check.

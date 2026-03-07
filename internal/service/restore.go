@@ -32,64 +32,23 @@ import (
 // It extracts business logic from controllers and can be used both by
 // Kubernetes controllers and the CLI tool.
 type RestoreService struct {
-	baseService
-	adapter adapter.DatabaseAdapter
-	config  *Config
+	*ResourceService
 }
 
 // NewRestoreService creates a new RestoreService with the given configuration.
 func NewRestoreService(cfg *Config) (*RestoreService, error) {
-	if cfg == nil {
-		return nil, &ValidationError{Field: "config", Message: "config is required"}
-	}
-
-	// Create adapter
-	dbAdapter, err := adapter.NewAdapter(cfg.GetEngineType(), cfg.ToAdapterConfig())
+	rs, err := NewResourceService(cfg, "RestoreService")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create adapter: %w", err)
+		return nil, err
 	}
-
-	return &RestoreService{
-		baseService: newBaseService(cfg, "RestoreService"),
-		adapter:     dbAdapter,
-		config:      cfg,
-	}, nil
+	return &RestoreService{ResourceService: rs}, nil
 }
 
 // NewRestoreServiceWithAdapter creates a RestoreService with a pre-created adapter.
 func NewRestoreServiceWithAdapter(adp adapter.DatabaseAdapter, cfg *Config) *RestoreService {
 	return &RestoreService{
-		baseService: newBaseService(cfg, "RestoreService"),
-		adapter:     adp,
-		config:      cfg,
+		ResourceService: NewResourceServiceWithAdapter(adp, cfg, "RestoreService"),
 	}
-}
-
-// Connect establishes a connection to the database server.
-func (s *RestoreService) Connect(ctx context.Context) error {
-	op := s.startOp("Connect", s.config.Host)
-
-	ctx, cancel := s.config.Timeouts.WithConnectTimeout(ctx)
-	defer cancel()
-
-	if err := s.adapter.Connect(ctx); err != nil {
-		op.Error(err, "failed to connect")
-		if ctx.Err() == context.DeadlineExceeded {
-			return NewTimeoutError("connect", s.config.Host, s.config.Timeouts.ConnectTimeout.String(), err)
-		}
-		return NewConnectionError(s.config.Host, s.config.Port, err)
-	}
-
-	op.Success("connected successfully")
-	return nil
-}
-
-// Close closes the database connection.
-func (s *RestoreService) Close() error {
-	if s.adapter != nil {
-		return s.adapter.Close()
-	}
-	return nil
 }
 
 // RestoreOptions contains options for performing a restore.

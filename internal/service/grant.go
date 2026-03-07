@@ -29,69 +29,23 @@ import (
 // It extracts business logic from controllers and can be used both by
 // Kubernetes controllers and the CLI tool.
 type GrantService struct {
-	baseService
-	adapter adapter.DatabaseAdapter
-	config  *Config
+	*ResourceService
 }
 
 // NewGrantService creates a new GrantService with the given configuration.
 func NewGrantService(cfg *Config) (*GrantService, error) {
-	if cfg == nil {
-		return nil, &ValidationError{Field: "config", Message: "config is required"}
-	}
-
-	// Create adapter
-	dbAdapter, err := adapter.NewAdapter(cfg.GetEngineType(), cfg.ToAdapterConfig())
+	rs, err := NewResourceService(cfg, "GrantService")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create adapter: %w", err)
+		return nil, err
 	}
-
-	return &GrantService{
-		baseService: newBaseService(cfg, "GrantService"),
-		adapter:     dbAdapter,
-		config:      cfg,
-	}, nil
+	return &GrantService{ResourceService: rs}, nil
 }
 
 // NewGrantServiceWithAdapter creates a GrantService with a pre-created adapter.
 func NewGrantServiceWithAdapter(adp adapter.DatabaseAdapter, cfg *Config) *GrantService {
 	return &GrantService{
-		baseService: newBaseService(cfg, "GrantService"),
-		adapter:     adp,
-		config:      cfg,
+		ResourceService: NewResourceServiceWithAdapter(adp, cfg, "GrantService"),
 	}
-}
-
-// Connect establishes a connection to the database server.
-func (s *GrantService) Connect(ctx context.Context) error {
-	op := s.startOp("Connect", s.config.Host)
-
-	ctx, cancel := s.config.Timeouts.WithConnectTimeout(ctx)
-	defer cancel()
-
-	if err := s.adapter.Connect(ctx); err != nil {
-		op.Error(err, "failed to connect")
-		if ctx.Err() == context.DeadlineExceeded {
-			return NewTimeoutError("connect", s.config.Host, s.config.Timeouts.ConnectTimeout.String(), err)
-		}
-		return NewConnectionError(s.config.Host, s.config.Port, err)
-	}
-
-	op.Success("connected successfully")
-	return nil
-}
-
-// Close closes the database connection.
-func (s *GrantService) Close() error {
-	if s.adapter != nil {
-		return s.adapter.Close()
-	}
-	return nil
-}
-
-// Adapter returns the underlying database adapter for drift detection.
-func (s *GrantService) Adapter() adapter.DatabaseAdapter {
-	return s.adapter
 }
 
 // ApplyGrantServiceOptions contains options for applying grants.

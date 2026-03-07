@@ -32,64 +32,23 @@ import (
 // It extracts business logic from controllers and can be used both by
 // Kubernetes controllers and the CLI tool.
 type BackupService struct {
-	baseService
-	adapter adapter.DatabaseAdapter
-	config  *Config
+	*ResourceService
 }
 
 // NewBackupService creates a new BackupService with the given configuration.
 func NewBackupService(cfg *Config) (*BackupService, error) {
-	if cfg == nil {
-		return nil, &ValidationError{Field: "config", Message: "config is required"}
-	}
-
-	// Create adapter
-	dbAdapter, err := adapter.NewAdapter(cfg.GetEngineType(), cfg.ToAdapterConfig())
+	rs, err := NewResourceService(cfg, "BackupService")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create adapter: %w", err)
+		return nil, err
 	}
-
-	return &BackupService{
-		baseService: newBaseService(cfg, "BackupService"),
-		adapter:     dbAdapter,
-		config:      cfg,
-	}, nil
+	return &BackupService{ResourceService: rs}, nil
 }
 
 // NewBackupServiceWithAdapter creates a BackupService with a pre-created adapter.
 func NewBackupServiceWithAdapter(adp adapter.DatabaseAdapter, cfg *Config) *BackupService {
 	return &BackupService{
-		baseService: newBaseService(cfg, "BackupService"),
-		adapter:     adp,
-		config:      cfg,
+		ResourceService: NewResourceServiceWithAdapter(adp, cfg, "BackupService"),
 	}
-}
-
-// Connect establishes a connection to the database server.
-func (s *BackupService) Connect(ctx context.Context) error {
-	op := s.startOp("Connect", s.config.Host)
-
-	ctx, cancel := s.config.Timeouts.WithConnectTimeout(ctx)
-	defer cancel()
-
-	if err := s.adapter.Connect(ctx); err != nil {
-		op.Error(err, "failed to connect")
-		if ctx.Err() == context.DeadlineExceeded {
-			return NewTimeoutError("connect", s.config.Host, s.config.Timeouts.ConnectTimeout.String(), err)
-		}
-		return NewConnectionError(s.config.Host, s.config.Port, err)
-	}
-
-	op.Success("connected successfully")
-	return nil
-}
-
-// Close closes the database connection.
-func (s *BackupService) Close() error {
-	if s.adapter != nil {
-		return s.adapter.Close()
-	}
-	return nil
 }
 
 // BackupOptions contains options for performing a backup.

@@ -29,76 +29,25 @@ import (
 // It extracts business logic from controllers and can be used both by
 // Kubernetes controllers and the CLI tool.
 type DatabaseService struct {
-	baseService
-	adapter     adapter.DatabaseAdapter
-	config      *Config
-	specBuilder SpecBuilder
+	*ResourceService
 }
 
 // NewDatabaseService creates a new DatabaseService with the given configuration.
 // It creates the appropriate database adapter based on the engine type.
 func NewDatabaseService(cfg *Config) (*DatabaseService, error) {
-	if cfg == nil {
-		return nil, &ValidationError{Field: "config", Message: "config is required"}
-	}
-
-	// Create adapter
-	dbAdapter, err := adapter.NewAdapter(cfg.GetEngineType(), cfg.ToAdapterConfig())
+	rs, err := NewResourceService(cfg, "DatabaseService")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create adapter: %w", err)
+		return nil, err
 	}
-
-	return &DatabaseService{
-		baseService: newBaseService(cfg, "DatabaseService"),
-		adapter:     dbAdapter,
-		config:      cfg,
-		specBuilder: GetSpecBuilder(cfg.GetEngineType()),
-	}, nil
+	return &DatabaseService{ResourceService: rs}, nil
 }
 
 // NewDatabaseServiceWithAdapter creates a DatabaseService with a pre-created adapter.
 // This is useful for testing or when the adapter is already available.
 func NewDatabaseServiceWithAdapter(adp adapter.DatabaseAdapter, cfg *Config) *DatabaseService {
 	return &DatabaseService{
-		baseService: newBaseService(cfg, "DatabaseService"),
-		adapter:     adp,
-		config:      cfg,
-		specBuilder: GetSpecBuilder(cfg.GetEngineType()),
+		ResourceService: NewResourceServiceWithAdapter(adp, cfg, "DatabaseService"),
 	}
-}
-
-// Connect establishes a connection to the database server.
-func (s *DatabaseService) Connect(ctx context.Context) error {
-	op := s.startOp("Connect", s.config.Host)
-
-	ctx, cancel := s.config.Timeouts.WithConnectTimeout(ctx)
-	defer cancel()
-
-	if err := s.adapter.Connect(ctx); err != nil {
-		op.Error(err, "failed to connect")
-		if ctx.Err() == context.DeadlineExceeded {
-			return NewTimeoutError("connect", s.config.Host, s.config.Timeouts.ConnectTimeout.String(), err)
-		}
-		return NewConnectionError(s.config.Host, s.config.Port, err)
-	}
-
-	op.Success("connected successfully")
-	return nil
-}
-
-// Close closes the database connection.
-func (s *DatabaseService) Close() error {
-	if s.adapter != nil {
-		return s.adapter.Close()
-	}
-	return nil
-}
-
-// Adapter returns the underlying database adapter.
-// This is useful for drift detection and other operations that need
-// direct adapter access.
-func (s *DatabaseService) Adapter() adapter.DatabaseAdapter {
-	return s.adapter
 }
 
 // Create creates a new database with the given spec.
