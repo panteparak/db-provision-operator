@@ -37,7 +37,6 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/service/drift"
-	"github.com/db-provision-operator/internal/shared/instanceresolver"
 	"github.com/db-provision-operator/internal/util"
 )
 
@@ -393,122 +392,9 @@ func TestController_Reconcile_DeletionProtected(t *testing.T) {
 	assert.False(t, mockRepo.WasCalled("Delete"))
 }
 
-func TestController_GetEffectiveDriftPolicy(t *testing.T) {
-	tests := []struct {
-		name         string
-		database     *dbopsv1alpha1.Database
-		resolved     *instanceresolver.ResolvedInstance
-		expectedMode dbopsv1alpha1.DriftMode
-	}{
-		{
-			name: "use database-level policy",
-			database: &dbopsv1alpha1.Database{
-				Spec: dbopsv1alpha1.DatabaseSpec{
-					DriftPolicy: &dbopsv1alpha1.DriftPolicy{
-						Mode: dbopsv1alpha1.DriftModeCorrect,
-					},
-				},
-			},
-			resolved:     nil,
-			expectedMode: dbopsv1alpha1.DriftModeCorrect,
-		},
-		{
-			name: "fallback to instance policy",
-			database: &dbopsv1alpha1.Database{
-				Spec: dbopsv1alpha1.DatabaseSpec{},
-			},
-			resolved: &instanceresolver.ResolvedInstance{
-				Spec: &dbopsv1alpha1.DatabaseInstanceSpec{
-					DriftPolicy: &dbopsv1alpha1.DriftPolicy{
-						Mode: dbopsv1alpha1.DriftModeIgnore,
-					},
-				},
-			},
-			expectedMode: dbopsv1alpha1.DriftModeIgnore,
-		},
-		{
-			name: "use default policy when neither specified",
-			database: &dbopsv1alpha1.Database{
-				Spec: dbopsv1alpha1.DatabaseSpec{},
-			},
-			resolved:     &instanceresolver.ResolvedInstance{Spec: &dbopsv1alpha1.DatabaseInstanceSpec{}},
-			expectedMode: dbopsv1alpha1.DriftModeDetect,
-		},
-		{
-			name: "database policy takes precedence over instance",
-			database: &dbopsv1alpha1.Database{
-				Spec: dbopsv1alpha1.DatabaseSpec{
-					DriftPolicy: &dbopsv1alpha1.DriftPolicy{
-						Mode: dbopsv1alpha1.DriftModeCorrect,
-					},
-				},
-			},
-			resolved: &instanceresolver.ResolvedInstance{
-				Spec: &dbopsv1alpha1.DatabaseInstanceSpec{
-					DriftPolicy: &dbopsv1alpha1.DriftPolicy{
-						Mode: dbopsv1alpha1.DriftModeIgnore,
-					},
-				},
-			},
-			expectedMode: dbopsv1alpha1.DriftModeCorrect,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			controller := &Controller{defaultDriftInterval: testDefaultDriftInterval}
-			policy := controller.getEffectiveDriftPolicy(tt.database, tt.resolved)
-			assert.Equal(t, tt.expectedMode, policy.Mode)
-		})
-	}
-}
-
-func TestController_HasDestructiveDriftAnnotation(t *testing.T) {
-	tests := []struct {
-		name        string
-		annotations map[string]string
-		expected    bool
-	}{
-		{
-			name:        "no annotations",
-			annotations: nil,
-			expected:    false,
-		},
-		{
-			name:        "annotation not set",
-			annotations: map[string]string{"other": "value"},
-			expected:    false,
-		},
-		{
-			name:        "annotation set to true",
-			annotations: map[string]string{dbopsv1alpha1.AnnotationAllowDestructiveDrift: "true"},
-			expected:    true,
-		},
-		{
-			name:        "annotation set to false",
-			annotations: map[string]string{dbopsv1alpha1.AnnotationAllowDestructiveDrift: "false"},
-			expected:    false,
-		},
-		{
-			name:        "annotation set to other value",
-			annotations: map[string]string{dbopsv1alpha1.AnnotationAllowDestructiveDrift: "yes"},
-			expected:    false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			controller := &Controller{}
-			database := &dbopsv1alpha1.Database{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: tt.annotations,
-				},
-			}
-			result := controller.hasDestructiveDriftAnnotation(database)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
+// TestController_GetEffectiveDriftPolicy and TestController_HasDestructiveDriftAnnotation
+// have been moved to internal/controller/drift/orchestrator_test.go as part of the
+// drift orchestrator extraction.
 
 func TestController_Reconcile_ExistsError(t *testing.T) {
 	scheme := newTestScheme()

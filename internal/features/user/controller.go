@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	controllerdrift "github.com/db-provision-operator/internal/controller/drift"
 	"github.com/db-provision-operator/internal/logging"
 	"github.com/db-provision-operator/internal/reconcileutil"
 	"github.com/db-provision-operator/internal/secret"
@@ -57,6 +58,7 @@ type Controller struct {
 	defaultDriftInterval time.Duration
 	predicates           []predicate.Predicate
 	logger               logr.Logger
+	driftOrchestrator    *controllerdrift.Orchestrator
 }
 
 // ControllerConfig holds dependencies for the controller.
@@ -82,6 +84,10 @@ func NewController(cfg ControllerConfig) *Controller {
 		defaultDriftInterval: cfg.DefaultDriftInterval,
 		predicates:           cfg.Predicates,
 		logger:               cfg.Logger,
+		driftOrchestrator: &controllerdrift.Orchestrator{
+			Recorder:             cfg.Recorder,
+			DefaultDriftInterval: cfg.DefaultDriftInterval,
+		},
 	}
 }
 
@@ -188,7 +194,11 @@ func (c *Controller) reconcile(ctx context.Context, user *dbopsv1alpha1.Database
 	}
 
 	// Perform drift detection
-	c.performDriftDetection(ctx, user, instance)
+	c.driftOrchestrator.PerformDriftDetection(ctx,
+		&userDriftableResource{user},
+		&controllerdrift.NamespacedInstancePolicy{Instance: instance},
+		&userDriftDetector{handler: c.handler, spec: &user.Spec, namespace: user.Namespace},
+	)
 
 	// Update status
 	user.Status.Phase = dbopsv1alpha1.PhaseReady
@@ -218,7 +228,10 @@ func (c *Controller) reconcile(ctx context.Context, user *dbopsv1alpha1.Database
 	c.handler.UpdateInfoMetric(user)
 
 	log.Info("Successfully reconciled DatabaseUser", "username", user.Spec.Username)
-	return ctrl.Result{RequeueAfter: c.getRequeueInterval(user, instance)}, nil
+	return ctrl.Result{RequeueAfter: c.driftOrchestrator.GetRequeueInterval(
+		&userDriftableResource{user},
+		&controllerdrift.NamespacedInstancePolicy{Instance: instance},
+	)}, nil
 }
 
 func (c *Controller) ensureCredentialsSecret(ctx context.Context, user *dbopsv1alpha1.DatabaseUser, password, secretName string) error {
@@ -499,148 +512,6 @@ func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
 		Named("databaseuser").
 		WithPredicates(c.predicates...).
 		Complete(c)
-}
-
-// performDriftDetection detects and optionally corrects drift for the user.
-// It uses the drift policy from the user spec or falls back to the instance's default policy.
-func (c *Controller) performDriftDetection(ctx context.Context, user *dbopsv1alpha1.DatabaseUser, instance *dbopsv1alpha1.DatabaseInstance) {
-	log := logf.FromContext(ctx).WithValues("user", user.Name, "namespace", user.Namespace)
-
-	// 1. Get effective drift policy
-	policy := c.getEffectiveDriftPolicy(user, instance)
-	if policy.Mode == dbopsv1alpha1.DriftModeIgnore {
-		log.V(1).Info("Drift detection disabled (mode=ignore)")
-		return
-	}
-
-	// 2. Check if destructive drift corrections are allowed via annotation
-	allowDestructive := c.hasDestructiveDriftAnnotation(user)
-
-	// 3. Detect drift
-	driftResult, err := c.handler.DetectDrift(ctx, &user.Spec, user.Namespace, allowDestructive)
-	if err != nil {
-		log.Error(err, "Failed to detect drift")
-		return
-	}
-
-	// 4. Update drift status
-	if driftResult != nil {
-		user.Status.Drift = driftResult.ToAPIStatus()
-
-		// 5. Record event if drift detected
-		if driftResult.HasDrift() {
-			var driftFields []string
-			for _, d := range driftResult.Diffs {
-				driftFields = append(driftFields, d.Field)
-			}
-			c.Recorder.Eventf(user, corev1.EventTypeWarning, "DriftDetected",
-				"Configuration drift detected in fields: %v", driftFields)
-			log.Info("Drift detected", "fields", driftFields)
-
-			// 6. Correct drift if mode is "correct"
-			if policy.Mode == dbopsv1alpha1.DriftModeCorrect {
-				c.correctDrift(ctx, user, driftResult, allowDestructive)
-			}
-		}
-	}
-}
-
-// correctDrift attempts to correct detected drift.
-func (c *Controller) correctDrift(ctx context.Context, user *dbopsv1alpha1.DatabaseUser, driftResult interface{}, allowDestructive bool) {
-	log := logf.FromContext(ctx).WithValues("user", user.Name, "namespace", user.Namespace)
-
-	// Get the drift result - we need to use the concrete type from the handler
-	driftResultTyped, ok := driftResult.(interface {
-		ToAPIStatus() *dbopsv1alpha1.DriftStatus
-	})
-	if !ok {
-		log.Error(nil, "Invalid drift result type")
-		return
-	}
-
-	// Get the actual drift.Result from the handler
-	handlerDriftResult, err := c.handler.DetectDrift(ctx, &user.Spec, user.Namespace, allowDestructive)
-	if err != nil {
-		log.Error(err, "Failed to re-detect drift for correction")
-		return
-	}
-
-	// Skip if no drift to correct (could have been corrected elsewhere)
-	if handlerDriftResult == nil || !handlerDriftResult.HasDrift() {
-		log.V(1).Info("No drift to correct")
-		return
-	}
-
-	correctionResult, err := c.handler.CorrectDrift(ctx, &user.Spec, user.Namespace, handlerDriftResult, allowDestructive)
-	if err != nil {
-		log.Error(err, "Failed to correct drift")
-		c.Recorder.Eventf(user, corev1.EventTypeWarning, "DriftCorrectionFailed",
-			"Failed to correct drift: %v", err)
-		return
-	}
-
-	if correctionResult != nil && correctionResult.HasCorrections() {
-		var correctedFields []string
-		for _, corr := range correctionResult.Corrected {
-			correctedFields = append(correctedFields, corr.Diff.Field)
-		}
-		c.Recorder.Eventf(user, corev1.EventTypeNormal, "DriftCorrected",
-			"Drift corrected for fields: %v", correctedFields)
-		log.Info("Drift corrected", "fields", correctedFields)
-
-		// Clear drift status after successful correction
-		user.Status.Drift = driftResultTyped.ToAPIStatus()
-		user.Status.Drift.Detected = false
-		user.Status.Drift.Diffs = nil
-	}
-
-	// Log skipped corrections
-	if correctionResult != nil && len(correctionResult.Skipped) > 0 {
-		for _, s := range correctionResult.Skipped {
-			log.V(1).Info("Drift correction skipped", "field", s.Diff.Field, "reason", s.Reason)
-		}
-	}
-
-	// Log failed corrections
-	if correctionResult != nil && correctionResult.HasFailures() {
-		for _, f := range correctionResult.Failed {
-			log.Error(f.Error, "Drift correction failed", "field", f.Diff.Field)
-		}
-	}
-}
-
-// getRequeueInterval returns the requeue interval based on the effective drift policy.
-func (c *Controller) getRequeueInterval(user *dbopsv1alpha1.DatabaseUser, instance *dbopsv1alpha1.DatabaseInstance) time.Duration {
-	policy := c.getEffectiveDriftPolicy(user, instance)
-	return util.ParseDriftRequeueInterval(policy, c.defaultDriftInterval)
-}
-
-// getEffectiveDriftPolicy returns the effective drift policy for a user.
-// It uses the user's drift policy if set, otherwise falls back to the instance's default.
-func (c *Controller) getEffectiveDriftPolicy(user *dbopsv1alpha1.DatabaseUser, instance *dbopsv1alpha1.DatabaseInstance) dbopsv1alpha1.DriftPolicy {
-	// Use user-level policy if set
-	if user.Spec.DriftPolicy != nil {
-		return *user.Spec.DriftPolicy
-	}
-
-	// Fall back to instance-level policy if available
-	if instance != nil && instance.Spec.DriftPolicy != nil {
-		return *instance.Spec.DriftPolicy
-	}
-
-	// Default policy: detect mode, use configured default drift interval
-	return dbopsv1alpha1.DriftPolicy{
-		Mode:     dbopsv1alpha1.DriftModeDetect,
-		Interval: c.defaultDriftInterval.String(),
-	}
-}
-
-// hasDestructiveDriftAnnotation checks if the user has the allow-destructive-drift annotation.
-func (c *Controller) hasDestructiveDriftAnnotation(user *dbopsv1alpha1.DatabaseUser) bool {
-	if user.Annotations == nil {
-		return false
-	}
-	return user.Annotations[dbopsv1alpha1.AnnotationAllowDestructiveDrift] == "true"
 }
 
 // hasGrantDependencies checks if any DatabaseGrant resources reference this user.

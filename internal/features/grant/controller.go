@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	controllerdrift "github.com/db-provision-operator/internal/controller/drift"
 	"github.com/db-provision-operator/internal/logging"
 	"github.com/db-provision-operator/internal/reconcileutil"
 	reconcilecontext "github.com/db-provision-operator/internal/shared/reconcile"
@@ -56,6 +57,7 @@ type Controller struct {
 	defaultDriftInterval time.Duration
 	predicates           []predicate.Predicate
 	logger               logr.Logger
+	driftOrchestrator    *controllerdrift.Orchestrator
 }
 
 // ControllerConfig holds dependencies for the controller.
@@ -79,6 +81,10 @@ func NewController(cfg ControllerConfig) *Controller {
 		defaultDriftInterval: cfg.DefaultDriftInterval,
 		predicates:           cfg.Predicates,
 		logger:               cfg.Logger,
+		driftOrchestrator: &controllerdrift.Orchestrator{
+			Recorder:             cfg.Recorder,
+			DefaultDriftInterval: cfg.DefaultDriftInterval,
+		},
 	}
 }
 
@@ -161,7 +167,11 @@ func (c *Controller) reconcile(ctx context.Context, grant *dbopsv1alpha1.Databas
 	}
 
 	// Perform drift detection
-	c.performDriftDetection(ctx, grant, instance)
+	c.driftOrchestrator.PerformDriftDetection(ctx,
+		&grantDriftableResource{grant},
+		&controllerdrift.NamespacedInstancePolicy{Instance: instance},
+		&grantDriftDetector{handler: c.handler, spec: &grant.Spec, namespace: grant.Namespace},
+	)
 
 	// Update status
 	grant.Status.Phase = dbopsv1alpha1.PhaseReady
@@ -196,7 +206,10 @@ func (c *Controller) reconcile(ctx context.Context, grant *dbopsv1alpha1.Databas
 		"roles", len(result.Roles),
 		"directGrants", result.DirectGrants,
 		"defaultPrivileges", result.DefaultPrivileges)
-	return ctrl.Result{RequeueAfter: c.getRequeueInterval(grant, instance)}, nil
+	return ctrl.Result{RequeueAfter: c.driftOrchestrator.GetRequeueInterval(
+		&grantDriftableResource{grant},
+		&controllerdrift.NamespacedInstancePolicy{Instance: instance},
+	)}, nil
 }
 
 func (c *Controller) getUser(ctx context.Context, grant *dbopsv1alpha1.DatabaseGrant) (*dbopsv1alpha1.DatabaseUser, error) {
@@ -366,146 +379,4 @@ func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
 		Named("databasegrant-feature").
 		WithPredicates(c.predicates...).
 		Complete(c)
-}
-
-// performDriftDetection detects and optionally corrects drift for the grant.
-// It uses the drift policy from the grant spec or falls back to the instance's default policy.
-func (c *Controller) performDriftDetection(ctx context.Context, grant *dbopsv1alpha1.DatabaseGrant, instance *dbopsv1alpha1.DatabaseInstance) {
-	log := logf.FromContext(ctx).WithValues("grant", grant.Name, "namespace", grant.Namespace)
-
-	// 1. Get effective drift policy
-	policy := c.getEffectiveDriftPolicy(grant, instance)
-	if policy.Mode == dbopsv1alpha1.DriftModeIgnore {
-		log.V(1).Info("Drift detection disabled (mode=ignore)")
-		return
-	}
-
-	// 2. Check if destructive drift corrections are allowed via annotation
-	allowDestructive := c.hasDestructiveDriftAnnotation(grant)
-
-	// 3. Detect drift
-	driftResult, err := c.handler.DetectDrift(ctx, &grant.Spec, grant.Namespace, allowDestructive)
-	if err != nil {
-		log.Error(err, "Failed to detect drift")
-		return
-	}
-
-	// 4. Update drift status
-	if driftResult != nil {
-		grant.Status.Drift = driftResult.ToAPIStatus()
-
-		// 5. Record event if drift detected
-		if driftResult.HasDrift() {
-			var driftFields []string
-			for _, d := range driftResult.Diffs {
-				driftFields = append(driftFields, d.Field)
-			}
-			c.Recorder.Eventf(grant, corev1.EventTypeWarning, "DriftDetected",
-				"Configuration drift detected in fields: %v", driftFields)
-			log.Info("Drift detected", "fields", driftFields)
-
-			// 6. Correct drift if mode is "correct"
-			if policy.Mode == dbopsv1alpha1.DriftModeCorrect {
-				c.correctDrift(ctx, grant, driftResult, allowDestructive)
-			}
-		}
-	}
-}
-
-// correctDrift attempts to correct detected drift.
-func (c *Controller) correctDrift(ctx context.Context, grant *dbopsv1alpha1.DatabaseGrant, driftResult interface{}, allowDestructive bool) {
-	log := logf.FromContext(ctx).WithValues("grant", grant.Name, "namespace", grant.Namespace)
-
-	// Get the drift result - we need to use the concrete type from the handler
-	driftResultTyped, ok := driftResult.(interface {
-		ToAPIStatus() *dbopsv1alpha1.DriftStatus
-	})
-	if !ok {
-		log.Error(nil, "Invalid drift result type")
-		return
-	}
-
-	// Get the actual drift.Result from the handler
-	handlerDriftResult, err := c.handler.DetectDrift(ctx, &grant.Spec, grant.Namespace, allowDestructive)
-	if err != nil {
-		log.Error(err, "Failed to re-detect drift for correction")
-		return
-	}
-
-	// Skip if no drift to correct (could have been corrected elsewhere)
-	if handlerDriftResult == nil || !handlerDriftResult.HasDrift() {
-		log.V(1).Info("No drift to correct")
-		return
-	}
-
-	correctionResult, err := c.handler.CorrectDrift(ctx, &grant.Spec, grant.Namespace, handlerDriftResult, allowDestructive)
-	if err != nil {
-		log.Error(err, "Failed to correct drift")
-		c.Recorder.Eventf(grant, corev1.EventTypeWarning, "DriftCorrectionFailed",
-			"Failed to correct drift: %v", err)
-		return
-	}
-
-	if correctionResult != nil && correctionResult.HasCorrections() {
-		var correctedFields []string
-		for _, corr := range correctionResult.Corrected {
-			correctedFields = append(correctedFields, corr.Diff.Field)
-		}
-		c.Recorder.Eventf(grant, corev1.EventTypeNormal, "DriftCorrected",
-			"Drift corrected for fields: %v", correctedFields)
-		log.Info("Drift corrected", "fields", correctedFields)
-
-		// Clear drift status after successful correction
-		grant.Status.Drift = driftResultTyped.ToAPIStatus()
-		grant.Status.Drift.Detected = false
-		grant.Status.Drift.Diffs = nil
-	}
-
-	// Log skipped corrections
-	if correctionResult != nil && len(correctionResult.Skipped) > 0 {
-		for _, s := range correctionResult.Skipped {
-			log.V(1).Info("Drift correction skipped", "field", s.Diff.Field, "reason", s.Reason)
-		}
-	}
-
-	// Log failed corrections
-	if correctionResult != nil && correctionResult.HasFailures() {
-		for _, f := range correctionResult.Failed {
-			log.Error(f.Error, "Drift correction failed", "field", f.Diff.Field)
-		}
-	}
-}
-
-// getRequeueInterval returns the requeue interval based on the effective drift policy.
-func (c *Controller) getRequeueInterval(grant *dbopsv1alpha1.DatabaseGrant, instance *dbopsv1alpha1.DatabaseInstance) time.Duration {
-	policy := c.getEffectiveDriftPolicy(grant, instance)
-	return util.ParseDriftRequeueInterval(policy, c.defaultDriftInterval)
-}
-
-// getEffectiveDriftPolicy returns the effective drift policy for a grant.
-// It uses the grant's drift policy if set, otherwise falls back to the instance's default.
-func (c *Controller) getEffectiveDriftPolicy(grant *dbopsv1alpha1.DatabaseGrant, instance *dbopsv1alpha1.DatabaseInstance) dbopsv1alpha1.DriftPolicy {
-	// Use grant-level policy if set
-	if grant.Spec.DriftPolicy != nil {
-		return *grant.Spec.DriftPolicy
-	}
-
-	// Fall back to instance-level policy if available
-	if instance != nil && instance.Spec.DriftPolicy != nil {
-		return *instance.Spec.DriftPolicy
-	}
-
-	// Default policy: detect mode, operator-configured interval
-	return dbopsv1alpha1.DriftPolicy{
-		Mode:     dbopsv1alpha1.DriftModeDetect,
-		Interval: c.defaultDriftInterval.String(),
-	}
-}
-
-// hasDestructiveDriftAnnotation checks if the grant has the allow-destructive-drift annotation.
-func (c *Controller) hasDestructiveDriftAnnotation(grant *dbopsv1alpha1.DatabaseGrant) bool {
-	if grant.Annotations == nil {
-		return false
-	}
-	return grant.Annotations[dbopsv1alpha1.AnnotationAllowDestructiveDrift] == "true"
 }
