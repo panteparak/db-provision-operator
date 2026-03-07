@@ -1,8 +1,9 @@
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.4.1"
+version = "0.5.0"
 tag_format = "v$version"
 version_files = [
     "charts/db-provision-operator/Chart.yaml:^version",
     "charts/db-provision-operator/Chart.yaml:^appVersion",
+    "mkdocs.yml:version:",
 ]
