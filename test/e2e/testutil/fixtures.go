@@ -428,10 +428,14 @@ func BuildDatabaseGrantWithOptions(name, namespace, granteeType, granteeName str
 // getDefaultDatabase returns the default database name for the given engine.
 func getDefaultDatabase(engine string) string {
 	switch engine {
-	case "postgres", "cockroachdb":
+	case "postgres":
 		return "postgres"
+	case "cockroachdb":
+		return "defaultdb"
 	case "mysql":
 		return "mysql"
+	case "clickhouse":
+		return "default"
 	default:
 		return "default"
 	}

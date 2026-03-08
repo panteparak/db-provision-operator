@@ -156,3 +156,15 @@ func CockroachDBEngineConfig(host string, port int32, username, password string)
 		Password:      password,
 	}
 }
+
+// ClickHouseEngineConfig creates configuration for ClickHouse verification
+func ClickHouseEngineConfig(host string, port int32, username, password string) EngineConfig {
+	return EngineConfig{
+		Name:          "clickhouse",
+		Host:          host,
+		Port:          port,
+		AdminDatabase: "default", // ClickHouse default database
+		Username:      username,
+		Password:      password,
+	}
+}

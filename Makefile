@@ -229,6 +229,7 @@ E2E_POSTGRES_PORT ?= 15432
 E2E_MYSQL_PORT ?= 13306
 E2E_MARIADB_PORT ?= 13307
 E2E_COCKROACHDB_PORT ?= 26257
+E2E_CLICKHOUSE_PORT ?= 9000
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MICRO-STEPS: Each can be called independently (by CI or locally)
@@ -236,14 +237,14 @@ E2E_COCKROACHDB_PORT ?= 26257
 
 # Map E2E_DATABASE to compose service names (excluding init containers)
 define get_compose_services
-$(if $(filter postgresql,$(1)),postgres,$(if $(filter cockroachdb,$(1)),cockroachdb,$(1)))
+$(if $(filter postgresql,$(1)),postgres,$(if $(filter cockroachdb,$(1)),cockroachdb,$(if $(filter clickhouse,$(1)),clickhouse,$(1))))
 endef
 
 .PHONY: e2e-db-up
 e2e-db-up: ## Start database(s) via Docker Compose. Use E2E_DATABASE to select specific engine (postgresql|mysql|mariadb|cockroachdb)
 ifdef E2E_DATABASE
 	@echo "Starting $(E2E_DATABASE) on port $(call get_e2e_port,$(E2E_DATABASE))..."
-	E2E_POSTGRES_PORT=$(E2E_POSTGRES_PORT) E2E_MYSQL_PORT=$(E2E_MYSQL_PORT) E2E_MARIADB_PORT=$(E2E_MARIADB_PORT) E2E_COCKROACHDB_PORT=$(E2E_COCKROACHDB_PORT) \
+	E2E_POSTGRES_PORT=$(E2E_POSTGRES_PORT) E2E_MYSQL_PORT=$(E2E_MYSQL_PORT) E2E_MARIADB_PORT=$(E2E_MARIADB_PORT) E2E_COCKROACHDB_PORT=$(E2E_COCKROACHDB_PORT) E2E_CLICKHOUSE_PORT=$(E2E_CLICKHOUSE_PORT) \
 		docker compose -f docker-compose.e2e.yml up -d --wait --wait-timeout 180 $(call get_compose_services,$(E2E_DATABASE))
   ifeq ($(E2E_DATABASE),cockroachdb)
 	@echo "Running CockroachDB initialization..."
@@ -251,8 +252,8 @@ ifdef E2E_DATABASE
   endif
 else
 	@echo "Starting all databases (use E2E_DATABASE=<engine> to select one)..."
-	E2E_POSTGRES_PORT=$(E2E_POSTGRES_PORT) E2E_MYSQL_PORT=$(E2E_MYSQL_PORT) E2E_MARIADB_PORT=$(E2E_MARIADB_PORT) E2E_COCKROACHDB_PORT=$(E2E_COCKROACHDB_PORT) \
-		docker compose -f docker-compose.e2e.yml up -d --wait --wait-timeout 180 postgres mysql mariadb cockroachdb
+	E2E_POSTGRES_PORT=$(E2E_POSTGRES_PORT) E2E_MYSQL_PORT=$(E2E_MYSQL_PORT) E2E_MARIADB_PORT=$(E2E_MARIADB_PORT) E2E_COCKROACHDB_PORT=$(E2E_COCKROACHDB_PORT) E2E_CLICKHOUSE_PORT=$(E2E_CLICKHOUSE_PORT) \
+		docker compose -f docker-compose.e2e.yml up -d --wait --wait-timeout 180 postgres mysql mariadb cockroachdb clickhouse
 	@echo "Running CockroachDB initialization..."
 	E2E_COCKROACHDB_PORT=$(E2E_COCKROACHDB_PORT) docker compose -f docker-compose.e2e.yml up cockroachdb-init
 endif
@@ -309,7 +310,7 @@ endef
 
 # Helper to get port based on database type
 define get_e2e_port
-$(if $(filter postgresql,$(1)),$(E2E_POSTGRES_PORT),$(if $(filter mysql,$(1)),$(E2E_MYSQL_PORT),$(if $(filter mariadb,$(1)),$(E2E_MARIADB_PORT),$(if $(filter cockroachdb,$(1)),$(E2E_COCKROACHDB_PORT),5432))))
+$(if $(filter postgresql,$(1)),$(E2E_POSTGRES_PORT),$(if $(filter mysql,$(1)),$(E2E_MYSQL_PORT),$(if $(filter mariadb,$(1)),$(E2E_MARIADB_PORT),$(if $(filter cockroachdb,$(1)),$(E2E_COCKROACHDB_PORT),$(if $(filter clickhouse,$(1)),$(E2E_CLICKHOUSE_PORT),5432)))))
 endef
 
 .PHONY: e2e-create-db-instance
@@ -367,6 +368,12 @@ e2e-local-cockroachdb: ## Run CockroachDB E2E tests (single DB setup + test)
 	$(MAKE) e2e-create-db-instance E2E_DATABASE=cockroachdb
 	$(MAKE) e2e-local-run-tests E2E_DATABASE=cockroachdb
 
+.PHONY: e2e-local-clickhouse
+e2e-local-clickhouse: ## Run ClickHouse E2E tests (single DB setup + test)
+	$(MAKE) e2e-local-setup E2E_DATABASE=clickhouse
+	$(MAKE) e2e-create-db-instance E2E_DATABASE=clickhouse
+	$(MAKE) e2e-local-run-tests E2E_DATABASE=clickhouse
+
 .PHONY: e2e-local-all
 e2e-local-all: ## Run all local E2E tests (starts all DBs)
 	$(MAKE) e2e-local-setup
@@ -378,6 +385,8 @@ e2e-local-all: ## Run all local E2E tests (starts all DBs)
 	$(MAKE) e2e-local-run-tests E2E_DATABASE=mariadb
 	$(MAKE) e2e-create-db-instance E2E_DATABASE=cockroachdb
 	$(MAKE) e2e-local-run-tests E2E_DATABASE=cockroachdb
+	$(MAKE) e2e-create-db-instance E2E_DATABASE=clickhouse
+	$(MAKE) e2e-local-run-tests E2E_DATABASE=clickhouse
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MULTI-OPERATOR E2E TESTING

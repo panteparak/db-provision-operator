@@ -1,0 +1,41 @@
+# ClickHouse DatabaseInstance for local E2E testing (Docker Compose)
+# Uses host.k3d.internal to connect from k3d to Docker host
+#
+# Usage:
+#   kubectl apply -f test/e2e/fixtures/clickhouse-local.yaml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: clickhouse
+  labels:
+    app.kubernetes.io/name: clickhouse
+    app.kubernetes.io/component: database
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: clickhouse-credentials
+  namespace: clickhouse
+type: Opaque
+stringData:
+  username: admin
+  password: admin_password
+---
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseInstance
+metadata:
+  name: clickhouse-instance
+  namespace: clickhouse
+spec:
+  engine: clickhouse
+  connection:
+    host: host.k3d.internal
+    port: 9000
+    database: default
+    secretRef:
+      name: clickhouse-credentials
+      namespace: clickhouse
+  healthCheck:
+    enabled: true
+    intervalSeconds: 30
