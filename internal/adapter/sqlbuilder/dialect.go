@@ -62,3 +62,24 @@ func (MySQLDialect) EscapeLiteral(s string) string {
 func (MySQLDialect) ValidPrivileges() map[string]bool {
 	return ValidMySQLPrivileges
 }
+
+// ClickHouseDialect implements Dialect for ClickHouse.
+// ClickHouse uses backtick identifier escaping like MySQL.
+type ClickHouseDialect struct{}
+
+// EscapeIdentifier wraps s in backticks, doubling any embedded backticks.
+func (ClickHouseDialect) EscapeIdentifier(s string) string {
+	return "`" + strings.ReplaceAll(s, "`", "``") + "`"
+}
+
+// EscapeLiteral wraps s in single quotes, escaping embedded quotes and backslashes.
+func (ClickHouseDialect) EscapeLiteral(s string) string {
+	escaped := strings.ReplaceAll(s, `'`, `''`)
+	escaped = strings.ReplaceAll(escaped, `\`, `\\`)
+	return `'` + escaped + `'`
+}
+
+// ValidPrivileges returns the set of valid ClickHouse privileges.
+func (ClickHouseDialect) ValidPrivileges() map[string]bool {
+	return ValidClickHousePrivileges
+}

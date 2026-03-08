@@ -57,6 +57,52 @@ spec:
           spec:
             description: DatabaseUserSpec defines the desired state of DatabaseUser.
             properties:
+              clickhouse:
+                description: ClickHouse-specific configuration
+                properties:
+                  defaultDatabase:
+                    description: DefaultDatabase is the default database for the user
+                    type: string
+                  defaultRole:
+                    description: DefaultRole is the default role for the user
+                    type: string
+                  hostRestrictions:
+                    description: HostRestrictions specifies HOST clauses for user
+                      access control
+                    items:
+                      description: ClickHouseHostRestriction specifies a HOST clause
+                        for user access control
+                      properties:
+                        type:
+                          allOf:
+                          - enum:
+                            - IP
+                            - LIKE
+                            - REGEXP
+                            - NAME
+                            - ANY
+                            - LOCAL
+                            - NONE
+                          - enum:
+                            - IP
+                            - LIKE
+                            - REGEXP
+                            - NAME
+                            - ANY
+                            - LOCAL
+                            - NONE
+                          description: Type is the host restriction type
+                          type: string
+                        value:
+                          description: Value is the host restriction value (not required
+                            for ANY, LOCAL, NONE)
+                          type: string
+                      required:
+                      - type
+                      type: object
+                    maxItems: 10
+                    type: array
+                type: object
               clusterInstanceRef:
                 description: ClusterInstanceRef references a cluster-scoped ClusterDatabaseInstance
                   (mutually exclusive with InstanceRef)

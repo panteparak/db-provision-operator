@@ -72,6 +72,11 @@ func NewMySQL() *GrantBuilder {
 	return &GrantBuilder{dialect: MySQLDialect{}}
 }
 
+// NewClickHouse returns a fresh GrantBuilder for ClickHouse.
+func NewClickHouse() *GrantBuilder {
+	return &GrantBuilder{dialect: ClickHouseDialect{}}
+}
+
 // --- Action setters ------------------------------------------------------
 
 // Grant starts a GRANT <privileges> statement.
@@ -120,7 +125,7 @@ func (b *GrantBuilder) AlterDefaultPrivileges(forRole, schema string) *GrantBuil
 // PG: ON DATABASE "db"  |  MySQL: ON `db`.*
 func (b *GrantBuilder) OnDatabase(db string) *GrantBuilder {
 	switch b.dialect.(type) {
-	case MySQLDialect:
+	case MySQLDialect, ClickHouseDialect:
 		b.target = fmt.Sprintf("ON %s.*", b.dialect.EscapeIdentifier(db))
 	default:
 		b.target = fmt.Sprintf("ON DATABASE %s", b.dialect.EscapeIdentifier(db))

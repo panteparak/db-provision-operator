@@ -143,6 +143,30 @@ func (s *GrantService) Apply(ctx context.Context, opts ApplyGrantServiceOptions)
 				result.AppliedDirectGrants = len(opts.Spec.MySQL.Grants)
 			}
 		}
+
+	case dbopsv1alpha1.EngineTypeClickHouse:
+		if opts.Spec.ClickHouse != nil {
+			// Grant roles
+			if len(opts.Spec.ClickHouse.Roles) > 0 {
+				op.Debug("granting roles", "roles", opts.Spec.ClickHouse.Roles)
+				if err := s.adapter.GrantRole(ctx, opts.Username, opts.Spec.ClickHouse.Roles); err != nil {
+					op.Error(err, "failed to grant roles")
+					return nil, s.wrapError(ctx, s.config, "grant roles", opts.Username, err)
+				}
+				result.AppliedRoles = append(result.AppliedRoles, opts.Spec.ClickHouse.Roles...)
+			}
+
+			// Apply direct grants
+			if len(opts.Spec.ClickHouse.Grants) > 0 {
+				op.Debug("applying direct grants", "count", len(opts.Spec.ClickHouse.Grants))
+				grantOpts := s.buildClickHouseGrantOptions(opts.Spec.ClickHouse.Grants)
+				if err := s.adapter.Grant(ctx, opts.Username, grantOpts); err != nil {
+					op.Error(err, "failed to apply grants")
+					return nil, s.wrapError(ctx, s.config, "apply grants", opts.Username, err)
+				}
+				result.AppliedDirectGrants = len(opts.Spec.ClickHouse.Grants)
+			}
+		}
 	}
 
 	op.Success("grants applied successfully")
@@ -215,6 +239,30 @@ func (s *GrantService) Revoke(ctx context.Context, opts ApplyGrantServiceOptions
 					return nil, s.wrapError(ctx, s.config, "revoke grants", opts.Username, err)
 				}
 				revokedCount += len(opts.Spec.MySQL.Grants)
+			}
+		}
+
+	case dbopsv1alpha1.EngineTypeClickHouse:
+		if opts.Spec.ClickHouse != nil {
+			// Revoke roles
+			if len(opts.Spec.ClickHouse.Roles) > 0 {
+				op.Debug("revoking roles", "roles", opts.Spec.ClickHouse.Roles)
+				if err := s.adapter.RevokeRole(ctx, opts.Username, opts.Spec.ClickHouse.Roles); err != nil {
+					op.Error(err, "failed to revoke roles")
+					return nil, s.wrapError(ctx, s.config, "revoke roles", opts.Username, err)
+				}
+				revokedCount += len(opts.Spec.ClickHouse.Roles)
+			}
+
+			// Revoke direct grants
+			if len(opts.Spec.ClickHouse.Grants) > 0 {
+				op.Debug("revoking direct grants", "count", len(opts.Spec.ClickHouse.Grants))
+				grantOpts := s.buildClickHouseGrantOptions(opts.Spec.ClickHouse.Grants)
+				if err := s.adapter.Revoke(ctx, opts.Username, grantOpts); err != nil {
+					op.Error(err, "failed to revoke grants")
+					return nil, s.wrapError(ctx, s.config, "revoke grants", opts.Username, err)
+				}
+				revokedCount += len(opts.Spec.ClickHouse.Grants)
 			}
 		}
 	}
@@ -328,6 +376,30 @@ func (s *GrantService) buildMySQLGrantOptions(grants []dbopsv1alpha1.MySQLGrant)
 			Privileges:      g.Privileges,
 			WithGrantOption: g.WithGrantOption,
 		})
+	}
+	return opts
+}
+
+// buildClickHouseGrantOptions converts ClickHouseGrant specs to adapter GrantOptions.
+func (s *GrantService) buildClickHouseGrantOptions(grants []dbopsv1alpha1.ClickHouseGrant) []types.GrantOptions {
+	opts := make([]types.GrantOptions, 0, len(grants))
+	for _, g := range grants {
+		opt := types.GrantOptions{
+			Database:        g.Database,
+			Table:           g.Table,
+			Columns:         g.Columns,
+			Privileges:      g.Privileges,
+			WithGrantOption: g.WithGrantOption,
+		}
+		// Infer grant level from specified fields
+		if g.Table != "" {
+			opt.Level = "table"
+		} else if g.Database != "" {
+			opt.Level = "database"
+		} else {
+			opt.Level = "global"
+		}
+		opts = append(opts, opt)
 	}
 	return opts
 }

@@ -66,6 +66,19 @@ spec:
                 format: int64
                 minimum: 1
                 type: integer
+              clickhouse:
+                description: ClickHouse-specific backup configuration
+                properties:
+                  baseBackup:
+                    description: BaseBackup is the base backup path for incremental
+                      backups
+                    type: string
+                  diskName:
+                    default: backups
+                    description: DiskName is the ClickHouse disk name for BACKUP TO
+                      Disk(...)
+                    type: string
+                type: object
               compression:
                 description: Compression configures backup compression
                 properties:

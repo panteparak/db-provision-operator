@@ -93,6 +93,34 @@ func MySQLDropUser(name, host string) *RoleBuilder {
 	return &RoleBuilder{dialect: MySQLDialect{}, action: "DROP USER", name: name, host: host}
 }
 
+// --- ClickHouse constructors ---
+
+// ClickHouseCreateUser starts a CREATE USER statement for ClickHouse.
+// ClickHouse users are global (no host-based separation like MySQL).
+func ClickHouseCreateUser(name string) *RoleBuilder {
+	return &RoleBuilder{dialect: ClickHouseDialect{}, action: "CREATE USER", name: name}
+}
+
+// ClickHouseAlterUser starts an ALTER USER statement for ClickHouse.
+func ClickHouseAlterUser(name string) *RoleBuilder {
+	return &RoleBuilder{dialect: ClickHouseDialect{}, action: "ALTER USER", name: name}
+}
+
+// ClickHouseDropUser starts a DROP USER statement for ClickHouse.
+func ClickHouseDropUser(name string) *RoleBuilder {
+	return &RoleBuilder{dialect: ClickHouseDialect{}, action: "DROP USER", name: name}
+}
+
+// ClickHouseCreateRole starts a CREATE ROLE statement for ClickHouse.
+func ClickHouseCreateRole(name string) *RoleBuilder {
+	return &RoleBuilder{dialect: ClickHouseDialect{}, action: "CREATE ROLE", name: name}
+}
+
+// ClickHouseDropRole starts a DROP ROLE statement for ClickHouse.
+func ClickHouseDropRole(name string) *RoleBuilder {
+	return &RoleBuilder{dialect: ClickHouseDialect{}, action: "DROP ROLE", name: name}
+}
+
 // --- Option setters ---
 
 // Login adds LOGIN or NOLOGIN.
@@ -270,6 +298,8 @@ func (b *RoleBuilder) buildCreateOrAlter() string {
 	switch b.dialect.(type) {
 	case MySQLDialect:
 		return b.buildMySQL()
+	case ClickHouseDialect:
+		return b.buildClickHouse()
 	default:
 		// PostgreSQL / CockroachDB
 		sb.WriteString(b.action)
@@ -343,6 +373,39 @@ func (b *RoleBuilder) buildMySQL() string {
 	return sb.String()
 }
 
+func (b *RoleBuilder) buildClickHouse() string {
+	var sb strings.Builder
+
+	switch b.action {
+	case "CREATE ROLE":
+		sb.WriteString("CREATE ROLE IF NOT EXISTS ")
+		sb.WriteString(b.dialect.EscapeIdentifier(b.name))
+
+	case "CREATE USER":
+		sb.WriteString("CREATE USER IF NOT EXISTS ")
+		sb.WriteString(b.dialect.EscapeIdentifier(b.name))
+		if b.password != "" {
+			sb.WriteString(" IDENTIFIED BY ")
+			sb.WriteString(b.dialect.EscapeLiteral(b.password))
+		}
+
+	case "ALTER USER":
+		sb.WriteString("ALTER USER ")
+		sb.WriteString(b.dialect.EscapeIdentifier(b.name))
+		if b.password != "" {
+			sb.WriteString(" IDENTIFIED BY ")
+			sb.WriteString(b.dialect.EscapeLiteral(b.password))
+		}
+	}
+
+	if len(b.roleOpts) > 0 {
+		sb.WriteByte(' ')
+		sb.WriteString(strings.Join(b.roleOpts, " "))
+	}
+
+	return sb.String()
+}
+
 func (b *RoleBuilder) buildDropRole() string {
 	var sb strings.Builder
 	sb.WriteString("DROP ROLE ")
@@ -352,6 +415,8 @@ func (b *RoleBuilder) buildDropRole() string {
 	switch b.dialect.(type) {
 	case MySQLDialect:
 		sb.WriteString(b.dialect.EscapeLiteral(b.name))
+	case ClickHouseDialect:
+		sb.WriteString(b.dialect.EscapeIdentifier(b.name))
 	default:
 		sb.WriteString(b.dialect.EscapeIdentifier(b.name))
 	}
@@ -369,6 +434,8 @@ func (b *RoleBuilder) buildDropUser() string {
 		sb.WriteString(b.dialect.EscapeLiteral(b.name))
 		sb.WriteByte('@')
 		sb.WriteString(b.dialect.EscapeLiteral(b.host))
+	case ClickHouseDialect:
+		sb.WriteString(b.dialect.EscapeIdentifier(b.name))
 	default:
 		sb.WriteString(b.dialect.EscapeIdentifier(b.name))
 	}

@@ -57,6 +57,22 @@ spec:
           spec:
             description: DatabaseSpec defines the desired state of Database.
             properties:
+              clickhouse:
+                description: ClickHouse-specific configuration (required when instance
+                  engine is "clickhouse")
+                properties:
+                  comment:
+                    description: Comment is the database comment
+                    type: string
+                  engine:
+                    default: Atomic
+                    description: Engine is the database engine (Atomic, Lazy, Replicated)
+                    enum:
+                    - Atomic
+                    - Lazy
+                    - Replicated
+                    type: string
+                type: object
               clusterInstanceRef:
                 description: ClusterInstanceRef references a cluster-scoped ClusterDatabaseInstance
                   (mutually exclusive with InstanceRef)
@@ -324,6 +340,13 @@ spec:
           status:
             description: DatabaseStatus defines the observed state of Database.
             properties:
+              clickhouse:
+                description: ClickHouse contains ClickHouse-specific status information
+                properties:
+                  engine:
+                    description: Engine is the database engine
+                    type: string
+                type: object
               conditions:
                 description: Conditions represent the latest available observations
                 items:

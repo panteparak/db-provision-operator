@@ -176,6 +176,8 @@ func (s *BackupService) GetBackupExtension(spec *dbopsv1alpha1.DatabaseBackupSpe
 		return ".dump" // default for PostgreSQL
 	case dbopsv1alpha1.EngineTypeMySQL:
 		return ".sql"
+	case dbopsv1alpha1.EngineTypeClickHouse:
+		return ".bak"
 	default:
 		return ".bak"
 	}
@@ -232,6 +234,15 @@ func (s *BackupService) buildBackupOptions(opts BackupOptions) types.BackupOptio
 			adapterOpts.Quick = true
 			adapterOpts.Routines = true
 			adapterOpts.Triggers = true
+		}
+
+	case dbopsv1alpha1.EngineTypeClickHouse:
+		if opts.Spec != nil && opts.Spec.ClickHouse != nil {
+			ch := opts.Spec.ClickHouse
+			adapterOpts.DiskName = ch.DiskName
+			adapterOpts.BaseBackup = ch.BaseBackup
+		} else {
+			adapterOpts.DiskName = "backups"
 		}
 	}
 

@@ -42,6 +42,10 @@ type DatabaseBuilder struct {
 	charset   string
 	collation string
 
+	// ClickHouse-specific
+	engine  string
+	comment string
+
 	// DROP options
 	ifExists bool
 	cascade  bool
@@ -81,6 +85,23 @@ func MySQLDropDatabase(name string) *DatabaseBuilder {
 	return &DatabaseBuilder{dialect: MySQLDialect{}, action: "DROP", name: name}
 }
 
+// --- ClickHouse constructors ---
+
+// ClickHouseCreateDatabase starts a CREATE DATABASE statement for ClickHouse.
+func ClickHouseCreateDatabase(name string) *DatabaseBuilder {
+	return &DatabaseBuilder{dialect: ClickHouseDialect{}, action: "CREATE", name: name}
+}
+
+// ClickHouseAlterDatabase starts an ALTER DATABASE statement for ClickHouse.
+func ClickHouseAlterDatabase(name string) *DatabaseBuilder {
+	return &DatabaseBuilder{dialect: ClickHouseDialect{}, action: "ALTER", name: name}
+}
+
+// ClickHouseDropDatabase starts a DROP DATABASE statement for ClickHouse.
+func ClickHouseDropDatabase(name string) *DatabaseBuilder {
+	return &DatabaseBuilder{dialect: ClickHouseDialect{}, action: "DROP", name: name}
+}
+
 // --- Option setters ---
 
 func (b *DatabaseBuilder) Owner(owner string) *DatabaseBuilder    { b.owner = owner; return b }
@@ -93,6 +114,8 @@ func (b *DatabaseBuilder) ConnectionLimit(n int) *DatabaseBuilder { b.connection
 func (b *DatabaseBuilder) IsTemplate(v bool) *DatabaseBuilder     { b.isTemplate = v; return b }
 func (b *DatabaseBuilder) Charset(cs string) *DatabaseBuilder     { b.charset = cs; return b }
 func (b *DatabaseBuilder) Collation(col string) *DatabaseBuilder  { b.collation = col; return b }
+func (b *DatabaseBuilder) Engine(e string) *DatabaseBuilder       { b.engine = e; return b }
+func (b *DatabaseBuilder) Comment(c string) *DatabaseBuilder      { b.comment = c; return b }
 func (b *DatabaseBuilder) IfExists() *DatabaseBuilder             { b.ifExists = true; return b }
 func (b *DatabaseBuilder) Cascade() *DatabaseBuilder              { b.cascade = true; return b }
 
@@ -114,6 +137,17 @@ func (b *DatabaseBuilder) buildCreate() string {
 	var sb strings.Builder
 
 	switch b.dialect.(type) {
+	case ClickHouseDialect:
+		sb.WriteString("CREATE DATABASE IF NOT EXISTS ")
+		sb.WriteString(b.dialect.EscapeIdentifier(b.name))
+		if b.engine != "" {
+			sb.WriteString(" ENGINE = ")
+			sb.WriteString(b.engine)
+		}
+		if b.comment != "" {
+			sb.WriteString(" COMMENT ")
+			sb.WriteString(b.dialect.EscapeLiteral(b.comment))
+		}
 	case MySQLDialect:
 		sb.WriteString("CREATE DATABASE IF NOT EXISTS ")
 		sb.WriteString(b.dialect.EscapeIdentifier(b.name))
@@ -166,6 +200,13 @@ func (b *DatabaseBuilder) buildAlter() string {
 	var sb strings.Builder
 
 	switch b.dialect.(type) {
+	case ClickHouseDialect:
+		sb.WriteString("ALTER DATABASE ")
+		sb.WriteString(b.dialect.EscapeIdentifier(b.name))
+		if b.comment != "" {
+			sb.WriteString(" MODIFY COMMENT ")
+			sb.WriteString(b.dialect.EscapeLiteral(b.comment))
+		}
 	case MySQLDialect:
 		sb.WriteString("ALTER DATABASE ")
 		sb.WriteString(b.dialect.EscapeIdentifier(b.name))

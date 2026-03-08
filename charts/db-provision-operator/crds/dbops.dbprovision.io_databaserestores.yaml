@@ -78,6 +78,15 @@ spec:
                 required:
                 - name
                 type: object
+              clickhouse:
+                description: ClickHouse-specific restore configuration
+                properties:
+                  diskName:
+                    default: backups
+                    description: DiskName is the ClickHouse disk name for RESTORE
+                      FROM Disk(...)
+                    type: string
+                type: object
               confirmation:
                 description: Confirmation contains safety confirmations for destructive
                   operations

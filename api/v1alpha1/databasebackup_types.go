@@ -60,6 +60,10 @@ type DatabaseBackupSpec struct {
 	// MySQL-specific backup configuration
 	// +optional
 	MySQL *MySQLBackupConfig `json:"mysql,omitempty"`
+
+	// ClickHouse-specific backup configuration
+	// +optional
+	ClickHouse *ClickHouseBackupConfig `json:"clickhouse,omitempty"`
 }
 
 // DatabaseBackupStatus defines the observed state of DatabaseBackup.

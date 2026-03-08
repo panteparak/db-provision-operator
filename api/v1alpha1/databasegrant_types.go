@@ -44,6 +44,10 @@ type DatabaseGrantSpec struct {
 	// +optional
 	MySQL *MySQLGrantConfig `json:"mysql,omitempty"`
 
+	// ClickHouse-specific grants
+	// +optional
+	ClickHouse *ClickHouseGrantConfig `json:"clickhouse,omitempty"`
+
 	// DriftPolicy overrides the instance-level drift policy for this grant.
 	// If not specified, the instance's drift policy is used.
 	// +optional

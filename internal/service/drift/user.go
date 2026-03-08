@@ -55,6 +55,9 @@ func (s *Service) DetectUserDrift(ctx context.Context, spec *dbopsv1alpha1.Datab
 	if spec.MySQL != nil {
 		s.detectMySQLUserDrift(spec, info, result)
 	}
+	if spec.ClickHouse != nil {
+		s.detectClickHouseUserDrift(spec, info, result)
+	}
 
 	if result.HasDrift() {
 		log.Info("drift detected", "diffs", len(result.Diffs))
@@ -149,6 +152,16 @@ func (s *Service) detectMySQLUserDrift(spec *dbopsv1alpha1.DatabaseUserSpec, inf
 	// - MaxUserConnections
 	// - AllowedHosts
 	// - SSL requirements
+}
+
+// detectClickHouseUserDrift detects drift for ClickHouse-specific user settings.
+// ClickHouse users have minimal drift-detectable attributes.
+func (s *Service) detectClickHouseUserDrift(_ *dbopsv1alpha1.DatabaseUserSpec, _ *types.UserInfo, _ *Result) {
+	// ClickHouse user drift detection is minimal:
+	// - Host restrictions and default database are not easily queryable
+	//   via system.users in a comparable format
+	// - Password changes are detected by the controller's password hash comparison
+	// Future: query system.users for host_ip, host_names, default_database
 }
 
 // compareRoleMemberships compares expected role memberships to actual.

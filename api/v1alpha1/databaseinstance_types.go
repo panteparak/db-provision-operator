@@ -24,7 +24,7 @@ import (
 type DatabaseInstanceSpec struct {
 	// Engine type (required, immutable)
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum=postgres;mysql;mariadb;cockroachdb
+	// +kubebuilder:validation:Enum=postgres;mysql;mariadb;cockroachdb;clickhouse
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="engine is immutable"
 	Engine EngineType `json:"engine"`
 
@@ -57,6 +57,10 @@ type DatabaseInstanceSpec struct {
 	// MySQL-specific options (only valid when engine is "mysql")
 	// +optional
 	MySQL *MySQLInstanceConfig `json:"mysql,omitempty"`
+
+	// ClickHouse-specific options (only valid when engine is "clickhouse")
+	// +optional
+	ClickHouse *ClickHouseInstanceConfig `json:"clickhouse,omitempty"`
 
 	// ResourceTracking configures how managed resources are tagged in the database.
 	// This enables identifying operator-managed resources at the database level

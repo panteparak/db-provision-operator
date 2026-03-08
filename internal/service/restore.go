@@ -207,6 +207,14 @@ func (s *RestoreService) buildRestoreOptions(opts RestoreOptions) types.RestoreO
 			adapterOpts.DisableForeignKeyChecks = true
 			adapterOpts.DisableBinlog = true
 		}
+
+	case dbopsv1alpha1.EngineTypeClickHouse:
+		if opts.Spec != nil && opts.Spec.ClickHouse != nil {
+			ch := opts.Spec.ClickHouse
+			adapterOpts.DiskName = ch.DiskName
+		} else {
+			adapterOpts.DiskName = "backups"
+		}
 	}
 
 	return adapterOpts

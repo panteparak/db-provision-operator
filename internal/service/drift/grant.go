@@ -53,6 +53,9 @@ func (s *Service) DetectGrantDrift(ctx context.Context, spec *dbopsv1alpha1.Data
 	if spec.MySQL != nil {
 		s.detectMySQLGrantDrift(spec.MySQL, actualGrants, result)
 	}
+	if spec.ClickHouse != nil {
+		s.detectClickHouseGrantDrift(spec.ClickHouse, actualGrants, result)
+	}
 
 	if result.HasDrift() {
 		log.Info("drift detected", "diffs", len(result.Diffs))
@@ -264,6 +267,64 @@ func (s *Service) detectMySQLDirectGrantDrift(grant dbopsv1alpha1.MySQLGrant, ac
 	}
 }
 
+// detectClickHouseGrantDrift detects drift for ClickHouse-specific grant settings.
+func (s *Service) detectClickHouseGrantDrift(spec *dbopsv1alpha1.ClickHouseGrantConfig, actualGrants []types.GrantInfo, result *Result) {
+	// Detect role membership drift
+	s.detectRoleMembershipDrift(spec.Roles, actualGrants, result)
+
+	// Detect direct grant drift
+	for _, grant := range spec.Grants {
+		s.detectClickHouseDirectGrantDrift(grant, actualGrants, result)
+	}
+}
+
+// detectClickHouseDirectGrantDrift detects drift for a ClickHouse grant.
+func (s *Service) detectClickHouseDirectGrantDrift(grant dbopsv1alpha1.ClickHouseGrant, actualGrants []types.GrantInfo, result *Result) {
+	// Build a map of actual grants for quick lookup
+	actualGrantMap := make(map[string][]string)
+	for _, g := range actualGrants {
+		key := buildGrantKey(g.Database, "", g.ObjectType, g.ObjectName)
+		actualGrantMap[key] = g.Privileges
+	}
+
+	tableName := "*"
+	if grant.Table != "" {
+		tableName = grant.Table
+	}
+	key := buildGrantKey(grant.Database, "", "table", tableName)
+	actualPrivileges, exists := actualGrantMap[key]
+
+	if !exists {
+		// Grant doesn't exist at all
+		result.AddDiff(Diff{
+			Field:    fmt.Sprintf("grants.%s.%s", grant.Database, tableName),
+			Expected: strings.Join(grant.Privileges, ", "),
+			Actual:   "",
+		})
+		return
+	}
+
+	// Check for missing privileges
+	actualPrivSet := make(map[string]bool)
+	for _, priv := range actualPrivileges {
+		actualPrivSet[strings.ToUpper(priv)] = true
+	}
+
+	var missingPrivs []string
+	for _, priv := range grant.Privileges {
+		if !actualPrivSet[strings.ToUpper(priv)] {
+			missingPrivs = append(missingPrivs, priv)
+		}
+	}
+	if len(missingPrivs) > 0 {
+		result.AddDiff(Diff{
+			Field:    fmt.Sprintf("grants.%s.%s.missing", grant.Database, tableName),
+			Expected: strings.Join(missingPrivs, ", "),
+			Actual:   "",
+		})
+	}
+}
+
 // buildGrantKey builds a unique key for a grant.
 func buildGrantKey(database, schema, objectType, objectName string) string {
 	parts := []string{database}
@@ -381,6 +442,24 @@ func (s *Service) applyMissingGrants(ctx context.Context, spec *dbopsv1alpha1.Da
 	// For MySQL grants
 	if spec.MySQL != nil {
 		for _, grant := range spec.MySQL.Grants {
+			tableName := grant.Table
+			if tableName == "" {
+				tableName = "*"
+			}
+			if strings.Contains(diff.Field, tableName) || strings.Contains(diff.Field, grant.Database) {
+				opts := []types.GrantOptions{{
+					Database:   grant.Database,
+					Table:      tableName,
+					Privileges: privileges,
+				}}
+				return s.adapter.Grant(ctx, grantee, opts)
+			}
+		}
+	}
+
+	// For ClickHouse grants
+	if spec.ClickHouse != nil {
+		for _, grant := range spec.ClickHouse.Grants {
 			tableName := grant.Table
 			if tableName == "" {
 				tableName = "*"

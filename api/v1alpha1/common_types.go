@@ -22,7 +22,7 @@ import (
 )
 
 // EngineType defines the database engine type
-// +kubebuilder:validation:Enum=postgres;mysql;mariadb;cockroachdb
+// +kubebuilder:validation:Enum=postgres;mysql;mariadb;cockroachdb;clickhouse
 type EngineType string
 
 const (
@@ -30,6 +30,7 @@ const (
 	EngineTypeMySQL       EngineType = "mysql"
 	EngineTypeMariaDB     EngineType = "mariadb"
 	EngineTypeCockroachDB EngineType = "cockroachdb"
+	EngineTypeClickHouse  EngineType = "clickhouse"
 )
 
 // DeletionPolicy defines what happens when a resource is deleted

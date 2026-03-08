@@ -55,6 +55,9 @@ func (s *Service) DetectDatabaseDrift(ctx context.Context, spec *dbopsv1alpha1.D
 	if spec.MySQL != nil {
 		s.detectMySQLDatabaseDrift(spec, info, result)
 	}
+	if spec.ClickHouse != nil {
+		s.detectClickHouseDatabaseDrift(spec, info, result)
+	}
 
 	if result.HasDrift() {
 		log.Info("drift detected", "diffs", len(result.Diffs))
@@ -269,6 +272,10 @@ func (s *Service) applyDatabaseCorrection(ctx context.Context, spec *dbopsv1alph
 		// MySQL charset/collation change
 		return s.correctMySQLCharset(ctx, spec)
 
+	case diff.Field == "comment":
+		// ClickHouse comment change
+		return s.correctClickHouseComment(ctx, spec)
+
 	default:
 		return fmt.Errorf("unsupported drift correction for field: %s", diff.Field)
 	}
@@ -336,6 +343,41 @@ func (s *Service) correctMySQLCharset(ctx context.Context, spec *dbopsv1alpha1.D
 	return s.adapter.UpdateDatabase(ctx, spec.Name, types.UpdateDatabaseOptions{
 		Charset:   spec.MySQL.Charset,
 		Collation: spec.MySQL.Collation,
+	})
+}
+
+// detectClickHouseDatabaseDrift detects drift for ClickHouse-specific settings.
+func (s *Service) detectClickHouseDatabaseDrift(spec *dbopsv1alpha1.DatabaseSpec, info *types.DatabaseInfo, result *Result) {
+	chSpec := spec.ClickHouse
+
+	// Engine comparison (immutable — cannot change after creation)
+	if chSpec.Engine != "" && !strings.EqualFold(chSpec.Engine, info.Engine) {
+		result.AddDiff(Diff{
+			Field:     "engine",
+			Expected:  chSpec.Engine,
+			Actual:    info.Engine,
+			Immutable: true,
+		})
+	}
+
+	// Comment comparison
+	if chSpec.Comment != "" && chSpec.Comment != info.Comment {
+		result.AddDiff(Diff{
+			Field:    "comment",
+			Expected: chSpec.Comment,
+			Actual:   info.Comment,
+		})
+	}
+}
+
+// correctClickHouseComment corrects ClickHouse database comment.
+func (s *Service) correctClickHouseComment(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec) error {
+	if spec.ClickHouse == nil {
+		return nil
+	}
+
+	return s.adapter.UpdateDatabase(ctx, spec.Name, types.UpdateDatabaseOptions{
+		Comment: spec.ClickHouse.Comment,
 	})
 }
 

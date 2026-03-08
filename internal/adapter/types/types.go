@@ -98,6 +98,10 @@ type CreateDatabaseOptions struct {
 	Collation     string
 	SQLMode       string
 	StorageEngine string
+
+	// ClickHouse-specific
+	Engine  string // Atomic, Lazy, Replicated
+	Comment string
 }
 
 // DropDatabaseOptions contains options for dropping a database
@@ -116,6 +120,9 @@ type UpdateDatabaseOptions struct {
 	// MySQL-specific
 	Charset   string
 	Collation string
+
+	// ClickHouse-specific
+	Comment string
 }
 
 // ExtensionOptions contains options for installing an extension
@@ -153,6 +160,10 @@ type DatabaseInfo struct {
 
 	// MySQL-specific
 	Charset string
+
+	// ClickHouse-specific
+	Engine  string
+	Comment string
 }
 
 // ExtensionInfo contains extension status information
@@ -216,6 +227,11 @@ type CreateUserOptions struct {
 	RequireX509           bool
 	AllowedHosts          []string
 	AccountLocked         bool
+
+	// ClickHouse-specific
+	HostRestrictions []string
+	DefaultDatabase  string
+	DefaultRole      string
 }
 
 // UpdateUserOptions contains options for updating a user
@@ -451,6 +467,11 @@ type BackupOptions struct {
 	ExtendedInsert    bool
 	SetGtidPurged     string
 	Databases         []string
+
+	// ClickHouse-specific
+	DiskName   string // Disk name for BACKUP TO Disk(...)
+	BackupName string // Backup identifier within the disk
+	BaseBackup string // For incremental backups
 }
 
 // BackupResult contains backup result information
@@ -503,6 +524,9 @@ type RestoreOptions struct {
 	Events                  bool
 	DisableForeignKeyChecks bool
 	DisableBinlog           bool
+
+	// ClickHouse-specific
+	DiskName string // Disk name for RESTORE FROM Disk(...)
 }
 
 // RestoreResult contains restore result information
@@ -664,4 +688,10 @@ type ConnectionConfig struct {
 	Timeout      string
 	ReadTimeout  string
 	WriteTimeout string
+
+	// ClickHouse-specific
+	ClickHouseDialTimeout  string
+	ClickHouseReadTimeout  string
+	ClickHouseMaxOpenConns int32
+	ClickHouseDebug        bool
 }

@@ -77,6 +77,10 @@ type DatabaseSpec struct {
 	// MySQL-specific configuration (required when instance engine is "mysql")
 	// +optional
 	MySQL *MySQLDatabaseConfig `json:"mysql,omitempty"`
+
+	// ClickHouse-specific configuration (required when instance engine is "clickhouse")
+	// +optional
+	ClickHouse *ClickHouseDatabaseConfig `json:"clickhouse,omitempty"`
 }
 
 // DatabaseStatus defines the observed state of Database.
@@ -110,6 +114,10 @@ type DatabaseStatus struct {
 	// MySQL contains MySQL-specific status information
 	// +optional
 	MySQL *MySQLDatabaseStatus `json:"mysql,omitempty"`
+
+	// ClickHouse contains ClickHouse-specific status information
+	// +optional
+	ClickHouse *ClickHouseDatabaseStatus `json:"clickhouse,omitempty"`
 
 	// Drift contains drift detection status information
 	// +optional

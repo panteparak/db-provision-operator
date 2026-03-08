@@ -60,6 +60,26 @@ spec:
           spec:
             description: DatabaseInstanceSpec defines the desired state of DatabaseInstance.
             properties:
+              clickhouse:
+                description: ClickHouse-specific options (only valid when engine is
+                  "clickhouse")
+                properties:
+                  debug:
+                    description: Debug enables debug logging for the ClickHouse driver
+                    type: boolean
+                  dialTimeout:
+                    description: DialTimeout is the connection dial timeout (e.g.,
+                      "10s")
+                    type: string
+                  maxOpenConns:
+                    default: 25
+                    description: MaxOpenConns sets the maximum number of open connections
+                    format: int32
+                    type: integer
+                  readTimeout:
+                    description: ReadTimeout is the read timeout (e.g., "30s")
+                    type: string
+                type: object
               connection:
                 description: Connection configuration
                 properties:
@@ -183,11 +203,13 @@ spec:
                   - mysql
                   - mariadb
                   - cockroachdb
+                  - clickhouse
                 - enum:
                   - postgres
                   - mysql
                   - mariadb
                   - cockroachdb
+                  - clickhouse
                 description: Engine type (required, immutable)
                 type: string
                 x-kubernetes-validations:

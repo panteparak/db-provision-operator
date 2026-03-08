@@ -55,6 +55,10 @@ type DatabaseRestoreSpec struct {
 	// MySQL-specific restore configuration
 	// +optional
 	MySQL *MySQLRestoreConfig `json:"mysql,omitempty"`
+
+	// ClickHouse-specific restore configuration
+	// +optional
+	ClickHouse *ClickHouseRestoreConfig `json:"clickhouse,omitempty"`
 }
 
 // RestoreFromPath defines restoring from a direct path
