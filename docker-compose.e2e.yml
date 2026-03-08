@@ -89,8 +89,8 @@ services:
       test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
       interval: 5s
       timeout: 5s
-      retries: 10
-      start_period: 10s
+      retries: 24
+      start_period: 30s
 
   cockroachdb-init:
     image: cockroachdb/cockroach:v24.1.0
