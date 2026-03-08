@@ -674,3 +674,249 @@ func TestMySQLCreateUserEscapesBackslashInPassword(t *testing.T) {
 		t.Errorf("got  %q\nwant %q", q, want)
 	}
 }
+
+// --- ClickHouse dialect tests -----------------------------------------------
+
+func TestClickHouseEscapeIdentifier(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"mydb", "`mydb`"},
+		{"my`db", "`my``db`"},
+		{"", "``"},
+		{"`; DROP TABLE students;--", "```; DROP TABLE students;--`"},
+	}
+	d := ClickHouseDialect{}
+	for _, tt := range tests {
+		got := d.EscapeIdentifier(tt.input)
+		if got != tt.want {
+			t.Errorf("ClickHouseEscapeIdentifier(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestClickHouseEscapeLiteral(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"hello", `'hello'`},
+		{"it's", `'it''s'`},
+		{`back\slash`, `'back\\slash'`},
+		{`'; DROP TABLE students;--`, `'''; DROP TABLE students;--'`},
+	}
+	d := ClickHouseDialect{}
+	for _, tt := range tests {
+		got := d.EscapeLiteral(tt.input)
+		if got != tt.want {
+			t.Errorf("ClickHouseEscapeLiteral(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestClickHousePrivilegeValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		privs   []string
+		wantErr bool
+	}{
+		{"valid clickhouse", []string{"SELECT", "INSERT"}, false},
+		{"valid clickhouse all", []string{"ALL"}, false},
+		{"valid clickhouse create", []string{"CREATE DATABASE", "CREATE TABLE"}, false},
+		{"valid clickhouse system", []string{"SYSTEM"}, false},
+		{"case insensitive", []string{"select", "insert"}, false},
+		{"invalid privilege", []string{"INVALID_PRIV"}, true},
+		{"injection payload", []string{"SELECT; DROP TABLE users"}, true},
+		{"empty", []string{}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidatePrivileges(tt.privs, ValidClickHousePrivileges)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidatePrivileges() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// --- ClickHouse grant builder tests ------------------------------------------
+
+func TestClickHouseGrantDatabase(t *testing.T) {
+	q, err := NewClickHouse().Grant("SELECT", "INSERT").OnDatabase("mydb").To("appuser").Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "GRANT SELECT, INSERT ON `mydb`.* TO `appuser`"
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}
+
+func TestClickHouseGrantGlobal(t *testing.T) {
+	q, err := NewClickHouse().Grant("ALL").OnGlobal().To("admin").Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "GRANT ALL ON *.* TO `admin`"
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}
+
+func TestClickHouseGrantTable(t *testing.T) {
+	q, err := NewClickHouse().Grant("SELECT", "UPDATE").OnMySQLTable("mydb", "users").To("appuser").Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "GRANT SELECT, UPDATE ON `mydb`.`users` TO `appuser`"
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}
+
+func TestClickHouseGrantRole(t *testing.T) {
+	q, err := NewClickHouse().GrantRole("admin_role").To("myuser").Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "GRANT `admin_role` TO `myuser`"
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}
+
+func TestClickHouseRevokeRole(t *testing.T) {
+	q, err := NewClickHouse().RevokeRole("admin_role").From("myuser").Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "REVOKE `admin_role` FROM `myuser`"
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}
+
+func TestClickHouseGrantWithGrantOption(t *testing.T) {
+	q, err := NewClickHouse().Grant("SELECT").OnGlobal().To("admin").WithGrantOption().Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "GRANT SELECT ON *.* TO `admin` WITH GRANT OPTION"
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}
+
+func TestClickHouseRevokeDatabase(t *testing.T) {
+	q, err := NewClickHouse().Revoke("SELECT", "INSERT").OnDatabase("mydb").From("appuser").Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "REVOKE SELECT, INSERT ON `mydb`.* FROM `appuser`"
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}
+
+func TestClickHouseGrantRejectsInvalidPrivilege(t *testing.T) {
+	_, err := NewClickHouse().Grant("SELECT; DROP TABLE users").OnGlobal().To("evil").Build()
+	if err == nil {
+		t.Fatal("expected error for injection payload")
+	}
+}
+
+func TestClickHouseGrantEscapesBacktick(t *testing.T) {
+	q, err := NewClickHouse().Grant("SELECT").OnDatabase("my`db").To("user").Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "GRANT SELECT ON `my``db`.* TO `user`"
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}
+
+// --- ClickHouse database builder tests ---------------------------------------
+
+func TestClickHouseCreateDatabase(t *testing.T) {
+	q := ClickHouseCreateDatabase("mydb").Build()
+	want := "CREATE DATABASE IF NOT EXISTS `mydb`"
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}
+
+func TestClickHouseCreateDatabaseWithEngine(t *testing.T) {
+	q := ClickHouseCreateDatabase("mydb").Engine("Atomic").Build()
+	want := "CREATE DATABASE IF NOT EXISTS `mydb` ENGINE = Atomic"
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}
+
+func TestClickHouseCreateDatabaseWithComment(t *testing.T) {
+	q := ClickHouseCreateDatabase("mydb").Comment("managed").Build()
+	want := "CREATE DATABASE IF NOT EXISTS `mydb` COMMENT 'managed'"
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}
+
+func TestClickHouseDropDatabase(t *testing.T) {
+	q := ClickHouseDropDatabase("mydb").IfExists().Build()
+	want := "DROP DATABASE IF EXISTS `mydb`"
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}
+
+// --- ClickHouse role/user builder tests --------------------------------------
+
+func TestClickHouseCreateRole(t *testing.T) {
+	q := ClickHouseCreateRole("admin").Build()
+	want := "CREATE ROLE IF NOT EXISTS `admin`"
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}
+
+func TestClickHouseDropRole(t *testing.T) {
+	q := ClickHouseDropRole("admin").IfExists().Build()
+	want := "DROP ROLE IF EXISTS `admin`"
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}
+
+func TestClickHouseCreateUser(t *testing.T) {
+	q := ClickHouseCreateUser("appuser").IdentifiedBy("s3cret").Build()
+	want := "CREATE USER IF NOT EXISTS `appuser` IDENTIFIED BY 's3cret'"
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}
+
+func TestClickHouseAlterUser(t *testing.T) {
+	q := ClickHouseAlterUser("appuser").IdentifiedBy("newpass").Build()
+	want := "ALTER USER `appuser` IDENTIFIED BY 'newpass'"
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}
+
+func TestClickHouseDropUser(t *testing.T) {
+	q := ClickHouseDropUser("appuser").IfExists().Build()
+	want := "DROP USER IF EXISTS `appuser`"
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}
+
+func TestClickHouseCreateUserEscapesPassword(t *testing.T) {
+	q := ClickHouseCreateUser("user").IdentifiedBy("pass'word").Build()
+	want := "CREATE USER IF NOT EXISTS `user` IDENTIFIED BY 'pass''word'"
+	if q != want {
+		t.Errorf("got  %q\nwant %q", q, want)
+	}
+}

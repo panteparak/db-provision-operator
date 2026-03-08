@@ -50,6 +50,11 @@ func TestGetSpecBuilder(t *testing.T) {
 			expectedType: "*service.postgresSpecBuilder",
 		},
 		{
+			name:         "clickhouse returns ClickHouseSpecBuilder",
+			engine:       dbopsv1alpha1.EngineTypeClickHouse,
+			expectedType: "*service.clickhouseSpecBuilder",
+		},
+		{
 			name:         "unknown engine returns emptySpecBuilder",
 			engine:       dbopsv1alpha1.EngineType("unknown"),
 			expectedType: "*service.emptySpecBuilder",
@@ -70,6 +75,9 @@ func TestGetSpecBuilder(t *testing.T) {
 			case "*service.mysqlSpecBuilder":
 				_, ok := builder.(*mysqlSpecBuilder)
 				assert.True(t, ok, "expected *mysqlSpecBuilder, got %T", builder)
+			case "*service.clickhouseSpecBuilder":
+				_, ok := builder.(*clickhouseSpecBuilder)
+				assert.True(t, ok, "expected *clickhouseSpecBuilder, got %T", builder)
 			case "*service.emptySpecBuilder":
 				_, ok := builder.(*emptySpecBuilder)
 				assert.True(t, ok, "expected *emptySpecBuilder, got %T", builder)
