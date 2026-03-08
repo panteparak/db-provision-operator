@@ -81,14 +81,12 @@ services:
       - "${E2E_CLICKHOUSE_PORT:-9000}:9000"
       - "${E2E_CLICKHOUSE_HTTP_PORT:-8123}:8123"
     environment:
-      CLICKHOUSE_USER: default
-      CLICKHOUSE_PASSWORD: clickhouse
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     volumes:
       - ./test/e2e/fixtures/clickhouse-config/grant-default.xml:/etc/clickhouse-server/users.d/grant-default.xml:ro
       - ./test/e2e/fixtures/clickhouse-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD", "clickhouse-client", "--password", "clickhouse", "--query", "SELECT 1"]
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
       interval: 5s
       timeout: 5s
       retries: 10
