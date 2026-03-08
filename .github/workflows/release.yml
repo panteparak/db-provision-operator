@@ -197,9 +197,9 @@ jobs:
         run: |
           echo "Retagging ${IMAGE_TAG} -> ${VERSION} and latest"
           docker buildx imagetools create \
-            -t ${{ env.REGISTRY }}/${IMAGE_NAME}:${VERSION} \
-            -t ${{ env.REGISTRY }}/${IMAGE_NAME}:latest \
-            ${{ env.REGISTRY }}/${IMAGE_NAME}:${IMAGE_TAG}
+            -t "${REGISTRY}/${IMAGE_NAME}:${VERSION}" \
+            -t "${REGISTRY}/${IMAGE_NAME}:latest" \
+            "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
 
       # workflow_dispatch fallback: rebuild from source
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -264,7 +264,7 @@ jobs:
         env:
           VERSION: ${{ needs.guard.outputs.version }}
         run: |
-          make build-installer IMG=${{ env.REGISTRY }}/${IMAGE_NAME}:${VERSION}
+          make build-installer "IMG=${REGISTRY}/${IMAGE_NAME}:${VERSION}"
           mv dist/install.yaml dist/db-provision-operator-${VERSION}.yaml
 
       # Package CRDs tarball

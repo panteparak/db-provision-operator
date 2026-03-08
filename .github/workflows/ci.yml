@@ -409,11 +409,11 @@ jobs:
         working-directory: /tmp/digests
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.REGISTRY }}/${IMAGE_NAME}@sha256:%s ' *)
+            $(printf "${REGISTRY}/${IMAGE_NAME}@sha256:%s " *)
 
       - name: Inspect image
         run: |
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/${IMAGE_NAME}:${STEPS_META_OUTPUTS_VERSION}
+          docker buildx imagetools inspect "${REGISTRY}/${IMAGE_NAME}:${STEPS_META_OUTPUTS_VERSION}"
         env:
           STEPS_META_OUTPUTS_VERSION: ${{ steps.meta.outputs.version }}
 
@@ -825,7 +825,7 @@ jobs:
       - name: Pull operator image from registry
         if: github.event_name != 'pull_request'
         run: |
-          docker pull ${{ env.REGISTRY }}/${IMAGE_NAME}:sha-${STEPS_SHORT_SHA_OUTPUTS_SHA}
+          docker pull "${REGISTRY}/${IMAGE_NAME}:sha-${STEPS_SHORT_SHA_OUTPUTS_SHA}"
 
         env:
           STEPS_SHORT_SHA_OUTPUTS_SHA: ${{ steps.short-sha.outputs.sha }}
@@ -844,8 +844,7 @@ jobs:
 
       # Load operator image into k3d (Makefile micro-step with custom image)
       - name: Load operator image into k3d
-        run: make e2e-image-load E2E_IMG=${{ env.REGISTRY }}/${IMAGE_NAME}:sha-${STEPS_SHORT_SHA_OUTPUTS_SHA}
-
+        run: make e2e-image-load "E2E_IMG=${REGISTRY}/${IMAGE_NAME}:sha-${STEPS_SHORT_SHA_OUTPUTS_SHA}"
         env:
           STEPS_SHORT_SHA_OUTPUTS_SHA: ${{ steps.short-sha.outputs.sha }}
 
@@ -864,7 +863,7 @@ jobs:
           helm install db-provision-operator ./charts/db-provision-operator \
             --namespace db-provision-operator-system \
             --create-namespace \
-            --set image.repository=${{ env.REGISTRY }}/${IMAGE_NAME} \
+            --set image.repository="${REGISTRY}/${IMAGE_NAME}" \
             --set image.tag=sha-${STEPS_SHORT_SHA_OUTPUTS_SHA} \
             --set image.pullPolicy=IfNotPresent \
             --wait \
@@ -892,7 +891,7 @@ jobs:
       # Multi-operator E2E tests (PostgreSQL only)
       - name: Deploy second operator (multi-instance test)
         if: matrix.database == 'postgresql'
-        run: make e2e-deploy-second-operator E2E_IMG=${{ env.REGISTRY }}/${IMAGE_NAME}:sha-${STEPS_SHORT_SHA_OUTPUTS_SHA}
+        run: make e2e-deploy-second-operator "E2E_IMG=${REGISTRY}/${IMAGE_NAME}:sha-${STEPS_SHORT_SHA_OUTPUTS_SHA}"
         env:
           STEPS_SHORT_SHA_OUTPUTS_SHA: ${{ steps.short-sha.outputs.sha }}
 
