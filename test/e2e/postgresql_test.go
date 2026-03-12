@@ -954,6 +954,259 @@ var _ = Describe("postgresql", Ordered, func() {
 		})
 	})
 
+	// ===== SecretTemplate E2E Tests (E1-E6) =====
+	Context("SecretTemplate", func() {
+		// E1: DatabaseUser with SecretTemplate.Data containing DATABASE_URL
+		It("should render SecretTemplate.Data and replace default keys (E1)", func() {
+			tmplUserName := "tmpl-test-user"
+			tmplSecretName := "tmpl-user-creds"
+
+			By("creating a DatabaseUser with SecretTemplate.Data")
+			user := &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": "dbops.dbprovision.io/v1alpha1",
+				"kind":       "DatabaseUser",
+				"metadata": map[string]interface{}{
+					"name": tmplUserName, "namespace": testNamespace,
+				},
+				"spec": map[string]interface{}{
+					"instanceRef": map[string]interface{}{"name": instanceName},
+					"username":    "tmpl_user",
+					"passwordSecret": map[string]interface{}{
+						"generate": true, "secretName": tmplSecretName,
+						"secretTemplate": map[string]interface{}{
+							"data": map[string]interface{}{
+								"DATABASE_URL": `postgresql://{{ .Username }}:{{ urlEncode .Password }}@{{ .Host }}:{{ .Port }}/{{ .Database }}`,
+							},
+						},
+					},
+				},
+			}}
+
+			_, err := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Create(ctx, user, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for DatabaseUser to become Ready")
+			Eventually(func() string {
+				obj, err := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Get(ctx, tmplUserName, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				return phase
+			}, reconcileTimeout, pollingInterval).Should(Equal("Ready"))
+
+			By("verifying secret has DATABASE_URL key")
+			Eventually(func() bool {
+				has, _ := testutil.SecretContainsKeys(ctx, k8sClient, testNamespace, tmplSecretName, "DATABASE_URL")
+				return has
+			}, reconcileTimeout, pollingInterval).Should(BeTrue())
+
+			By("verifying DATABASE_URL contains expected prefix")
+			Eventually(func() string {
+				val, _ := getSecretValue(ctx, testNamespace, tmplSecretName, "DATABASE_URL")
+				return val
+			}, reconcileTimeout, pollingInterval).Should(ContainSubstring("postgresql://tmpl_user:"))
+
+			By("verifying default keys are NOT present")
+			noDefaults, err := testutil.SecretDoesNotContainKeys(ctx, k8sClient, testNamespace, tmplSecretName, "username", "password", "host", "port")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(noDefaults).To(BeTrue(), "Default keys should not be present when SecretTemplate.Data is set")
+
+			By("cleaning up template test user")
+			_ = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Delete(ctx, tmplUserName, metav1.DeleteOptions{})
+			Eventually(func() bool {
+				_, err := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Get(ctx, tmplUserName, metav1.GetOptions{})
+				return err != nil
+			}, getDeletionTimeout(), pollingInterval).Should(BeTrue())
+		})
+
+		// E3: DatabaseUser without SecretTemplate.Data — backward compat
+		It("should use default keys when no SecretTemplate.Data (E3)", func() {
+			defaultUserName := "default-keys-user"
+			defaultSecretName := defaultUserName + "-credentials"
+
+			By("creating a DatabaseUser without SecretTemplate.Data")
+			user := testutil.BuildDatabaseUser(defaultUserName, testNamespace, instanceName, "default_keys_user")
+			_, err := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Create(ctx, user, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for DatabaseUser to become Ready")
+			Eventually(func() string {
+				obj, err := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Get(ctx, defaultUserName, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				return phase
+			}, reconcileTimeout, pollingInterval).Should(Equal("Ready"))
+
+			By("verifying default keys exist")
+			Eventually(func() bool {
+				has, _ := testutil.SecretContainsKeys(ctx, k8sClient, testNamespace, defaultSecretName, "username", "password", "host", "port")
+				return has
+			}, reconcileTimeout, pollingInterval).Should(BeTrue())
+
+			By("cleaning up")
+			_ = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Delete(ctx, defaultUserName, metav1.DeleteOptions{})
+			Eventually(func() bool {
+				_, err := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Get(ctx, defaultUserName, metav1.GetOptions{})
+				return err != nil
+			}, getDeletionTimeout(), pollingInterval).Should(BeTrue())
+		})
+
+		// E4: DatabaseUser with multi-key template (DATABASE_URL + JDBC_URL)
+		It("should render multi-key templates correctly (E4)", func() {
+			multiKeyUserName := "multi-key-user"
+			multiKeySecretName := "multi-key-creds"
+
+			By("creating a DatabaseUser with multi-key SecretTemplate.Data")
+			user := &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": "dbops.dbprovision.io/v1alpha1",
+				"kind":       "DatabaseUser",
+				"metadata": map[string]interface{}{
+					"name": multiKeyUserName, "namespace": testNamespace,
+				},
+				"spec": map[string]interface{}{
+					"instanceRef": map[string]interface{}{"name": instanceName},
+					"username":    "multi_key_user",
+					"passwordSecret": map[string]interface{}{
+						"generate": true, "secretName": multiKeySecretName,
+						"secretTemplate": map[string]interface{}{
+							"data": map[string]interface{}{
+								"DATABASE_URL": `postgresql://{{ .Username }}:{{ urlEncode .Password }}@{{ .Host }}:{{ .Port }}/{{ .Database }}`,
+								"JDBC_URL":     `jdbc:postgresql://{{ .Host }}:{{ .Port }}/{{ .Database }}`,
+							},
+						},
+					},
+				},
+			}}
+
+			_, err := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Create(ctx, user, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for DatabaseUser to become Ready")
+			Eventually(func() string {
+				obj, err := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Get(ctx, multiKeyUserName, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				return phase
+			}, reconcileTimeout, pollingInterval).Should(Equal("Ready"))
+
+			By("verifying both keys exist")
+			Eventually(func() bool {
+				has, _ := testutil.SecretContainsKeys(ctx, k8sClient, testNamespace, multiKeySecretName, "DATABASE_URL", "JDBC_URL")
+				return has
+			}, reconcileTimeout, pollingInterval).Should(BeTrue())
+
+			By("verifying JDBC_URL content")
+			Eventually(func() string {
+				val, _ := getSecretValue(ctx, testNamespace, multiKeySecretName, "JDBC_URL")
+				return val
+			}, reconcileTimeout, pollingInterval).Should(ContainSubstring("jdbc:postgresql://"))
+
+			By("cleaning up")
+			_ = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Delete(ctx, multiKeyUserName, metav1.DeleteOptions{})
+			Eventually(func() bool {
+				_, err := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Get(ctx, multiKeyUserName, metav1.GetOptions{})
+				return err != nil
+			}, getDeletionTimeout(), pollingInterval).Should(BeTrue())
+		})
+
+		// E5: DatabaseUser with invalid template syntax
+		It("should fail with invalid template syntax (E5)", func() {
+			badTmplUserName := "bad-tmpl-user"
+
+			By("creating a DatabaseUser with invalid template syntax")
+			user := &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": "dbops.dbprovision.io/v1alpha1",
+				"kind":       "DatabaseUser",
+				"metadata": map[string]interface{}{
+					"name": badTmplUserName, "namespace": testNamespace,
+				},
+				"spec": map[string]interface{}{
+					"instanceRef": map[string]interface{}{"name": instanceName},
+					"username":    "bad_tmpl_user",
+					"passwordSecret": map[string]interface{}{
+						"generate": true, "secretName": "bad-tmpl-creds",
+						"secretTemplate": map[string]interface{}{
+							"data": map[string]interface{}{
+								"bad": "{{ .Username ",
+							},
+						},
+					},
+				},
+			}}
+
+			_, err := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Create(ctx, user, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for DatabaseUser to enter Failed phase")
+			Eventually(func() string {
+				obj, err := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Get(ctx, badTmplUserName, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				return phase
+			}, reconcileTimeout, pollingInterval).Should(Equal("Failed"))
+
+			By("cleaning up")
+			_ = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Delete(ctx, badTmplUserName, metav1.DeleteOptions{})
+			Eventually(func() bool {
+				_, err := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Get(ctx, badTmplUserName, metav1.GetOptions{})
+				return err != nil
+			}, getDeletionTimeout(), pollingInterval).Should(BeTrue())
+		})
+
+		// E6: DatabaseUser with template referencing undefined function
+		It("should fail with undefined function in template (E6)", func() {
+			undefinedFnUserName := "undef-fn-user"
+
+			By("creating a DatabaseUser with undefined function in template")
+			user := &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": "dbops.dbprovision.io/v1alpha1",
+				"kind":       "DatabaseUser",
+				"metadata": map[string]interface{}{
+					"name": undefinedFnUserName, "namespace": testNamespace,
+				},
+				"spec": map[string]interface{}{
+					"instanceRef": map[string]interface{}{"name": instanceName},
+					"username":    "undef_fn_user",
+					"passwordSecret": map[string]interface{}{
+						"generate": true, "secretName": "undef-fn-creds",
+						"secretTemplate": map[string]interface{}{
+							"data": map[string]interface{}{
+								"bad": "{{ noSuchFunc .Username }}",
+							},
+						},
+					},
+				},
+			}}
+
+			_, err := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Create(ctx, user, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for DatabaseUser to enter Failed phase")
+			Eventually(func() string {
+				obj, err := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Get(ctx, undefinedFnUserName, metav1.GetOptions{})
+				if err != nil {
+					return ""
+				}
+				phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+				return phase
+			}, reconcileTimeout, pollingInterval).Should(Equal("Failed"))
+
+			By("cleaning up")
+			_ = dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Delete(ctx, undefinedFnUserName, metav1.DeleteOptions{})
+			Eventually(func() bool {
+				_, err := dynamicClient.Resource(databaseUserGVR).Namespace(testNamespace).Get(ctx, undefinedFnUserName, metav1.GetOptions{})
+				return err != nil
+			}, getDeletionTimeout(), pollingInterval).Should(BeTrue())
+		})
+	})
+
 	// Cleanup after all tests
 	AfterAll(func() {
 		By("closing database verifier connection")

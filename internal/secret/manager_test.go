@@ -273,6 +273,54 @@ var _ = Describe("Secret Manager", func() {
 				Expect(creds).To(BeNil())
 			})
 		})
+
+		Context("when TLS secret has all keys as empty byte slices (M13)", func() {
+			It("should return credentials with empty strings", func() {
+				secret := testutil.NewOpaqueSecret(
+					"empty-tls-secret",
+					testutil.TestNamespace,
+					map[string][]byte{
+						"ca.crt":  []byte(""),
+						"tls.crt": []byte(""),
+						"tls.key": []byte(""),
+					},
+				)
+				Expect(fakeClient.Create(ctx, secret)).To(Succeed())
+
+				tlsConfig := testutil.NewTLSConfig(true, "empty-tls-secret")
+				creds, err := manager.GetTLSCredentials(ctx, testutil.TestNamespace, tlsConfig)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(creds).NotTo(BeNil())
+				Expect(creds.CA).To(Equal([]byte("")))
+				Expect(creds.Cert).To(Equal([]byte("")))
+				Expect(creds.Key).To(Equal([]byte("")))
+			})
+		})
+
+		Context("when TLS secret has partial keys (M14)", func() {
+			It("should return CA + Key populated, Cert empty", func() {
+				secret := testutil.NewOpaqueSecret(
+					"partial-tls-secret",
+					testutil.TestNamespace,
+					map[string][]byte{
+						"ca.crt":  []byte("ca-data"),
+						"tls.key": []byte("key-data"),
+						// tls.crt is absent
+					},
+				)
+				Expect(fakeClient.Create(ctx, secret)).To(Succeed())
+
+				tlsConfig := testutil.NewTLSConfig(true, "partial-tls-secret")
+				creds, err := manager.GetTLSCredentials(ctx, testutil.TestNamespace, tlsConfig)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(creds).NotTo(BeNil())
+				Expect(creds.CA).To(Equal([]byte("ca-data")))
+				Expect(creds.Cert).To(BeNil())
+				Expect(creds.Key).To(Equal([]byte("key-data")))
+			})
+		})
 	})
 
 	Describe("GetPassword", func() {
@@ -337,6 +385,19 @@ var _ = Describe("Secret Manager", func() {
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("does not contain key"))
 				Expect(password).To(BeEmpty())
+			})
+		})
+
+		Context("when password secret key has empty value (M15)", func() {
+			It("should return empty string without error", func() {
+				secret := testutil.NewPasswordSecret("empty-pw-secret", testutil.TestNamespace, "password", "")
+				Expect(fakeClient.Create(ctx, secret)).To(Succeed())
+
+				secretRef := testutil.NewExistingPasswordSecret("empty-pw-secret", "password")
+				password, err := manager.GetPassword(ctx, testutil.TestNamespace, secretRef)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(password).To(Equal(""))
 			})
 		})
 	})
@@ -769,6 +830,19 @@ var _ = Describe("GeneratePassword", func() {
 		})
 	})
 
+	Context("with zero length (M16)", func() {
+		It("should fall back to default length when length is 0", func() {
+			config := &dbopsv1alpha1.PasswordConfig{
+				Length:              0,
+				IncludeSpecialChars: false,
+			}
+			password, err := GeneratePassword(config)
+			// Length 0 falls through the `opts.Length > 0` check, so default (32) is used
+			Expect(err).NotTo(HaveOccurred())
+			Expect(password).To(HaveLen(32))
+		})
+	})
+
 	Context("randomness", func() {
 		It("should generate unique passwords", func() {
 			passwords := make(map[string]bool)
@@ -916,6 +990,297 @@ var _ = Describe("RenderSecretTemplate", func() {
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(result["static"])).To(Equal("this-is-a-static-value"))
+		})
+	})
+
+	Context("with TLS fields", func() {
+		It("should render CA certificate in template", func() {
+			tmpl := testutil.NewSecretTemplate(map[string]string{
+				"ca.crt": "{{ .CA }}",
+			})
+
+			data := TemplateData{
+				CA: "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----",
+			}
+
+			result, err := RenderSecretTemplate(tmpl, data)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(result["ca.crt"])).To(Equal("-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"))
+		})
+
+		It("should render all TLS fields", func() {
+			tmpl := testutil.NewSecretTemplate(map[string]string{
+				"ca.crt":  "{{ .CA }}",
+				"tls.crt": "{{ .TLSCert }}",
+				"tls.key": "{{ .TLSKey }}",
+			})
+
+			data := TemplateData{
+				CA:      "ca-cert-data",
+				TLSCert: "client-cert-data",
+				TLSKey:  "client-key-data",
+			}
+
+			result, err := RenderSecretTemplate(tmpl, data)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(result["ca.crt"])).To(Equal("ca-cert-data"))
+			Expect(string(result["tls.crt"])).To(Equal("client-cert-data"))
+			Expect(string(result["tls.key"])).To(Equal("client-key-data"))
+		})
+
+		It("should render TLS fields alongside connection info", func() {
+			tmpl := testutil.NewSecretTemplate(map[string]string{
+				"DATABASE_URL": "postgresql://{{ .Username }}:{{ .Password }}@{{ .Host }}:{{ .Port }}/{{ .Database }}?sslmode=verify-full",
+				"ca.crt":       "{{ .CA }}",
+				"tls.crt":      "{{ .TLSCert }}",
+				"tls.key":      "{{ .TLSKey }}",
+			})
+
+			data := TemplateData{
+				Username: "admin",
+				Password: "secret",
+				Host:     "db.example.com",
+				Port:     5432,
+				Database: "mydb",
+				CA:       "ca-data",
+				TLSCert:  "cert-data",
+				TLSKey:   "key-data",
+			}
+
+			result, err := RenderSecretTemplate(tmpl, data)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(result["DATABASE_URL"])).To(Equal("postgresql://admin:secret@db.example.com:5432/mydb?sslmode=verify-full"))
+			Expect(string(result["ca.crt"])).To(Equal("ca-data"))
+			Expect(string(result["tls.crt"])).To(Equal("cert-data"))
+			Expect(string(result["tls.key"])).To(Equal("key-data"))
+		})
+
+		It("should handle empty TLS fields gracefully", func() {
+			tmpl := testutil.NewSecretTemplate(map[string]string{
+				"ca.crt": "{{ .CA }}",
+			})
+
+			data := TemplateData{} // CA is empty
+
+			result, err := RenderSecretTemplate(tmpl, data)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(result["ca.crt"])).To(Equal(""))
+		})
+	})
+
+	// ===== Edge Cases (M1-M16) =====
+
+	Context("with chained functions and TLS (M1)", func() {
+		It("should render base64-encoded CA from template", func() {
+			tmpl := testutil.NewSecretTemplate(map[string]string{
+				"ca_b64": "{{ base64Encode .CA }}",
+			})
+
+			data := TemplateData{
+				CA: "test-ca-data",
+			}
+
+			result, err := RenderSecretTemplate(tmpl, data)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(result["ca_b64"])).To(Equal("dGVzdC1jYS1kYXRh"))
+		})
+	})
+
+	Context("with multi-key template (M2)", func() {
+		It("should render all keys independently", func() {
+			tmpl := testutil.NewSecretTemplate(map[string]string{
+				"DATABASE_URL": "postgresql://{{ .Username }}@{{ .Host }}:{{ .Port }}/{{ .Database }}",
+				"JDBC_URL":     "jdbc:postgresql://{{ .Host }}:{{ .Port }}/{{ .Database }}",
+				"APP_USER":     "{{ .Username }}",
+			})
+
+			data := TemplateData{
+				Username: "admin",
+				Host:     "db.example.com",
+				Port:     5432,
+				Database: "mydb",
+			}
+
+			result, err := RenderSecretTemplate(tmpl, data)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(HaveLen(3))
+			Expect(string(result["DATABASE_URL"])).To(Equal("postgresql://admin@db.example.com:5432/mydb"))
+			Expect(string(result["JDBC_URL"])).To(Equal("jdbc:postgresql://db.example.com:5432/mydb"))
+			Expect(string(result["APP_USER"])).To(Equal("admin"))
+		})
+	})
+
+	Context("with Port field in template (M3)", func() {
+		It("should render int32 Port as number", func() {
+			tmpl := testutil.NewSecretTemplate(map[string]string{
+				"port": "{{ .Port }}",
+			})
+
+			data := TemplateData{Port: 5432}
+
+			result, err := RenderSecretTemplate(tmpl, data)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(result["port"])).To(Equal("5432"))
+		})
+	})
+
+	Context("with Go control flow (M4)", func() {
+		It("should render conditional based on CA presence", func() {
+			tmpl := testutil.NewSecretTemplate(map[string]string{
+				"sslmode": `{{ if .CA }}has-ca{{ else }}no-ca{{ end }}`,
+			})
+
+			// With CA
+			result, err := RenderSecretTemplate(tmpl, TemplateData{CA: "cert-data"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(result["sslmode"])).To(Equal("has-ca"))
+
+			// Without CA
+			result, err = RenderSecretTemplate(tmpl, TemplateData{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(result["sslmode"])).To(Equal("no-ca"))
+		})
+	})
+
+	Context("with default on Port (int32 vs string) (M5)", func() {
+		It("should document Port type mismatch with default", func() {
+			// default function takes (string, string), Port is int32
+			// Using printf to convert: {{ printf "%d" .Port }}
+			tmpl := testutil.NewSecretTemplate(map[string]string{
+				"port_str": `{{ printf "%d" .Port }}`,
+			})
+
+			result, err := RenderSecretTemplate(tmpl, TemplateData{Port: 0})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(result["port_str"])).To(Equal("0"))
+		})
+	})
+
+	Context("with nil template (M6)", func() {
+		It("should return error for nil template", func() {
+			result, err := RenderSecretTemplate(nil, TemplateData{})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("template is nil"))
+			Expect(result).To(BeNil())
+		})
+	})
+
+	Context("with empty Data map (M7)", func() {
+		It("should return empty map for non-nil but empty Data", func() {
+			tmpl := testutil.NewSecretTemplate(map[string]string{})
+			result, err := RenderSecretTemplate(tmpl, TemplateData{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(BeEmpty())
+		})
+	})
+
+	Context("with undefined variable (M8)", func() {
+		It("should return error for {{ .Nonexistent }}", func() {
+			tmpl := testutil.NewSecretTemplate(map[string]string{
+				"bad": "{{ .Nonexistent }}",
+			})
+			_, err := RenderSecretTemplate(tmpl, TemplateData{})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("can't evaluate field"))
+		})
+	})
+
+	Context("with syntax error (M9)", func() {
+		It("should return error for unclosed template", func() {
+			tmpl := testutil.NewSecretTemplate(map[string]string{
+				"bad": "{{ .Username ",
+			})
+			_, err := RenderSecretTemplate(tmpl, TemplateData{})
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("with function error during execution (M10)", func() {
+		It("should return error when base64Decode receives non-base64 password", func() {
+			tmpl := testutil.NewSecretTemplate(map[string]string{
+				"decoded": `{{ base64Decode .Password }}`,
+			})
+			_, err := RenderSecretTemplate(tmpl, TemplateData{Password: "not-base64!!!"})
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("with range over int (M11)", func() {
+		It("should iterate N times when ranging over int32 Port (Go 1.22+)", func() {
+			// Go 1.22+ allows range over integers: range N iterates 0..N-1
+			tmpl := testutil.NewSecretTemplate(map[string]string{
+				"counted": `{{ range .Port }}x{{ end }}`,
+			})
+			result, err := RenderSecretTemplate(tmpl, TemplateData{Port: 3})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(result["counted"])).To(Equal("xxx"))
+		})
+	})
+
+	Context("with partial render failure (M12)", func() {
+		It("should return error and not leak partial results", func() {
+			tmpl := testutil.NewSecretTemplate(map[string]string{
+				"good": "{{ .Username }}",
+				"bad":  "{{ .Nonexistent }}",
+			})
+			result, err := RenderSecretTemplate(tmpl, TemplateData{Username: "admin"})
+			// Since map iteration order is non-deterministic, the error may come from "bad"
+			// but the function returns nil result on error
+			Expect(err).To(HaveOccurred())
+			Expect(result).To(BeNil())
+		})
+	})
+
+	Context("with template functions", func() {
+		It("should render urlEncode in templates", func() {
+			tmpl := testutil.NewSecretTemplate(map[string]string{
+				"DSN": "postgresql://{{ urlEncode .Username }}:{{ urlEncode .Password }}@{{ .Host }}:{{ .Port }}/{{ .Database }}",
+			})
+
+			data := TemplateData{
+				Username: "admin",
+				Password: "p@ss!w0rd",
+				Host:     "db.example.com",
+				Port:     5432,
+				Database: "mydb",
+			}
+
+			result, err := RenderSecretTemplate(tmpl, data)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(result["DSN"])).To(Equal("postgresql://admin:p%40ss%21w0rd@db.example.com:5432/mydb"))
+		})
+
+		It("should render default function in templates", func() {
+			tmpl := testutil.NewSecretTemplate(map[string]string{
+				"sslmode": `{{ default "prefer" .SSLMode }}`,
+			})
+
+			data := TemplateData{} // SSLMode is empty
+
+			result, err := RenderSecretTemplate(tmpl, data)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(result["sslmode"])).To(Equal("prefer"))
+		})
+
+		It("should render base64Encode with TLS data", func() {
+			tmpl := testutil.NewSecretTemplate(map[string]string{
+				"ca_b64": "{{ base64Encode .CA }}",
+			})
+
+			data := TemplateData{
+				CA: "test-ca-data",
+			}
+
+			result, err := RenderSecretTemplate(tmpl, data)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(result["ca_b64"])).To(Equal("dGVzdC1jYS1kYXRh"))
 		})
 	})
 })

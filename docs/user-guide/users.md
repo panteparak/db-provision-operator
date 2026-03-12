@@ -49,16 +49,48 @@ Customize the generated Secret:
 |-------|------|-------------|
 | `labels` | map | Additional labels |
 | `annotations` | map | Additional annotations |
-| `data` | map | Additional data fields with templates |
+| `type` | string | Secret type (default: `Opaque`) |
+| `data` | map | Templated data keys — **replaces** default keys when provided |
+
+!!! important "Full Replacement Behavior"
+    When `secretTemplate.data` is provided, it **fully replaces** the default secret keys (`username`, `password`, `host`, `port`). No merging occurs. If you need those values, include them explicitly in your template.
 
 **Template variables:**
 
-- `{{ .Username }}` - The username
-- `{{ .Password }}` - The password
-- `{{ .Host }}` - Database host
-- `{{ .Port }}` - Database port
-- `{{ .Database }}` - Database name
-- `{{ .SSLMode }}` - SSL mode (PostgreSQL)
+| Variable | Type | Description |
+|----------|------|-------------|
+| `.Username` | string | The database username |
+| `.Password` | string | The password (generated or existing) |
+| `.Host` | string | Database host from the parent instance |
+| `.Port` | int32 | Database port from the parent instance |
+| `.Database` | string | Database name from the parent instance |
+| `.SSLMode` | string | TLS mode from the parent instance (e.g., `verify-full`) |
+| `.Namespace` | string | Namespace of the DatabaseUser resource |
+| `.Name` | string | Name of the DatabaseUser resource |
+| `.CA` | string | PEM-encoded CA certificate from instance TLS secret |
+| `.TLSCert` | string | PEM-encoded client certificate from instance TLS secret |
+| `.TLSKey` | string | PEM-encoded client key from instance TLS secret |
+
+!!! note "TLS Variables"
+    `.CA`, `.TLSCert`, and `.TLSKey` are populated from the parent `DatabaseInstance`'s `tls.secretRef`. If TLS is not enabled or the secret is missing, these fields are empty strings.
+
+**Template functions:**
+
+| Function | Description | Example |
+|----------|-------------|---------|
+| `urlEncode` | URL query-escape | `{{ urlEncode .Password }}` → `p%40ss%21` |
+| `urlPathEncode` | URL path-escape | `{{ urlPathEncode .Database }}` → `my%2Fdb` |
+| `base64Encode` | Base64 encode | `{{ base64Encode .CA }}` |
+| `base64Decode` | Base64 decode | `{{ base64Decode .EncodedValue }}` |
+| `upper` / `lower` | Case conversion | `{{ upper .Username }}` |
+| `title` | Capitalize first letter | `{{ title .Name }}` |
+| `trim` | Trim whitespace | `{{ trim .Value }}` |
+| `trimPrefix` / `trimSuffix` | Trim prefix/suffix | `{{ trimPrefix .Host "db-" }}` |
+| `replace` | Replace all occurrences | `{{ replace .Host "." "-" }}` |
+| `quote` / `squote` | Wrap in double/single quotes | `{{ quote .Password }}` |
+| `default` | Fallback for empty values | `{{ default "5432" .Port }}` |
+| `toJson` | Marshal to JSON | `{{ toJson .Data }}` |
+| `join` | Join string slice | `{{ join .Items "," }}` |
 
 ### existingPasswordSecret (optional)
 
@@ -146,8 +178,54 @@ spec:
       labels:
         app: myapp
       data:
-        DATABASE_URL: "postgresql://{{ .Username }}:{{ .Password }}@{{ .Host }}:{{ .Port }}/myapp?sslmode={{ .SSLMode }}"
+        DATABASE_URL: "postgresql://{{ urlEncode .Username }}:{{ urlEncode .Password }}@{{ .Host }}:{{ .Port }}/myapp?sslmode={{ default \"prefer\" .SSLMode }}"
         JDBC_URL: "jdbc:postgresql://{{ .Host }}:{{ .Port }}/myapp?user={{ .Username }}&password={{ .Password }}"
+```
+
+### MySQL DSN for Go Applications
+
+```yaml
+secretTemplate:
+  data:
+    DSN: "{{ urlEncode .Username }}:{{ urlEncode .Password }}@tcp({{ .Host }}:{{ .Port }})/{{ .Database }}?tls=required&parseTime=true"
+```
+
+### .env File Format
+
+```yaml
+secretTemplate:
+  data:
+    .env: |
+      DB_HOST={{ .Host }}
+      DB_PORT={{ .Port }}
+      DB_USER={{ .Username }}
+      DB_PASS={{ .Password }}
+      DB_NAME={{ .Database }}
+      DB_SSLMODE={{ default "disable" .SSLMode }}
+```
+
+### mTLS-Enabled Application
+
+Distribute TLS certificates alongside connection credentials:
+
+```yaml
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseUser
+metadata:
+  name: secure-app-user
+spec:
+  instanceRef:
+    name: postgres-mtls  # Instance with TLS enabled
+  username: secure_app
+  passwordSecret:
+    generate: true
+    secretName: secure-app-credentials
+    secretTemplate:
+      data:
+        DATABASE_URL: "postgresql://{{ urlEncode .Username }}:{{ urlEncode .Password }}@{{ .Host }}:{{ .Port }}/{{ .Database }}?sslmode=verify-full&sslrootcert=/certs/ca.crt&sslcert=/certs/tls.crt&sslkey=/certs/tls.key"
+        ca.crt: "{{ .CA }}"
+        tls.crt: "{{ .TLSCert }}"
+        tls.key: "{{ .TLSKey }}"
 ```
 
 ### User with Existing Password
@@ -214,7 +292,9 @@ spec:
 
 ## Generated Secret Structure
 
-When `passwordSecret.generate: true`, the operator creates a Secret:
+When `passwordSecret.generate: true`, the operator creates a Secret.
+
+**Default keys** (no `secretTemplate.data`):
 
 ```yaml
 apiVersion: v1
@@ -229,7 +309,22 @@ type: Opaque
 data:
   username: <base64>
   password: <base64>
-  # Plus any custom fields from secretTemplate
+  host: <base64>
+  port: <base64>
+```
+
+**Custom keys** (with `secretTemplate.data`):
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: myapp-user-credentials
+type: Opaque
+data:
+  # Only the keys you defined in secretTemplate.data
+  DATABASE_URL: <base64-encoded rendered template>
+  ca.crt: <base64-encoded PEM certificate>
 ```
 
 ## Password Rotation

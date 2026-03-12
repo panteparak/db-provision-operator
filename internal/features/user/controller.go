@@ -235,6 +235,8 @@ func (c *Controller) reconcile(ctx context.Context, user *dbopsv1alpha1.Database
 }
 
 func (c *Controller) ensureCredentialsSecret(ctx context.Context, user *dbopsv1alpha1.DatabaseUser, password, secretName string) error {
+	log := logf.FromContext(ctx)
+
 	// Get instance for connection info
 	instance, err := c.handler.GetInstance(ctx, &user.Spec, user.Namespace)
 	if err != nil {
@@ -273,6 +275,51 @@ func (c *Controller) ensureCredentialsSecret(ctx context.Context, user *dbopsv1a
 		}
 	}
 
+	// Build template data for potential template rendering
+	tmplData := secret.TemplateData{
+		Username:  user.Spec.Username,
+		Password:  password,
+		Host:      instance.Spec.Connection.Host,
+		Port:      instance.Spec.Connection.Port,
+		Database:  instance.Spec.Connection.Database,
+		Namespace: user.Namespace,
+		Name:      user.Name,
+	}
+
+	// Populate SSLMode and TLS certs from instance
+	if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
+		tmplData.SSLMode = instance.Spec.TLS.Mode
+		tlsCreds, tlsErr := c.secretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
+		if tlsErr != nil {
+			log.Error(tlsErr, "Failed to load TLS credentials for template")
+		} else if tlsCreds != nil {
+			tmplData.CA = string(tlsCreds.CA)
+			tmplData.TLSCert = string(tlsCreds.Cert)
+			tmplData.TLSKey = string(tlsCreds.Key)
+		}
+	}
+
+	// Determine secret data: use SecretTemplate.Data if provided, else defaults
+	var secretData map[string]string
+	if hasSecretTemplateData(user) {
+		rendered, renderErr := secret.RenderSecretTemplate(user.Spec.PasswordSecret.SecretTemplate, tmplData)
+		if renderErr != nil {
+			return fmt.Errorf("render secret template: %w", renderErr)
+		}
+		secretData = make(map[string]string, len(rendered))
+		for k, v := range rendered {
+			secretData[k] = string(v)
+		}
+	} else {
+		// Default keys (backward compatible)
+		secretData = map[string]string{
+			"username": user.Spec.Username,
+			"password": password,
+			"host":     instance.Spec.Connection.Host,
+			"port":     fmt.Sprintf("%d", instance.Spec.Connection.Port),
+		}
+	}
+
 	credSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        secretName,
@@ -280,13 +327,8 @@ func (c *Controller) ensureCredentialsSecret(ctx context.Context, user *dbopsv1a
 			Labels:      labels,
 			Annotations: annotations,
 		},
-		Type: secretType,
-		StringData: map[string]string{
-			"username": user.Spec.Username,
-			"password": password,
-			"host":     instance.Spec.Connection.Host,
-			"port":     fmt.Sprintf("%d", instance.Spec.Connection.Port),
-		},
+		Type:       secretType,
+		StringData: secretData,
 	}
 
 	// Set owner reference
@@ -308,6 +350,13 @@ func (c *Controller) ensureCredentialsSecret(ctx context.Context, user *dbopsv1a
 	existing.Annotations = credSecret.Annotations
 	existing.Type = credSecret.Type
 	return c.Update(ctx, existing)
+}
+
+// hasSecretTemplateData returns true if the user has SecretTemplate.Data with entries.
+func hasSecretTemplateData(user *dbopsv1alpha1.DatabaseUser) bool {
+	return user.Spec.PasswordSecret != nil &&
+		user.Spec.PasswordSecret.SecretTemplate != nil &&
+		len(user.Spec.PasswordSecret.SecretTemplate.Data) > 0
 }
 
 func (c *Controller) handleDeletion(ctx context.Context, user *dbopsv1alpha1.DatabaseUser) (ctrl.Result, error) {

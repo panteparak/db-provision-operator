@@ -2042,3 +2042,1341 @@ func TestController_Reconcile_ForceDeleteBypassesGrantCheck(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, updatedUser.Finalizers, util.FinalizerDatabaseUser, "Finalizer should be removed")
 }
+
+func TestController_Reconcile_SecretTemplateDataReplacesDefaultKeys(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "custom-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Data: map[string]string{
+						"DATABASE_URL": "postgresql://{{ .Username }}:{{ .Password }}@{{ .Host }}:{{ .Port }}/{{ .Database }}",
+						"JDBC_URL":     "jdbc:postgresql://{{ .Host }}:{{ .Port }}/{{ .Database }}",
+					},
+				},
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return false, nil
+	}
+	mockRepo.CreateFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error) {
+		return &Result{Created: true}, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return &dbopsv1alpha1.DatabaseInstance{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-instance", Namespace: namespace},
+			Spec: dbopsv1alpha1.DatabaseInstanceSpec{
+				Engine: dbopsv1alpha1.EngineTypePostgres,
+				Connection: dbopsv1alpha1.ConnectionConfig{
+					Host:     "db.example.com",
+					Port:     5432,
+					Database: "mydb",
+				},
+			},
+		}, nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	// Verify the secret has template-rendered keys, NOT default keys
+	var credSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "custom-creds", Namespace: "default"}, &credSecret)
+	require.NoError(t, err)
+
+	// Should have template-defined keys (fake client stores StringData, not Data)
+	assert.Contains(t, credSecret.StringData, "DATABASE_URL")
+	assert.Contains(t, credSecret.StringData, "JDBC_URL")
+
+	// Should NOT have default keys
+	assert.NotContains(t, credSecret.StringData, "username")
+	assert.NotContains(t, credSecret.StringData, "password")
+	assert.NotContains(t, credSecret.StringData, "host")
+	assert.NotContains(t, credSecret.StringData, "port")
+
+	// Verify template rendered correctly
+	assert.Contains(t, credSecret.StringData["JDBC_URL"], "jdbc:postgresql://db.example.com:5432/mydb")
+}
+
+func TestController_Reconcile_EmptySecretTemplateDataUsesDefaults(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "default-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Labels: map[string]string{"app": "test"},
+					// Data is nil — should use default keys
+				},
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return false, nil
+	}
+	mockRepo.CreateFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error) {
+		return &Result{Created: true}, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	// Verify default keys exist
+	var credSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "default-creds", Namespace: "default"}, &credSecret)
+	require.NoError(t, err)
+
+	assert.Contains(t, credSecret.StringData, "username")
+	assert.Contains(t, credSecret.StringData, "password")
+	assert.Contains(t, credSecret.StringData, "host")
+	assert.Contains(t, credSecret.StringData, "port")
+}
+
+func TestController_Reconcile_SecretTemplateDataWithTLS(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "secureuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "tls-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Data: map[string]string{
+						"ca.crt":       "{{ .CA }}",
+						"tls.crt":      "{{ .TLSCert }}",
+						"tls.key":      "{{ .TLSKey }}",
+						"DATABASE_URL": "postgresql://{{ .Username }}@{{ .Host }}:{{ .Port }}/{{ .Database }}?sslmode={{ .SSLMode }}",
+					},
+				},
+			},
+		},
+	}
+
+	// Create the TLS secret that the instance references
+	tlsSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "instance-tls-certs",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			"ca.crt":  []byte("test-ca-cert"),
+			"tls.crt": []byte("test-client-cert"),
+			"tls.key": []byte("test-client-key"),
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, tlsSecret).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return false, nil
+	}
+	mockRepo.CreateFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error) {
+		return &Result{Created: true}, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return &dbopsv1alpha1.DatabaseInstance{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-instance", Namespace: namespace},
+			Spec: dbopsv1alpha1.DatabaseInstanceSpec{
+				Engine: dbopsv1alpha1.EngineTypePostgres,
+				Connection: dbopsv1alpha1.ConnectionConfig{
+					Host:     "db.example.com",
+					Port:     5432,
+					Database: "mydb",
+				},
+				TLS: &dbopsv1alpha1.TLSConfig{
+					Enabled: true,
+					Mode:    "verify-full",
+					SecretRef: &dbopsv1alpha1.TLSSecretRef{
+						Name: "instance-tls-certs",
+					},
+				},
+			},
+		}, nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	// Verify TLS certs were rendered into the secret
+	var credSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "tls-creds", Namespace: "default"}, &credSecret)
+	require.NoError(t, err)
+
+	assert.Equal(t, "test-ca-cert", credSecret.StringData["ca.crt"])
+	assert.Equal(t, "test-client-cert", credSecret.StringData["tls.crt"])
+	assert.Equal(t, "test-client-key", credSecret.StringData["tls.key"])
+	assert.Contains(t, credSecret.StringData["DATABASE_URL"], "sslmode=verify-full")
+}
+
+func TestController_Reconcile_SecretTemplateDataWithUrlEncode(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "encoded-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Data: map[string]string{
+						"DSN": `postgresql://{{ urlEncode .Username }}:{{ urlEncode .Password }}@{{ .Host }}:{{ .Port }}/{{ .Database }}`,
+					},
+				},
+			},
+		},
+	}
+
+	// Pre-create the secret with a known password containing special chars
+	existingSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "encoded-creds",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			"password": []byte("p@ss!w0rd"),
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, existingSecret).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil // User already exists
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return &dbopsv1alpha1.DatabaseInstance{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-instance", Namespace: namespace},
+			Spec: dbopsv1alpha1.DatabaseInstanceSpec{
+				Engine: dbopsv1alpha1.EngineTypePostgres,
+				Connection: dbopsv1alpha1.ConnectionConfig{
+					Host:     "db.example.com",
+					Port:     5432,
+					Database: "mydb",
+				},
+			},
+		}, nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	// Verify URL encoding in the DSN
+	var credSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "encoded-creds", Namespace: "default"}, &credSecret)
+	require.NoError(t, err)
+
+	dsn := credSecret.StringData["DSN"]
+	assert.Contains(t, dsn, "p%40ss%21w0rd") // URL-encoded password
+	assert.Contains(t, dsn, "db.example.com:5432/mydb")
+}
+
+func TestController_Reconcile_TLSSecretMissing_GracefulDegradation(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "graceful-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Data: map[string]string{
+						"ca.crt":       "{{ .CA }}",
+						"DATABASE_URL": "postgresql://{{ .Username }}@{{ .Host }}:{{ .Port }}/{{ .Database }}",
+					},
+				},
+			},
+		},
+	}
+
+	// No TLS secret created — it's missing
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return false, nil
+	}
+	mockRepo.CreateFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error) {
+		return &Result{Created: true}, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return &dbopsv1alpha1.DatabaseInstance{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-instance", Namespace: namespace},
+			Spec: dbopsv1alpha1.DatabaseInstanceSpec{
+				Engine: dbopsv1alpha1.EngineTypePostgres,
+				Connection: dbopsv1alpha1.ConnectionConfig{
+					Host:     "db.example.com",
+					Port:     5432,
+					Database: "mydb",
+				},
+				TLS: &dbopsv1alpha1.TLSConfig{
+					Enabled: true,
+					Mode:    "verify-full",
+					SecretRef: &dbopsv1alpha1.TLSSecretRef{
+						Name: "nonexistent-tls-secret", // This doesn't exist
+					},
+				},
+			},
+		}, nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	// Should succeed even though TLS secret is missing (graceful degradation)
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	// Verify secret was still created with empty TLS fields
+	var credSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "graceful-creds", Namespace: "default"}, &credSecret)
+	require.NoError(t, err)
+
+	// CA should be empty since TLS secret was missing
+	assert.Equal(t, "", credSecret.StringData["ca.crt"])
+	// DATABASE_URL should still render correctly
+	assert.Contains(t, credSecret.StringData["DATABASE_URL"], "db.example.com:5432/mydb")
+}
+
+// ===== Controller SecretTemplate Edge Cases (C1-C17) =====
+
+// C1: SecretTemplate with multi-key data + labels
+func TestController_Reconcile_SecretTemplateMultiKeyWithLabels(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "multi-key-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Labels: map[string]string{"app": "test", "env": "dev"},
+					Data: map[string]string{
+						"DATABASE_URL": "postgresql://{{ .Username }}@{{ .Host }}:{{ .Port }}/{{ .Database }}",
+						"APP_USER":     "{{ .Username }}",
+					},
+				},
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return false, nil
+	}
+	mockRepo.CreateFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error) {
+		return &Result{Created: true}, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return &dbopsv1alpha1.DatabaseInstance{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-instance", Namespace: namespace},
+			Spec: dbopsv1alpha1.DatabaseInstanceSpec{
+				Engine: dbopsv1alpha1.EngineTypePostgres,
+				Connection: dbopsv1alpha1.ConnectionConfig{
+					Host: "db.example.com", Port: 5432, Database: "mydb",
+				},
+			},
+		}, nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, SecretManager: secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval, Logger: logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	var credSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "multi-key-creds", Namespace: "default"}, &credSecret)
+	require.NoError(t, err)
+
+	// Both template keys rendered
+	assert.Contains(t, credSecret.StringData, "DATABASE_URL")
+	assert.Contains(t, credSecret.StringData, "APP_USER")
+	assert.Equal(t, "myuser", credSecret.StringData["APP_USER"])
+
+	// Labels present
+	assert.Equal(t, "test", credSecret.Labels["app"])
+	assert.Equal(t, "dev", credSecret.Labels["env"])
+}
+
+// C2: SecretTemplate with .Database field
+func TestController_Reconcile_SecretTemplateWithDatabaseField(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "db-field-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Data: map[string]string{
+						"database": "{{ .Database }}",
+					},
+				},
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return false, nil
+	}
+	mockRepo.CreateFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error) {
+		return &Result{Created: true}, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return &dbopsv1alpha1.DatabaseInstance{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-instance", Namespace: namespace},
+			Spec: dbopsv1alpha1.DatabaseInstanceSpec{
+				Engine: dbopsv1alpha1.EngineTypePostgres,
+				Connection: dbopsv1alpha1.ConnectionConfig{
+					Host: "db.example.com", Port: 5432, Database: "production_db",
+				},
+			},
+		}, nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, SecretManager: secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval, Logger: logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	var credSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "db-field-creds", Namespace: "default"}, &credSecret)
+	require.NoError(t, err)
+	assert.Equal(t, "production_db", credSecret.StringData["database"])
+}
+
+// C3: SecretTemplate update — changed template re-renders secret
+func TestController_Reconcile_SecretTemplateUpdateReRendersSecret(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "update-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Data: map[string]string{
+						"DSN": "postgresql://{{ .Username }}@{{ .Host }}:{{ .Port }}/{{ .Database }}",
+					},
+				},
+			},
+		},
+	}
+
+	// Pre-create the secret with old data
+	existingSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "update-creds",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			"password": []byte("oldpass"),
+			"DSN":      []byte("old-dsn-value"),
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, existingSecret).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return &dbopsv1alpha1.DatabaseInstance{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-instance", Namespace: namespace},
+			Spec: dbopsv1alpha1.DatabaseInstanceSpec{
+				Engine: dbopsv1alpha1.EngineTypePostgres,
+				Connection: dbopsv1alpha1.ConnectionConfig{
+					Host: "new-host.example.com", Port: 5432, Database: "newdb",
+				},
+			},
+		}, nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, SecretManager: secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval, Logger: logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	var credSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "update-creds", Namespace: "default"}, &credSecret)
+	require.NoError(t, err)
+
+	// Secret should be updated with new template-rendered data
+	assert.Contains(t, credSecret.StringData["DSN"], "new-host.example.com:5432/newdb")
+	// Old default key should NOT be present since template Data is set
+	assert.NotContains(t, credSecret.StringData, "password")
+}
+
+// C4: hasSecretTemplateData with nil PasswordSecret
+func TestHasSecretTemplateData_NilPasswordSecret(t *testing.T) {
+	user := &dbopsv1alpha1.DatabaseUser{
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			PasswordSecret: nil,
+		},
+	}
+	assert.False(t, hasSecretTemplateData(user))
+}
+
+// C5: hasSecretTemplateData with empty SecretTemplate
+func TestHasSecretTemplateData_EmptySecretTemplate(t *testing.T) {
+	user := &dbopsv1alpha1.DatabaseUser{
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{},
+			},
+		},
+	}
+	assert.False(t, hasSecretTemplateData(user))
+}
+
+// C6: SecretTemplate with .Namespace and .Name
+func TestController_Reconcile_SecretTemplateWithNamespaceAndName(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "my-namespace",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "ns-name-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Data: map[string]string{
+						"metadata": "ns={{ .Namespace }},name={{ .Name }}",
+					},
+				},
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return false, nil
+	}
+	mockRepo.CreateFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error) {
+		return &Result{Created: true}, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, SecretManager: secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval, Logger: logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "my-namespace"},
+	})
+	require.NoError(t, err)
+
+	var credSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "ns-name-creds", Namespace: "my-namespace"}, &credSecret)
+	require.NoError(t, err)
+	assert.Equal(t, "ns=my-namespace,name=testuser", credSecret.StringData["metadata"])
+}
+
+// C7: SecretTemplate render failure (invalid syntax)
+func TestController_Reconcile_SecretTemplateInvalidSyntax(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "bad-syntax-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Data: map[string]string{
+						"bad": "{{ .Username ",
+					},
+				},
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return false, nil
+	}
+	mockRepo.CreateFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error) {
+		return &Result{Created: true}, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, SecretManager: secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval, Logger: logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	// Template parse error should propagate
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render secret template")
+}
+
+// C8: SecretTemplate render failure (undefined field reference)
+func TestController_Reconcile_SecretTemplateUndefinedFieldError(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "func-err-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Data: map[string]string{
+						"bad": `{{ .NonexistentField }}`,
+					},
+				},
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return false, nil
+	}
+	mockRepo.CreateFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error) {
+		return &Result{Created: true}, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, SecretManager: secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval, Logger: logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	// Undefined field reference should cause template execution error
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render secret template")
+}
+
+// C9: Instance not found during reconcile
+func TestController_Reconcile_InstanceNotFound(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "nonexistent-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "no-instance-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Data: map[string]string{
+						"DSN": "postgresql://{{ .Username }}@{{ .Host }}",
+					},
+				},
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return nil, fmt.Errorf("DatabaseInstance nonexistent-instance not found")
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "", fmt.Errorf("DatabaseInstance nonexistent-instance not found")
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, SecretManager: secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval, Logger: logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	// Instance not found should cause reconcile error
+	require.Error(t, err)
+}
+
+// C10: TLS enabled but only CA present (no cert/key in TLS secret)
+func TestController_Reconcile_TLSOnlyCAPresentInSecret(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "ca-only-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Data: map[string]string{
+						"ca.crt":  "{{ .CA }}",
+						"tls.crt": "{{ .TLSCert }}",
+						"tls.key": "{{ .TLSKey }}",
+					},
+				},
+			},
+		},
+	}
+
+	// TLS secret with only CA
+	tlsSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "ca-only-tls", Namespace: "default"},
+		Data: map[string][]byte{
+			"ca.crt": []byte("test-ca-only"),
+			// tls.crt and tls.key are absent
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, tlsSecret).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return false, nil
+	}
+	mockRepo.CreateFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error) {
+		return &Result{Created: true}, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return &dbopsv1alpha1.DatabaseInstance{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-instance", Namespace: namespace},
+			Spec: dbopsv1alpha1.DatabaseInstanceSpec{
+				Engine: dbopsv1alpha1.EngineTypePostgres,
+				Connection: dbopsv1alpha1.ConnectionConfig{
+					Host: "db.example.com", Port: 5432, Database: "mydb",
+				},
+				TLS: &dbopsv1alpha1.TLSConfig{
+					Enabled:   true,
+					Mode:      "verify-ca",
+					SecretRef: &dbopsv1alpha1.TLSSecretRef{Name: "ca-only-tls"},
+				},
+			},
+		}, nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, SecretManager: secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval, Logger: logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	var credSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "ca-only-creds", Namespace: "default"}, &credSecret)
+	require.NoError(t, err)
+
+	assert.Equal(t, "test-ca-only", credSecret.StringData["ca.crt"])
+	assert.Equal(t, "", credSecret.StringData["tls.crt"])
+	assert.Equal(t, "", credSecret.StringData["tls.key"])
+}
+
+// C11: TLS disabled but template uses {{ .TLSCert }}
+func TestController_Reconcile_TLSDisabledTemplateUsesTLSFields(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "no-tls-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Data: map[string]string{
+						"ca.crt": "{{ .CA }}",
+						"cert":   "{{ .TLSCert }}",
+					},
+				},
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return false, nil
+	}
+	mockRepo.CreateFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error) {
+		return &Result{Created: true}, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return &dbopsv1alpha1.DatabaseInstance{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-instance", Namespace: namespace},
+			Spec: dbopsv1alpha1.DatabaseInstanceSpec{
+				Engine: dbopsv1alpha1.EngineTypePostgres,
+				Connection: dbopsv1alpha1.ConnectionConfig{
+					Host: "db.example.com", Port: 5432, Database: "mydb",
+				},
+				// TLS is nil — disabled
+			},
+		}, nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, SecretManager: secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval, Logger: logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	var credSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "no-tls-creds", Namespace: "default"}, &credSecret)
+	require.NoError(t, err)
+
+	// TLS fields should render as empty strings since TLS is disabled
+	assert.Equal(t, "", credSecret.StringData["ca.crt"])
+	assert.Equal(t, "", credSecret.StringData["cert"])
+}
+
+// C14: Instance has empty Host / Port=0 / empty Database
+func TestController_Reconcile_InstanceEmptyConnectionFields(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "empty-conn-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Data: map[string]string{
+						"DSN": "postgresql://{{ .Username }}@{{ .Host }}:{{ .Port }}/{{ .Database }}",
+					},
+				},
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return false, nil
+	}
+	mockRepo.CreateFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error) {
+		return &Result{Created: true}, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return &dbopsv1alpha1.DatabaseInstance{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-instance", Namespace: namespace},
+			Spec: dbopsv1alpha1.DatabaseInstanceSpec{
+				Engine: dbopsv1alpha1.EngineTypePostgres,
+				Connection: dbopsv1alpha1.ConnectionConfig{
+					Host: "", Port: 0, Database: "",
+				},
+			},
+		}, nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, SecretManager: secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval, Logger: logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	var credSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "empty-conn-creds", Namespace: "default"}, &credSecret)
+	require.NoError(t, err)
+
+	// Should render with zero/empty values
+	assert.Equal(t, "postgresql://myuser@:0/", credSecret.StringData["DSN"])
+}
+
+// C15: hasSecretTemplateData — SecretTemplate non-nil but Data map is nil
+func TestHasSecretTemplateData_NonNilTemplateNilData(t *testing.T) {
+	user := &dbopsv1alpha1.DatabaseUser{
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Labels: map[string]string{"app": "test"},
+					// Data is nil
+				},
+			},
+		},
+	}
+	assert.False(t, hasSecretTemplateData(user))
+}
+
+// C16: hasSecretTemplateData — SecretTemplate.Data is non-nil empty map
+func TestHasSecretTemplateData_EmptyDataMap(t *testing.T) {
+	user := &dbopsv1alpha1.DatabaseUser{
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Data: map[string]string{},
+				},
+			},
+		},
+	}
+	assert.False(t, hasSecretTemplateData(user))
+}
+
+// C17: Secret already exists — update path with SecretTemplate.Data
+func TestController_Reconcile_SecretExistsUpdateWithTemplate(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "existing-tmpl-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Data: map[string]string{
+						"DATABASE_URL": "postgresql://{{ .Username }}@{{ .Host }}:{{ .Port }}/{{ .Database }}",
+					},
+				},
+			},
+		},
+	}
+
+	// Pre-create an existing secret (simulates previous reconcile)
+	existingSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "existing-tmpl-creds",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			"DATABASE_URL": []byte("old-value"),
+			"password":     []byte("old-password"),
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, existingSecret).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return &dbopsv1alpha1.DatabaseInstance{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-instance", Namespace: namespace},
+			Spec: dbopsv1alpha1.DatabaseInstanceSpec{
+				Engine: dbopsv1alpha1.EngineTypePostgres,
+				Connection: dbopsv1alpha1.ConnectionConfig{
+					Host: "db.example.com", Port: 5432, Database: "mydb",
+				},
+			},
+		}, nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, SecretManager: secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval, Logger: logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	var credSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "existing-tmpl-creds", Namespace: "default"}, &credSecret)
+	require.NoError(t, err)
+
+	// Updated with new template data
+	assert.Contains(t, credSecret.StringData, "DATABASE_URL")
+	assert.Contains(t, credSecret.StringData["DATABASE_URL"], "db.example.com:5432/mydb")
+	// Old default key "password" should be replaced (StringData now only has template keys)
+	assert.NotContains(t, credSecret.StringData, "password")
+}

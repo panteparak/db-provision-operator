@@ -117,3 +117,46 @@ func SecretContainsKeys(
 
 	return true, nil
 }
+
+// SecretDoesNotContainKeys checks that a Kubernetes Secret does NOT contain any of the specified keys.
+func SecretDoesNotContainKeys(
+	ctx context.Context,
+	k8sClient kubernetes.Interface,
+	namespace, name string,
+	keys ...string,
+) (bool, error) {
+	secret, err := k8sClient.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return true, nil // Secret doesn't exist, so it can't contain the keys
+		}
+		return false, fmt.Errorf("failed to get secret %s/%s: %w", namespace, name, err)
+	}
+
+	for _, key := range keys {
+		if _, exists := secret.Data[key]; exists {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+// GetSecretValue retrieves a specific key's value from a Kubernetes Secret.
+func GetSecretValue(
+	ctx context.Context,
+	k8sClient kubernetes.Interface,
+	namespace, name, key string,
+) (string, error) {
+	secret, err := k8sClient.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to get secret %s/%s: %w", namespace, name, err)
+	}
+
+	data, exists := secret.Data[key]
+	if !exists {
+		return "", fmt.Errorf("key %s not found in secret %s/%s", key, namespace, name)
+	}
+
+	return string(data), nil
+}

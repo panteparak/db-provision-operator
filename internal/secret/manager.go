@@ -424,6 +424,10 @@ type TemplateData struct {
 	SSLMode   string
 	Namespace string
 	Name      string
+	// TLS fields - populated from parent DatabaseInstance's TLS secret
+	CA      string // PEM-encoded CA certificate
+	TLSCert string // PEM-encoded client certificate
+	TLSKey  string // PEM-encoded client key
 }
 
 // RenderSecretTemplate renders a secret template with the given data
@@ -448,7 +452,7 @@ func RenderSecretTemplate(tmpl *dbopsv1alpha1.SecretTemplate, data TemplateData)
 
 // renderTemplate renders a single template string
 func renderTemplate(name, tmplStr string, data TemplateData) (string, error) {
-	tmpl, err := template.New(name).Parse(tmplStr)
+	tmpl, err := template.New(name).Funcs(TemplateFuncMap()).Parse(tmplStr)
 	if err != nil {
 		return "", err
 	}

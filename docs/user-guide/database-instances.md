@@ -69,6 +69,9 @@ TLS configuration for secure connections.
 | `verify-ca` | Verify server certificate against CA |
 | `verify-full` | Verify server certificate and hostname |
 
+!!! tip "Distributing TLS Certs to Applications"
+    TLS certificates from `tls.secretRef` can be distributed to application credential secrets via `DatabaseUser.SecretTemplate.Data` using the `.CA`, `.TLSCert`, and `.TLSKey` template variables. See [DatabaseUser SecretTemplate](users.md#secrettemplate) for details.
+
 ### healthCheck (optional)
 
 Health check configuration.

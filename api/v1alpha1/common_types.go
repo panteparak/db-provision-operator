@@ -442,8 +442,14 @@ type SecretTemplate struct {
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
 
-	// Data defines templated data keys
-	// Available variables: .Username, .Password, .Host, .Port, .Database, .SSLMode
+	// Data defines templated data keys.
+	// When provided, these keys REPLACE the default secret keys (username, password, host, port).
+	// Available variables: .Username, .Password, .Host, .Port, .Database, .SSLMode,
+	//   .Namespace, .Name, .CA, .TLSCert, .TLSKey
+	// Available functions: urlEncode, urlPathEncode, base64Encode, base64Decode,
+	//   upper, lower, title, trim, trimPrefix, trimSuffix, replace, quote, squote,
+	//   default, toJson, join
+	// Example: "postgresql://{{ urlEncode .Username }}:{{ urlEncode .Password }}@{{ .Host }}:{{ .Port }}/{{ .Database }}"
 	// +optional
 	Data map[string]string `json:"data,omitempty"`
 }

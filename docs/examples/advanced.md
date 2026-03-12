@@ -163,6 +163,236 @@ spec:
           key: tls.key
 ```
 
+## Secret Template Functions
+
+Real-world examples of `secretTemplate.data` with custom template functions.
+
+### PostgreSQL Connection String
+
+```yaml
+secretTemplate:
+  data:
+    DATABASE_URL: "postgresql://{{ urlEncode .Username }}:{{ urlEncode .Password }}@{{ .Host }}:{{ .Port }}/{{ .Database }}?sslmode={{ default \"prefer\" .SSLMode }}"
+```
+
+### MySQL DSN for Go
+
+```yaml
+secretTemplate:
+  data:
+    DSN: "{{ urlEncode .Username }}:{{ urlEncode .Password }}@tcp({{ .Host }}:{{ .Port }})/{{ .Database }}?tls=required&parseTime=true"
+```
+
+### Spring Boot
+
+```yaml
+secretTemplate:
+  data:
+    SPRING_DATASOURCE_URL: "jdbc:postgresql://{{ .Host }}:{{ .Port }}/{{ .Database }}?ssl=true&sslmode={{ .SSLMode }}"
+    SPRING_DATASOURCE_USERNAME: "{{ .Username }}"
+    SPRING_DATASOURCE_PASSWORD: "{{ .Password }}"
+```
+
+### .env File Format
+
+```yaml
+secretTemplate:
+  data:
+    .env: |
+      DB_HOST={{ .Host }}
+      DB_PORT={{ .Port }}
+      DB_USER={{ .Username }}
+      DB_PASS={{ .Password }}
+      DB_NAME={{ .Database }}
+      DB_SSLMODE={{ default "disable" .SSLMode }}
+```
+
+### ClickHouse DSN
+
+```yaml
+secretTemplate:
+  data:
+    DSN: "clickhouse://{{ urlEncode .Username }}:{{ urlEncode .Password }}@{{ .Host }}:{{ .Port }}/{{ .Database }}?secure=true"
+```
+
+## mTLS with cert-manager
+
+End-to-end example: cert-manager issues certificates, operator distributes them to app secrets.
+
+```yaml
+# Step 0: Bootstrap a self-signed CA (dev/staging — use corporate PKI in production)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned
+spec:
+  selfSigned: {}
+---
+# Step 0b: Create the CA certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: database-ca
+spec:
+  isCA: true
+  secretName: database-ca-keypair
+  commonName: "Database CA"
+  duration: 87600h      # 10 years
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: selfsigned
+    kind: ClusterIssuer
+---
+# Step 1: CA Issuer that signs client/server certs
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: database-ca
+spec:
+  ca:
+    secretName: database-ca-keypair
+---
+# Step 2: Client certificate for operator
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: postgres-client-cert
+spec:
+  secretName: postgres-tls-certs
+  issuerRef:
+    name: database-ca
+    kind: Issuer
+  commonName: db-provision-operator
+  usages:
+    - client auth
+  duration: 8760h
+  renewBefore: 720h
+---
+# Step 3: DatabaseInstance references cert-manager's output secret
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseInstance
+metadata:
+  name: postgres-mtls
+spec:
+  engine: postgres
+  connection:
+    host: postgres.database.svc.cluster.local
+    port: 5432
+    secretRef:
+      name: postgres-admin-credentials
+  tls:
+    enabled: true
+    mode: verify-full
+    secretRef:
+      name: postgres-tls-certs
+---
+# Step 4: DatabaseUser distributes certs via template
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseUser
+metadata:
+  name: app-user
+spec:
+  instanceRef:
+    name: postgres-mtls
+  username: app_user
+  passwordSecret:
+    generate: true
+    secretName: app-db-credentials
+    secretTemplate:
+      data:
+        DATABASE_URL: "postgresql://{{ urlEncode .Username }}:{{ urlEncode .Password }}@{{ .Host }}:{{ .Port }}/{{ .Database }}?sslmode=verify-full"
+        ca.crt: "{{ .CA }}"
+        tls.crt: "{{ .TLSCert }}"
+        tls.key: "{{ .TLSKey }}"
+---
+# Step 5: App Deployment mounting the credential secret
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-db-credentials
+                  key: DATABASE_URL
+          volumeMounts:
+            - name: db-certs
+              mountPath: /certs
+              readOnly: true
+      volumes:
+        - name: db-certs
+          secret:
+            secretName: app-db-credentials
+            items:
+              - key: ca.crt
+                path: ca.crt
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+```
+
+## Cloud SQL with Pre-Provisioned Certs
+
+```yaml
+# Step 1: Cloud SQL CA cert in a K8s secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cloudsql-ca
+type: Opaque
+stringData:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    ... Cloud SQL server CA cert from GCP console ...
+    -----END CERTIFICATE-----
+---
+# Step 2: DatabaseInstance with TLS (server verification only)
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseInstance
+metadata:
+  name: cloudsql-postgres
+spec:
+  engine: postgres
+  connection:
+    host: 10.0.0.5
+    port: 5432
+    secretRef:
+      name: cloudsql-admin-credentials
+  tls:
+    enabled: true
+    mode: verify-ca
+    secretRef:
+      name: cloudsql-ca
+      keys:
+        ca: ca.crt
+---
+# Step 3: DatabaseUser with CA in template
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseUser
+metadata:
+  name: api-user
+spec:
+  instanceRef:
+    name: cloudsql-postgres
+  username: api_service
+  passwordSecret:
+    generate: true
+    secretName: api-db-credentials
+    secretTemplate:
+      data:
+        DATABASE_URL: "postgresql://{{ urlEncode .Username }}:{{ urlEncode .Password }}@{{ .Host }}:{{ .Port }}/{{ .Database }}?sslmode=verify-ca&sslrootcert=/certs/ca.crt"
+        ca.crt: "{{ .CA }}"
+```
+
 ## Cloud Backups
 
 ### AWS S3

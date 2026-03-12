@@ -273,6 +273,100 @@ spec:
     - client auth
 ```
 
+### mTLS (Mutual TLS)
+
+In standard TLS, the client verifies the server's identity. In **mutual TLS (mTLS)**, both sides authenticate:
+
+- **Server certificate** (signed by a CA) — clients verify server identity
+- **Client certificate** (signed by a CA the server trusts) — server verifies client identity
+
+```
+                    CA (Certificate Authority)
+                   /                          \
+         signs server cert              signs client cert(s)
+                |                              |
+         DB Server                    Client Application
+   (presents server cert)          (presents client cert)
+         ↕ mutual verification ↕
+```
+
+**Database support:**
+
+| Database | Server-side TLS | mTLS (Client Certs) |
+|----------|----------------|---------------------|
+| PostgreSQL | `ssl = on` in postgresql.conf | `clientcert=verify-ca` in pg_hba.conf |
+| MySQL | `REQUIRE SSL` | `REQUIRE X509` |
+| CockroachDB | `--certs-dir` flag | Built-in cert auth |
+
+#### Distributing TLS Certs to Applications via SecretTemplate
+
+The operator loads TLS certificates from `DatabaseInstance.Spec.TLS.SecretRef` for its own connections. Using `SecretTemplate.Data`, these same certs can be distributed to application secrets:
+
+```
+DatabaseInstance.Spec.TLS.SecretRef → K8s Secret (ca.crt, tls.crt, tls.key)
+    ↓ (operator reads at reconcile time)
+TemplateData{.CA, .TLSCert, .TLSKey}
+    ↓ (rendered into user's credential secret)
+DatabaseUser credential Secret (ca.crt, tls.crt, tls.key, DATABASE_URL)
+    ↓ (mounted by application)
+Application Pod
+```
+
+See [DatabaseUser SecretTemplate](../user-guide/users.md#secrettemplate) for template variables and functions.
+
+#### cert-manager Integration
+
+cert-manager creates `Certificate` CRs that populate K8s Secrets automatically. The operator references these secrets via `TLSConfig.SecretRef`:
+
+```yaml
+# cert-manager issues a client certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: postgres-client-cert
+spec:
+  secretName: postgres-tls-certs  # cert-manager populates this
+  issuerRef:
+    name: database-ca
+    kind: Issuer
+  commonName: db-provision-operator
+  usages: [client auth]
+---
+# DatabaseInstance references the cert-manager output
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseInstance
+metadata:
+  name: postgres-mtls
+spec:
+  engine: postgres
+  connection:
+    host: postgres.database.svc.cluster.local
+    port: 5432
+    secretRef:
+      name: postgres-admin-credentials
+  tls:
+    enabled: true
+    mode: verify-full
+    secretRef:
+      name: postgres-tls-certs  # From cert-manager
+```
+
+See [Advanced Examples — mTLS with cert-manager](../examples/advanced.md#mtls-with-cert-manager) for a complete end-to-end setup.
+
+#### Cloud Database Providers
+
+Cloud-managed databases provide their own CA bundles. Download them into K8s Secrets and reference via `TLSConfig.SecretRef`:
+
+- **Cloud SQL (GCP)**: Server CA from Cloud SQL Admin API. Client certs optional (IAM auth preferred).
+- **RDS (AWS)**: Regional CA bundle downloadable from AWS. IAM database authentication available as alternative.
+- **Azure Database**: Server CA downloadable from Azure portal. Client certs supported for PostgreSQL.
+
+Pattern: download certs → K8s Secret (manually or via external-secrets-operator) → `TLSConfig.SecretRef` → `SecretTemplate` distribution.
+
+#### SSL SANs
+
+Subject Alternative Names (SANs) are configured in **server certificates**, not controlled by the operator. The `verify-full` TLS mode validates the server hostname against SANs in the server cert. Client certificate SANs are typically not checked by database servers.
+
 ## Database Security
 
 ### PostgreSQL Security
