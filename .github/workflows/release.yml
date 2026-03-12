@@ -1,9 +1,8 @@
 name: Release
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+*']
   workflow_dispatch:
     inputs:
       version:
@@ -37,46 +36,64 @@ jobs:
       image-tag: ${{ steps.image-tag.outputs.image-tag }}
       ci-run-id: ${{ steps.ci-run.outputs.run-id }}
     steps:
-      - name: Check CI conclusion
-        if: github.event_name == 'workflow_run'
+      # --- push (tag): extract version from GITHUB_REF_NAME, poll for CI ---
+      - name: Extract version from tag
+        if: github.event_name == 'push'
+        id: version
         env:
-          WR_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          TAG: ${{ github.ref_name }}
         run: |
-          if [[ "$WR_CONCLUSION" != "success" ]]; then
-            echo "::error::CI workflow did not succeed (conclusion: $WR_CONCLUSION)"
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::Tag '$TAG' does not match semver pattern"
             exit 1
           fi
-
-      # --- workflow_run: discover version tag on the CI-tested commit ---
-      # CI only triggers on branch pushes (not tags) to avoid duplicate runs.
-      # We discover version tags by checking git history of the tested SHA.
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        if: github.event_name == 'workflow_run'
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          fetch-depth: 1
-          fetch-tags: true
-          persist-credentials: false
-
-      - name: Extract tag and version
-        if: github.event_name == 'workflow_run'
-        id: version
-        run: |
-          TAG=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]' | head -1)
-
-          if [[ -z "$TAG" ]]; then
-            echo "::notice::No version tag found for SHA ${GITHUB_EVENT_WORKFLOW_RUN_HEAD_SHA}, skipping release"
-            echo "should-release=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
           VERSION="${TAG#v}"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "should-release=true" >> $GITHUB_OUTPUT
           echo "Release: $TAG (version $VERSION)"
+
+      - name: Wait for CI to complete
+        if: github.event_name == 'push'
+        id: ci-poll
         env:
-          GITHUB_EVENT_WORKFLOW_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_SHA: ${{ github.sha }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          echo "Polling CI status for commit $COMMIT_SHA (up to 30 minutes)..."
+          MAX_ATTEMPTS=60
+          SLEEP_SECONDS=30
+          for (( i=1; i<=MAX_ATTEMPTS; i++ )); do
+            # Find CI workflow runs for this exact commit
+            RUN_JSON=$(gh run list \
+              --repo "$GH_REPO" \
+              --workflow "CI" \
+              --commit "$COMMIT_SHA" \
+              --json databaseId,status,conclusion \
+              --limit 1)
+
+            STATUS=$(echo "$RUN_JSON" | jq -r '.[0].status // empty')
+            CONCLUSION=$(echo "$RUN_JSON" | jq -r '.[0].conclusion // empty')
+            RUN_ID=$(echo "$RUN_JSON" | jq -r '.[0].databaseId // empty')
+
+            if [[ "$STATUS" == "completed" ]]; then
+              if [[ "$CONCLUSION" == "success" ]]; then
+                echo "CI run $RUN_ID succeeded"
+                echo "run-id=$RUN_ID" >> $GITHUB_OUTPUT
+                exit 0
+              else
+                echo "::error::CI run $RUN_ID finished with conclusion: $CONCLUSION"
+                exit 1
+              fi
+            fi
+
+            echo "Attempt $i/$MAX_ATTEMPTS: CI status=$STATUS, waiting ${SLEEP_SECONDS}s..."
+            sleep "$SLEEP_SECONDS"
+          done
+
+          echo "::error::Timed out waiting for CI to complete after $((MAX_ATTEMPTS * SLEEP_SECONDS))s"
+          exit 1
 
       # --- workflow_dispatch: resolve version via commitizen or override ---
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -126,9 +143,8 @@ jobs:
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "version=${{ steps.version.outputs.version || steps.dispatch-version.outputs.version }}" >> $GITHUB_OUTPUT
           echo "should-release=${{ steps.version.outputs.should-release || steps.dispatch-version.outputs.should-release || 'false' }}" >> $GITHUB_OUTPUT
-          # For workflow_run, use the tag as checkout ref for downstream jobs
-          # (guard already checked out the commit; downstream jobs need to checkout separately)
-          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+          # For tag push, use the tag as checkout ref for downstream jobs
+          if [[ "$EVENT_NAME" == "push" ]]; then
             echo "checkout-ref=${TAG}" >> $GITHUB_OUTPUT
           else
             echo "checkout-ref=" >> $GITHUB_OUTPUT
@@ -138,11 +154,12 @@ jobs:
         if: steps.final-version.outputs.should-release == 'true'
         id: image-tag
         env:
-          WR_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
-            SHA="$WR_HEAD_SHA"
+          # For tag push: GITHUB_SHA is the tagged commit (same SHA CI used)
+          # For dispatch: use HEAD of the checked-out repo
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            SHA="${GITHUB_SHA}"
           else
             SHA=$(git rev-parse HEAD)
           fi
@@ -154,11 +171,11 @@ jobs:
         if: steps.final-version.outputs.should-release == 'true'
         id: ci-run
         env:
-          WR_RUN_ID: ${{ github.event.workflow_run.id }}
+          POLL_RUN_ID: ${{ steps.ci-poll.outputs.run-id }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
-            echo "run-id=$WR_RUN_ID" >> $GITHUB_OUTPUT
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            echo "run-id=$POLL_RUN_ID" >> $GITHUB_OUTPUT
           else
             echo "run-id=" >> $GITHUB_OUTPUT
           fi
@@ -166,7 +183,7 @@ jobs:
   # ============================================================================
   # Docker Release: Retag CI images or rebuild (manual dispatch)
   # ============================================================================
-  # For workflow_run: retags CI-built SHA images to version tags using
+  # For tag push: retags CI-built SHA images to version tags using
   # `docker buildx imagetools create`. This is a manifest-only operation —
   # no rebuild, bit-for-bit identical to what CI tested.
   # For workflow_dispatch: rebuilds from source as a fallback.
@@ -188,7 +205,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # workflow_run: retag existing CI-tested images
+      # tag push: retag existing CI-tested images
       - name: Retag CI images to release version
         if: needs.guard.outputs.ci-run-id != ''
         env:
@@ -243,7 +260,7 @@ jobs:
 
           persist-credentials: false
 
-      # Download SBOMs from CI run (only available via workflow_run)
+      # Download SBOMs from CI run (only available via tag push)
       - name: Download SBOM
         if: needs.guard.outputs.ci-run-id != ''
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0

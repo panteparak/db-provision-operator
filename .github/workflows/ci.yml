@@ -531,7 +531,6 @@ jobs:
         with:
           # Use a token with write access for auto-commit
           token: ${{ secrets.GITHUB_TOKEN }}
-          persist-credentials: false
 
       - name: Setup Go
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0

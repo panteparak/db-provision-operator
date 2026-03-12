@@ -2,6 +2,7 @@
 name = "cz_conventional_commits"
 version = "0.6.0"
 tag_format = "v$version"
+bump_message = "chore(release): bump version $current_version → $new_version"
 version_files = [
     "charts/db-provision-operator/Chart.yaml:^version",
     "charts/db-provision-operator/Chart.yaml:^appVersion",
