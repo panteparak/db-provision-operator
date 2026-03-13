@@ -1642,3 +1642,74 @@ func TestController_Reconcile_ForceDeleteBypassesGrantCheck(t *testing.T) {
 	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testrole", Namespace: "default"}, &updatedRole)
 	assert.True(t, apierrors.IsNotFound(err), "expected NotFound after force-delete bypass, got: %v", err)
 }
+
+func TestController_Reconcile_ClusterInstanceRefDoesNotPanic(t *testing.T) {
+	scheme := newTestScheme()
+
+	// Create a DatabaseRole with clusterInstanceRef (NOT instanceRef)
+	role := &dbopsv1alpha1.DatabaseRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "shared-reader",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseRoleSpec{
+			RoleName: "shared-reader",
+			ClusterInstanceRef: &dbopsv1alpha1.ClusterInstanceReference{
+				Name: "shared-postgres",
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(role).
+		WithStatusSubresource(role).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, roleName string, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string) (bool, error) {
+		return false, nil
+	}
+	mockRepo.CreateFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string) (*Result, error) {
+		return &Result{Created: true, Message: "created"}, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, roleName string, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("shared-postgres", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	// This must not panic — the bug was a nil deref on spec.InstanceRef.Name
+	// when clusterInstanceRef is used instead.
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "shared-reader", Namespace: "default"},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, ctrl.Result{}, result)
+
+	var updatedRole dbopsv1alpha1.DatabaseRole
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "shared-reader", Namespace: "default"}, &updatedRole)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedRole.Status.Phase)
+	assert.True(t, mockRepo.WasCalled("Create"))
+}

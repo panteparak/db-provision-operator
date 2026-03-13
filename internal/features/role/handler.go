@@ -53,6 +53,17 @@ func NewHandler(cfg HandlerConfig) *Handler {
 	}
 }
 
+// resolveInstanceName returns the instance name from whichever ref is set.
+func resolveInstanceName(spec *dbopsv1alpha1.DatabaseRoleSpec) string {
+	if spec.InstanceRef != nil {
+		return spec.InstanceRef.Name
+	}
+	if spec.ClusterInstanceRef != nil {
+		return spec.ClusterInstanceRef.Name
+	}
+	return ""
+}
+
 // Create creates a new database role.
 func (h *Handler) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string) (*Result, error) {
 	log := logf.FromContext(ctx).WithValues("role", spec.RoleName, "namespace", namespace)
@@ -98,7 +109,7 @@ func (h *Handler) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseRoleSp
 	if result.Created && h.eventBus != nil {
 		h.eventBus.PublishAsync(ctx, eventbus.NewRoleCreated(
 			spec.RoleName,
-			spec.InstanceRef.Name,
+			resolveInstanceName(spec),
 			namespace,
 		))
 	}
@@ -124,7 +135,7 @@ func (h *Handler) Update(ctx context.Context, roleName string, spec *dbopsv1alph
 		if h.eventBus != nil {
 			h.eventBus.PublishAsync(ctx, eventbus.NewRoleUpdated(
 				roleName,
-				spec.InstanceRef.Name,
+				resolveInstanceName(spec),
 				namespace,
 				[]string{"settings"},
 			))
@@ -157,7 +168,7 @@ func (h *Handler) Delete(ctx context.Context, roleName string, spec *dbopsv1alph
 	if h.eventBus != nil {
 		h.eventBus.PublishAsync(ctx, eventbus.NewRoleDeleted(
 			roleName,
-			spec.InstanceRef.Name,
+			resolveInstanceName(spec),
 			namespace,
 		))
 	}
@@ -197,7 +208,7 @@ func (h *Handler) UpdateInfoMetric(role *dbopsv1alpha1.DatabaseRole) {
 	metrics.SetRoleInfo(
 		role.Name,
 		role.Namespace,
-		role.Spec.InstanceRef.Name,
+		resolveInstanceName(&role.Spec),
 		role.Spec.RoleName,
 		phase,
 	)

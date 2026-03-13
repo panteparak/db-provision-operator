@@ -344,11 +344,25 @@ func (c *Controller) ensureCredentialsSecret(ctx context.Context, user *dbopsv1a
 		return err
 	}
 
-	// Update if exists - update StringData, Labels, Annotations, and Type
+	// Update if exists - merge Labels/Annotations (preserve external keys), replace StringData and Type
 	existing.StringData = credSecret.StringData
-	existing.Labels = credSecret.Labels
-	existing.Annotations = credSecret.Annotations
 	existing.Type = credSecret.Type
+
+	// Merge labels: update operator-managed keys, preserve external keys
+	if existing.Labels == nil {
+		existing.Labels = make(map[string]string)
+	}
+	for k, v := range credSecret.Labels {
+		existing.Labels[k] = v
+	}
+
+	// Merge annotations: update operator-managed keys, preserve external keys
+	if existing.Annotations == nil {
+		existing.Annotations = make(map[string]string)
+	}
+	for k, v := range credSecret.Annotations {
+		existing.Annotations[k] = v
+	}
 	return c.Update(ctx, existing)
 }
 

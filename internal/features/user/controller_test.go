@@ -3380,3 +3380,489 @@ func TestController_Reconcile_SecretExistsUpdateWithTemplate(t *testing.T) {
 	// Old default key "password" should be replaced (StringData now only has template keys)
 	assert.NotContains(t, credSecret.StringData, "password")
 }
+
+// ===== Secret Update Merge Tests =====
+
+func TestController_Reconcile_SecretUpdatePreservesExternalAnnotations(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "merge-ann-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Annotations: map[string]string{
+						"operator-ann": "value",
+					},
+				},
+			},
+		},
+	}
+
+	// Pre-create secret with external annotations
+	existingSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "merge-ann-creds",
+			Namespace: "default",
+			Annotations: map[string]string{
+				"reloader.stakater.com/match": "true",
+				"custom.io/managed":           "external",
+			},
+		},
+		Data: map[string][]byte{"password": []byte("old")},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, existingSecret).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, SecretManager: secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval, Logger: logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	var credSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "merge-ann-creds", Namespace: "default"}, &credSecret)
+	require.NoError(t, err)
+
+	// External annotations preserved
+	assert.Equal(t, "true", credSecret.Annotations["reloader.stakater.com/match"])
+	assert.Equal(t, "external", credSecret.Annotations["custom.io/managed"])
+	// Operator annotation merged
+	assert.Equal(t, "value", credSecret.Annotations["operator-ann"])
+	// Default operator labels set
+	assert.Equal(t, "db-provision-operator", credSecret.Labels["app.kubernetes.io/managed-by"])
+	assert.Equal(t, "testuser", credSecret.Labels["dbops.dbprovision.io/user"])
+}
+
+func TestController_Reconcile_SecretUpdatePreservesExternalLabels(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "merge-lbl-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Labels: map[string]string{
+						"custom-label": "value",
+					},
+				},
+			},
+		},
+	}
+
+	// Pre-create secret with external labels
+	existingSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "merge-lbl-creds",
+			Namespace: "default",
+			Labels: map[string]string{
+				"argocd.argoproj.io/instance": "myapp",
+				"team":                        "platform",
+			},
+		},
+		Data: map[string][]byte{"password": []byte("old")},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, existingSecret).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, SecretManager: secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval, Logger: logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	var credSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "merge-lbl-creds", Namespace: "default"}, &credSecret)
+	require.NoError(t, err)
+
+	// External labels preserved
+	assert.Equal(t, "myapp", credSecret.Labels["argocd.argoproj.io/instance"])
+	assert.Equal(t, "platform", credSecret.Labels["team"])
+	// Custom label merged
+	assert.Equal(t, "value", credSecret.Labels["custom-label"])
+	// Default operator labels set
+	assert.Equal(t, "db-provision-operator", credSecret.Labels["app.kubernetes.io/managed-by"])
+	assert.Equal(t, "testuser", credSecret.Labels["dbops.dbprovision.io/user"])
+}
+
+func TestController_Reconcile_SecretUpdateMergesOperatorAndExternalMetadata(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "merge-both-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Labels: map[string]string{
+						"operator-label": "op-value",
+					},
+					Annotations: map[string]string{
+						"operator-ann": "op-ann-value",
+					},
+				},
+			},
+		},
+	}
+
+	// Pre-create secret with both external annotations AND labels
+	existingSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "merge-both-creds",
+			Namespace: "default",
+			Labels: map[string]string{
+				"external-label": "ext-value",
+			},
+			Annotations: map[string]string{
+				"external-ann": "ext-ann-value",
+			},
+		},
+		StringData: map[string]string{"old-key": "old-value"},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, existingSecret).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, SecretManager: secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval, Logger: logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	var credSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "merge-both-creds", Namespace: "default"}, &credSecret)
+	require.NoError(t, err)
+
+	// External metadata preserved
+	assert.Equal(t, "ext-value", credSecret.Labels["external-label"])
+	assert.Equal(t, "ext-ann-value", credSecret.Annotations["external-ann"])
+	// Operator metadata merged
+	assert.Equal(t, "op-value", credSecret.Labels["operator-label"])
+	assert.Equal(t, "op-ann-value", credSecret.Annotations["operator-ann"])
+	// Default operator labels
+	assert.Equal(t, "db-provision-operator", credSecret.Labels["app.kubernetes.io/managed-by"])
+	// StringData is fully replaced (operator-owned) — old key gone
+	assert.NotContains(t, credSecret.StringData, "old-key")
+	assert.Contains(t, credSecret.StringData, "username")
+}
+
+func TestController_Reconcile_SecretUpdateOverwritesOperatorAnnotationValues(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "overwrite-ann-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Annotations: map[string]string{
+						"operator-ann": "new",
+					},
+				},
+			},
+		},
+	}
+
+	// Pre-create secret with the same annotation at an old value
+	existingSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "overwrite-ann-creds",
+			Namespace: "default",
+			Annotations: map[string]string{
+				"operator-ann": "old",
+				"external-ann": "keep-me",
+			},
+		},
+		Data: map[string][]byte{"password": []byte("old")},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, existingSecret).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, SecretManager: secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval, Logger: logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	var credSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "overwrite-ann-creds", Namespace: "default"}, &credSecret)
+	require.NoError(t, err)
+
+	// Operator annotation updated to new value
+	assert.Equal(t, "new", credSecret.Annotations["operator-ann"])
+	// External annotation untouched
+	assert.Equal(t, "keep-me", credSecret.Annotations["external-ann"])
+}
+
+func TestController_Reconcile_SecretUpdateWithNilAnnotationsOnExisting(t *testing.T) {
+	scheme := newTestScheme()
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "myuser",
+			InstanceRef: &dbopsv1alpha1.InstanceReference{
+				Name: "test-instance",
+			},
+			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
+				Generate:   true,
+				SecretName: "nil-meta-creds",
+				SecretTemplate: &dbopsv1alpha1.SecretTemplate{
+					Annotations: map[string]string{
+						"new-ann": "added",
+					},
+				},
+			},
+		},
+	}
+
+	// Pre-create bare secret with nil annotations and labels
+	existingSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "nil-meta-creds",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{"password": []byte("old")},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, existingSecret).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{repo: mockRepo, eventBus: NewMockEventBus(), logger: logr.Discard()}
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, SecretManager: secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval, Logger: logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	var credSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "nil-meta-creds", Namespace: "default"}, &credSecret)
+	require.NoError(t, err)
+
+	// Annotations added without nil-pointer panic
+	assert.Equal(t, "added", credSecret.Annotations["new-ann"])
+	// Default operator labels set
+	assert.Equal(t, "db-provision-operator", credSecret.Labels["app.kubernetes.io/managed-by"])
+	assert.Equal(t, "testuser", credSecret.Labels["dbops.dbprovision.io/user"])
+}
+
+func TestController_Reconcile_ClusterInstanceRefDoesNotPanic(t *testing.T) {
+	scheme := newTestScheme()
+
+	// Create a DatabaseUser with clusterInstanceRef (NOT instanceRef)
+	user := &dbopsv1alpha1.DatabaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "vault",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseUserSpec{
+			Username: "vault",
+			ClusterInstanceRef: &dbopsv1alpha1.ClusterInstanceReference{
+				Name: "shared-postgres",
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return false, nil
+	}
+	mockRepo.CreateFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error) {
+		return &Result{Created: true, Message: "created"}, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("shared-postgres", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	// This must not panic — the bug was a nil deref on spec.InstanceRef.Name
+	// when clusterInstanceRef is used instead.
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "vault", Namespace: "default"},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, ctrl.Result{}, result)
+
+	var updatedUser dbopsv1alpha1.DatabaseUser
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "vault", Namespace: "default"}, &updatedUser)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedUser.Status.Phase)
+	assert.True(t, mockRepo.WasCalled("Create"))
+}

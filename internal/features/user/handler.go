@@ -56,6 +56,17 @@ func NewHandler(cfg HandlerConfig) *Handler {
 	}
 }
 
+// resolveInstanceName returns the instance name from whichever ref is set.
+func resolveInstanceName(spec *dbopsv1alpha1.DatabaseUserSpec) string {
+	if spec.InstanceRef != nil {
+		return spec.InstanceRef.Name
+	}
+	if spec.ClusterInstanceRef != nil {
+		return spec.ClusterInstanceRef.Name
+	}
+	return ""
+}
+
 // Create creates a new database user with the provided password.
 func (h *Handler) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, password string) (*Result, error) {
 	log := logf.FromContext(ctx).WithValues("user", spec.Username, "namespace", namespace)
@@ -103,7 +114,7 @@ func (h *Handler) Create(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSp
 	if result.Created && h.eventBus != nil {
 		h.eventBus.PublishAsync(ctx, eventbus.NewUserCreated(
 			spec.Username,
-			spec.InstanceRef.Name,
+			resolveInstanceName(spec),
 			namespace,
 			result.SecretName,
 		))
@@ -130,7 +141,7 @@ func (h *Handler) Update(ctx context.Context, username string, spec *dbopsv1alph
 		if h.eventBus != nil {
 			h.eventBus.PublishAsync(ctx, eventbus.NewUserUpdated(
 				username,
-				spec.InstanceRef.Name,
+				resolveInstanceName(spec),
 				namespace,
 				[]string{"settings"},
 			))
@@ -161,7 +172,7 @@ func (h *Handler) Delete(ctx context.Context, username string, spec *dbopsv1alph
 	if h.eventBus != nil {
 		h.eventBus.PublishAsync(ctx, eventbus.NewUserDeleted(
 			username,
-			spec.InstanceRef.Name,
+			resolveInstanceName(spec),
 			namespace,
 		))
 	}
@@ -240,7 +251,7 @@ func (h *Handler) UpdateInfoMetric(user *dbopsv1alpha1.DatabaseUser) {
 	metrics.SetUserInfo(
 		user.Name,
 		user.Namespace,
-		user.Spec.InstanceRef.Name,
+		resolveInstanceName(&user.Spec),
 		user.Spec.Username,
 		phase,
 	)
