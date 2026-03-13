@@ -22,6 +22,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
 	"strings"
 
 	_ "github.com/ClickHouse/clickhouse-go/v2"
@@ -55,7 +56,7 @@ func ClickHouseEngineConfig(host string, port int32, username, password string) 
 func (v *ClickHouseVerifier) Connect(ctx context.Context) error {
 	dsn := fmt.Sprintf("clickhouse://%s:%d/%s?username=%s&password=%s",
 		v.config.Host, v.config.Port, v.config.AdminDatabase,
-		v.config.Username, v.config.Password)
+		url.QueryEscape(v.config.Username), url.QueryEscape(v.config.Password))
 
 	db, err := sql.Open("clickhouse", dsn)
 	if err != nil {
@@ -235,7 +236,7 @@ func (v *ClickHouseVerifier) HasRoleMembership(ctx context.Context, username, ro
 // ConnectAsUser creates a new database connection as a specific user.
 func (v *ClickHouseVerifier) ConnectAsUser(ctx context.Context, username, password, database string) (UserConnection, error) {
 	dsn := fmt.Sprintf("clickhouse://%s:%d/%s?username=%s&password=%s",
-		v.config.Host, v.config.Port, database, username, password)
+		v.config.Host, v.config.Port, database, url.QueryEscape(username), url.QueryEscape(password))
 
 	db, err := sql.Open("clickhouse", dsn)
 	if err != nil {

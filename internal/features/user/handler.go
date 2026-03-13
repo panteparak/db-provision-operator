@@ -231,6 +231,11 @@ func (h *Handler) RotatePassword(ctx context.Context, username string, spec *dbo
 	return nil
 }
 
+// SetPassword updates the password for an existing user in the database.
+func (h *Handler) SetPassword(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) error {
+	return h.repo.SetPassword(ctx, username, password, spec, namespace)
+}
+
 // OnDatabaseCreated handles the DatabaseCreated event.
 func (h *Handler) OnDatabaseCreated(ctx context.Context, event *eventbus.DatabaseCreated) error {
 	logf.FromContext(ctx).V(1).Info("Database created, users can now be granted access",

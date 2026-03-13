@@ -146,6 +146,7 @@ func (c *Controller) reconcile(ctx context.Context, user *dbopsv1alpha1.Database
 
 	// Get or create password
 	var password string
+	var secretMissing bool
 	secretName := user.Spec.Username + "-credentials"
 	if user.Spec.PasswordSecret != nil && user.Spec.PasswordSecret.SecretName != "" {
 		secretName = user.Spec.PasswordSecret.SecretName
@@ -154,6 +155,7 @@ func (c *Controller) reconcile(ctx context.Context, user *dbopsv1alpha1.Database
 	existingSecret := &corev1.Secret{}
 	err = c.Get(ctx, client.ObjectKey{Namespace: user.Namespace, Name: secretName}, existingSecret)
 	if errors.IsNotFound(err) {
+		secretMissing = true
 		// Generate new password using PasswordConfig if specified
 		password, err = secret.GeneratePassword(user.Spec.PasswordSecret)
 		if err != nil {
@@ -175,6 +177,12 @@ func (c *Controller) reconcile(ctx context.Context, user *dbopsv1alpha1.Database
 			return c.handleError(ctx, user, err, "create user")
 		}
 		c.Recorder.Eventf(user, corev1.EventTypeNormal, "Created", "User %s created successfully", user.Spec.Username)
+	} else if secretMissing {
+		// User exists but Secret is missing — sync the new password to the database
+		log.Info("Syncing password for existing user (Secret was missing)", "username", user.Spec.Username)
+		if err := c.handler.SetPassword(ctx, user.Spec.Username, &user.Spec, user.Namespace, password); err != nil {
+			return c.handleError(ctx, user, err, "sync password")
+		}
 	}
 
 	// Update user settings

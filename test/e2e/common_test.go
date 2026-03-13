@@ -416,13 +416,14 @@ func (cfg *DatabaseTestConfig) RunInvalidInstanceConnectionTest(ctx context.Cont
 // Test ID: ALL-NEG-02
 func (cfg *DatabaseTestConfig) RunNonExistentInstanceRefTest(ctx context.Context) {
 	invalidDbName := cfg.DatabaseName + "-invalid-ref"
+	invalidDbSpecName := cfg.DatabaseName + "_invalid_ref"
 
 	By("creating a Database CR with non-existent instance reference")
 	database := testutil.BuildDatabase(
 		invalidDbName,
 		cfg.TestNamespace,
 		"non-existent-instance-that-does-not-exist",
-		invalidDbName,
+		invalidDbSpecName,
 	)
 
 	_, err := dynamicClient.Resource(databaseGVR).Namespace(cfg.TestNamespace).Create(ctx, database, metav1.CreateOptions{})
@@ -461,11 +462,9 @@ func (cfg *DatabaseTestConfig) RunDeletionProtectionTest(ctx context.Context) {
 		testutil.SecretRef{Name: cfg.SecretName, Namespace: cfg.SecretNamespace},
 	)
 
-	// Add deletion protection annotation
-	metadata := instance.Object["metadata"].(map[string]interface{})
-	metadata["annotations"] = map[string]interface{}{
-		"dbops.dbprovision.io/deletion-protection": "true",
-	}
+	// Enable deletion protection via spec field (DatabaseInstance uses spec, not annotation)
+	spec := instance.Object["spec"].(map[string]interface{})
+	spec["deletionProtection"] = true
 
 	_, err := dynamicClient.Resource(databaseInstanceGVR).Namespace(cfg.TestNamespace).Create(ctx, instance, metav1.CreateOptions{})
 	Expect(err).NotTo(HaveOccurred(), "Failed to create protected DatabaseInstance")
@@ -493,10 +492,14 @@ func (cfg *DatabaseTestConfig) RunDeletionProtectionTest(ctx context.Context) {
 	By("cleaning up - removing protection and deleting")
 	obj, _ := dynamicClient.Resource(databaseInstanceGVR).Namespace(cfg.TestNamespace).Get(ctx, protectedInstanceName, metav1.GetOptions{})
 	if obj != nil {
-		// Remove the deletion protection annotation
+		// Remove the deletion protection spec field and add force-delete annotation
+		spec := obj.Object["spec"].(map[string]interface{})
+		spec["deletionProtection"] = false
 		metadata := obj.Object["metadata"].(map[string]interface{})
+		if metadata["annotations"] == nil {
+			metadata["annotations"] = map[string]interface{}{}
+		}
 		annotations := metadata["annotations"].(map[string]interface{})
-		delete(annotations, "dbops.dbprovision.io/deletion-protection")
 		annotations["dbops.dbprovision.io/force-delete"] = "true"
 		_, _ = dynamicClient.Resource(databaseInstanceGVR).Namespace(cfg.TestNamespace).Update(ctx, obj, metav1.UpdateOptions{})
 	}

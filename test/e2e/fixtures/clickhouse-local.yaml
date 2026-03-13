@@ -19,8 +19,8 @@ metadata:
   namespace: clickhouse
 type: Opaque
 stringData:
-  username: default
-  password: clickhouse-root-password
+  username: dbprovision_admin
+  password: adminpassword123
 ---
 apiVersion: dbops.dbprovision.io/v1alpha1
 kind: DatabaseInstance
