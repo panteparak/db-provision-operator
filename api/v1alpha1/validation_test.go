@@ -308,6 +308,229 @@ func TestDatabaseUserValidation(t *testing.T) {
 	}
 }
 
+// TestDatabaseInstanceRefValidation tests the instanceRef/clusterInstanceRef
+// mutual exclusivity and "at least one required" CEL rules on Database, DatabaseUser,
+// and DatabaseRole specs. These tests exist because a nil pointer dereference in the
+// user/role handlers went undetected when CRs used clusterInstanceRef instead of
+// instanceRef. By proving the CRD accepts clusterInstanceRef-only CRs, we enforce
+// that controllers must handle them safely.
+func TestDatabaseInstanceRefValidation(t *testing.T) {
+	k8sClient, ctx := setupTestEnv(t)
+
+	t.Run("Database", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			database  *Database
+			wantErr   bool
+			errSubstr string
+		}{
+			{
+				name: "clusterInstanceRef only - should succeed",
+				database: &Database{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-db-cluster-ref",
+						Namespace: "default",
+					},
+					Spec: DatabaseSpec{
+						ClusterInstanceRef: &ClusterInstanceReference{Name: "shared-postgres"},
+						Name:               "mydb",
+					},
+				},
+				wantErr: false,
+			},
+			{
+				name: "both instanceRef and clusterInstanceRef - should fail",
+				database: &Database{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-db-both-refs",
+						Namespace: "default",
+					},
+					Spec: DatabaseSpec{
+						InstanceRef:        &InstanceReference{Name: "local-pg"},
+						ClusterInstanceRef: &ClusterInstanceReference{Name: "shared-pg"},
+						Name:               "mydb",
+					},
+				},
+				wantErr:   true,
+				errSubstr: "mutually exclusive",
+			},
+			{
+				name: "neither instanceRef nor clusterInstanceRef - should fail",
+				database: &Database{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-db-no-ref",
+						Namespace: "default",
+					},
+					Spec: DatabaseSpec{
+						Name: "mydb",
+					},
+				},
+				wantErr:   true,
+				errSubstr: "either instanceRef or clusterInstanceRef",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				err := k8sClient.Create(ctx, tt.database)
+				if tt.wantErr {
+					assert.Error(t, err, "Expected validation error")
+					if tt.errSubstr != "" && err != nil {
+						assert.Contains(t, err.Error(), tt.errSubstr)
+					}
+				} else {
+					assert.NoError(t, err, "Expected no validation error")
+					if err == nil {
+						_ = k8sClient.Delete(ctx, tt.database)
+					}
+				}
+			})
+		}
+	})
+
+	t.Run("DatabaseUser", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			user      *DatabaseUser
+			wantErr   bool
+			errSubstr string
+		}{
+			{
+				name: "clusterInstanceRef only - should succeed",
+				user: &DatabaseUser{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-user-cluster-ref",
+						Namespace: "default",
+					},
+					Spec: DatabaseUserSpec{
+						ClusterInstanceRef: &ClusterInstanceReference{Name: "shared-postgres"},
+						Username:           "vault",
+					},
+				},
+				wantErr: false,
+			},
+			{
+				name: "both instanceRef and clusterInstanceRef - should fail",
+				user: &DatabaseUser{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-user-both-refs",
+						Namespace: "default",
+					},
+					Spec: DatabaseUserSpec{
+						InstanceRef:        &InstanceReference{Name: "local-pg"},
+						ClusterInstanceRef: &ClusterInstanceReference{Name: "shared-pg"},
+						Username:           "vault",
+					},
+				},
+				wantErr:   true,
+				errSubstr: "mutually exclusive",
+			},
+			{
+				name: "neither instanceRef nor clusterInstanceRef - should fail",
+				user: &DatabaseUser{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-user-no-ref",
+						Namespace: "default",
+					},
+					Spec: DatabaseUserSpec{
+						Username: "vault",
+					},
+				},
+				wantErr:   true,
+				errSubstr: "either instanceRef or clusterInstanceRef",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				err := k8sClient.Create(ctx, tt.user)
+				if tt.wantErr {
+					assert.Error(t, err, "Expected validation error")
+					if tt.errSubstr != "" && err != nil {
+						assert.Contains(t, err.Error(), tt.errSubstr)
+					}
+				} else {
+					assert.NoError(t, err, "Expected no validation error")
+					if err == nil {
+						_ = k8sClient.Delete(ctx, tt.user)
+					}
+				}
+			})
+		}
+	})
+
+	t.Run("DatabaseRole", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			role      *DatabaseRole
+			wantErr   bool
+			errSubstr string
+		}{
+			{
+				name: "clusterInstanceRef only - should succeed",
+				role: &DatabaseRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-role-cluster-ref",
+						Namespace: "default",
+					},
+					Spec: DatabaseRoleSpec{
+						ClusterInstanceRef: &ClusterInstanceReference{Name: "shared-postgres"},
+						RoleName:           "app_reader",
+					},
+				},
+				wantErr: false,
+			},
+			{
+				name: "both instanceRef and clusterInstanceRef - should fail",
+				role: &DatabaseRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-role-both-refs",
+						Namespace: "default",
+					},
+					Spec: DatabaseRoleSpec{
+						InstanceRef:        &InstanceReference{Name: "local-pg"},
+						ClusterInstanceRef: &ClusterInstanceReference{Name: "shared-pg"},
+						RoleName:           "app_reader",
+					},
+				},
+				wantErr:   true,
+				errSubstr: "mutually exclusive",
+			},
+			{
+				name: "neither instanceRef nor clusterInstanceRef - should fail",
+				role: &DatabaseRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-role-no-ref",
+						Namespace: "default",
+					},
+					Spec: DatabaseRoleSpec{
+						RoleName: "app_reader",
+					},
+				},
+				wantErr:   true,
+				errSubstr: "either instanceRef or clusterInstanceRef",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				err := k8sClient.Create(ctx, tt.role)
+				if tt.wantErr {
+					assert.Error(t, err, "Expected validation error")
+					if tt.errSubstr != "" && err != nil {
+						assert.Contains(t, err.Error(), tt.errSubstr)
+					}
+				} else {
+					assert.NoError(t, err, "Expected no validation error")
+					if err == nil {
+						_ = k8sClient.Delete(ctx, tt.role)
+					}
+				}
+			})
+		}
+	})
+}
+
 // TestDatabaseInstanceValidation tests DatabaseInstance CRD validation
 func TestDatabaseInstanceValidation(t *testing.T) {
 	k8sClient, ctx := setupTestEnv(t)
