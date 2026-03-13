@@ -175,7 +175,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        database: [postgresql, mysql, mariadb, cockroachdb]
+        database: [postgresql, mysql, mariadb, cockroachdb, clickhouse]
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -780,9 +780,9 @@ jobs:
     needs: [integration-test]
     strategy:
       fail-fast: false
-      max-parallel: 4  # Run all 4 database tests in parallel
+      max-parallel: 5  # Run all 5 database tests in parallel
       matrix:
-        database: [postgresql, mysql, mariadb, cockroachdb]
+        database: [postgresql, mysql, mariadb, cockroachdb, clickhouse]
         include:
           - database: postgresql
             port: 5432
@@ -792,6 +792,8 @@ jobs:
             port: 3307
           - database: cockroachdb
             port: 26257
+          - database: clickhouse
+            port: 19000
 
     steps:
       - name: Checkout code
@@ -944,7 +946,9 @@ jobs:
           echo "  ✅ Integration Tests (MySQL)"
           echo "  ✅ Integration Tests (MariaDB)"
           echo "  ✅ Integration Tests (CockroachDB)"
+          echo "  ✅ Integration Tests (ClickHouse)"
           echo "  ✅ E2E Tests (PostgreSQL)"
           echo "  ✅ E2E Tests (MySQL)"
           echo "  ✅ E2E Tests (MariaDB)"
           echo "  ✅ E2E Tests (CockroachDB)"
+          echo "  ✅ E2E Tests (ClickHouse)"

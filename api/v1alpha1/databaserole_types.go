@@ -48,6 +48,10 @@ type DatabaseRoleSpec struct {
 	// +optional
 	MySQL *MySQLRoleConfig `json:"mysql,omitempty"`
 
+	// ClickHouse-specific configuration
+	// +optional
+	ClickHouse *ClickHouseRoleConfig `json:"clickhouse,omitempty"`
+
 	// DriftPolicy overrides the instance-level drift policy for this role.
 	// If not specified, the instance's drift policy is used.
 	// +optional

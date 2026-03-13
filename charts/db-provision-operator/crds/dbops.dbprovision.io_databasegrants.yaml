@@ -54,6 +54,58 @@ spec:
           spec:
             description: DatabaseGrantSpec defines the desired state of DatabaseGrant.
             properties:
+              clickhouse:
+                description: ClickHouse-specific grants
+                properties:
+                  grants:
+                    description: Grants defines direct privilege grants
+                    items:
+                      description: ClickHouseGrant defines a ClickHouse privilege
+                        grant
+                      properties:
+                        database:
+                          description: Database is the target database (for database/table
+                            levels)
+                          type: string
+                        level:
+                          allOf:
+                          - enum:
+                            - global
+                            - database
+                            - table
+                          - enum:
+                            - global
+                            - database
+                            - table
+                          description: Level is the grant level
+                          type: string
+                        privileges:
+                          description: Privileges to grant (SELECT, INSERT, ALTER,
+                            CREATE, DROP, TRUNCATE, SHOW, etc.)
+                          items:
+                            pattern: ^[A-Z][A-Z ]*$
+                            type: string
+                          maxItems: 20
+                          minItems: 1
+                          type: array
+                        table:
+                          description: Table is the target table (for table level)
+                          type: string
+                        withGrantOption:
+                          description: WithGrantOption allows the grantee to grant
+                            these privileges to others
+                          type: boolean
+                      required:
+                      - level
+                      - privileges
+                      type: object
+                    type: array
+                  roles:
+                    description: Roles to assign to the user
+                    items:
+                      type: string
+                    type: array
+                type: object
               databaseRef:
                 description: DatabaseRef references the Database for context (optional)
                 properties:

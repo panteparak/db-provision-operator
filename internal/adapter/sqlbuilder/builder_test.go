@@ -100,6 +100,55 @@ func TestMySQLEscapeLiteral(t *testing.T) {
 	}
 }
 
+func TestClickHouseEscapeIdentifier(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"mydb", "`mydb`"},
+		{"my`db", "`my``db`"},
+		{"", "``"},
+		{"`; DROP TABLE students;--", "```; DROP TABLE students;--`"},
+	}
+	d := ClickHouseDialect{}
+	for _, tt := range tests {
+		got := d.EscapeIdentifier(tt.input)
+		if got != tt.want {
+			t.Errorf("ClickHouseEscapeIdentifier(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestClickHouseEscapeLiteral(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"hello", `'hello'`},
+		{"it's", `'it''s'`},
+		{`back\slash`, `'back\\slash'`},
+		{`'; DROP TABLE students;--`, `'''; DROP TABLE students;--'`},
+	}
+	d := ClickHouseDialect{}
+	for _, tt := range tests {
+		got := d.EscapeLiteral(tt.input)
+		if got != tt.want {
+			t.Errorf("ClickHouseEscapeLiteral(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestClickHouseValidPrivileges(t *testing.T) {
+	d := ClickHouseDialect{}
+	privs := d.ValidPrivileges()
+	expectedPrivs := []string{"SELECT", "INSERT", "ALTER", "CREATE", "DROP", "TRUNCATE", "SHOW", "ALL", "CREATE DATABASE", "CREATE TABLE"}
+	for _, p := range expectedPrivs {
+		if !privs[p] {
+			t.Errorf("ClickHouseDialect.ValidPrivileges() missing %q", p)
+		}
+	}
+}
+
 // --- Privilege validation tests ------------------------------------------
 
 func TestValidatePrivileges(t *testing.T) {
@@ -118,6 +167,9 @@ func TestValidatePrivileges(t *testing.T) {
 		{"mixed valid invalid", []string{"SELECT", "INVALID_PRIV"}, ValidPostgresPrivileges, true},
 		{"valid mysql", []string{"CREATE VIEW", "SHOW DATABASES"}, ValidMySQLPrivileges, false},
 		{"mysql injection", []string{"SELECT, DROP"}, ValidMySQLPrivileges, true},
+		{"valid clickhouse", []string{"SELECT", "INSERT", "CREATE DATABASE"}, ValidClickHousePrivileges, false},
+		{"clickhouse truncate", []string{"TRUNCATE"}, ValidClickHousePrivileges, false},
+		{"clickhouse invalid", []string{"SUPER"}, ValidClickHousePrivileges, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

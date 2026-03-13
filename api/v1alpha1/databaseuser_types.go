@@ -65,6 +65,10 @@ type DatabaseUserSpec struct {
 	// +optional
 	MySQL *MySQLUserConfig `json:"mysql,omitempty"`
 
+	// ClickHouse-specific configuration
+	// +optional
+	ClickHouse *ClickHouseUserConfig `json:"clickhouse,omitempty"`
+
 	// DriftPolicy overrides the instance-level drift policy for this user.
 	// If not specified, the instance's drift policy is used.
 	// +optional

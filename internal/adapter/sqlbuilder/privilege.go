@@ -76,6 +76,38 @@ var ValidMySQLPrivileges = map[string]bool{
 	"USAGE":                   true,
 }
 
+// ValidClickHousePrivileges is the allowlist of ClickHouse privileges.
+var ValidClickHousePrivileges = map[string]bool{
+	"ALL":                    true,
+	"SELECT":                 true,
+	"INSERT":                 true,
+	"ALTER":                  true,
+	"CREATE":                 true,
+	"DROP":                   true,
+	"TRUNCATE":               true,
+	"SHOW":                   true,
+	"OPTIMIZE":               true,
+	"CREATE DATABASE":        true,
+	"CREATE TABLE":           true,
+	"CREATE VIEW":            true,
+	"CREATE DICTIONARY":      true,
+	"CREATE TEMPORARY TABLE": true,
+	"CREATE FUNCTION":        true,
+	"ALTER TABLE":            true,
+	"ALTER VIEW":             true,
+	"DROP DATABASE":          true,
+	"DROP TABLE":             true,
+	"DROP VIEW":              true,
+	"DROP DICTIONARY":        true,
+	"DROP FUNCTION":          true,
+	"SHOW DATABASES":         true,
+	"SHOW TABLES":            true,
+	"SHOW DICTIONARIES":      true,
+	"SHOW COLUMNS":           true,
+	"KILL QUERY":             true,
+	"SYSTEM":                 true,
+}
+
 // ValidatePrivileges checks that every privilege is in the allowlist.
 // Returns an error listing the first invalid privilege found.
 func ValidatePrivileges(privileges []string, allowlist map[string]bool) error {

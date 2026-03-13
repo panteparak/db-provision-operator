@@ -57,6 +57,16 @@ spec:
           spec:
             description: DatabaseSpec defines the desired state of Database.
             properties:
+              clickhouse:
+                description: ClickHouse-specific configuration (required when instance
+                  engine is "clickhouse")
+                properties:
+                  engine:
+                    default: Atomic
+                    description: Engine specifies the database engine (e.g., "Atomic",
+                      "Lazy", "Replicated")
+                    type: string
+                type: object
               clusterInstanceRef:
                 description: ClusterInstanceRef references a cluster-scoped ClusterDatabaseInstance
                   (mutually exclusive with InstanceRef)

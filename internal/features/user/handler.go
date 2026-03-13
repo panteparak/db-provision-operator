@@ -28,6 +28,7 @@ import (
 	"github.com/db-provision-operator/internal/secret"
 	"github.com/db-provision-operator/internal/service/drift"
 	"github.com/db-provision-operator/internal/shared/eventbus"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 )
 
 // Handler contains the business logic for user operations.
@@ -186,8 +187,14 @@ func (h *Handler) Exists(ctx context.Context, username string, spec *dbopsv1alph
 }
 
 // GetInstance returns the DatabaseInstance for the given spec.
+// Deprecated: Use ResolveInstance instead, which supports both DatabaseInstance and ClusterDatabaseInstance.
 func (h *Handler) GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
 	return h.repo.GetInstance(ctx, spec, namespace)
+}
+
+// ResolveInstance resolves the instance reference (supports both instanceRef and clusterInstanceRef).
+func (h *Handler) ResolveInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*instanceresolver.ResolvedInstance, error) {
+	return h.repo.ResolveInstance(ctx, spec, namespace)
 }
 
 // RotatePassword rotates the user's password.

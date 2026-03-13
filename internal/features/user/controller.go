@@ -39,6 +39,7 @@ import (
 	"github.com/db-provision-operator/internal/logging"
 	"github.com/db-provision-operator/internal/reconcileutil"
 	"github.com/db-provision-operator/internal/secret"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 	reconcilecontext "github.com/db-provision-operator/internal/shared/reconcile"
 	"github.com/db-provision-operator/internal/util"
 )
@@ -186,17 +187,21 @@ func (c *Controller) reconcile(ctx context.Context, user *dbopsv1alpha1.Database
 		return c.handleError(ctx, user, err, "ensure credentials secret")
 	}
 
-	// Get instance for drift detection
-	instance, err := c.handler.GetInstance(ctx, &user.Spec, user.Namespace)
+	// Resolve instance for drift detection (supports both instanceRef and clusterInstanceRef)
+	resolvedInstance, err := c.handler.ResolveInstance(ctx, &user.Spec, user.Namespace)
 	if err != nil {
-		log.Error(err, "Failed to get instance for drift detection")
+		log.Error(err, "Failed to resolve instance for drift detection")
 		// Continue anyway, drift detection will use defaults
 	}
 
 	// Perform drift detection
+	var driftInstance *dbopsv1alpha1.DatabaseInstance
+	if resolvedInstance != nil {
+		driftInstance = instanceFromResolved(resolvedInstance)
+	}
 	c.driftOrchestrator.PerformDriftDetection(ctx,
 		&userDriftableResource{user},
-		&controllerdrift.NamespacedInstancePolicy{Instance: instance},
+		&controllerdrift.NamespacedInstancePolicy{Instance: driftInstance},
 		&userDriftDetector{handler: c.handler, spec: &user.Spec, namespace: user.Namespace},
 	)
 
@@ -230,17 +235,17 @@ func (c *Controller) reconcile(ctx context.Context, user *dbopsv1alpha1.Database
 	log.Info("Successfully reconciled DatabaseUser", "username", user.Spec.Username)
 	return ctrl.Result{RequeueAfter: c.driftOrchestrator.GetRequeueInterval(
 		&userDriftableResource{user},
-		&controllerdrift.NamespacedInstancePolicy{Instance: instance},
+		&controllerdrift.NamespacedInstancePolicy{Instance: driftInstance},
 	)}, nil
 }
 
 func (c *Controller) ensureCredentialsSecret(ctx context.Context, user *dbopsv1alpha1.DatabaseUser, password, secretName string) error {
 	log := logf.FromContext(ctx)
 
-	// Get instance for connection info
-	instance, err := c.handler.GetInstance(ctx, &user.Spec, user.Namespace)
+	// Resolve instance for connection info (supports both instanceRef and clusterInstanceRef)
+	resolved, err := c.handler.ResolveInstance(ctx, &user.Spec, user.Namespace)
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve instance: %w", err)
 	}
 
 	// Build base labels
@@ -279,17 +284,17 @@ func (c *Controller) ensureCredentialsSecret(ctx context.Context, user *dbopsv1a
 	tmplData := secret.TemplateData{
 		Username:  user.Spec.Username,
 		Password:  password,
-		Host:      instance.Spec.Connection.Host,
-		Port:      instance.Spec.Connection.Port,
-		Database:  instance.Spec.Connection.Database,
+		Host:      resolved.Spec.Connection.Host,
+		Port:      resolved.Spec.Connection.Port,
+		Database:  resolved.Spec.Connection.Database,
 		Namespace: user.Namespace,
 		Name:      user.Name,
 	}
 
 	// Populate SSLMode and TLS certs from instance
-	if instance.Spec.TLS != nil && instance.Spec.TLS.Enabled {
-		tmplData.SSLMode = instance.Spec.TLS.Mode
-		tlsCreds, tlsErr := c.secretManager.GetTLSCredentials(ctx, instance.Namespace, instance.Spec.TLS)
+	if resolved.Spec.TLS != nil && resolved.Spec.TLS.Enabled {
+		tmplData.SSLMode = resolved.Spec.TLS.Mode
+		tlsCreds, tlsErr := c.secretManager.GetTLSCredentials(ctx, resolved.CredentialNamespace, resolved.Spec.TLS)
 		if tlsErr != nil {
 			log.Error(tlsErr, "Failed to load TLS credentials for template")
 		} else if tlsCreds != nil {
@@ -315,8 +320,8 @@ func (c *Controller) ensureCredentialsSecret(ctx context.Context, user *dbopsv1a
 		secretData = map[string]string{
 			"username": user.Spec.Username,
 			"password": password,
-			"host":     instance.Spec.Connection.Host,
-			"port":     fmt.Sprintf("%d", instance.Spec.Connection.Port),
+			"host":     resolved.Spec.Connection.Host,
+			"port":     fmt.Sprintf("%d", resolved.Spec.Connection.Port),
 		}
 	}
 
@@ -575,6 +580,17 @@ func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
 		Named("databaseuser").
 		WithPredicates(c.predicates...).
 		Complete(c)
+}
+
+// instanceFromResolved creates a DatabaseInstance from a ResolvedInstance for backward compatibility
+// with drift detection policies that expect a DatabaseInstance.
+func instanceFromResolved(resolved *instanceresolver.ResolvedInstance) *dbopsv1alpha1.DatabaseInstance {
+	return &dbopsv1alpha1.DatabaseInstance{
+		Spec: *resolved.Spec,
+		Status: dbopsv1alpha1.DatabaseInstanceStatus{
+			Phase: resolved.Phase,
+		},
+	}
 }
 
 // hasGrantDependencies checks if any DatabaseGrant resources reference this user.

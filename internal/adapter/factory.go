@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/adapter/clickhouse"
 	"github.com/db-provision-operator/internal/adapter/cockroachdb"
 	"github.com/db-provision-operator/internal/adapter/mysql"
 	"github.com/db-provision-operator/internal/adapter/postgres"
@@ -35,6 +36,8 @@ func NewAdapter(engine dbopsv1alpha1.EngineType, config ConnectionConfig) (Datab
 		return mysql.NewAdapter(config), nil
 	case dbopsv1alpha1.EngineTypeCockroachDB:
 		return cockroachdb.NewAdapter(config), nil
+	case dbopsv1alpha1.EngineTypeClickHouse:
+		return clickhouse.NewAdapter(config), nil
 	default:
 		return nil, fmt.Errorf("unsupported engine type: %s", engine)
 	}

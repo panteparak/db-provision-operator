@@ -22,6 +22,7 @@ import (
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/service/drift"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 )
 
 // API defines the public interface for the user module.
@@ -42,7 +43,11 @@ type API interface {
 	RotatePassword(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error
 
 	// GetInstance returns the DatabaseInstance for the given spec.
+	// Deprecated: Use ResolveInstance instead, which supports both DatabaseInstance and ClusterDatabaseInstance.
 	GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error)
+
+	// ResolveInstance resolves the instance reference (supports both instanceRef and clusterInstanceRef).
+	ResolveInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*instanceresolver.ResolvedInstance, error)
 
 	// GetOwnedObjects retrieves all database objects owned by the specified user.
 	// This is used for pre-deletion safety checks to prevent dropping users
@@ -98,7 +103,11 @@ type RepositoryInterface interface {
 	SetPassword(ctx context.Context, username, password string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error
 
 	// GetInstance returns the DatabaseInstance for a given spec.
+	// Deprecated: Use ResolveInstance instead, which supports both DatabaseInstance and ClusterDatabaseInstance.
 	GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error)
+
+	// ResolveInstance resolves the instance reference (supports both instanceRef and clusterInstanceRef).
+	ResolveInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*instanceresolver.ResolvedInstance, error)
 
 	// GetEngine returns the database engine type for a given spec.
 	GetEngine(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error)

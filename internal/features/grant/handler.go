@@ -217,6 +217,13 @@ func (h *Handler) collectPrivileges(spec *dbopsv1alpha1.DatabaseGrantSpec) []str
 		}
 	}
 
+	if spec.ClickHouse != nil {
+		privileges = append(privileges, spec.ClickHouse.Roles...)
+		for _, g := range spec.ClickHouse.Grants {
+			privileges = append(privileges, g.Privileges...)
+		}
+	}
+
 	return privileges
 }
 

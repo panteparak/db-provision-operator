@@ -54,6 +54,16 @@ spec:
           spec:
             description: DatabaseRoleSpec defines the desired state of DatabaseRole.
             properties:
+              clickhouse:
+                description: ClickHouse-specific configuration
+                properties:
+                  settings:
+                    additionalProperties:
+                      type: string
+                    description: Settings defines ClickHouse settings to apply to
+                      the role
+                    type: object
+                type: object
               clusterInstanceRef:
                 description: ClusterInstanceRef references a cluster-scoped ClusterDatabaseInstance
                   (mutually exclusive with InstanceRef)

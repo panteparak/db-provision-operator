@@ -60,6 +60,21 @@ spec:
           spec:
             description: DatabaseInstanceSpec defines the desired state of DatabaseInstance.
             properties:
+              clickhouse:
+                description: ClickHouse-specific options (only valid when engine is
+                  "clickhouse")
+                properties:
+                  httpPort:
+                    description: HTTPPort is the ClickHouse HTTP interface port (optional,
+                      for HTTP protocol alongside native)
+                    format: int32
+                    maximum: 65535
+                    minimum: 1
+                    type: integer
+                  secure:
+                    description: Secure enables TLS for native protocol connections
+                    type: boolean
+                type: object
               connection:
                 description: Connection configuration
                 properties:
@@ -183,11 +198,13 @@ spec:
                   - mysql
                   - mariadb
                   - cockroachdb
+                  - clickhouse
                 - enum:
                   - postgres
                   - mysql
                   - mariadb
                   - cockroachdb
+                  - clickhouse
                 description: Engine type (required, immutable)
                 type: string
                 x-kubernetes-validations:

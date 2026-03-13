@@ -704,3 +704,24 @@ func MariaDBTestConfig() *DatabaseTestConfig {
 		Interval:        2 * time.Second,
 	}
 }
+
+// ClickHouseTestConfig returns the default configuration for ClickHouse tests.
+func ClickHouseTestConfig() *DatabaseTestConfig {
+	return &DatabaseTestConfig{
+		EngineType:      "clickhouse",
+		InstanceName:    "clickhouse-e2e-instance",
+		DatabaseName:    "testdb",
+		UserName:        "testuser",
+		RoleName:        "testrole",
+		GrantName:       "testgrant",
+		TestNamespace:   "default",
+		Host:            "host.k3d.internal",
+		Port:            9000,
+		SecretName:      "clickhouse-credentials",
+		SecretNamespace: "clickhouse",
+		Engine:          "clickhouse",
+		AdminDatabase:   "default",
+		Timeout:         2 * time.Minute,
+		Interval:        2 * time.Second,
+	}
+}

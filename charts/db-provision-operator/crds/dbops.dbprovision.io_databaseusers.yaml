@@ -57,6 +57,22 @@ spec:
           spec:
             description: DatabaseUserSpec defines the desired state of DatabaseUser.
             properties:
+              clickhouse:
+                description: ClickHouse-specific configuration
+                properties:
+                  allowedHosts:
+                    description: |-
+                      AllowedHosts restricts where the user can connect from.
+                      Supports IP addresses, hostnames, and LIKE patterns.
+                      If empty, the user can connect from anywhere.
+                    items:
+                      type: string
+                    type: array
+                  defaultDatabase:
+                    description: DefaultDatabase sets the default database for the
+                      user
+                    type: string
+                type: object
               clusterInstanceRef:
                 description: ClusterInstanceRef references a cluster-scoped ClusterDatabaseInstance
                   (mutually exclusive with InstanceRef)

@@ -56,6 +56,9 @@ func GetSpecBuilder(engine dbopsv1alpha1.EngineType) SpecBuilder {
 		// The CockroachDB adapter silently ignores unsupported PG attributes
 		// (SUPERUSER, REPLICATION, BYPASSRLS).
 		return NewPostgresSpecBuilder()
+	case dbopsv1alpha1.EngineTypeClickHouse:
+		// ClickHouse uses minimal spec options; the empty builder provides safe defaults
+		return &emptySpecBuilder{}
 	default:
 		// Return empty builder for unknown engines
 		// This provides safe defaults without panicking

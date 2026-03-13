@@ -53,6 +53,9 @@ func (s *Service) DetectGrantDrift(ctx context.Context, spec *dbopsv1alpha1.Data
 	if spec.MySQL != nil {
 		s.detectMySQLGrantDrift(spec.MySQL, actualGrants, result)
 	}
+	if spec.ClickHouse != nil {
+		s.detectClickHouseGrantDrift(spec.ClickHouse, actualGrants, result)
+	}
 
 	if result.HasDrift() {
 		log.Info("drift detected", "diffs", len(result.Diffs))
@@ -79,6 +82,70 @@ func (s *Service) detectMySQLGrantDrift(spec *dbopsv1alpha1.MySQLGrantConfig, ac
 	// Detect direct grant drift
 	for _, grant := range spec.Grants {
 		s.detectMySQLDirectGrantDrift(grant, actualGrants, result)
+	}
+}
+
+// detectClickHouseGrantDrift detects drift for ClickHouse-specific grant settings.
+func (s *Service) detectClickHouseGrantDrift(spec *dbopsv1alpha1.ClickHouseGrantConfig, actualGrants []types.GrantInfo, result *Result) {
+	// Detect role membership drift
+	if len(spec.Roles) > 0 {
+		s.detectRoleMembershipDrift(spec.Roles, actualGrants, result)
+	}
+
+	// Detect direct grant drift using the MySQL-style comparison (level-based)
+	for _, grant := range spec.Grants {
+		s.detectClickHouseDirectGrantDrift(grant, actualGrants, result)
+	}
+}
+
+// detectClickHouseDirectGrantDrift compares expected grants to actual for ClickHouse.
+func (s *Service) detectClickHouseDirectGrantDrift(grant dbopsv1alpha1.ClickHouseGrant, actualGrants []types.GrantInfo, result *Result) {
+	targetDB := grant.Database
+	targetTable := grant.Table
+	if targetTable == "" {
+		targetTable = "*"
+	}
+
+	// Build set of expected privileges
+	expectedPrivs := make(map[string]bool)
+	for _, p := range grant.Privileges {
+		expectedPrivs[strings.ToUpper(strings.TrimSpace(p))] = true
+	}
+
+	// Find matching actual grants
+	matchFound := false
+	for _, actual := range actualGrants {
+		if actual.Database == targetDB {
+			matchFound = true
+			// Check for missing privileges
+			actualPrivs := make(map[string]bool)
+			for _, p := range actual.Privileges {
+				actualPrivs[strings.ToUpper(strings.TrimSpace(p))] = true
+			}
+
+			var missing []string
+			for p := range expectedPrivs {
+				if !actualPrivs[p] {
+					missing = append(missing, p)
+				}
+			}
+			sort.Strings(missing)
+			if len(missing) > 0 {
+				result.AddDiff(Diff{
+					Field:    fmt.Sprintf("grants.%s.%s.missing", targetDB, targetTable),
+					Expected: strings.Join(missing, ", "),
+					Actual:   "",
+				})
+			}
+		}
+	}
+
+	if !matchFound && len(grant.Privileges) > 0 {
+		result.AddDiff(Diff{
+			Field:    fmt.Sprintf("grants.%s.%s.missing", targetDB, targetTable),
+			Expected: strings.Join(grant.Privileges, ", "),
+			Actual:   "",
+		})
 	}
 }
 
@@ -387,6 +454,25 @@ func (s *Service) applyMissingGrants(ctx context.Context, spec *dbopsv1alpha1.Da
 			}
 			if strings.Contains(diff.Field, tableName) || strings.Contains(diff.Field, grant.Database) {
 				opts := []types.GrantOptions{{
+					Database:   grant.Database,
+					Table:      tableName,
+					Privileges: privileges,
+				}}
+				return s.adapter.Grant(ctx, grantee, opts)
+			}
+		}
+	}
+
+	// For ClickHouse grants
+	if spec.ClickHouse != nil {
+		for _, grant := range spec.ClickHouse.Grants {
+			tableName := grant.Table
+			if tableName == "" {
+				tableName = "*"
+			}
+			if strings.Contains(diff.Field, tableName) || strings.Contains(diff.Field, grant.Database) {
+				opts := []types.GrantOptions{{
+					Level:      string(grant.Level),
 					Database:   grant.Database,
 					Table:      tableName,
 					Privileges: privileges,

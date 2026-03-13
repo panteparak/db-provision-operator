@@ -22,6 +22,7 @@ import (
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/service/drift"
 	"github.com/db-provision-operator/internal/shared/eventbus"
+	"github.com/db-provision-operator/internal/shared/instanceresolver"
 )
 
 // MockRepository is a mock implementation of user repository operations for testing.
@@ -32,6 +33,7 @@ type MockRepository struct {
 	DeleteFunc          func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, force bool) error
 	SetPasswordFunc     func(ctx context.Context, username, password string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error
 	GetInstanceFunc     func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error)
+	ResolveInstanceFunc func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*instanceresolver.ResolvedInstance, error)
 	GetEngineFunc       func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error)
 	GetOwnedObjectsFunc func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) ([]OwnedObject, error)
 	DetectDriftFunc     func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, allowDestructive bool) (*drift.Result, error)
@@ -74,6 +76,19 @@ func NewMockRepository() *MockRepository {
 			Spec: dbopsv1alpha1.DatabaseInstanceSpec{
 				Engine: dbopsv1alpha1.EngineTypePostgres,
 			},
+		}, nil
+	}
+	m.ResolveInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*instanceresolver.ResolvedInstance, error) {
+		// Delegate to GetInstanceFunc for backward compatibility with existing tests
+		instance, err := m.GetInstanceFunc(ctx, spec, namespace)
+		if err != nil {
+			return nil, err
+		}
+		return &instanceresolver.ResolvedInstance{
+			Spec:                &instance.Spec,
+			CredentialNamespace: instance.Namespace,
+			Phase:               dbopsv1alpha1.PhaseReady,
+			Name:                instance.Name,
 		}, nil
 	}
 	m.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
@@ -131,6 +146,12 @@ func (m *MockRepository) SetPassword(ctx context.Context, username, password str
 func (m *MockRepository) GetInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
 	m.recordCall("GetInstance", spec, namespace)
 	return m.GetInstanceFunc(ctx, spec, namespace)
+}
+
+// ResolveInstance implements the resolve instance operation.
+func (m *MockRepository) ResolveInstance(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*instanceresolver.ResolvedInstance, error) {
+	m.recordCall("ResolveInstance", spec, namespace)
+	return m.ResolveInstanceFunc(ctx, spec, namespace)
 }
 
 // GetEngine implements the get engine operation.
