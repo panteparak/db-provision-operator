@@ -165,6 +165,16 @@ func (c *Controller) reconcile(ctx context.Context, user *dbopsv1alpha1.Database
 		return c.handleError(ctx, user, err, "get secret")
 	} else {
 		password = string(existingSecret.Data["password"])
+		if password == "" {
+			// Secret exists but password key is missing or empty (e.g., secretTemplate
+			// was used without storing the password key). Treat as missing to regenerate.
+			log.Info("Secret exists but password is empty, regenerating", "secret", secretName)
+			secretMissing = true
+			password, err = secret.GeneratePassword(user.Spec.PasswordSecret)
+			if err != nil {
+				return c.handleError(ctx, user, err, "generate password")
+			}
+		}
 	}
 
 	// Create user if not exists
@@ -183,6 +193,8 @@ func (c *Controller) reconcile(ctx context.Context, user *dbopsv1alpha1.Database
 		if err := c.handler.SetPassword(ctx, user.Spec.Username, &user.Spec, user.Namespace, password); err != nil {
 			return c.handleError(ctx, user, err, "sync password")
 		}
+		c.Recorder.Eventf(user, corev1.EventTypeNormal, "SecretRegenerated",
+			"Secret was missing for user %s, password synced and secret recreated", user.Spec.Username)
 	}
 
 	// Update user settings
@@ -319,10 +331,13 @@ func (c *Controller) ensureCredentialsSecret(ctx context.Context, user *dbopsv1a
 		if renderErr != nil {
 			return fmt.Errorf("render secret template: %w", renderErr)
 		}
-		secretData = make(map[string]string, len(rendered))
+		secretData = make(map[string]string, len(rendered)+1)
 		for k, v := range rendered {
 			secretData[k] = string(v)
 		}
+		// Always store the password so subsequent reconciles can read it back
+		// via existingSecret.Data["password"], even when using secretTemplate.
+		secretData["password"] = password
 	} else {
 		// Default keys (backward compatible)
 		secretData = map[string]string{

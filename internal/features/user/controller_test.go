@@ -18,6 +18,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -2126,9 +2127,9 @@ func TestController_Reconcile_SecretTemplateDataReplacesDefaultKeys(t *testing.T
 	assert.Contains(t, credSecret.StringData, "DATABASE_URL")
 	assert.Contains(t, credSecret.StringData, "JDBC_URL")
 
-	// Should NOT have default keys
+	// Should NOT have default keys (except "password" which is always stored for read-back)
 	assert.NotContains(t, credSecret.StringData, "username")
-	assert.NotContains(t, credSecret.StringData, "password")
+	assert.Contains(t, credSecret.StringData, "password")
 	assert.NotContains(t, credSecret.StringData, "host")
 	assert.NotContains(t, credSecret.StringData, "port")
 
@@ -2745,8 +2746,8 @@ func TestController_Reconcile_SecretTemplateUpdateReRendersSecret(t *testing.T) 
 
 	// Secret should be updated with new template-rendered data
 	assert.Contains(t, credSecret.StringData["DSN"], "new-host.example.com:5432/newdb")
-	// Old default key should NOT be present since template Data is set
-	assert.NotContains(t, credSecret.StringData, "password")
+	// Password key is always present for read-back on subsequent reconciles
+	assert.Contains(t, credSecret.StringData, "password")
 }
 
 // C4: hasSecretTemplateData with nil PasswordSecret
@@ -3377,8 +3378,8 @@ func TestController_Reconcile_SecretExistsUpdateWithTemplate(t *testing.T) {
 	// Updated with new template data
 	assert.Contains(t, credSecret.StringData, "DATABASE_URL")
 	assert.Contains(t, credSecret.StringData["DATABASE_URL"], "db.example.com:5432/mydb")
-	// Old default key "password" should be replaced (StringData now only has template keys)
-	assert.NotContains(t, credSecret.StringData, "password")
+	// Password key is always present for read-back on subsequent reconciles
+	assert.Contains(t, credSecret.StringData, "password")
 }
 
 // ===== Secret Update Merge Tests =====
@@ -3865,4 +3866,366 @@ func TestController_Reconcile_ClusterInstanceRefDoesNotPanic(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedUser.Status.Phase)
 	assert.True(t, mockRepo.WasCalled("Create"))
+}
+
+// ─── Secret Auto-Recovery Tests ──────────────────────────────────────────────
+
+func TestController_Reconcile_SecretDeletedAutoRecovery(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+
+	// No credentials Secret — simulates deletion
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	setPasswordCalled := false
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil // User exists in DB
+	}
+	mockRepo.SetPasswordFunc = func(ctx context.Context, username, password string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
+		setPasswordCalled = true
+		return nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	recorder := record.NewFakeRecorder(10)
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             recorder,
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, ctrl.Result{}, result)
+
+	// SetPassword was called to sync the new password to DB
+	assert.True(t, setPasswordCalled, "SetPassword should be called when Secret is missing")
+
+	// A new credentials Secret was created
+	var createdSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testuser-credentials", Namespace: "default"}, &createdSecret)
+	require.NoError(t, err)
+	assert.NotEmpty(t, createdSecret.StringData["password"], "Secret should have a non-empty password")
+
+	// SecretRegenerated event was emitted
+	var foundEvent bool
+	for len(recorder.Events) > 0 {
+		event := <-recorder.Events
+		if assert.ObjectsAreEqual("", "") { // drain all
+			_ = event
+		}
+		if containsSubstring(event, "SecretRegenerated") {
+			foundEvent = true
+		}
+	}
+	assert.True(t, foundEvent, "Expected SecretRegenerated event")
+
+	// User status is Ready
+	var updatedUser dbopsv1alpha1.DatabaseUser
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testuser", Namespace: "default"}, &updatedUser)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedUser.Status.Phase)
+}
+
+func TestController_Reconcile_SecretEmptyPasswordAutoRecovery(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+
+	// Secret exists but with empty password
+	existingSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser-credentials",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			"password": {},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, existingSecret).
+		WithStatusSubresource(user).
+		Build()
+
+	setPasswordCalled := false
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.SetPasswordFunc = func(ctx context.Context, username, password string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
+		setPasswordCalled = true
+		return nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	recorder := record.NewFakeRecorder(10)
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             recorder,
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, ctrl.Result{}, result)
+
+	// SetPassword was called (empty password treated as missing)
+	assert.True(t, setPasswordCalled, "SetPassword should be called when password is empty")
+
+	// Secret updated with new non-empty password
+	var updatedSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testuser-credentials", Namespace: "default"}, &updatedSecret)
+	require.NoError(t, err)
+	assert.NotEmpty(t, updatedSecret.StringData["password"], "Secret should have a non-empty password after regeneration")
+
+	// SecretRegenerated event was emitted
+	foundEvent := drainAndFind(recorder, "SecretRegenerated")
+	assert.True(t, foundEvent, "Expected SecretRegenerated event")
+}
+
+func TestController_Reconcile_SecretDeletedSetPasswordFails(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+
+	// No credentials Secret
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.SetPasswordFunc = func(ctx context.Context, username, password string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
+		return errors.New("connection refused")
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	recorder := record.NewFakeRecorder(10)
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             recorder,
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "connection refused")
+
+	// User status should be Failed
+	var updatedUser dbopsv1alpha1.DatabaseUser
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testuser", Namespace: "default"}, &updatedUser)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseFailed, updatedUser.Status.Phase)
+
+	// No credentials Secret should have been created
+	var createdSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testuser-credentials", Namespace: "default"}, &createdSecret)
+	assert.True(t, apierrors.IsNotFound(err), "Secret should not exist after SetPassword failure")
+}
+
+func TestController_Reconcile_SecretExistsNoRegeneration(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+
+	// Credentials Secret exists with valid password
+	existingSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testuser-credentials",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			"password": []byte("existing-password-123"),
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, existingSecret).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	recorder := record.NewFakeRecorder(10)
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             recorder,
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, ctrl.Result{}, result)
+
+	// SetPassword should NOT have been called
+	assert.False(t, mockRepo.WasCalled("SetPassword"), "SetPassword should not be called when Secret exists with valid password")
+
+	// Create should NOT have been called
+	assert.False(t, mockRepo.WasCalled("Create"), "Create should not be called for existing user")
+
+	// No SecretRegenerated event
+	foundEvent := drainAndFind(recorder, "SecretRegenerated")
+	assert.False(t, foundEvent, "SecretRegenerated event should not be emitted when Secret exists")
+}
+
+func TestController_Reconcile_NewUserSecretCreated(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+
+	// No credentials Secret (new user)
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return false, nil // New user
+	}
+	mockRepo.CreateFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error) {
+		return &Result{Created: true, Message: "created"}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	recorder := record.NewFakeRecorder(10)
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             recorder,
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, ctrl.Result{}, result)
+
+	// Create was called (not SetPassword)
+	assert.True(t, mockRepo.WasCalled("Create"), "Create should be called for new user")
+	assert.False(t, mockRepo.WasCalled("SetPassword"), "SetPassword should not be called for new user")
+
+	// Credentials Secret was created
+	var createdSecret corev1.Secret
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testuser-credentials", Namespace: "default"}, &createdSecret)
+	require.NoError(t, err)
+
+	// Event should be "Created", not "SecretRegenerated"
+	foundCreated := drainAndFind(recorder, "Created")
+	assert.True(t, foundCreated, "Expected Created event for new user")
+}
+
+// containsSubstring checks if a string contains a substring.
+func containsSubstring(s, substr string) bool {
+	return len(s) >= len(substr) && searchSubstring(s, substr)
+}
+
+func searchSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+// drainAndFind drains all events from the recorder and returns true if any contain substr.
+func drainAndFind(recorder *record.FakeRecorder, substr string) bool {
+	found := false
+	for {
+		select {
+		case event := <-recorder.Events:
+			if containsSubstring(event, substr) {
+				found = true
+			}
+		default:
+			return found
+		}
+	}
 }

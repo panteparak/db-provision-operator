@@ -329,18 +329,21 @@ data:
 
 ## Password Rotation
 
-To rotate a password:
+The operator automatically recovers when a DatabaseUser's credentials Secret is deleted.
+The flow works as follows:
 
-1. Delete the existing credentials Secret
-2. The operator will detect the missing Secret and regenerate
+1. The credentials Secret is deleted (manually or by an external process).
+2. The `Owns(&corev1.Secret{})` Watch detects the deletion and triggers an immediate reconciliation.
+3. The controller generates a new password, calls `SetPassword()` to sync it to the database, and recreates the Secret via `ensureCredentialsSecret()`.
+4. A `SecretRegenerated` event is emitted on the DatabaseUser resource.
 
-Or use the annotation:
+To manually rotate a password, delete the existing Secret:
 
-```yaml
-metadata:
-  annotations:
-    dbops.dbprovision.io/rotate-password: "true"
+```bash
+kubectl delete secret <user>-credentials -n <namespace>
 ```
+
+The operator will regenerate the password and recreate the Secret within seconds.
 
 ## Troubleshooting
 
