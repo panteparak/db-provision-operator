@@ -2127,11 +2127,14 @@ func TestController_Reconcile_SecretTemplateDataReplacesDefaultKeys(t *testing.T
 	assert.Contains(t, credSecret.StringData, "DATABASE_URL")
 	assert.Contains(t, credSecret.StringData, "JDBC_URL")
 
-	// Should NOT have default keys (except "password" which is always stored for read-back)
+	// Should NOT have any default keys in Data (password is stored in annotation instead)
 	assert.NotContains(t, credSecret.StringData, "username")
-	assert.Contains(t, credSecret.StringData, "password")
+	assert.NotContains(t, credSecret.StringData, "password")
 	assert.NotContains(t, credSecret.StringData, "host")
 	assert.NotContains(t, credSecret.StringData, "port")
+
+	// Password should be stored in annotation for read-back on subsequent reconciles
+	assert.NotEmpty(t, credSecret.Annotations[annotationManagedPassword])
 
 	// Verify template rendered correctly
 	assert.Contains(t, credSecret.StringData["JDBC_URL"], "jdbc:postgresql://db.example.com:5432/mydb")
@@ -2746,8 +2749,9 @@ func TestController_Reconcile_SecretTemplateUpdateReRendersSecret(t *testing.T) 
 
 	// Secret should be updated with new template-rendered data
 	assert.Contains(t, credSecret.StringData["DSN"], "new-host.example.com:5432/newdb")
-	// Password key is always present for read-back on subsequent reconciles
-	assert.Contains(t, credSecret.StringData, "password")
+	// Password should NOT be in Data — stored in annotation instead
+	assert.NotContains(t, credSecret.StringData, "password")
+	assert.NotEmpty(t, credSecret.Annotations[annotationManagedPassword])
 }
 
 // C4: hasSecretTemplateData with nil PasswordSecret
@@ -3378,8 +3382,9 @@ func TestController_Reconcile_SecretExistsUpdateWithTemplate(t *testing.T) {
 	// Updated with new template data
 	assert.Contains(t, credSecret.StringData, "DATABASE_URL")
 	assert.Contains(t, credSecret.StringData["DATABASE_URL"], "db.example.com:5432/mydb")
-	// Password key is always present for read-back on subsequent reconciles
-	assert.Contains(t, credSecret.StringData, "password")
+	// Password should NOT be in Data — stored in annotation instead
+	assert.NotContains(t, credSecret.StringData, "password")
+	assert.NotEmpty(t, credSecret.Annotations[annotationManagedPassword])
 }
 
 // ===== Secret Update Merge Tests =====
