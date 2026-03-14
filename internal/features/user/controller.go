@@ -47,6 +47,8 @@ import (
 const (
 	RequeueAfterError   = 30 * time.Second
 	RequeueAfterPending = 10 * time.Second
+
+	annotationManagedPassword = "dbops.dbprovision.io/managed-password"
 )
 
 // Controller handles K8s reconciliation for DatabaseUser resources.
@@ -164,10 +166,12 @@ func (c *Controller) reconcile(ctx context.Context, user *dbopsv1alpha1.Database
 	} else if err != nil {
 		return c.handleError(ctx, user, err, "get secret")
 	} else {
-		password = string(existingSecret.Data["password"])
+		// Read password: prefer annotation (used by SecretTemplate), fall back to Data key (default)
+		password = existingSecret.Annotations[annotationManagedPassword]
 		if password == "" {
-			// Secret exists but password key is missing or empty (e.g., secretTemplate
-			// was used without storing the password key). Treat as missing to regenerate.
+			password = string(existingSecret.Data["password"])
+		}
+		if password == "" {
 			log.Info("Secret exists but password is empty, regenerating", "secret", secretName)
 			secretMissing = true
 			password, err = secret.GeneratePassword(user.Spec.PasswordSecret)
@@ -331,13 +335,13 @@ func (c *Controller) ensureCredentialsSecret(ctx context.Context, user *dbopsv1a
 		if renderErr != nil {
 			return fmt.Errorf("render secret template: %w", renderErr)
 		}
-		secretData = make(map[string]string, len(rendered)+1)
+		secretData = make(map[string]string, len(rendered))
 		for k, v := range rendered {
 			secretData[k] = string(v)
 		}
-		// Always store the password so subsequent reconciles can read it back
-		// via existingSecret.Data["password"], even when using secretTemplate.
-		secretData["password"] = password
+		// Store password in annotation for read-back on subsequent reconciles,
+		// keeping the user's SecretTemplate data keys clean.
+		annotations[annotationManagedPassword] = password
 	} else {
 		// Default keys (backward compatible)
 		secretData = map[string]string{
