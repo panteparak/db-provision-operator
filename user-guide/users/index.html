@@ -3309,16 +3309,18 @@
 </span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">  </span><span class="nt">ca.crt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;base64-encoded PEM certificate&gt;</span>
 </span></code></pre></div>
 <h2 id="password-rotation">Password Rotation<a class="headerlink" href="#password-rotation" title="Permanent link">&para;</a></h2>
-<p>To rotate a password:</p>
+<p>The operator automatically recovers when a DatabaseUser's credentials Secret is deleted.
+The flow works as follows:</p>
 <ol>
-<li>Delete the existing credentials Secret</li>
-<li>The operator will detect the missing Secret and regenerate</li>
+<li>The credentials Secret is deleted (manually or by an external process).</li>
+<li>The <code>Owns(&amp;corev1.Secret{})</code> Watch detects the deletion and triggers an immediate reconciliation.</li>
+<li>The controller generates a new password, calls <code>SetPassword()</code> to sync it to the database, and recreates the Secret via <code>ensureCredentialsSecret()</code>.</li>
+<li>A <code>SecretRegenerated</code> event is emitted on the DatabaseUser resource.</li>
 </ol>
-<p>Or use the annotation:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">metadata</span><span class="p">:</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="nt">annotations</span><span class="p">:</span>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span><span class="nt">dbops.dbprovision.io/rotate-password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+<p>To manually rotate a password, delete the existing Secret:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>kubectl<span class="w"> </span>delete<span class="w"> </span>secret<span class="w"> </span>&lt;user&gt;-credentials<span class="w"> </span>-n<span class="w"> </span>&lt;namespace&gt;
 </span></code></pre></div>
+<p>The operator will regenerate the password and recreate the Secret within seconds.</p>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <h3 id="user-stuck-in-pending">User stuck in Pending<a class="headerlink" href="#user-stuck-in-pending" title="Permanent link">&para;</a></h3>
 <ul>
