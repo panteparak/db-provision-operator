@@ -181,21 +181,100 @@ jobs:
           fi
 
   # ============================================================================
-  # Docker Release: Retag CI images or rebuild (manual dispatch)
+  # Setup: Platform Matrix (single source of truth)
   # ============================================================================
-  # For tag push: retags CI-built SHA images to version tags using
-  # `docker buildx imagetools create`. This is a manifest-only operation —
-  # no rebuild, bit-for-bit identical to what CI tested.
-  # For workflow_dispatch: rebuilds from source as a fallback.
 
-  docker-release:
-    name: Docker Release
+  setup:
+    name: Setup
     runs-on: ubuntu-latest
+    outputs:
+      platforms: ${{ steps.platforms.outputs.matrix }}
+    steps:
+      - name: Set platform matrix
+        id: platforms
+        run: |
+          echo 'matrix=[{"platform":"linux/amd64","runner":"ubuntu-24.04"},{"platform":"linux/arm64","runner":"ubuntu-24.04-arm"}]' >> $GITHUB_OUTPUT
+
+  # ============================================================================
+  # Docker Release Build: Parallel per-platform builds (fallback)
+  # ============================================================================
+  # Only runs when there's no CI run to retag from.
+  # Mirrors CI's matrix build pattern for parallel per-platform builds.
+
+  docker-release-build:
+    name: Docker Build (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    needs: [guard, setup]
+    if: needs.guard.outputs.should-release == 'true' && needs.guard.outputs.ci-run-id == ''
     permissions:
       contents: read
       packages: write
-    needs: [guard]
-    if: needs.guard.outputs.should-release == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.setup.outputs.platforms) }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.guard.outputs.checkout-ref }}
+          persist-credentials: false
+
+      - name: Prepare platform vars
+        id: platform
+        run: |
+          platform="${{ matrix.platform }}"
+          echo "pair=${platform//\//-}" >> $GITHUB_OUTPUT  # linux/amd64 -> linux-amd64
+
+      - name: Check if QEMU is needed
+        id: qemu-check
+        run: |
+          RUNNER_ARCH="${{ runner.arch }}"
+          TARGET="${{ matrix.platform }}"
+          NEED_QEMU="true"
+          if [[ "$RUNNER_ARCH" == "X64" && "$TARGET" == "linux/amd64" ]] || \
+             [[ "$RUNNER_ARCH" == "ARM64" && "$TARGET" == "linux/arm64" ]]; then
+            NEED_QEMU="false"
+          fi
+          echo "needed=$NEED_QEMU" >> $GITHUB_OUTPUT
+          echo "Runner: $RUNNER_ARCH, Target: $TARGET, QEMU needed: $NEED_QEMU"
+
+      - uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
+        if: steps.qemu-check.outputs.needed == 'true'
+
+      - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+
+      - uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6.15.0
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.guard.outputs.version }}-${{ steps.platform.outputs.pair }}
+          cache-from: type=gha,scope=release-${{ steps.platform.outputs.pair }}
+          cache-to: type=gha,scope=release-${{ steps.platform.outputs.pair }},mode=max
+
+  # ============================================================================
+  # Docker Release Manifest: Retag CI images or merge platform-specific builds
+  # ============================================================================
+  # If a CI run exists: retags CI-built SHA images to version tags using
+  # `docker buildx imagetools create`. This is a manifest-only operation —
+  # no rebuild, bit-for-bit identical to what CI tested.
+  # If no CI run: merges per-platform builds into a multi-arch manifest.
+
+  docker-release-manifest:
+    name: Docker Manifest
+    runs-on: ubuntu-latest
+    needs: [guard, setup, docker-release-build]
+    if: always() && needs.guard.outputs.should-release == 'true' && !contains(needs.*.result, 'failure')
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
@@ -205,7 +284,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # tag push: retag existing CI-tested images
+      # Retag existing CI-tested images (when CI run found)
       - name: Retag CI images to release version
         if: needs.guard.outputs.ci-run-id != ''
         env:
@@ -214,32 +293,26 @@ jobs:
         run: |
           echo "Retagging ${IMAGE_TAG} -> ${VERSION} and latest"
           docker buildx imagetools create \
-            -t "${REGISTRY}/${IMAGE_NAME}:${VERSION}" \
-            -t "${REGISTRY}/${IMAGE_NAME}:latest" \
-            "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}
 
-      # workflow_dispatch fallback: rebuild from source
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      # Fallback: merge platform-specific builds into multi-arch manifest
+      - name: Create multi-platform manifest
         if: needs.guard.outputs.ci-run-id == ''
-        with:
-          ref: ${{ needs.guard.outputs.checkout-ref }}
-          persist-credentials: false
-
-      - uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
-        if: needs.guard.outputs.ci-run-id == ''
-
-      - name: Build and push (manual dispatch)
-        if: needs.guard.outputs.ci-run-id == ''
-        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6.15.0
-        with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.guard.outputs.version }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          IMAGES=""
+          for platform in $(echo '${{ needs.setup.outputs.platforms }}' | jq -r '.[].platform'); do
+            pair="${platform//\//-}"
+            IMAGES="$IMAGES ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-${pair}"
+          done
+          echo "Merging platform images into ${VERSION} and latest: $IMAGES"
+          docker buildx imagetools create \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            $IMAGES
 
   # ============================================================================
   # Create GitHub Release
@@ -250,8 +323,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    needs: [guard, docker-release]
-    if: needs.guard.outputs.should-release == 'true'
+    needs: [guard, docker-release-manifest]
+    if: always() && needs.guard.outputs.should-release == 'true' && !contains(needs.*.result, 'failure')
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -260,7 +333,7 @@ jobs:
 
           persist-credentials: false
 
-      # Download SBOMs from CI run (only available via tag push)
+      # Download SBOM from CI run (manifest-level SPDX from docker-merge)
       - name: Download SBOM
         if: needs.guard.outputs.ci-run-id != ''
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -269,6 +342,27 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           name: sbom
           path: /tmp/sbom/
+        continue-on-error: true
+
+      # Download per-platform security scan artifacts (contain CycloneDX SBOMs)
+      - name: Download security scan (linux-amd64)
+        if: needs.guard.outputs.ci-run-id != ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          run-id: ${{ needs.guard.outputs.ci-run-id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: security-scan-linux-amd64
+          path: /tmp/security-scan-amd64/
+        continue-on-error: true
+
+      - name: Download security scan (linux-arm64)
+        if: needs.guard.outputs.ci-run-id != ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          run-id: ${{ needs.guard.outputs.ci-run-id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: security-scan-linux-arm64
+          path: /tmp/security-scan-arm64/
         continue-on-error: true
 
       # Build versioned install manifest
@@ -329,6 +423,8 @@ jobs:
           cp dist/db-provision-operator-${VERSION}.tgz release-assets/
           cp dist/checksums.txt release-assets/
           [ -f /tmp/sbom/sbom.spdx.json ] && cp /tmp/sbom/sbom.spdx.json release-assets/ || true
+          [ -f /tmp/security-scan-amd64/sbom-linux-amd64.cyclonedx.json ] && cp /tmp/security-scan-amd64/sbom-linux-amd64.cyclonedx.json release-assets/ || true
+          [ -f /tmp/security-scan-arm64/sbom-linux-arm64.cyclonedx.json ] && cp /tmp/security-scan-arm64/sbom-linux-arm64.cyclonedx.json release-assets/ || true
           echo "Release assets:"
           ls -la release-assets/
 
@@ -369,8 +465,8 @@ jobs:
     permissions:
       contents: read
       packages: write
-    needs: [guard, github-release]
-    if: needs.guard.outputs.should-release == 'true'
+    needs: [guard, docker-release-manifest, github-release]
+    if: always() && needs.guard.outputs.should-release == 'true' && !contains(needs.*.result, 'failure')
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -450,7 +546,7 @@ jobs:
     name: Release Summary
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [guard, docker-release, github-release, helm-oci, docs-release]
+    needs: [guard, docker-release-manifest, github-release, helm-oci, docs-release]
     if: always() && needs.guard.outputs.should-release == 'true'
     env:
       VERSION: ${{ needs.guard.outputs.version }}
@@ -458,7 +554,7 @@ jobs:
     steps:
       - name: Summary
         env:
-          DOCKER_RESULT: ${{ needs.docker-release.result }}
+          DOCKER_RESULT: ${{ needs.docker-release-manifest.result }}
           RELEASE_RESULT: ${{ needs.github-release.result }}
           HELM_RESULT: ${{ needs.helm-oci.result }}
           DOCS_RESULT: ${{ needs.docs-release.result }}
