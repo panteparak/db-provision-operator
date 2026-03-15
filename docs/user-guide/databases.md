@@ -58,6 +58,51 @@ What happens to the database when the CR is deleted.
 
 Prevent accidental deletion. Default: `false`
 
+### initSQL (optional)
+
+SQL statements to execute once after the database is created. Useful for bootstrapping schemas, seed data, or initial configuration.
+
+Exactly one source must be specified:
+
+=== "inline"
+
+    An array of SQL statements executed in order.
+
+    | Field | Type | Required | Description |
+    |-------|------|----------|-------------|
+    | `inline` | []string | Yes | SQL statements (max 50 items) |
+
+=== "configMapRef"
+
+    References a ConfigMap key containing SQL statements separated by `---`.
+
+    | Field | Type | Required | Description |
+    |-------|------|----------|-------------|
+    | `configMapRef.name` | string | Yes | ConfigMap name |
+    | `configMapRef.key` | string | Yes | Key within the ConfigMap |
+
+=== "secretRef"
+
+    References a Secret key containing SQL statements separated by `---`. Use this for sensitive seed data.
+
+    | Field | Type | Required | Description |
+    |-------|------|----------|-------------|
+    | `secretRef.name` | string | Yes | Secret name |
+    | `secretRef.key` | string | Yes | Key within the Secret |
+
+**Failure policy:**
+
+| Value | Default | Description |
+|-------|---------|-------------|
+| `Continue` | Yes | Database reaches Ready; `Synced` condition set to `False` with error details |
+| `Block` | No | Database stays in `Failed` phase and requeues until SQL succeeds |
+
+!!! warning "Security: Init SQL runs with operator credentials"
+    Init SQL statements are executed using the operator's database connection credentials (from the DatabaseInstance). Treat `initSQL` content with the same trust level as direct database admin access. Use `secretRef` for sensitive data.
+
+!!! tip "Idempotency and re-execution"
+    The operator computes a SHA-256 hash of the resolved SQL content and stores it in `status.initSQL.hash`. Init SQL only re-executes when the content hash changes. Write idempotent SQL (e.g., `CREATE TABLE IF NOT EXISTS`, `INSERT ... ON CONFLICT DO NOTHING`) to handle re-execution safely.
+
 ### postgres (optional)
 
 PostgreSQL-specific configuration.
@@ -104,6 +149,18 @@ MySQL-specific configuration.
 | `phase` | Current phase |
 | `conditions` | Detailed conditions |
 | `observedGeneration` | Last observed generation |
+
+### initSQL
+
+Present when `spec.initSQL` is configured.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `applied` | bool | Whether init SQL executed successfully |
+| `appliedAt` | time | When init SQL was last successfully executed |
+| `hash` | string | SHA-256 hash of the resolved SQL content |
+| `error` | string | Last error message (empty on success) |
+| `statementsExecuted` | int32 | Number of statements successfully executed |
 
 ## Examples
 
@@ -216,6 +273,91 @@ spec:
   deletionPolicy: Delete  # Database will be dropped when CR is deleted
 ```
 
+### Database with Inline Init SQL
+
+```yaml
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: Database
+metadata:
+  name: myapp-database
+spec:
+  instanceRef:
+    name: postgres-primary
+  name: myapp
+  initSQL:
+    inline:
+      - |
+        CREATE TABLE IF NOT EXISTS users (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          email TEXT UNIQUE NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT now()
+        );
+      - CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
+      - |
+        INSERT INTO users (email) VALUES ('admin@example.com')
+        ON CONFLICT (email) DO NOTHING;
+    failurePolicy: Continue
+```
+
+### Database with ConfigMap Init SQL
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myapp-init-sql
+data:
+  bootstrap.sql: |
+    CREATE TABLE IF NOT EXISTS tenants (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name TEXT UNIQUE NOT NULL
+    );
+    ---
+    CREATE TABLE IF NOT EXISTS tenant_configs (
+      tenant_id UUID REFERENCES tenants(id),
+      key TEXT NOT NULL,
+      value JSONB,
+      PRIMARY KEY (tenant_id, key)
+    );
+    ---
+    INSERT INTO tenants (name) VALUES ('default')
+    ON CONFLICT (name) DO NOTHING;
+---
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: Database
+metadata:
+  name: myapp-database
+spec:
+  instanceRef:
+    name: postgres-primary
+  name: myapp
+  initSQL:
+    configMapRef:
+      name: myapp-init-sql
+      key: bootstrap.sql
+    failurePolicy: Block
+```
+
+### Database with Secret Init SQL
+
+```yaml
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: Database
+metadata:
+  name: myapp-database
+spec:
+  instanceRef:
+    name: postgres-primary
+  name: myapp
+  initSQL:
+    secretRef:
+      name: myapp-seed-data
+      key: seed.sql
+    failurePolicy: Block
+```
+
+Use `secretRef` when your init SQL contains sensitive data such as API keys, default passwords, or license keys that should not be stored in a ConfigMap.
+
 ## Lifecycle
 
 ### Creation
@@ -225,7 +367,8 @@ spec:
 3. Creates the database in the server
 4. Installs extensions (PostgreSQL)
 5. Creates schemas (PostgreSQL)
-6. Updates status to Ready
+6. Executes init SQL if configured (see [initSQL](#initsql-optional))
+7. Updates status to Ready
 
 ### Deletion
 
@@ -241,6 +384,7 @@ Most fields are immutable after creation. Supported updates:
 
 - `deletionPolicy`
 - `deletionProtection`
+- `initSQL` (changing content triggers re-execution based on hash comparison)
 - `postgres.connectionLimit`
 - Adding new extensions/schemas
 
@@ -262,3 +406,31 @@ Most fields are immutable after creation. Supported updates:
 - Check if `deletionProtection` is enabled
 - Verify no active connections to the database
 - For PostgreSQL, ensure no other databases depend on it
+
+### Init SQL failed with Continue policy
+
+The database is Ready but the `Synced` condition is `False`:
+
+```bash
+kubectl get database myapp-database -o jsonpath='{.status.initSQL}'
+```
+
+- Check `status.initSQL.error` for the error message
+- Check `status.initSQL.statementsExecuted` to see how many statements succeeded
+- Fix the SQL and update the resource — the changed hash triggers re-execution
+
+### Init SQL failed with Block policy
+
+The database is stuck in `Failed` phase:
+
+- Check operator logs and `status.initSQL.error` for the specific error
+- Fix the SQL in the inline array, ConfigMap, or Secret
+- The operator will automatically retry on the next reconciliation
+
+### Init SQL not re-executing after update
+
+The operator uses SHA-256 hash comparison to detect changes:
+
+- Verify the content actually changed (whitespace changes do count)
+- Check `status.initSQL.hash` — if it matches the new content hash, the SQL was already applied
+- For `configMapRef`/`secretRef`, ensure the referenced resource was updated

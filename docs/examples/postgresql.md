@@ -206,6 +206,103 @@ spec:
         privileges: [INSERT]
 ```
 
+## Init SQL
+
+Bootstrap your database with tables, indexes, and seed data using `initSQL`.
+
+### Inline SQL
+
+```yaml
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: Database
+metadata:
+  name: myapp-database
+spec:
+  instanceRef:
+    name: postgres-primary
+  name: myapp
+  postgres:
+    extensions:
+      - name: uuid-ossp
+      - name: pgcrypto
+    schemas:
+      - name: app
+  initSQL:
+    inline:
+      - |
+        CREATE TABLE IF NOT EXISTS app.users (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          email TEXT UNIQUE NOT NULL,
+          password_hash TEXT NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT now(),
+          updated_at TIMESTAMPTZ DEFAULT now()
+        );
+      - CREATE INDEX IF NOT EXISTS idx_users_email ON app.users (email);
+      - |
+        CREATE OR REPLACE FUNCTION app.update_updated_at()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          NEW.updated_at = now();
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+      - |
+        CREATE TRIGGER trg_users_updated_at
+          BEFORE UPDATE ON app.users
+          FOR EACH ROW EXECUTE FUNCTION app.update_updated_at();
+    failurePolicy: Block
+```
+
+### ConfigMap SQL with Block Policy
+
+Store longer migration scripts in a ConfigMap. Statements are separated by `---`.
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myapp-bootstrap
+data:
+  init.sql: |
+    CREATE TABLE IF NOT EXISTS app.organizations (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      name TEXT UNIQUE NOT NULL,
+      plan TEXT NOT NULL DEFAULT 'free',
+      created_at TIMESTAMPTZ DEFAULT now()
+    );
+    ---
+    CREATE TABLE IF NOT EXISTS app.members (
+      org_id UUID REFERENCES app.organizations(id) ON DELETE CASCADE,
+      user_id UUID REFERENCES app.users(id) ON DELETE CASCADE,
+      role TEXT NOT NULL DEFAULT 'member',
+      PRIMARY KEY (org_id, user_id)
+    );
+    ---
+    INSERT INTO app.organizations (name, plan)
+    VALUES ('default', 'enterprise')
+    ON CONFLICT (name) DO NOTHING;
+---
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: Database
+metadata:
+  name: myapp-database
+spec:
+  instanceRef:
+    name: postgres-primary
+  name: myapp
+  initSQL:
+    configMapRef:
+      name: myapp-bootstrap
+      key: init.sql
+    failurePolicy: Block
+```
+
+!!! tip "Writing idempotent init SQL"
+    - Use `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS`
+    - Use `INSERT ... ON CONFLICT DO NOTHING` for seed data
+    - Use `CREATE OR REPLACE FUNCTION` for functions and triggers
+    - Order statements so that referenced tables are created before foreign keys
+
 ## Backup Configuration
 
 ### One-Time Backup to S3
