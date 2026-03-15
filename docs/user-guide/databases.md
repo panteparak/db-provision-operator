@@ -33,6 +33,17 @@ The actual database name in the database server. Immutable after creation.
 - Default: Kubernetes resource name (`metadata.name`)
 - Must follow database naming rules for the target engine
 
+### owner (optional)
+
+The database owner (role name). If not specified, the database is owned by the connection user from the DatabaseInstance.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `owner` | string | No | Role name to own the database (max 63 chars, must match `^[a-zA-Z_][a-zA-Z0-9_]*$`) |
+
+!!! tip "Role-based ownership for credential rotation"
+    When using [password rotation](users.md#password-rotation) with the `role-inheritance` strategy, set `owner` to the **service role** (not a specific user). The service role persists across rotations while individual login users are created and retired. This prevents ownership from pointing to a deleted user.
+
 ### deletionPolicy (optional)
 
 What happens to the database when the CR is deleted.
@@ -155,6 +166,41 @@ spec:
     charset: utf8mb4
     collation: utf8mb4_unicode_ci
 ```
+
+### Database with Owner
+
+Create a DatabaseUser first, then reference its username as the database owner:
+
+```yaml
+# Step 1: Create the user (role must exist before the database)
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseUser
+metadata:
+  name: myapp-user
+spec:
+  instanceRef:
+    name: postgres-primary
+  username: myapp_user
+  passwordSecret:
+    generate: true
+    secretName: myapp-user-credentials
+    secretTemplate:
+      data:
+        DATABASE_URL: "postgresql://{{ urlEncode .Username }}:{{ urlEncode .Password }}@{{ .Host }}:{{ .Port }}/myapp?sslmode=prefer"
+---
+# Step 2: Create the database owned by that user
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: Database
+metadata:
+  name: myapp-database
+spec:
+  instanceRef:
+    name: postgres-primary
+  name: myapp
+  owner: myapp_user
+```
+
+The DatabaseUser automatically creates a Secret (`myapp-user-credentials`) containing the `DATABASE_URL` connection string. See [DatabaseUser secret templates](users.md#user-with-custom-secret-template) for more formats.
 
 ### Database with Delete Policy
 

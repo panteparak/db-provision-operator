@@ -84,35 +84,9 @@ NAME               ENGINE     PHASE   HOST                                      
 postgres-primary   postgres   Ready   postgresql.default.svc.cluster.local      5432   30s
 ```
 
-## Step 3: Create a Database
+## Step 3: Create a User
 
-Now create a database within the instance:
-
-```yaml
-apiVersion: dbops.dbprovision.io/v1alpha1
-kind: Database
-metadata:
-  name: myapp-database
-  namespace: default
-spec:
-  instanceRef:
-    name: postgres-primary
-  name: myapp
-  deletionPolicy: Retain
-```
-
-Apply:
-
-```bash
-kubectl apply -f database.yaml
-
-# Verify
-kubectl get database myapp-database
-```
-
-## Step 4: Create a User
-
-Create a user with an auto-generated password:
+Create a user first — the operator auto-generates a password and stores it in a Kubernetes Secret:
 
 ```yaml
 apiVersion: dbops.dbprovision.io/v1alpha1
@@ -139,7 +113,52 @@ kubectl apply -f user.yaml
 kubectl get secret myapp-user-credentials -o jsonpath='{.data.password}' | base64 -d
 ```
 
-## Step 5: Grant Permissions
+## Step 4: Create a Database with an Owner
+
+Now create a database and assign the user as its owner. The `owner` field references the username of a DatabaseUser (or any existing role):
+
+```yaml
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: Database
+metadata:
+  name: myapp-database
+  namespace: default
+spec:
+  instanceRef:
+    name: postgres-primary
+  name: myapp
+  owner: myapp_user
+  deletionPolicy: Retain
+```
+
+Apply:
+
+```bash
+kubectl apply -f database.yaml
+
+# Verify
+kubectl get database myapp-database
+```
+
+!!! tip "Why create the user first?"
+    The `owner` field references a database role that must already exist. By creating the DatabaseUser before the Database, the role is ready when the database is created.
+
+## Step 5: Customize Credentials with Secret Templates (Optional)
+
+The DatabaseUser's secret provides raw credentials by default. Use `secretTemplate` to format them as a connection string your application can consume directly:
+
+```yaml
+# Patch the user to add a DATABASE_URL key
+spec:
+  passwordSecret:
+    secretTemplate:
+      data:
+        DATABASE_URL: "postgresql://{{ urlEncode .Username }}:{{ urlEncode .Password }}@{{ .Host }}:{{ .Port }}/myapp?sslmode=prefer"
+```
+
+See the [DatabaseUser docs](../user-guide/users.md#user-with-custom-secret-template) for the full list of template variables and functions.
+
+## Step 6: Grant Permissions
 
 Grant the user access to the database:
 
@@ -207,6 +226,9 @@ export PGPASSWORD=$(kubectl get secret myapp-user-credentials -o jsonpath='{.dat
 # Connect (from a pod with psql)
 kubectl run -it --rm psql --image=postgres:16 --restart=Never -- psql
 ```
+
+!!! info "Credentials lifecycle"
+    The DatabaseUser's Secret is owned by the operator. If the Secret is deleted, the operator automatically generates a new password and recreates it. See [Password Rotation](../user-guide/users.md#password-rotation) for scheduled rotation.
 
 ## Clean Up
 

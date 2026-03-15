@@ -237,6 +237,85 @@ echo "Resources will be deleted on next reconciliation"
     kube_resource_annotations{annotation_dbops_dbprovision_io_force_delete="true"}
     ```
 
+## Force Delete with Children (Cascade Confirmation)
+
+When you force-delete a parent resource that has child dependencies (e.g., a DatabaseInstance with Databases, Users, and Roles), the operator enters a **cascade confirmation flow** to prevent accidental mass deletion.
+
+### How It Works
+
+1. You add the `force-delete` annotation to the parent
+2. The operator detects children exist and enters `PhasePendingDeletion`
+3. `status.deletionConfirmation` is populated with the list of affected children and a confirmation hash
+4. You confirm by setting the `confirm-force-delete` annotation to the hash value
+5. The operator cascade-deletes each child (respecting each child's own `deletionPolicy`)
+6. `status.deletionConfirmation.remainingCount` decreases as children are deleted
+7. Once all children are gone, the parent's finalizer is removed and the parent is deleted
+
+!!! note "No children = no confirmation"
+    If the parent has no child dependencies, force-delete proceeds immediately without the confirmation step.
+
+### Status Fields
+
+The `status.deletionConfirmation` object contains:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `required` | bool | Whether confirmation is needed |
+| `hash` | string | The confirmation value to set as the annotation |
+| `children` | []string | List of affected children (format: `Kind/Name`) |
+| `remainingCount` | int | Number of children still being deleted |
+| `message` | string | Human-readable explanation of current state |
+
+### Condition Reasons
+
+| Reason | Description |
+|--------|-------------|
+| `PendingDeletionConfirmation` | Waiting for user to confirm cascade via annotation |
+| `CascadeDeleting` | Confirmed; actively deleting children |
+
+### Example Workflow
+
+```bash
+# Step 1: Mark a DatabaseInstance for force-delete
+kubectl annotate databaseinstance postgres-primary \
+  dbops.dbprovision.io/force-delete="true"
+
+# Step 2: Check the status — operator lists children and provides a hash
+kubectl get databaseinstance postgres-primary -o jsonpath='{.status.deletionConfirmation}' | jq .
+```
+
+Example output:
+
+```json
+{
+  "required": true,
+  "hash": "a1b2c3d4",
+  "children": [
+    "Database/myapp-database",
+    "DatabaseUser/myapp-user",
+    "DatabaseRole/readonly-role"
+  ],
+  "remainingCount": 3,
+  "message": "Force-delete requires confirmation: 3 child resources will be cascade-deleted"
+}
+```
+
+```bash
+# Step 3: Confirm the cascade by setting the hash
+kubectl annotate databaseinstance postgres-primary \
+  dbops.dbprovision.io/confirm-force-delete="a1b2c3d4"
+
+# Step 4: Monitor cascade progress
+kubectl get databaseinstance postgres-primary -o jsonpath='{.status.deletionConfirmation.remainingCount}'
+# Output decreases: 3 → 2 → 1 → 0, then the parent is deleted
+```
+
+!!! warning "Each child's deletion policy is respected"
+    During cascade deletion, each child resource is deleted according to its own `deletionPolicy`. A child with `deletionPolicy: Retain` will have its CR removed but the underlying database object will be kept. A child with `deletionPolicy: Delete` will have both the CR and the database object removed.
+
+!!! danger "Wrong hash blocks deletion"
+    If the `confirm-force-delete` annotation does not match the hash in `status.deletionConfirmation.hash`, the operator stays in `PhasePendingDeletion` and does not proceed. This prevents copy-paste errors from triggering unintended cascades.
+
 ## Troubleshooting
 
 ### Resource Stuck in Terminating

@@ -519,6 +519,85 @@ spec:
       enabled: true
 ```
 
+## Force Delete with Cascade Confirmation
+
+End-to-end example of force-deleting a DatabaseInstance that has child resources.
+
+### Setup: Instance with Children
+
+```yaml
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseInstance
+metadata:
+  name: staging-postgres
+spec:
+  engine: postgres
+  connection:
+    host: postgres.staging.svc.cluster.local
+    port: 5432
+    secretRef:
+      name: staging-admin-credentials
+  deletionProtection: true
+---
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: Database
+metadata:
+  name: staging-app-db
+spec:
+  instanceRef:
+    name: staging-postgres
+  name: staging_app
+  deletionPolicy: Delete
+---
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseUser
+metadata:
+  name: staging-app-user
+spec:
+  instanceRef:
+    name: staging-postgres
+  username: staging_app_user
+  passwordSecret:
+    generate: true
+    secretName: staging-app-credentials
+```
+
+### Force Delete the Instance
+
+```bash
+# 1. Trigger force-delete (bypasses deletionProtection)
+kubectl annotate databaseinstance staging-postgres \
+  dbops.dbprovision.io/force-delete="true"
+
+# 2. Read the confirmation hash from status
+HASH=$(kubectl get databaseinstance staging-postgres \
+  -o jsonpath='{.status.deletionConfirmation.hash}')
+echo "Confirmation hash: $HASH"
+
+# 3. Review what will be deleted
+kubectl get databaseinstance staging-postgres \
+  -o jsonpath='{.status.deletionConfirmation.children}' | jq .
+# ["Database/staging-app-db", "DatabaseUser/staging-app-user"]
+
+# 4. Confirm the cascade
+kubectl annotate databaseinstance staging-postgres \
+  dbops.dbprovision.io/confirm-force-delete="$HASH"
+
+# 5. Watch cascade progress
+kubectl get databaseinstance staging-postgres -w
+# PHASE              REMAINING
+# PendingDeletion    2
+# PendingDeletion    1
+# PendingDeletion    0
+# (resource deleted)
+```
+
+Each child is deleted according to its own `deletionPolicy`:
+- `staging-app-db` has `deletionPolicy: Delete` — the actual database is dropped
+- `staging-app-user` uses the default `Retain` — the database user is kept
+
+See [Deletion Protection: Cascade Confirmation](../user-guide/deletion-protection.md#force-delete-with-children-cascade-confirmation) for the full reference.
+
 ## Multi-Tenant Setup
 
 ### Tenant Isolation Pattern

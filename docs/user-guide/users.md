@@ -18,6 +18,9 @@ spec:
     secretName: myapp-user-credentials
 ```
 
+!!! tip "Database Ownership"
+    When creating a Database with `owner: <username>`, create the DatabaseUser first so the role exists. The user's auto-generated Secret provides credentials for applications to access that database. See [Database owner field](databases.md#owner-optional) for details.
+
 ## Spec Fields
 
 ### instanceRef (required)
