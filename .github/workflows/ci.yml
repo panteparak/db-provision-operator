@@ -433,11 +433,12 @@ jobs:
   # Trivy security scanning - scans each platform using shared matrix
   security-scan:
     name: Security Scan (${{ matrix.config.platform }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.config.runner }}
     needs: [setup, docker-merge]
     if: github.event_name != 'pull_request'
     permissions:
       contents: read
+      packages: read  # For pulling images from GHCR
       security-events: write  # For uploading SARIF to GitHub Security tab
     strategy:
       fail-fast: false
@@ -463,6 +464,17 @@ jobs:
           DIGEST=$(ls /tmp/digests)
           echo "digest=sha256:$DIGEST" >> $GITHUB_OUTPUT
           echo "Image digest for ${{ matrix.config.platform }}: sha256:$DIGEST"
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull image
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.digest.outputs.digest }}
 
       # Generate SBOM from image (scans the image once)
       - name: Generate SBOM
