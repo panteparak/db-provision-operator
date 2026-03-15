@@ -233,6 +233,11 @@ func (a *Adapter) TransferDatabaseOwnership(ctx context.Context, dbName, newOwne
 	return nil
 }
 
+// ExecSQL executes a single SQL statement on the named database.
+func (a *Adapter) ExecSQL(ctx context.Context, database string, statement string) error {
+	return a.execWithNewConnection(ctx, database, statement)
+}
+
 // setDefaultPrivileges sets default privileges in a CockroachDB database.
 // CockroachDB supports ALTER DEFAULT PRIVILEGES with the same syntax as PostgreSQL.
 func (a *Adapter) setDefaultPrivileges(ctx context.Context, database string, dp types.DefaultPrivilegeOptions) error {

@@ -132,6 +132,30 @@ func (a *Adapter) TransferDatabaseOwnership(_ context.Context, _, _ string) erro
 	return nil
 }
 
+// ExecSQL executes a single SQL statement on the named database.
+func (a *Adapter) ExecSQL(ctx context.Context, database string, statement string) error {
+	db, err := a.getDB()
+	if err != nil {
+		return err
+	}
+
+	// Switch to the target database
+	if _, err := db.ExecContext(ctx, fmt.Sprintf("USE %s", escapeIdentifier(database))); err != nil {
+		return fmt.Errorf("failed to switch to database %s: %w", database, err)
+	}
+
+	// Execute the statement
+	_, execErr := db.ExecContext(ctx, statement)
+
+	// Always switch back to admin database
+	_, _ = db.ExecContext(ctx, fmt.Sprintf("USE %s", escapeIdentifier(a.config.Database)))
+
+	if execErr != nil {
+		return fmt.Errorf("failed to execute SQL on database %s: %w", database, execErr)
+	}
+	return nil
+}
+
 // UpdateDatabase is a no-op for ClickHouse as ClickHouse does not support
 // ALTER DATABASE for most settings.
 func (a *Adapter) UpdateDatabase(_ context.Context, _ string, _ types.UpdateDatabaseOptions) error {

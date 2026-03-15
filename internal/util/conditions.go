@@ -78,6 +78,7 @@ const (
 	ReasonDependenciesExist           = "DependenciesExist"
 	ReasonPendingDeletionConfirmation = "PendingDeletionConfirmation"
 	ReasonCascadeDeleting             = "CascadeDeleting"
+	ReasonInitSQLFailed               = "InitSQLFailed"
 )
 
 // SetCondition adds or updates a condition in the conditions list

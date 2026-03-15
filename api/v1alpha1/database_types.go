@@ -16,9 +16,7 @@ limitations under the License.
 
 package v1alpha1
 
-import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // Annotations for force delete
 const (
@@ -70,6 +68,11 @@ type DatabaseSpec struct {
 	// +optional
 	DriftPolicy *DriftPolicy `json:"driftPolicy,omitempty"`
 
+	// InitSQL defines SQL statements to execute once after database creation.
+	// WARNING: Executes raw SQL with the operator's database credentials.
+	// +optional
+	InitSQL *InitSQLConfig `json:"initSQL,omitempty"`
+
 	// PostgreSQL-specific configuration (required when instance engine is "postgres")
 	// +optional
 	Postgres *PostgresDatabaseConfig `json:"postgres,omitempty"`
@@ -118,6 +121,10 @@ type DatabaseStatus struct {
 	// Drift contains drift detection status information
 	// +optional
 	Drift *DriftStatus `json:"drift,omitempty"`
+
+	// InitSQL tracks init SQL execution state.
+	// +optional
+	InitSQL *InitSQLStatus `json:"initSQL,omitempty"`
 
 	// DeletionConfirmation tracks force-delete confirmation state and cascade progress.
 	// +optional

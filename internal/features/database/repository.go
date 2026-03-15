@@ -18,7 +18,9 @@ package database
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -334,4 +336,75 @@ func (r *Repository) CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.Datab
 	})
 
 	return correctionResult, err
+}
+
+// ResolveInitSQL resolves SQL from any source and returns statements + content hash.
+func (r *Repository) ResolveInitSQL(ctx context.Context, initSQL *dbopsv1alpha1.InitSQLConfig, namespace string) ([]string, string, error) {
+	var statements []string
+
+	switch {
+	case len(initSQL.Inline) > 0:
+		statements = initSQL.Inline
+
+	case initSQL.ConfigMapRef != nil:
+		content, err := r.secretManager.GetKeyFromConfigMap(ctx, namespace, initSQL.ConfigMapRef)
+		if err != nil {
+			return nil, "", fmt.Errorf("resolve configmap: %w", err)
+		}
+		statements = splitSQLStatements(content)
+
+	case initSQL.SecretRef != nil:
+		ns := namespace
+		if initSQL.SecretRef.Namespace != "" {
+			ns = initSQL.SecretRef.Namespace
+		}
+		data, err := r.secretManager.GetSecretData(ctx, initSQL.SecretRef.Name, ns)
+		if err != nil {
+			return nil, "", fmt.Errorf("resolve secret: %w", err)
+		}
+		content, ok := data[initSQL.SecretRef.Key]
+		if !ok {
+			return nil, "", fmt.Errorf("secret %s does not contain key %q", initSQL.SecretRef.Name, initSQL.SecretRef.Key)
+		}
+		statements = splitSQLStatements(content)
+	}
+
+	hash := computeHash(statements)
+	return statements, hash, nil
+}
+
+// ExecInitSQL executes init SQL statements on the named database using the withService pattern.
+func (r *Repository) ExecInitSQL(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, statements []string) (int, error) {
+	var executed int
+	err := r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
+		var execErr error
+		executed, execErr = svc.ExecInitSQL(ctx, spec.Name, statements)
+		return execErr
+	})
+	return executed, err
+}
+
+// splitSQLStatements splits content on "---" delimiter, trims whitespace, and filters empty.
+func splitSQLStatements(content string) []string {
+	parts := strings.Split(content, "---")
+	var statements []string
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			statements = append(statements, trimmed)
+		}
+	}
+	return statements
+}
+
+// computeHash returns the SHA-256 hex string of the joined statements.
+func computeHash(statements []string) string {
+	h := sha256.New()
+	for i, stmt := range statements {
+		if i > 0 {
+			h.Write([]byte("\n---\n"))
+		}
+		h.Write([]byte(stmt))
+	}
+	return fmt.Sprintf("%x", h.Sum(nil))
 }

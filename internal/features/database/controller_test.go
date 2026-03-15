@@ -1919,3 +1919,369 @@ func TestController_Reconcile_ForceDeleteCascadeTracksRemainingGrants(t *testing
 	assert.Equal(t, 1, updatedDB.Status.DeletionConfirmation.RemainingCount)
 	assert.Contains(t, updatedDB.Finalizers, util.FinalizerDatabase)
 }
+
+// ============================================================================
+// Init SQL Tests
+// ============================================================================
+
+func newTestDatabaseWithInitSQL(name, namespace string, initSQL *dbopsv1alpha1.InitSQLConfig) *dbopsv1alpha1.Database {
+	db := newTestDatabase(name, namespace)
+	db.Spec.InitSQL = initSQL
+	return db
+}
+
+func newInitSQLReadyMockRepo() *MockRepository {
+	m := NewMockRepository()
+	m.ExistsFunc = func(ctx context.Context, name string, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	m.CreateFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (*Result, error) {
+		return &Result{Created: false, Message: "already exists"}, nil
+	}
+	return m
+}
+
+func TestController_Reconcile_InitSQLAppliedSuccessfully(t *testing.T) {
+	scheme := newTestScheme()
+	database := newTestDatabaseWithInitSQL("testdb", "default", &dbopsv1alpha1.InitSQLConfig{
+		Inline: []string{"CREATE TABLE foo (id INT)", "INSERT INTO foo VALUES (1)"},
+	})
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(database).
+		WithStatusSubresource(database).
+		Build()
+
+	mockRepo := newInitSQLReadyMockRepo()
+	mockRepo.ResolveInitSQLFunc = func(ctx context.Context, initSQL *dbopsv1alpha1.InitSQLConfig, namespace string) ([]string, string, error) {
+		return []string{"CREATE TABLE foo (id INT)", "INSERT INTO foo VALUES (1)"}, "abc123hash", nil
+	}
+	mockRepo.ExecInitSQLFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, statements []string) (int, error) {
+		return 2, nil
+	}
+
+	handler := NewHandler(HandlerConfig{Repository: mockRepo, EventBus: NewMockEventBus(), Logger: logr.Discard()})
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, Logger: logr.Discard(), DefaultDriftInterval: testDefaultDriftInterval,
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testdb", Namespace: "default"},
+	})
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter)
+
+	var updatedDB dbopsv1alpha1.Database
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testdb", Namespace: "default"}, &updatedDB)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedDB.Status.Phase)
+	require.NotNil(t, updatedDB.Status.InitSQL)
+	assert.True(t, updatedDB.Status.InitSQL.Applied)
+	assert.Equal(t, "abc123hash", updatedDB.Status.InitSQL.Hash)
+	assert.Equal(t, int32(2), updatedDB.Status.InitSQL.StatementsExecuted)
+	assert.NotNil(t, updatedDB.Status.InitSQL.AppliedAt)
+	assert.Empty(t, updatedDB.Status.InitSQL.Error)
+	assert.True(t, mockRepo.WasCalled("ExecInitSQL"))
+
+	// Synced condition should be True
+	syncedCond := util.GetCondition(updatedDB.Status.Conditions, util.ConditionTypeSynced)
+	require.NotNil(t, syncedCond)
+	assert.Equal(t, metav1.ConditionTrue, syncedCond.Status)
+}
+
+func TestController_Reconcile_InitSQLSkippedWhenAlreadyApplied(t *testing.T) {
+	scheme := newTestScheme()
+	database := newTestDatabaseWithInitSQL("testdb", "default", &dbopsv1alpha1.InitSQLConfig{
+		Inline: []string{"CREATE TABLE foo (id INT)"},
+	})
+	// Pre-set status hash matching content
+	database.Status.InitSQL = &dbopsv1alpha1.InitSQLStatus{
+		Applied: true,
+		Hash:    "abc123hash",
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(database).
+		WithStatusSubresource(database).
+		Build()
+
+	mockRepo := newInitSQLReadyMockRepo()
+	mockRepo.ResolveInitSQLFunc = func(ctx context.Context, initSQL *dbopsv1alpha1.InitSQLConfig, namespace string) ([]string, string, error) {
+		return []string{"CREATE TABLE foo (id INT)"}, "abc123hash", nil
+	}
+
+	handler := NewHandler(HandlerConfig{Repository: mockRepo, EventBus: NewMockEventBus(), Logger: logr.Discard()})
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, Logger: logr.Discard(), DefaultDriftInterval: testDefaultDriftInterval,
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testdb", Namespace: "default"},
+	})
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter)
+
+	var updatedDB dbopsv1alpha1.Database
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testdb", Namespace: "default"}, &updatedDB)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedDB.Status.Phase)
+	assert.False(t, mockRepo.WasCalled("ExecInitSQL"))
+}
+
+func TestController_Reconcile_InitSQLReExecOnHashChange(t *testing.T) {
+	scheme := newTestScheme()
+	database := newTestDatabaseWithInitSQL("testdb", "default", &dbopsv1alpha1.InitSQLConfig{
+		Inline: []string{"CREATE TABLE bar (id INT)"},
+	})
+	// Pre-set status with old hash
+	database.Status.InitSQL = &dbopsv1alpha1.InitSQLStatus{
+		Applied: true,
+		Hash:    "oldhash",
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(database).
+		WithStatusSubresource(database).
+		Build()
+
+	mockRepo := newInitSQLReadyMockRepo()
+	mockRepo.ResolveInitSQLFunc = func(ctx context.Context, initSQL *dbopsv1alpha1.InitSQLConfig, namespace string) ([]string, string, error) {
+		return []string{"CREATE TABLE bar (id INT)"}, "newhash", nil
+	}
+	mockRepo.ExecInitSQLFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, statements []string) (int, error) {
+		return 1, nil
+	}
+
+	handler := NewHandler(HandlerConfig{Repository: mockRepo, EventBus: NewMockEventBus(), Logger: logr.Discard()})
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, Logger: logr.Discard(), DefaultDriftInterval: testDefaultDriftInterval,
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testdb", Namespace: "default"},
+	})
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter)
+
+	var updatedDB dbopsv1alpha1.Database
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testdb", Namespace: "default"}, &updatedDB)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedDB.Status.Phase)
+	require.NotNil(t, updatedDB.Status.InitSQL)
+	assert.True(t, updatedDB.Status.InitSQL.Applied)
+	assert.Equal(t, "newhash", updatedDB.Status.InitSQL.Hash)
+	assert.True(t, mockRepo.WasCalled("ExecInitSQL"))
+}
+
+func TestController_Reconcile_InitSQLFromConfigMap(t *testing.T) {
+	scheme := newTestScheme()
+	database := newTestDatabaseWithInitSQL("testdb", "default", &dbopsv1alpha1.InitSQLConfig{
+		ConfigMapRef: &dbopsv1alpha1.ConfigMapKeySelector{
+			Name: "sql-config",
+			Key:  "init.sql",
+		},
+	})
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(database).
+		WithStatusSubresource(database).
+		Build()
+
+	mockRepo := newInitSQLReadyMockRepo()
+	mockRepo.ResolveInitSQLFunc = func(ctx context.Context, initSQL *dbopsv1alpha1.InitSQLConfig, namespace string) ([]string, string, error) {
+		return []string{"CREATE TABLE from_cm (id INT)"}, "cmhash", nil
+	}
+	mockRepo.ExecInitSQLFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, statements []string) (int, error) {
+		return 1, nil
+	}
+
+	handler := NewHandler(HandlerConfig{Repository: mockRepo, EventBus: NewMockEventBus(), Logger: logr.Discard()})
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, Logger: logr.Discard(), DefaultDriftInterval: testDefaultDriftInterval,
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testdb", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	assert.True(t, mockRepo.WasCalled("ResolveInitSQL"))
+	assert.True(t, mockRepo.WasCalled("ExecInitSQL"))
+}
+
+func TestController_Reconcile_InitSQLFromSecret(t *testing.T) {
+	scheme := newTestScheme()
+	database := newTestDatabaseWithInitSQL("testdb", "default", &dbopsv1alpha1.InitSQLConfig{
+		SecretRef: &dbopsv1alpha1.SecretKeySelector{
+			Name: "sql-secret",
+			Key:  "init.sql",
+		},
+	})
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(database).
+		WithStatusSubresource(database).
+		Build()
+
+	mockRepo := newInitSQLReadyMockRepo()
+	mockRepo.ResolveInitSQLFunc = func(ctx context.Context, initSQL *dbopsv1alpha1.InitSQLConfig, namespace string) ([]string, string, error) {
+		return []string{"CREATE TABLE from_secret (id INT)"}, "secrethash", nil
+	}
+	mockRepo.ExecInitSQLFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, statements []string) (int, error) {
+		return 1, nil
+	}
+
+	handler := NewHandler(HandlerConfig{Repository: mockRepo, EventBus: NewMockEventBus(), Logger: logr.Discard()})
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, Logger: logr.Discard(), DefaultDriftInterval: testDefaultDriftInterval,
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testdb", Namespace: "default"},
+	})
+	require.NoError(t, err)
+
+	assert.True(t, mockRepo.WasCalled("ResolveInitSQL"))
+	assert.True(t, mockRepo.WasCalled("ExecInitSQL"))
+}
+
+func TestController_Reconcile_InitSQLFailurePolicyContinue(t *testing.T) {
+	scheme := newTestScheme()
+	database := newTestDatabaseWithInitSQL("testdb", "default", &dbopsv1alpha1.InitSQLConfig{
+		Inline:        []string{"INVALID SQL"},
+		FailurePolicy: dbopsv1alpha1.InitSQLFailurePolicyContinue,
+	})
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(database).
+		WithStatusSubresource(database).
+		Build()
+
+	mockRepo := newInitSQLReadyMockRepo()
+	mockRepo.ResolveInitSQLFunc = func(ctx context.Context, initSQL *dbopsv1alpha1.InitSQLConfig, namespace string) ([]string, string, error) {
+		return []string{"INVALID SQL"}, "failhash", nil
+	}
+	mockRepo.ExecInitSQLFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, statements []string) (int, error) {
+		return 0, fmt.Errorf("syntax error")
+	}
+
+	handler := NewHandler(HandlerConfig{Repository: mockRepo, EventBus: NewMockEventBus(), Logger: logr.Discard()})
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, Logger: logr.Discard(), DefaultDriftInterval: testDefaultDriftInterval,
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testdb", Namespace: "default"},
+	})
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter)
+
+	var updatedDB dbopsv1alpha1.Database
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testdb", Namespace: "default"}, &updatedDB)
+	require.NoError(t, err)
+
+	// Phase should be Ready (Continue policy)
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedDB.Status.Phase)
+
+	// Synced condition should be False
+	syncedCond := util.GetCondition(updatedDB.Status.Conditions, util.ConditionTypeSynced)
+	require.NotNil(t, syncedCond)
+	assert.Equal(t, metav1.ConditionFalse, syncedCond.Status)
+	assert.Equal(t, util.ReasonInitSQLFailed, syncedCond.Reason)
+
+	// Status should have error
+	require.NotNil(t, updatedDB.Status.InitSQL)
+	assert.False(t, updatedDB.Status.InitSQL.Applied)
+	assert.NotEmpty(t, updatedDB.Status.InitSQL.Error)
+}
+
+func TestController_Reconcile_InitSQLFailurePolicyBlock(t *testing.T) {
+	scheme := newTestScheme()
+	database := newTestDatabaseWithInitSQL("testdb", "default", &dbopsv1alpha1.InitSQLConfig{
+		Inline:        []string{"INVALID SQL"},
+		FailurePolicy: dbopsv1alpha1.InitSQLFailurePolicyBlock,
+	})
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(database).
+		WithStatusSubresource(database).
+		Build()
+
+	mockRepo := newInitSQLReadyMockRepo()
+	mockRepo.ResolveInitSQLFunc = func(ctx context.Context, initSQL *dbopsv1alpha1.InitSQLConfig, namespace string) ([]string, string, error) {
+		return []string{"INVALID SQL"}, "failhash", nil
+	}
+	mockRepo.ExecInitSQLFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, statements []string) (int, error) {
+		return 0, fmt.Errorf("syntax error")
+	}
+
+	handler := NewHandler(HandlerConfig{Repository: mockRepo, EventBus: NewMockEventBus(), Logger: logr.Discard()})
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, Logger: logr.Discard(), DefaultDriftInterval: testDefaultDriftInterval,
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testdb", Namespace: "default"},
+	})
+	require.Error(t, err)
+
+	var updatedDB dbopsv1alpha1.Database
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testdb", Namespace: "default"}, &updatedDB)
+	require.NoError(t, err)
+
+	// Phase should be Failed (Block policy)
+	assert.Equal(t, dbopsv1alpha1.PhaseFailed, updatedDB.Status.Phase)
+
+	// Ready condition should be False
+	readyCond := util.GetCondition(updatedDB.Status.Conditions, util.ConditionTypeReady)
+	require.NotNil(t, readyCond)
+	assert.Equal(t, metav1.ConditionFalse, readyCond.Status)
+}
+
+func TestController_Reconcile_InitSQLNilIsNoop(t *testing.T) {
+	scheme := newTestScheme()
+	database := newTestDatabase("testdb", "default")
+	// No initSQL in spec
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(database).
+		WithStatusSubresource(database).
+		Build()
+
+	mockRepo := newInitSQLReadyMockRepo()
+
+	handler := NewHandler(HandlerConfig{Repository: mockRepo, EventBus: NewMockEventBus(), Logger: logr.Discard()})
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, Logger: logr.Discard(), DefaultDriftInterval: testDefaultDriftInterval,
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testdb", Namespace: "default"},
+	})
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter)
+
+	var updatedDB dbopsv1alpha1.Database
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testdb", Namespace: "default"}, &updatedDB)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedDB.Status.Phase)
+	assert.Nil(t, updatedDB.Status.InitSQL)
+	assert.False(t, mockRepo.WasCalled("ResolveInitSQL"))
+	assert.False(t, mockRepo.WasCalled("ExecInitSQL"))
+}

@@ -275,6 +275,7 @@ type DatabaseBuildOptions struct {
 	DriftMode          string                   // "detect", "correct", "ignore"
 	DriftInterval      string                   // e.g. "10s"
 	Schemas            []map[string]interface{} // postgres.schemas entries
+	InitSQL            map[string]interface{}   // optional initSQL spec
 }
 
 // BuildDatabaseWithOptions creates an unstructured Database resource with additional options.
@@ -297,6 +298,10 @@ func BuildDatabaseWithOptions(name, namespace, instanceRef, dbName string, opts 
 			driftPolicy["interval"] = opts.DriftInterval
 		}
 		spec["driftPolicy"] = driftPolicy
+	}
+
+	if opts.InitSQL != nil {
+		spec["initSQL"] = opts.InitSQL
 	}
 
 	if len(opts.Schemas) > 0 {

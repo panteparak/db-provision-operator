@@ -32,6 +32,7 @@ const (
 	EventDatabaseCreated = "DatabaseCreated"
 	EventDatabaseDeleted = "DatabaseDeleted"
 	EventDatabaseUpdated = "DatabaseUpdated"
+	EventInitSQLExecuted = "InitSQLExecuted"
 
 	// User events
 	EventUserCreated       = "UserCreated"
@@ -230,6 +231,24 @@ func NewDatabaseUpdated(databaseName, instanceRef, namespace string, changes []s
 		InstanceRef:  instanceRef,
 		Namespace:    namespace,
 		Changes:      changes,
+	}
+}
+
+// InitSQLExecuted is published when init SQL is executed on a database.
+type InitSQLExecuted struct {
+	BaseEvent
+	DatabaseName string
+	Namespace    string
+	Success      bool
+}
+
+// NewInitSQLExecuted creates a new InitSQLExecuted event.
+func NewInitSQLExecuted(databaseName, namespace string, success bool) *InitSQLExecuted {
+	return &InitSQLExecuted{
+		BaseEvent:    NewBaseEvent(EventInitSQLExecuted, databaseName, "Database"),
+		DatabaseName: databaseName,
+		Namespace:    namespace,
+		Success:      success,
 	}
 }
 

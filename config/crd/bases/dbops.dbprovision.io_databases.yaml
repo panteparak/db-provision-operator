@@ -120,6 +120,73 @@ spec:
                     description: Mode determines how drift is handled
                     type: string
                 type: object
+              initSQL:
+                description: |-
+                  InitSQL defines SQL statements to execute once after database creation.
+                  WARNING: Executes raw SQL with the operator's database credentials.
+                properties:
+                  configMapRef:
+                    description: ConfigMapRef references a ConfigMap key containing
+                      SQL statements separated by '---'.
+                    properties:
+                      key:
+                        description: Key within the config map
+                        type: string
+                      name:
+                        description: Name of the config map
+                        type: string
+                      namespace:
+                        description: Namespace of the config map (defaults to the
+                          resource namespace)
+                        type: string
+                    required:
+                    - key
+                    - name
+                    type: object
+                  failurePolicy:
+                    allOf:
+                    - enum:
+                      - Continue
+                      - Block
+                    - enum:
+                      - Continue
+                      - Block
+                    default: Continue
+                    description: |-
+                      FailurePolicy controls behavior when init SQL execution fails.
+                      Continue (default): database reaches Ready with a Synced=False condition.
+                      Block: database stays in Failed phase and requeues.
+                    type: string
+                  inline:
+                    description: Inline SQL statements to execute in order.
+                    items:
+                      type: string
+                    maxItems: 50
+                    type: array
+                  secretRef:
+                    description: SecretRef references a Secret key containing SQL
+                      statements separated by '---'.
+                    properties:
+                      key:
+                        description: Key within the secret
+                        type: string
+                      name:
+                        description: Name of the secret
+                        type: string
+                      namespace:
+                        description: Namespace of the secret (defaults to the resource
+                          namespace)
+                        type: string
+                    required:
+                    - key
+                    - name
+                    type: object
+                type: object
+                x-kubernetes-validations:
+                - message: exactly one of inline, configMapRef, or secretRef must
+                    be specified
+                  rule: '(has(self.inline) ? 1 : 0) + (has(self.configMapRef) ? 1
+                    : 0) + (has(self.secretRef) ? 1 : 0) == 1'
               instanceRef:
                 description: InstanceRef references a namespaced DatabaseInstance
                   (mutually exclusive with ClusterInstanceRef)
@@ -485,6 +552,33 @@ spec:
                     description: LastChecked is when drift was last checked
                     format: date-time
                     type: string
+                type: object
+              initSQL:
+                description: InitSQL tracks init SQL execution state.
+                properties:
+                  applied:
+                    description: Applied indicates whether init SQL executed successfully.
+                    type: boolean
+                  appliedAt:
+                    description: AppliedAt is when init SQL was last successfully
+                      executed.
+                    format: date-time
+                    type: string
+                  error:
+                    description: Error contains the last error message (empty on success).
+                    type: string
+                  hash:
+                    description: Hash is the SHA-256 of the resolved SQL content.
+                      Changes trigger re-execution.
+                    type: string
+                  statementsExecuted:
+                    description: StatementsExecuted is the number of statements successfully
+                      executed.
+                    format: int32
+                    type: integer
+                required:
+                - applied
+                - statementsExecuted
                 type: object
               lastReconcileTime:
                 description: LastReconcileTime is when the last reconciliation occurred

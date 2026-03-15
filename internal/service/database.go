@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/adapter"
@@ -411,6 +412,23 @@ func (s *DatabaseService) CreateWithOwnership(ctx context.Context, spec *dbopsv1
 func (s *DatabaseService) DeleteOwnershipResources(ctx context.Context, roleName, userName string) error {
 	ownerSvc := NewOwnershipService(s.ResourceService)
 	return ownerSvc.DropOwnershipResources(ctx, roleName, userName)
+}
+
+// ExecInitSQL executes a list of SQL statements on the named database.
+// Returns the count of successfully executed statements and the first error encountered.
+func (s *DatabaseService) ExecInitSQL(ctx context.Context, database string, statements []string) (int, error) {
+	executed := 0
+	for i, stmt := range statements {
+		stmt = strings.TrimSpace(stmt)
+		if stmt == "" {
+			continue
+		}
+		if err := s.adapter.ExecSQL(ctx, database, stmt); err != nil {
+			return executed, fmt.Errorf("statement %d: %w", i+1, err)
+		}
+		executed++
+	}
+	return executed, nil
 }
 
 // VerifyAccess verifies that a database is accepting connections.

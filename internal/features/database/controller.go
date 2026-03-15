@@ -99,6 +99,7 @@ func NewController(cfg ControllerConfig) *Controller {
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databases/finalizers,verbs=update
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseinstances,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databasegrants,verbs=list
 
 // Reconcile implements the reconciliation loop for Database resources.
@@ -190,6 +191,45 @@ func (c *Controller) reconcile(ctx context.Context, database *dbopsv1alpha1.Data
 		// Don't fail reconciliation for update errors
 	}
 
+	// 4.5 Apply init SQL if configured
+	var initSQLFailed bool
+	if database.Spec.InitSQL != nil {
+		initResult, initErr := c.handler.ApplyInitSQL(ctx, database)
+		if initResult != nil {
+			if initResult.Skipped {
+				// Ensure status consistency even if it was externally cleared
+				if database.Status.InitSQL == nil {
+					database.Status.InitSQL = &dbopsv1alpha1.InitSQLStatus{
+						Applied: true,
+						Hash:    initResult.Hash,
+					}
+				}
+			} else {
+				now := metav1.Now()
+				database.Status.InitSQL = &dbopsv1alpha1.InitSQLStatus{
+					Applied:            initResult.Applied,
+					Hash:               initResult.Hash,
+					StatementsExecuted: initResult.StatementsExecuted,
+				}
+				if initResult.Applied {
+					database.Status.InitSQL.AppliedAt = &now
+				}
+				if initErr != nil {
+					database.Status.InitSQL.Error = initErr.Error()
+				}
+			}
+		}
+		if initErr != nil {
+			initSQLFailed = true
+			util.SetSyncedCondition(&database.Status.Conditions, metav1.ConditionFalse,
+				util.ReasonInitSQLFailed, fmt.Sprintf("Init SQL failed: %v", initErr))
+			if database.Spec.InitSQL.FailurePolicy == dbopsv1alpha1.InitSQLFailurePolicyBlock {
+				return c.handleError(ctx, database, initErr, "apply init SQL")
+			}
+			log.Error(initErr, "Init SQL failed, continuing per failure policy")
+		}
+	}
+
 	// 5. Update metrics
 	if err := c.handler.UpdateDatabaseMetrics(ctx, database.Spec.Name, &database.Spec, database.Namespace); err != nil {
 		log.Error(err, "Failed to update database metrics")
@@ -227,8 +267,10 @@ func (c *Controller) reconcile(ctx context.Context, database *dbopsv1alpha1.Data
 		}
 	}
 
-	util.SetSyncedCondition(&database.Status.Conditions, metav1.ConditionTrue,
-		util.ReasonReconcileSuccess, "Database is synced")
+	if !initSQLFailed {
+		util.SetSyncedCondition(&database.Status.Conditions, metav1.ConditionTrue,
+			util.ReasonReconcileSuccess, "Database is synced")
+	}
 	util.SetReadyCondition(&database.Status.Conditions, metav1.ConditionTrue,
 		util.ReasonReconcileSuccess, "Database is ready")
 

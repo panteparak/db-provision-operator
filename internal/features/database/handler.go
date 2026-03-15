@@ -385,5 +385,60 @@ func (h *Handler) CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.Database
 	return correctionResult, nil
 }
 
+// ApplyInitSQL resolves and executes init SQL statements on a database.
+// Implements API.ApplyInitSQL
+func (h *Handler) ApplyInitSQL(ctx context.Context, database *dbopsv1alpha1.Database) (*InitSQLResult, error) {
+	log := logf.FromContext(ctx).WithValues("database", database.Name, "namespace", database.Namespace)
+	spec := &database.Spec
+
+	// No-op if not configured
+	if spec.InitSQL == nil {
+		return nil, nil
+	}
+
+	// Resolve SQL content
+	statements, hash, err := h.repo.ResolveInitSQL(ctx, spec.InitSQL, database.Namespace)
+	if err != nil {
+		return &InitSQLResult{Error: err}, err
+	}
+
+	// Skip if already applied with same hash
+	if database.Status.InitSQL != nil && database.Status.InitSQL.Applied && database.Status.InitSQL.Hash == hash {
+		log.V(1).Info("Init SQL already applied, skipping", "hash", hash)
+		return &InitSQLResult{Skipped: true, Hash: hash}, nil
+	}
+
+	// Execute via repository
+	log.Info("Executing init SQL", "statements", len(statements), "hash", hash)
+	executed, execErr := h.repo.ExecInitSQL(ctx, spec, database.Namespace, statements)
+
+	// Metrics
+	engine, _ := h.repo.GetEngine(ctx, spec, database.Namespace)
+	if execErr != nil {
+		metrics.RecordDatabaseOperation(metrics.OperationInitSQL, engine, database.Namespace, metrics.StatusFailure)
+	} else {
+		metrics.RecordDatabaseOperation(metrics.OperationInitSQL, engine, database.Namespace, metrics.StatusSuccess)
+	}
+
+	// Events
+	if h.eventBus != nil {
+		h.eventBus.PublishAsync(ctx, eventbus.NewInitSQLExecuted(spec.Name, database.Namespace, execErr == nil))
+	}
+
+	result := &InitSQLResult{
+		Applied:            execErr == nil,
+		Hash:               hash,
+		StatementsExecuted: int32(executed),
+		Error:              execErr,
+	}
+
+	if execErr != nil {
+		return result, execErr
+	}
+
+	log.Info("Init SQL executed successfully", "statements", executed)
+	return result, nil
+}
+
 // Ensure Handler implements API interface.
 var _ API = (*Handler)(nil)

@@ -38,6 +38,8 @@ type MockRepository struct {
 	GetEngineFunc       func(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string) (string, error)
 	DetectDriftFunc     func(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, allowDestructive bool) (*drift.Result, error)
 	CorrectDriftFunc    func(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error)
+	ResolveInitSQLFunc  func(ctx context.Context, initSQL *dbopsv1alpha1.InitSQLConfig, namespace string) ([]string, string, error)
+	ExecInitSQLFunc     func(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, statements []string) (int, error)
 
 	// Call tracking
 	Calls []MockCall
@@ -93,6 +95,12 @@ func NewMockRepository() *MockRepository {
 	}
 	m.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
 		return drift.NewCorrectionResult(spec.Name), nil
+	}
+	m.ResolveInitSQLFunc = func(ctx context.Context, initSQL *dbopsv1alpha1.InitSQLConfig, namespace string) ([]string, string, error) {
+		return nil, "", nil
+	}
+	m.ExecInitSQLFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, statements []string) (int, error) {
+		return 0, nil
 	}
 
 	return m
@@ -167,6 +175,18 @@ func (m *MockRepository) DetectDrift(ctx context.Context, spec *dbopsv1alpha1.Da
 func (m *MockRepository) CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
 	m.recordCall("CorrectDrift", spec, namespace, driftResult, allowDestructive)
 	return m.CorrectDriftFunc(ctx, spec, namespace, driftResult, allowDestructive)
+}
+
+// ResolveInitSQL implements the resolve init SQL operation.
+func (m *MockRepository) ResolveInitSQL(ctx context.Context, initSQL *dbopsv1alpha1.InitSQLConfig, namespace string) ([]string, string, error) {
+	m.recordCall("ResolveInitSQL", initSQL, namespace)
+	return m.ResolveInitSQLFunc(ctx, initSQL, namespace)
+}
+
+// ExecInitSQL implements the exec init SQL operation.
+func (m *MockRepository) ExecInitSQL(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, statements []string) (int, error) {
+	m.recordCall("ExecInitSQL", spec, namespace, statements)
+	return m.ExecInitSQLFunc(ctx, spec, namespace, statements)
 }
 
 // WasCalled checks if a method was called.

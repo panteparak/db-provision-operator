@@ -81,6 +81,21 @@ type DeletionConfirmation struct {
 	Message string `json:"message"`
 }
 
+// ConfigMapKeySelector contains a reference to a config map key.
+type ConfigMapKeySelector struct {
+	// Name of the config map
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Namespace of the config map (defaults to the resource namespace)
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
+	// Key within the config map
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
+}
+
 // SecretKeySelector contains a reference to a secret key
 type SecretKeySelector struct {
 	// Name of the secret

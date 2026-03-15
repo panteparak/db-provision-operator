@@ -66,6 +66,10 @@ type API interface {
 	// CorrectDrift attempts to correct detected drift by applying necessary changes.
 	// Only non-destructive corrections are applied unless allowDestructive is true.
 	CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error)
+
+	// ApplyInitSQL resolves and executes init SQL statements on a database.
+	// Returns nil result if no initSQL is configured.
+	ApplyInitSQL(ctx context.Context, database *dbopsv1alpha1.Database) (*InitSQLResult, error)
 }
 
 // Result represents the result of a database operation.
@@ -90,6 +94,24 @@ type OwnershipResult struct {
 
 	// UserName is the auto-created login user name.
 	UserName string
+}
+
+// InitSQLResult holds the outcome of init SQL execution.
+type InitSQLResult struct {
+	// Applied indicates whether init SQL executed successfully.
+	Applied bool
+
+	// Skipped is true when hash matches (already applied).
+	Skipped bool
+
+	// Hash is the SHA-256 of the resolved SQL content.
+	Hash string
+
+	// StatementsExecuted is the number of statements successfully executed.
+	StatementsExecuted int32
+
+	// Error contains the execution error, if any.
+	Error error
 }
 
 // Info contains information about a database.
@@ -151,6 +173,14 @@ type RepositoryInterface interface {
 
 	// CorrectDrift attempts to correct detected drift.
 	CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error)
+
+	// ResolveInitSQL resolves SQL from any source (inline, configMapRef, secretRef).
+	// Returns the statements, a content hash, and any error.
+	ResolveInitSQL(ctx context.Context, initSQL *dbopsv1alpha1.InitSQLConfig, namespace string) ([]string, string, error)
+
+	// ExecInitSQL executes init SQL statements on the named database.
+	// Returns the count of successfully executed statements and the first error.
+	ExecInitSQL(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, statements []string) (int, error)
 }
 
 // Ensure Repository implements RepositoryInterface.

@@ -51,6 +51,7 @@ const (
 	OperationRestore         = "restore"
 	OperationDriftDetection  = "drift_detection"
 	OperationDriftCorrection = "drift_correction"
+	OperationInitSQL         = "init_sql"
 )
 
 var (

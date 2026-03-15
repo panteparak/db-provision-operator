@@ -180,6 +180,35 @@ func (m *Manager) getSecretData(ctx context.Context, namespace, secretName, key 
 	return data, nil
 }
 
+// GetConfigMapData reads all data from a ConfigMap as map[string]string.
+func (m *Manager) GetConfigMapData(ctx context.Context, name, namespace string) (map[string]string, error) {
+	cm := &corev1.ConfigMap{}
+	if err := m.client.Get(ctx, types.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}, cm); err != nil {
+		return nil, fmt.Errorf("get configmap %s/%s: %w", namespace, name, err)
+	}
+	return cm.Data, nil
+}
+
+// GetKeyFromConfigMap reads a single key from a ConfigMap.
+func (m *Manager) GetKeyFromConfigMap(ctx context.Context, namespace string, ref *dbopsv1alpha1.ConfigMapKeySelector) (string, error) {
+	ns := namespace
+	if ref.Namespace != "" {
+		ns = ref.Namespace
+	}
+	data, err := m.GetConfigMapData(ctx, ref.Name, ns)
+	if err != nil {
+		return "", err
+	}
+	content, ok := data[ref.Key]
+	if !ok {
+		return "", fmt.Errorf("configmap %s/%s does not contain key %q", ns, ref.Name, ref.Key)
+	}
+	return content, nil
+}
+
 // GetSecretData retrieves all data from a secret as a map of string keys to string values
 func (m *Manager) GetSecretData(ctx context.Context, secretName, namespace string) (map[string]string, error) {
 	secret := &corev1.Secret{}
