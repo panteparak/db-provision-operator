@@ -93,6 +93,16 @@ repos:
         files: ^(api/v1alpha1/|config/crd/)
         pass_filenames: false
 
+  # Verify generated code is up-to-date (deepcopy, CRDs, RBAC)
+  - repo: local
+    hooks:
+      - id: verify-codegen
+        name: verify generated code
+        entry: bash -c 'make generate manifests && git diff --exit-code -- api/ config/ charts/'
+        language: system
+        files: ^(api/v1alpha1/.*\.go|config/crd/|config/rbac/|charts/db-provision-operator/crds/)
+        pass_filenames: false
+
   # Shell script linting (for scripts in Makefile, CI, etc.)
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.10.0.1
