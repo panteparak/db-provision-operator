@@ -518,6 +518,42 @@ spec:
                   - type
                   type: object
                 type: array
+              deletionConfirmation:
+                description: DeletionConfirmation tracks force-delete confirmation
+                  state and cascade progress.
+                properties:
+                  children:
+                    description: |-
+                      Children lists the child resource names that will be cascade-deleted.
+                      Format: "Kind/Name" (e.g., "Database/mydb", "DatabaseGrant/grant-1").
+                    items:
+                      type: string
+                    type: array
+                  hash:
+                    description: |-
+                      Hash is the confirmation value the user must set as the
+                      confirm-force-delete annotation to approve cascade deletion.
+                    type: string
+                  message:
+                    description: Message is a human-readable explanation of the current
+                      state.
+                    type: string
+                  remainingCount:
+                    description: |-
+                      RemainingCount tracks how many children are still being deleted
+                      after confirmation. Decreases as child controllers complete deletion.
+                    type: integer
+                  required:
+                    description: Required indicates that confirmation is needed before
+                      deletion proceeds.
+                    type: boolean
+                required:
+                - children
+                - hash
+                - message
+                - remainingCount
+                - required
+                type: object
               drift:
                 description: Drift contains drift detection status information
                 properties:
