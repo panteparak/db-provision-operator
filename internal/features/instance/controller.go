@@ -24,6 +24,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -84,9 +85,9 @@ func NewController(cfg ControllerConfig) *Controller {
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseinstances/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseinstances/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
-// +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databases,verbs=list
-// +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseusers,verbs=list
-// +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseroles,verbs=list
+// +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databases,verbs=get;list;delete
+// +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseusers,verbs=get;list;delete
+// +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseroles,verbs=get;list;delete
 
 // Reconcile implements the reconciliation loop for DatabaseInstance resources.
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -209,26 +210,85 @@ func (c *Controller) handleDeletion(ctx context.Context, instance *dbopsv1alpha1
 		return ctrl.Result{}, fmt.Errorf("deletion protection enabled")
 	}
 
-	// Check for child dependencies (skip if force-delete)
-	if !util.HasForceDeleteAnnotation(instance) {
-		hasChildren, msg, children, err := c.hasChildDependencies(ctx, instance)
-		if err != nil {
-			log.Error(err, "Failed to check child dependencies")
-			// Don't block on check errors — proceed with deletion
-		} else if hasChildren {
-			log.Info("Deletion blocked by child dependencies", "children", children, "message", msg)
+	// Check for child dependencies
+	hasChildren, msg, children, err := c.hasChildDependencies(ctx, instance)
+	if err != nil {
+		log.Error(err, "Failed to check child dependencies")
+		// Fail-open: proceed without blocking on check errors
+	}
+
+	if hasChildren && !util.HasForceDeleteAnnotation(instance) {
+		// Normal deletion: block on children
+		log.Info("Deletion blocked by child dependencies", "children", children, "message", msg)
+		util.SetReadyCondition(&instance.Status.Conditions, metav1.ConditionFalse,
+			util.ReasonDependenciesExist, msg)
+		instance.Status.Phase = dbopsv1alpha1.PhaseFailed
+		instance.Status.Message = msg
+		if statusErr := c.Status().Update(ctx, instance); statusErr != nil {
+			log.Error(statusErr, "Failed to update status")
+		}
+		c.Recorder.Eventf(instance, corev1.EventTypeWarning, "DeletionBlocked",
+			"Deletion blocked: %s", msg)
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+
+	if hasChildren && util.HasForceDeleteAnnotation(instance) {
+		// Force-delete with children: require confirmation
+		if !util.IsForceDeleteConfirmed(instance, children) {
+			hash := util.ComputeDeletionHash(children)
+			instance.Status.Phase = dbopsv1alpha1.PhasePendingDeletion
+			instance.Status.Message = fmt.Sprintf(
+				"Force-delete requires confirmation: %d child(ren) will be cascade-deleted. "+
+					"Set annotation %s=%s to confirm.",
+				len(children), util.AnnotationConfirmForceDelete, hash)
+			instance.Status.DeletionConfirmation = &dbopsv1alpha1.DeletionConfirmation{
+				Required:       true,
+				Hash:           hash,
+				Children:       children,
+				RemainingCount: len(children),
+				Message:        instance.Status.Message,
+			}
 			util.SetReadyCondition(&instance.Status.Conditions, metav1.ConditionFalse,
-				util.ReasonDependenciesExist, msg)
-			instance.Status.Phase = dbopsv1alpha1.PhaseFailed
-			instance.Status.Message = msg
+				util.ReasonPendingDeletionConfirmation, instance.Status.Message)
 			if statusErr := c.Status().Update(ctx, instance); statusErr != nil {
 				log.Error(statusErr, "Failed to update status")
 			}
-			c.Recorder.Eventf(instance, corev1.EventTypeWarning, "DeletionBlocked",
-				"Deletion blocked: %s", msg)
+			c.Recorder.Eventf(instance, corev1.EventTypeWarning, "ForceDeletePending",
+				"Confirmation required: %d children will be cascade-deleted: %s",
+				len(children), strings.Join(children, ", "))
 			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 		}
+
+		// Confirmed — cascade delete children
+		remaining, remainingNames, err := c.cascadeDeleteChildren(ctx, instance)
+		if err != nil {
+			return c.handleError(ctx, instance, err, "cascade delete children")
+		}
+		if remaining > 0 {
+			log.Info("Waiting for children to be deleted", "remaining", remaining)
+			instance.Status.Phase = dbopsv1alpha1.PhaseDeleting
+			instance.Status.Message = fmt.Sprintf("Cascade-deleting: %d child(ren) remaining", remaining)
+			instance.Status.DeletionConfirmation = &dbopsv1alpha1.DeletionConfirmation{
+				Required:       false,
+				Hash:           util.ComputeDeletionHash(children),
+				Children:       remainingNames,
+				RemainingCount: remaining,
+				Message:        instance.Status.Message,
+			}
+			util.SetReadyCondition(&instance.Status.Conditions, metav1.ConditionFalse,
+				util.ReasonCascadeDeleting, instance.Status.Message)
+			if statusErr := c.Status().Update(ctx, instance); statusErr != nil {
+				log.Error(statusErr, "Failed to update status")
+			}
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+
+		c.Recorder.Eventf(instance, corev1.EventTypeNormal, "CascadeDeleteComplete",
+			"All %d children cascade-deleted", len(children))
 	}
+
+	// Clear deletion confirmation before final cleanup
+	instance.Status.DeletionConfirmation = nil
 
 	// Clean up metrics
 	c.handler.CleanupMetrics(instance)
@@ -337,6 +397,81 @@ func (c *Controller) hasChildDependencies(ctx context.Context, instance *dbopsv1
 	msg := fmt.Sprintf("cannot delete: %d child resource(s) still reference this instance: %s. "+
 		"Delete children first or use force-delete annotation", len(childTypes), strings.Join(childTypes, ", "))
 	return true, msg, childTypes, nil
+}
+
+// cascadeDeleteChildren deletes all child resources (Database, DatabaseUser, DatabaseRole)
+// that reference this instance and returns the count of children still remaining.
+func (c *Controller) cascadeDeleteChildren(ctx context.Context, instance *dbopsv1alpha1.DatabaseInstance) (int, []string, error) {
+	var remaining []string
+
+	// Delete Databases referencing this instance
+	var databases dbopsv1alpha1.DatabaseList
+	if err := c.List(ctx, &databases, client.InNamespace(instance.Namespace)); err != nil {
+		return 0, nil, fmt.Errorf("list databases: %w", err)
+	}
+	for i := range databases.Items {
+		db := &databases.Items[i]
+		if db.Spec.InstanceRef != nil && db.Spec.InstanceRef.Name == instance.Name {
+			ns := db.Spec.InstanceRef.Namespace
+			if ns == "" || ns == instance.Namespace {
+				if err := c.Delete(ctx, db); err != nil {
+					if !apierrors.IsNotFound(err) {
+						return 0, nil, fmt.Errorf("delete database %s: %w", db.Name, err)
+					}
+				}
+				// Check if still exists (may have finalizers)
+				if err := c.Get(ctx, client.ObjectKeyFromObject(db), db); err == nil {
+					remaining = append(remaining, "Database/"+db.Name)
+				}
+			}
+		}
+	}
+
+	// Delete DatabaseUsers referencing this instance
+	var users dbopsv1alpha1.DatabaseUserList
+	if err := c.List(ctx, &users, client.InNamespace(instance.Namespace)); err != nil {
+		return 0, nil, fmt.Errorf("list users: %w", err)
+	}
+	for i := range users.Items {
+		u := &users.Items[i]
+		if u.Spec.InstanceRef != nil && u.Spec.InstanceRef.Name == instance.Name {
+			ns := u.Spec.InstanceRef.Namespace
+			if ns == "" || ns == instance.Namespace {
+				if err := c.Delete(ctx, u); err != nil {
+					if !apierrors.IsNotFound(err) {
+						return 0, nil, fmt.Errorf("delete user %s: %w", u.Name, err)
+					}
+				}
+				if err := c.Get(ctx, client.ObjectKeyFromObject(u), u); err == nil {
+					remaining = append(remaining, "DatabaseUser/"+u.Name)
+				}
+			}
+		}
+	}
+
+	// Delete DatabaseRoles referencing this instance
+	var roles dbopsv1alpha1.DatabaseRoleList
+	if err := c.List(ctx, &roles, client.InNamespace(instance.Namespace)); err != nil {
+		return 0, nil, fmt.Errorf("list roles: %w", err)
+	}
+	for i := range roles.Items {
+		r := &roles.Items[i]
+		if r.Spec.InstanceRef != nil && r.Spec.InstanceRef.Name == instance.Name {
+			ns := r.Spec.InstanceRef.Namespace
+			if ns == "" || ns == instance.Namespace {
+				if err := c.Delete(ctx, r); err != nil {
+					if !apierrors.IsNotFound(err) {
+						return 0, nil, fmt.Errorf("delete role %s: %w", r.Name, err)
+					}
+				}
+				if err := c.Get(ctx, client.ObjectKeyFromObject(r), r); err == nil {
+					remaining = append(remaining, "DatabaseRole/"+r.Name)
+				}
+			}
+		}
+	}
+
+	return len(remaining), remaining, nil
 }
 
 // hasDeletionProtection checks if the instance has deletion protection enabled.

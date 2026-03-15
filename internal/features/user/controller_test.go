@@ -1975,7 +1975,6 @@ func TestController_Reconcile_ForceDeleteBypassesGrantCheck(t *testing.T) {
 	now := metav1.Now()
 	user.DeletionTimestamp = &now
 
-	// Create a DatabaseGrant referencing this user
 	grant := &dbopsv1alpha1.DatabaseGrant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-grant",
@@ -2027,21 +2026,280 @@ func TestController_Reconcile_ForceDeleteBypassesGrantCheck(t *testing.T) {
 		},
 	})
 
-	// Should succeed — force-delete bypasses grant dependency check
+	// Force-delete with children now requires confirmation
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{RequeueAfter: 10 * time.Second}, result)
+
+	var updatedUser dbopsv1alpha1.DatabaseUser
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testuser", Namespace: "default"}, &updatedUser)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhasePendingDeletion, updatedUser.Status.Phase)
+	require.NotNil(t, updatedUser.Status.DeletionConfirmation)
+	assert.True(t, updatedUser.Status.DeletionConfirmation.Required)
+	assert.NotEmpty(t, updatedUser.Status.DeletionConfirmation.Hash)
+	assert.Contains(t, updatedUser.Status.DeletionConfirmation.Children, "DatabaseGrant/test-grant")
+	assert.Contains(t, updatedUser.Finalizers, util.FinalizerDatabaseUser)
+	// Delete should NOT have been called
+	assert.False(t, mockRepo.WasCalled("Delete"))
+}
+
+func TestController_Reconcile_ForceDeleteConfirmedCascadesGrants(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+	user.Finalizers = []string{util.FinalizerDatabaseUser}
+
+	grant := &dbopsv1alpha1.DatabaseGrant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-grant",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseGrantSpec{
+			UserRef:     &dbopsv1alpha1.UserReference{Name: user.Name},
+			DatabaseRef: &dbopsv1alpha1.DatabaseReference{Name: "somedb"},
+		},
+	}
+
+	children := []string{"DatabaseGrant/test-grant"}
+	hash := util.ComputeDeletionHash(children)
+	user.Annotations = map[string]string{
+		util.AnnotationForceDelete:             "true",
+		util.AnnotationConfirmForceDelete:      hash,
+		"dbops.dbprovision.io/deletion-policy": string(dbopsv1alpha1.DeletionPolicyDelete),
+	}
+	now := metav1.Now()
+	user.DeletionTimestamp = &now
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, grant).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.DeleteFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, force bool) error {
+		return nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+	assert.True(t, mockRepo.WasCalled("Delete"))
+}
+
+func TestController_Reconcile_ForceDeleteWrongHashBlocksDeletion(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+	user.Finalizers = []string{util.FinalizerDatabaseUser}
+	user.Annotations = map[string]string{
+		util.AnnotationForceDelete:        "true",
+		util.AnnotationConfirmForceDelete: "wronghash",
+	}
+	now := metav1.Now()
+	user.DeletionTimestamp = &now
+
+	grant := &dbopsv1alpha1.DatabaseGrant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-grant",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseGrantSpec{
+			UserRef:     &dbopsv1alpha1.UserReference{Name: user.Name},
+			DatabaseRef: &dbopsv1alpha1.DatabaseReference{Name: "somedb"},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, grant).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{RequeueAfter: 10 * time.Second}, result)
+
+	var updatedUser dbopsv1alpha1.DatabaseUser
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testuser", Namespace: "default"}, &updatedUser)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhasePendingDeletion, updatedUser.Status.Phase)
+	assert.NotEqual(t, "wronghash", updatedUser.Status.DeletionConfirmation.Hash)
+}
+
+func TestController_Reconcile_ForceDeleteNoChildrenSkipsConfirmation(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+	user.Finalizers = []string{util.FinalizerDatabaseUser}
+	user.Annotations = map[string]string{
+		util.AnnotationForceDelete: "true",
+	}
+	now := metav1.Now()
+	user.DeletionTimestamp = &now
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+	})
+
 	require.NoError(t, err)
 	assert.Equal(t, ctrl.Result{}, result)
 
-	// Verify Delete WAS called (force delete proceeds despite grant)
-	assert.True(t, mockRepo.WasCalled("Delete"))
-
-	// Verify finalizer is removed
 	var updatedUser dbopsv1alpha1.DatabaseUser
 	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testuser", Namespace: "default"}, &updatedUser)
-	if apierrors.IsNotFound(err) {
-		return
+	assert.True(t, apierrors.IsNotFound(err), "user should be deleted when no children")
+}
+
+func TestController_Reconcile_ForceDeleteHashChangesWhenChildrenChange(t *testing.T) {
+	children1 := []string{"DatabaseGrant/grant1"}
+	children2 := []string{"DatabaseGrant/grant1", "DatabaseGrant/grant2"}
+
+	hash1 := util.ComputeDeletionHash(children1)
+	hash2 := util.ComputeDeletionHash(children2)
+
+	assert.NotEqual(t, hash1, hash2)
+}
+
+func TestController_Reconcile_ForceDeleteCascadeTracksRemainingGrants(t *testing.T) {
+	scheme := newTestScheme()
+	user := newTestUser("testuser", "default")
+	user.Finalizers = []string{util.FinalizerDatabaseUser}
+
+	grant := &dbopsv1alpha1.DatabaseGrant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test-grant",
+			Namespace:  "default",
+			Finalizers: []string{"dbops.dbprovision.io/databasegrant-finalizer"},
+		},
+		Spec: dbopsv1alpha1.DatabaseGrantSpec{
+			UserRef:     &dbopsv1alpha1.UserReference{Name: user.Name},
+			DatabaseRef: &dbopsv1alpha1.DatabaseReference{Name: "somedb"},
+		},
 	}
+
+	children := []string{"DatabaseGrant/test-grant"}
+	hash := util.ComputeDeletionHash(children)
+	user.Annotations = map[string]string{
+		util.AnnotationForceDelete:        "true",
+		util.AnnotationConfirmForceDelete: hash,
+	}
+	now := metav1.Now()
+	user.DeletionTimestamp = &now
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, grant).
+		WithStatusSubresource(user, grant).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testuser",
+			Namespace: "default",
+		},
+	})
+
 	require.NoError(t, err)
-	assert.NotContains(t, updatedUser.Finalizers, util.FinalizerDatabaseUser, "Finalizer should be removed")
+	assert.Equal(t, ctrl.Result{RequeueAfter: 5 * time.Second}, result)
+
+	var updatedUser dbopsv1alpha1.DatabaseUser
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testuser", Namespace: "default"}, &updatedUser)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseDeleting, updatedUser.Status.Phase)
+	require.NotNil(t, updatedUser.Status.DeletionConfirmation)
+	assert.Equal(t, 1, updatedUser.Status.DeletionConfirmation.RemainingCount)
+	assert.Contains(t, updatedUser.Finalizers, util.FinalizerDatabaseUser)
 }
 
 func TestController_Reconcile_SecretTemplateDataReplacesDefaultKeys(t *testing.T) {

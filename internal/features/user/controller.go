@@ -434,26 +434,85 @@ func (c *Controller) handleDeletion(ctx context.Context, user *dbopsv1alpha1.Dat
 		return ctrl.Result{}, fmt.Errorf("deletion protection enabled")
 	}
 
-	// Check for grant dependencies (skip if force-delete)
-	if !util.HasForceDeleteAnnotation(user) {
-		hasGrants, msg, children, err := c.hasGrantDependencies(ctx, user)
-		if err != nil {
-			log.Error(err, "Failed to check grant dependencies")
-			// Don't block on check errors — proceed with deletion
-		} else if hasGrants {
-			log.Info("Deletion blocked by grant dependencies", "children", children, "message", msg)
+	// Check for grant dependencies
+	hasGrants, msg, children, err := c.hasGrantDependencies(ctx, user)
+	if err != nil {
+		log.Error(err, "Failed to check grant dependencies")
+		// Fail-open: proceed without blocking on check errors
+	}
+
+	if hasGrants && !util.HasForceDeleteAnnotation(user) {
+		// Normal deletion: block on grants
+		log.Info("Deletion blocked by grant dependencies", "children", children, "message", msg)
+		util.SetReadyCondition(&user.Status.Conditions, metav1.ConditionFalse,
+			util.ReasonDependenciesExist, msg)
+		user.Status.Phase = dbopsv1alpha1.PhaseFailed
+		user.Status.Message = msg
+		if statusErr := c.Status().Update(ctx, user); statusErr != nil {
+			log.Error(statusErr, "Failed to update status")
+		}
+		c.Recorder.Eventf(user, corev1.EventTypeWarning, "DeletionBlocked",
+			"Deletion blocked: %s", msg)
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+
+	if hasGrants && util.HasForceDeleteAnnotation(user) {
+		// Force-delete with children: require confirmation
+		if !util.IsForceDeleteConfirmed(user, children) {
+			hash := util.ComputeDeletionHash(children)
+			user.Status.Phase = dbopsv1alpha1.PhasePendingDeletion
+			user.Status.Message = fmt.Sprintf(
+				"Force-delete requires confirmation: %d child(ren) will be cascade-deleted. "+
+					"Set annotation %s=%s to confirm.",
+				len(children), util.AnnotationConfirmForceDelete, hash)
+			user.Status.DeletionConfirmation = &dbopsv1alpha1.DeletionConfirmation{
+				Required:       true,
+				Hash:           hash,
+				Children:       children,
+				RemainingCount: len(children),
+				Message:        user.Status.Message,
+			}
 			util.SetReadyCondition(&user.Status.Conditions, metav1.ConditionFalse,
-				util.ReasonDependenciesExist, msg)
-			user.Status.Phase = dbopsv1alpha1.PhaseFailed
-			user.Status.Message = msg
+				util.ReasonPendingDeletionConfirmation, user.Status.Message)
 			if statusErr := c.Status().Update(ctx, user); statusErr != nil {
 				log.Error(statusErr, "Failed to update status")
 			}
-			c.Recorder.Eventf(user, corev1.EventTypeWarning, "DeletionBlocked",
-				"Deletion blocked: %s", msg)
+			c.Recorder.Eventf(user, corev1.EventTypeWarning, "ForceDeletePending",
+				"Confirmation required: %d children will be cascade-deleted: %s",
+				len(children), strings.Join(children, ", "))
 			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 		}
+
+		// Confirmed — cascade delete children
+		remaining, remainingNames, err := c.cascadeDeleteChildren(ctx, user)
+		if err != nil {
+			return c.handleError(ctx, user, err, "cascade delete children")
+		}
+		if remaining > 0 {
+			log.Info("Waiting for children to be deleted", "remaining", remaining)
+			user.Status.Phase = dbopsv1alpha1.PhaseDeleting
+			user.Status.Message = fmt.Sprintf("Cascade-deleting: %d child(ren) remaining", remaining)
+			user.Status.DeletionConfirmation = &dbopsv1alpha1.DeletionConfirmation{
+				Required:       false,
+				Hash:           util.ComputeDeletionHash(children),
+				Children:       remainingNames,
+				RemainingCount: remaining,
+				Message:        user.Status.Message,
+			}
+			util.SetReadyCondition(&user.Status.Conditions, metav1.ConditionFalse,
+				util.ReasonCascadeDeleting, user.Status.Message)
+			if statusErr := c.Status().Update(ctx, user); statusErr != nil {
+				log.Error(statusErr, "Failed to update status")
+			}
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+
+		c.Recorder.Eventf(user, corev1.EventTypeNormal, "CascadeDeleteComplete",
+			"All %d children cascade-deleted", len(children))
 	}
+
+	// Clear deletion confirmation before proceeding
+	user.Status.DeletionConfirmation = nil
 
 	if deletionPolicy == dbopsv1alpha1.DeletionPolicyDelete {
 		force := util.HasForceDeleteAnnotation(user)
@@ -645,4 +704,33 @@ func (c *Controller) hasGrantDependencies(ctx context.Context, user *dbopsv1alph
 	msg := fmt.Sprintf("cannot delete: %d DatabaseGrant(s) still reference this user: %s. "+
 		"Delete grants first or use force-delete annotation", len(childNames), strings.Join(childNames, ", "))
 	return true, msg, childNames, nil
+}
+
+// cascadeDeleteChildren deletes all DatabaseGrant CRs referencing this user.
+// Returns the count of children still existing (pending finalizer removal by their controllers).
+func (c *Controller) cascadeDeleteChildren(ctx context.Context, user *dbopsv1alpha1.DatabaseUser) (int, []string, error) {
+	var remaining []string
+
+	var grants dbopsv1alpha1.DatabaseGrantList
+	if err := c.List(ctx, &grants, client.InNamespace(user.Namespace)); err != nil {
+		return 0, nil, fmt.Errorf("list grants: %w", err)
+	}
+	for i := range grants.Items {
+		g := &grants.Items[i]
+		if g.Spec.UserRef != nil && g.Spec.UserRef.Name == user.Name {
+			ns := g.Spec.UserRef.Namespace
+			if ns == "" || ns == user.Namespace {
+				if err := c.Delete(ctx, g); err != nil {
+					if !errors.IsNotFound(err) {
+						return 0, nil, fmt.Errorf("delete grant %s: %w", g.Name, err)
+					}
+				}
+				if err := c.Get(ctx, client.ObjectKeyFromObject(g), g); err == nil {
+					remaining = append(remaining, "DatabaseGrant/"+g.Name)
+				}
+			}
+		}
+	}
+
+	return len(remaining), remaining, nil
 }

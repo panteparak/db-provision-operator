@@ -24,6 +24,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -279,26 +280,85 @@ func (c *Controller) handleDeletion(ctx context.Context, database *dbopsv1alpha1
 		return ctrl.Result{}, fmt.Errorf("deletion protection enabled")
 	}
 
-	// Check for child dependencies (skip if force-delete)
-	if !util.HasForceDeleteAnnotation(database) {
-		hasChildren, msg, children, err := c.hasChildDependencies(ctx, database)
-		if err != nil {
-			log.Error(err, "Failed to check child dependencies")
-			// Don't block on check errors — proceed with deletion
-		} else if hasChildren {
-			log.Info("Deletion blocked by child dependencies", "children", children, "message", msg)
+	// Check for child dependencies
+	hasChildren, msg, children, err := c.hasChildDependencies(ctx, database)
+	if err != nil {
+		log.Error(err, "Failed to check child dependencies")
+		// Fail-open: proceed without blocking on check errors
+	}
+
+	if hasChildren && !util.HasForceDeleteAnnotation(database) {
+		// Normal deletion: block on children
+		log.Info("Deletion blocked by child dependencies", "children", children, "message", msg)
+		util.SetReadyCondition(&database.Status.Conditions, metav1.ConditionFalse,
+			util.ReasonDependenciesExist, msg)
+		database.Status.Phase = dbopsv1alpha1.PhaseFailed
+		database.Status.Message = msg
+		if statusErr := c.Status().Update(ctx, database); statusErr != nil {
+			log.Error(statusErr, "Failed to update status")
+		}
+		c.Recorder.Eventf(database, corev1.EventTypeWarning, "DeletionBlocked",
+			"Deletion blocked: %s", msg)
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+
+	if hasChildren && util.HasForceDeleteAnnotation(database) {
+		// Force-delete with children: require confirmation
+		if !util.IsForceDeleteConfirmed(database, children) {
+			hash := util.ComputeDeletionHash(children)
+			database.Status.Phase = dbopsv1alpha1.PhasePendingDeletion
+			database.Status.Message = fmt.Sprintf(
+				"Force-delete requires confirmation: %d child(ren) will be cascade-deleted. "+
+					"Set annotation %s=%s to confirm.",
+				len(children), util.AnnotationConfirmForceDelete, hash)
+			database.Status.DeletionConfirmation = &dbopsv1alpha1.DeletionConfirmation{
+				Required:       true,
+				Hash:           hash,
+				Children:       children,
+				RemainingCount: len(children),
+				Message:        database.Status.Message,
+			}
 			util.SetReadyCondition(&database.Status.Conditions, metav1.ConditionFalse,
-				util.ReasonDependenciesExist, msg)
-			database.Status.Phase = dbopsv1alpha1.PhaseFailed
-			database.Status.Message = msg
+				util.ReasonPendingDeletionConfirmation, database.Status.Message)
 			if statusErr := c.Status().Update(ctx, database); statusErr != nil {
 				log.Error(statusErr, "Failed to update status")
 			}
-			c.Recorder.Eventf(database, corev1.EventTypeWarning, "DeletionBlocked",
-				"Deletion blocked: %s", msg)
+			c.Recorder.Eventf(database, corev1.EventTypeWarning, "ForceDeletePending",
+				"Confirmation required: %d children will be cascade-deleted: %s",
+				len(children), strings.Join(children, ", "))
 			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 		}
+
+		// Confirmed — cascade delete children
+		remaining, remainingNames, err := c.cascadeDeleteChildren(ctx, database)
+		if err != nil {
+			return c.handleError(ctx, database, err, "cascade delete children")
+		}
+		if remaining > 0 {
+			log.Info("Waiting for children to be deleted", "remaining", remaining)
+			database.Status.Phase = dbopsv1alpha1.PhaseDeleting
+			database.Status.Message = fmt.Sprintf("Cascade-deleting: %d child(ren) remaining", remaining)
+			database.Status.DeletionConfirmation = &dbopsv1alpha1.DeletionConfirmation{
+				Required:       false,
+				Hash:           util.ComputeDeletionHash(children),
+				Children:       remainingNames,
+				RemainingCount: remaining,
+				Message:        database.Status.Message,
+			}
+			util.SetReadyCondition(&database.Status.Conditions, metav1.ConditionFalse,
+				util.ReasonCascadeDeleting, database.Status.Message)
+			if statusErr := c.Status().Update(ctx, database); statusErr != nil {
+				log.Error(statusErr, "Failed to update status")
+			}
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+
+		c.Recorder.Eventf(database, corev1.EventTypeNormal, "CascadeDeleteComplete",
+			"All %d children cascade-deleted", len(children))
 	}
+
+	// Clear deletion confirmation before proceeding
+	database.Status.DeletionConfirmation = nil
 
 	// Handle based on deletion policy
 	if deletionPolicy == dbopsv1alpha1.DeletionPolicyDelete {
@@ -396,4 +456,33 @@ func (c *Controller) hasChildDependencies(ctx context.Context, database *dbopsv1
 	msg := fmt.Sprintf("cannot delete: %d DatabaseGrant(s) still reference this database: %s. "+
 		"Delete grants first or use force-delete annotation", len(childNames), strings.Join(childNames, ", "))
 	return true, msg, childNames, nil
+}
+
+// cascadeDeleteChildren deletes all DatabaseGrant CRs referencing this database.
+// Returns the count of children still existing (pending finalizer removal by their controllers).
+func (c *Controller) cascadeDeleteChildren(ctx context.Context, database *dbopsv1alpha1.Database) (int, []string, error) {
+	var remaining []string
+
+	var grants dbopsv1alpha1.DatabaseGrantList
+	if err := c.List(ctx, &grants, client.InNamespace(database.Namespace)); err != nil {
+		return 0, nil, fmt.Errorf("list grants: %w", err)
+	}
+	for i := range grants.Items {
+		g := &grants.Items[i]
+		if g.Spec.DatabaseRef != nil && g.Spec.DatabaseRef.Name == database.Name {
+			ns := g.Spec.DatabaseRef.Namespace
+			if ns == "" || ns == database.Namespace {
+				if err := c.Delete(ctx, g); err != nil {
+					if !apierrors.IsNotFound(err) {
+						return 0, nil, fmt.Errorf("delete grant %s: %w", g.Name, err)
+					}
+				}
+				if err := c.Get(ctx, client.ObjectKeyFromObject(g), g); err == nil {
+					remaining = append(remaining, "DatabaseGrant/"+g.Name)
+				}
+			}
+		}
+	}
+
+	return len(remaining), remaining, nil
 }

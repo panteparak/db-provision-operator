@@ -767,7 +767,7 @@ func TestController_Reconcile_ForceDeleteBypassesChildCheck(t *testing.T) {
 	now := metav1.Now()
 	instance.DeletionTimestamp = &now
 
-	// Create a Database that references this instance — should be bypassed
+	// Create a Database that references this instance
 	childDB := &dbopsv1alpha1.Database{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "child-db",
@@ -807,13 +807,285 @@ func TestController_Reconcile_ForceDeleteBypassesChildCheck(t *testing.T) {
 		},
 	})
 
-	// Force-delete bypasses child dependency check: deletion proceeds
+	// Force-delete with children now requires confirmation — should be PendingDeletion
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{RequeueAfter: 10 * time.Second}, result)
+
+	var updatedInstance dbopsv1alpha1.DatabaseInstance
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testinstance", Namespace: "default"}, &updatedInstance)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhasePendingDeletion, updatedInstance.Status.Phase)
+	require.NotNil(t, updatedInstance.Status.DeletionConfirmation)
+	assert.True(t, updatedInstance.Status.DeletionConfirmation.Required)
+	assert.NotEmpty(t, updatedInstance.Status.DeletionConfirmation.Hash)
+	assert.Contains(t, updatedInstance.Status.DeletionConfirmation.Children, "Database/child-db")
+	assert.Equal(t, 1, updatedInstance.Status.DeletionConfirmation.RemainingCount)
+	// Finalizer should still be present
+	assert.Contains(t, updatedInstance.Finalizers, util.FinalizerDatabaseInstance)
+}
+
+func TestController_Reconcile_ForceDeleteConfirmedCascadesChildren(t *testing.T) {
+	scheme := newTestScheme()
+	instance := newTestInstanceResource("testinstance", "default")
+	instance.Finalizers = []string{util.FinalizerDatabaseInstance}
+
+	childDB := &dbopsv1alpha1.Database{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "child-db",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseSpec{
+			InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "testinstance"},
+			Name:        "mydb",
+		},
+	}
+
+	// Compute the hash for the child and set it as confirmation
+	children := []string{"Database/child-db"}
+	hash := util.ComputeDeletionHash(children)
+	instance.Annotations = map[string]string{
+		util.AnnotationForceDelete:        "true",
+		util.AnnotationConfirmForceDelete: hash,
+	}
+	now := metav1.Now()
+	instance.DeletionTimestamp = &now
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(instance, childDB).
+		WithStatusSubresource(instance, childDB).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testinstance",
+			Namespace: "default",
+		},
+	})
+
+	// Child DB has no finalizer, so cascade delete removes it immediately.
+	// Instance should also be fully deleted (finalizer removed).
 	require.NoError(t, err)
 	assert.Equal(t, ctrl.Result{}, result)
 
-	// Verify the instance was fully deleted (fake client removes objects
-	// once all finalizers are cleared and DeletionTimestamp is set)
+	// Verify instance was deleted
 	var updatedInstance dbopsv1alpha1.DatabaseInstance
 	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testinstance", Namespace: "default"}, &updatedInstance)
-	assert.True(t, apierrors.IsNotFound(err), "instance should be deleted despite having children")
+	assert.True(t, apierrors.IsNotFound(err), "instance should be deleted after cascade")
+
+	// Verify child was also deleted
+	var updatedDB dbopsv1alpha1.Database
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "child-db", Namespace: "default"}, &updatedDB)
+	assert.True(t, apierrors.IsNotFound(err), "child database should be cascade-deleted")
+}
+
+func TestController_Reconcile_ForceDeleteWrongHashBlocksDeletion(t *testing.T) {
+	scheme := newTestScheme()
+	instance := newTestInstanceResource("testinstance", "default")
+	instance.Finalizers = []string{util.FinalizerDatabaseInstance}
+	instance.Annotations = map[string]string{
+		util.AnnotationForceDelete:        "true",
+		util.AnnotationConfirmForceDelete: "wronghash",
+	}
+	now := metav1.Now()
+	instance.DeletionTimestamp = &now
+
+	childDB := &dbopsv1alpha1.Database{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "child-db",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseSpec{
+			InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "testinstance"},
+			Name:        "mydb",
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(instance, childDB).
+		WithStatusSubresource(instance, childDB).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testinstance",
+			Namespace: "default",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{RequeueAfter: 10 * time.Second}, result)
+
+	var updatedInstance dbopsv1alpha1.DatabaseInstance
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testinstance", Namespace: "default"}, &updatedInstance)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhasePendingDeletion, updatedInstance.Status.Phase)
+	require.NotNil(t, updatedInstance.Status.DeletionConfirmation)
+	assert.True(t, updatedInstance.Status.DeletionConfirmation.Required)
+	// The status shows the CORRECT hash, not the wrong one the user set
+	assert.NotEqual(t, "wronghash", updatedInstance.Status.DeletionConfirmation.Hash)
+	// Children should NOT be deleted
+	var childDB2 dbopsv1alpha1.Database
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "child-db", Namespace: "default"}, &childDB2)
+	require.NoError(t, err, "child should NOT be deleted when hash is wrong")
+}
+
+func TestController_Reconcile_ForceDeleteNoChildrenSkipsConfirmation(t *testing.T) {
+	scheme := newTestScheme()
+	instance := newTestInstanceResource("testinstance", "default")
+	instance.Finalizers = []string{util.FinalizerDatabaseInstance}
+	instance.Annotations = map[string]string{
+		util.AnnotationForceDelete: "true",
+	}
+	now := metav1.Now()
+	instance.DeletionTimestamp = &now
+
+	// No children — force-delete should proceed immediately
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(instance).
+		WithStatusSubresource(instance).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testinstance",
+			Namespace: "default",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+
+	// Instance should be fully deleted
+	var updatedInstance dbopsv1alpha1.DatabaseInstance
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testinstance", Namespace: "default"}, &updatedInstance)
+	assert.True(t, apierrors.IsNotFound(err), "instance should be deleted when no children exist")
+}
+
+func TestController_Reconcile_ForceDeleteHashChangesWhenChildrenChange(t *testing.T) {
+	children1 := []string{"Database/db1"}
+	children2 := []string{"Database/db1", "DatabaseUser/user1"}
+
+	hash1 := util.ComputeDeletionHash(children1)
+	hash2 := util.ComputeDeletionHash(children2)
+
+	assert.NotEqual(t, hash1, hash2, "hash should change when child list changes")
+}
+
+func TestController_Reconcile_ForceDeleteCascadeTracksRemainingChildren(t *testing.T) {
+	scheme := newTestScheme()
+	instance := newTestInstanceResource("testinstance", "default")
+	instance.Finalizers = []string{util.FinalizerDatabaseInstance}
+
+	// Child DB with a finalizer — won't be fully deleted
+	childDB := &dbopsv1alpha1.Database{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "child-db",
+			Namespace:  "default",
+			Finalizers: []string{util.FinalizerDatabase},
+		},
+		Spec: dbopsv1alpha1.DatabaseSpec{
+			InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "testinstance"},
+			Name:        "mydb",
+		},
+	}
+
+	children := []string{"Database/child-db"}
+	hash := util.ComputeDeletionHash(children)
+	instance.Annotations = map[string]string{
+		util.AnnotationForceDelete:        "true",
+		util.AnnotationConfirmForceDelete: hash,
+	}
+	now := metav1.Now()
+	instance.DeletionTimestamp = &now
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(instance, childDB).
+		WithStatusSubresource(instance, childDB).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testinstance",
+			Namespace: "default",
+		},
+	})
+
+	// Child has a finalizer so it won't be fully deleted — should track remaining
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{RequeueAfter: 5 * time.Second}, result)
+
+	var updatedInstance dbopsv1alpha1.DatabaseInstance
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testinstance", Namespace: "default"}, &updatedInstance)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseDeleting, updatedInstance.Status.Phase)
+	require.NotNil(t, updatedInstance.Status.DeletionConfirmation)
+	assert.False(t, updatedInstance.Status.DeletionConfirmation.Required)
+	assert.Equal(t, 1, updatedInstance.Status.DeletionConfirmation.RemainingCount)
+	assert.Contains(t, updatedInstance.Status.DeletionConfirmation.Children, "Database/child-db")
+	// Instance finalizer should still be present
+	assert.Contains(t, updatedInstance.Finalizers, util.FinalizerDatabaseInstance)
 }

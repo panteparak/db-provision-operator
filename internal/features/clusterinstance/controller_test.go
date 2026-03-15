@@ -20,11 +20,13 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -648,4 +650,315 @@ func TestController_Reconcile_MySQL(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, dbopsv1alpha1.PhaseReady, updatedInstance.Status.Phase)
 	assert.Equal(t, "8.0.32", updatedInstance.Status.Version)
+}
+
+func TestController_Reconcile_ForceDeleteWithChildrenRequiresConfirmation(t *testing.T) {
+	scheme := newTestScheme()
+	instance := newTestClusterInstanceResource("test-cluster-instance")
+	instance.Finalizers = []string{FinalizerClusterDatabaseInstance}
+	instance.Annotations = map[string]string{
+		util.AnnotationForceDelete: "true",
+	}
+	now := metav1.Now()
+	instance.DeletionTimestamp = &now
+
+	// Create a Database referencing this cluster instance
+	childDB := &dbopsv1alpha1.Database{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "child-db",
+			Namespace: "app-team",
+		},
+		Spec: dbopsv1alpha1.DatabaseSpec{
+			ClusterInstanceRef: &dbopsv1alpha1.ClusterInstanceReference{Name: "test-cluster-instance"},
+			Name:               "mydb",
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(instance, childDB).
+		WithStatusSubresource(instance, childDB).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.GetInstanceFunc = func(ctx context.Context, name string) (*dbopsv1alpha1.ClusterDatabaseInstance, error) {
+		return instance, nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name: "test-cluster-instance",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{RequeueAfter: 10 * time.Second}, result)
+
+	var updatedInstance dbopsv1alpha1.ClusterDatabaseInstance
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "test-cluster-instance"}, &updatedInstance)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhasePendingDeletion, updatedInstance.Status.Phase)
+	require.NotNil(t, updatedInstance.Status.DeletionConfirmation)
+	assert.True(t, updatedInstance.Status.DeletionConfirmation.Required)
+	assert.NotEmpty(t, updatedInstance.Status.DeletionConfirmation.Hash)
+	assert.Contains(t, updatedInstance.Status.DeletionConfirmation.Children, "Database/app-team/child-db")
+	assert.Contains(t, updatedInstance.Finalizers, FinalizerClusterDatabaseInstance)
+}
+
+func TestController_Reconcile_ForceDeleteConfirmedCascadesChildren(t *testing.T) {
+	scheme := newTestScheme()
+	instance := newTestClusterInstanceResource("test-cluster-instance")
+	instance.Finalizers = []string{FinalizerClusterDatabaseInstance}
+
+	childDB := &dbopsv1alpha1.Database{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "child-db",
+			Namespace: "app-team",
+		},
+		Spec: dbopsv1alpha1.DatabaseSpec{
+			ClusterInstanceRef: &dbopsv1alpha1.ClusterInstanceReference{Name: "test-cluster-instance"},
+			Name:               "mydb",
+		},
+	}
+
+	children := []string{"Database/app-team/child-db"}
+	hash := util.ComputeDeletionHash(children)
+	instance.Annotations = map[string]string{
+		util.AnnotationForceDelete:        "true",
+		util.AnnotationConfirmForceDelete: hash,
+	}
+	now := metav1.Now()
+	instance.DeletionTimestamp = &now
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(instance, childDB).
+		WithStatusSubresource(instance, childDB).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.GetInstanceFunc = func(ctx context.Context, name string) (*dbopsv1alpha1.ClusterDatabaseInstance, error) {
+		return instance, nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name: "test-cluster-instance",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+
+	// Instance should be fully deleted
+	var updatedInstance dbopsv1alpha1.ClusterDatabaseInstance
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "test-cluster-instance"}, &updatedInstance)
+	assert.True(t, apierrors.IsNotFound(err), "cluster instance should be deleted after cascade")
+}
+
+func TestController_Reconcile_ForceDeleteWrongHashBlocksDeletion(t *testing.T) {
+	scheme := newTestScheme()
+	instance := newTestClusterInstanceResource("test-cluster-instance")
+	instance.Finalizers = []string{FinalizerClusterDatabaseInstance}
+	instance.Annotations = map[string]string{
+		util.AnnotationForceDelete:        "true",
+		util.AnnotationConfirmForceDelete: "wronghash",
+	}
+	now := metav1.Now()
+	instance.DeletionTimestamp = &now
+
+	childDB := &dbopsv1alpha1.Database{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "child-db",
+			Namespace: "app-team",
+		},
+		Spec: dbopsv1alpha1.DatabaseSpec{
+			ClusterInstanceRef: &dbopsv1alpha1.ClusterInstanceReference{Name: "test-cluster-instance"},
+			Name:               "mydb",
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(instance, childDB).
+		WithStatusSubresource(instance, childDB).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name: "test-cluster-instance",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{RequeueAfter: 10 * time.Second}, result)
+
+	var updatedInstance dbopsv1alpha1.ClusterDatabaseInstance
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "test-cluster-instance"}, &updatedInstance)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhasePendingDeletion, updatedInstance.Status.Phase)
+	assert.NotEqual(t, "wronghash", updatedInstance.Status.DeletionConfirmation.Hash)
+}
+
+func TestController_Reconcile_ForceDeleteNoChildrenSkipsConfirmation(t *testing.T) {
+	scheme := newTestScheme()
+	instance := newTestClusterInstanceResource("test-cluster-instance")
+	instance.Finalizers = []string{FinalizerClusterDatabaseInstance}
+	instance.Annotations = map[string]string{
+		util.AnnotationForceDelete: "true",
+	}
+	now := metav1.Now()
+	instance.DeletionTimestamp = &now
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(instance).
+		WithStatusSubresource(instance).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name: "test-cluster-instance",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+
+	var updatedInstance dbopsv1alpha1.ClusterDatabaseInstance
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "test-cluster-instance"}, &updatedInstance)
+	assert.True(t, apierrors.IsNotFound(err), "cluster instance should be deleted when no children")
+}
+
+func TestController_Reconcile_ForceDeleteHashChangesWhenChildrenChange(t *testing.T) {
+	children1 := []string{"Database/ns/db1"}
+	children2 := []string{"Database/ns/db1", "DatabaseUser/ns/user1"}
+
+	hash1 := util.ComputeDeletionHash(children1)
+	hash2 := util.ComputeDeletionHash(children2)
+
+	assert.NotEqual(t, hash1, hash2)
+}
+
+func TestController_Reconcile_ForceDeleteCascadeTracksRemainingChildren(t *testing.T) {
+	scheme := newTestScheme()
+	instance := newTestClusterInstanceResource("test-cluster-instance")
+	instance.Finalizers = []string{FinalizerClusterDatabaseInstance}
+
+	childDB := &dbopsv1alpha1.Database{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "child-db",
+			Namespace:  "app-team",
+			Finalizers: []string{"dbops.dbprovision.io/database-finalizer"},
+		},
+		Spec: dbopsv1alpha1.DatabaseSpec{
+			ClusterInstanceRef: &dbopsv1alpha1.ClusterInstanceReference{Name: "test-cluster-instance"},
+			Name:               "mydb",
+		},
+	}
+
+	children := []string{"Database/app-team/child-db"}
+	hash := util.ComputeDeletionHash(children)
+	instance.Annotations = map[string]string{
+		util.AnnotationForceDelete:        "true",
+		util.AnnotationConfirmForceDelete: hash,
+	}
+	now := metav1.Now()
+	instance.DeletionTimestamp = &now
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(instance, childDB).
+		WithStatusSubresource(instance, childDB).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name: "test-cluster-instance",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{RequeueAfter: 5 * time.Second}, result)
+
+	var updatedInstance dbopsv1alpha1.ClusterDatabaseInstance
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "test-cluster-instance"}, &updatedInstance)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseDeleting, updatedInstance.Status.Phase)
+	require.NotNil(t, updatedInstance.Status.DeletionConfirmation)
+	assert.Equal(t, 1, updatedInstance.Status.DeletionConfirmation.RemainingCount)
+	assert.Contains(t, updatedInstance.Finalizers, FinalizerClusterDatabaseInstance)
 }

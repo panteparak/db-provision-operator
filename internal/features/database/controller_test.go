@@ -1612,21 +1612,15 @@ func TestController_Reconcile_ForceDeleteBypassesGrantCheck(t *testing.T) {
 	}
 	now := metav1.Now()
 	database.DeletionTimestamp = &now
-	// Default deletion policy is Retain
 
-	// Create a DatabaseGrant that references this database
 	grant := &dbopsv1alpha1.DatabaseGrant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-grant",
 			Namespace: "default",
 		},
 		Spec: dbopsv1alpha1.DatabaseGrantSpec{
-			DatabaseRef: &dbopsv1alpha1.DatabaseReference{
-				Name: "testdb",
-			},
-			UserRef: &dbopsv1alpha1.UserReference{
-				Name: "someuser",
-			},
+			DatabaseRef: &dbopsv1alpha1.DatabaseReference{Name: "testdb"},
+			UserRef:     &dbopsv1alpha1.UserReference{Name: "someuser"},
 		},
 	}
 
@@ -1659,17 +1653,269 @@ func TestController_Reconcile_ForceDeleteBypassesGrantCheck(t *testing.T) {
 		},
 	})
 
-	// Force delete bypasses dependency check: deletion proceeds
+	// Force-delete with children now requires confirmation
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{RequeueAfter: 10 * time.Second}, result)
+
+	var updatedDB dbopsv1alpha1.Database
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testdb", Namespace: "default"}, &updatedDB)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhasePendingDeletion, updatedDB.Status.Phase)
+	require.NotNil(t, updatedDB.Status.DeletionConfirmation)
+	assert.True(t, updatedDB.Status.DeletionConfirmation.Required)
+	assert.NotEmpty(t, updatedDB.Status.DeletionConfirmation.Hash)
+	assert.Contains(t, updatedDB.Status.DeletionConfirmation.Children, "DatabaseGrant/test-grant")
+	assert.Equal(t, 1, updatedDB.Status.DeletionConfirmation.RemainingCount)
+	assert.Contains(t, updatedDB.Finalizers, util.FinalizerDatabase)
+	assert.False(t, mockRepo.WasCalled("Delete"))
+}
+
+func TestController_Reconcile_ForceDeleteConfirmedCascadesGrants(t *testing.T) {
+	scheme := newTestScheme()
+	database := newTestDatabase("testdb", "default")
+	database.Finalizers = []string{util.FinalizerDatabase}
+
+	grant := &dbopsv1alpha1.DatabaseGrant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-grant",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseGrantSpec{
+			DatabaseRef: &dbopsv1alpha1.DatabaseReference{Name: "testdb"},
+			UserRef:     &dbopsv1alpha1.UserReference{Name: "someuser"},
+		},
+	}
+
+	children := []string{"DatabaseGrant/test-grant"}
+	hash := util.ComputeDeletionHash(children)
+	database.Annotations = map[string]string{
+		util.AnnotationForceDelete:        "true",
+		util.AnnotationConfirmForceDelete: hash,
+	}
+	now := metav1.Now()
+	database.DeletionTimestamp = &now
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(database, grant).
+		WithStatusSubresource(database).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := NewHandler(HandlerConfig{
+		Repository: mockRepo,
+		EventBus:   NewMockEventBus(),
+		Logger:     logr.Discard(),
+	})
+
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testdb",
+			Namespace: "default",
+		},
+	})
+
+	// Grant has no finalizer so cascade delete removes it; database deletion proceeds
 	require.NoError(t, err)
 	assert.Equal(t, ctrl.Result{}, result)
 
-	// Verify the database was fully deleted (fake client removes objects
-	// once all finalizers are cleared and DeletionTimestamp is set)
 	var updatedDB dbopsv1alpha1.Database
 	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testdb", Namespace: "default"}, &updatedDB)
-	assert.True(t, apierrors.IsNotFound(err), "database should be deleted after force-delete bypasses grant check")
+	assert.True(t, apierrors.IsNotFound(err), "database should be deleted after cascade")
+}
 
-	// Verify Delete was NOT called (Retain policy — force-delete only bypasses dependency check,
-	// it does not change the deletion policy)
-	assert.False(t, mockRepo.WasCalled("Delete"))
+func TestController_Reconcile_ForceDeleteWrongHashBlocksDeletion(t *testing.T) {
+	scheme := newTestScheme()
+	database := newTestDatabase("testdb", "default")
+	database.Finalizers = []string{util.FinalizerDatabase}
+	database.Annotations = map[string]string{
+		util.AnnotationForceDelete:        "true",
+		util.AnnotationConfirmForceDelete: "wronghash",
+	}
+	now := metav1.Now()
+	database.DeletionTimestamp = &now
+
+	grant := &dbopsv1alpha1.DatabaseGrant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-grant",
+			Namespace: "default",
+		},
+		Spec: dbopsv1alpha1.DatabaseGrantSpec{
+			DatabaseRef: &dbopsv1alpha1.DatabaseReference{Name: "testdb"},
+			UserRef:     &dbopsv1alpha1.UserReference{Name: "someuser"},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(database, grant).
+		WithStatusSubresource(database).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := NewHandler(HandlerConfig{
+		Repository: mockRepo,
+		EventBus:   NewMockEventBus(),
+		Logger:     logr.Discard(),
+	})
+
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testdb",
+			Namespace: "default",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{RequeueAfter: 10 * time.Second}, result)
+
+	var updatedDB dbopsv1alpha1.Database
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testdb", Namespace: "default"}, &updatedDB)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhasePendingDeletion, updatedDB.Status.Phase)
+	assert.NotEqual(t, "wronghash", updatedDB.Status.DeletionConfirmation.Hash)
+}
+
+func TestController_Reconcile_ForceDeleteNoChildrenSkipsConfirmation(t *testing.T) {
+	scheme := newTestScheme()
+	database := newTestDatabase("testdb", "default")
+	database.Finalizers = []string{util.FinalizerDatabase}
+	database.Annotations = map[string]string{
+		util.AnnotationForceDelete: "true",
+	}
+	now := metav1.Now()
+	database.DeletionTimestamp = &now
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(database).
+		WithStatusSubresource(database).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := NewHandler(HandlerConfig{
+		Repository: mockRepo,
+		EventBus:   NewMockEventBus(),
+		Logger:     logr.Discard(),
+	})
+
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testdb",
+			Namespace: "default",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+
+	var updatedDB dbopsv1alpha1.Database
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testdb", Namespace: "default"}, &updatedDB)
+	assert.True(t, apierrors.IsNotFound(err), "database should be deleted immediately when no children")
+}
+
+func TestController_Reconcile_ForceDeleteHashChangesWhenChildrenChange(t *testing.T) {
+	children1 := []string{"DatabaseGrant/grant1"}
+	children2 := []string{"DatabaseGrant/grant1", "DatabaseGrant/grant2"}
+
+	hash1 := util.ComputeDeletionHash(children1)
+	hash2 := util.ComputeDeletionHash(children2)
+
+	assert.NotEqual(t, hash1, hash2, "hash should change when child list changes")
+}
+
+func TestController_Reconcile_ForceDeleteCascadeTracksRemainingGrants(t *testing.T) {
+	scheme := newTestScheme()
+	database := newTestDatabase("testdb", "default")
+	database.Finalizers = []string{util.FinalizerDatabase}
+
+	// Grant with finalizer — won't be fully deleted
+	grant := &dbopsv1alpha1.DatabaseGrant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test-grant",
+			Namespace:  "default",
+			Finalizers: []string{"dbops.dbprovision.io/databasegrant-finalizer"},
+		},
+		Spec: dbopsv1alpha1.DatabaseGrantSpec{
+			DatabaseRef: &dbopsv1alpha1.DatabaseReference{Name: "testdb"},
+			UserRef:     &dbopsv1alpha1.UserReference{Name: "someuser"},
+		},
+	}
+
+	children := []string{"DatabaseGrant/test-grant"}
+	hash := util.ComputeDeletionHash(children)
+	database.Annotations = map[string]string{
+		util.AnnotationForceDelete:        "true",
+		util.AnnotationConfirmForceDelete: hash,
+	}
+	now := metav1.Now()
+	database.DeletionTimestamp = &now
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(database, grant).
+		WithStatusSubresource(database, grant).
+		Build()
+
+	mockRepo := NewMockRepository()
+	handler := NewHandler(HandlerConfig{
+		Repository: mockRepo,
+		EventBus:   NewMockEventBus(),
+		Logger:     logr.Discard(),
+	})
+
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		Logger:               logr.Discard(),
+		DefaultDriftInterval: testDefaultDriftInterval,
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testdb",
+			Namespace: "default",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{RequeueAfter: 5 * time.Second}, result)
+
+	var updatedDB dbopsv1alpha1.Database
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testdb", Namespace: "default"}, &updatedDB)
+	require.NoError(t, err)
+	assert.Equal(t, dbopsv1alpha1.PhaseDeleting, updatedDB.Status.Phase)
+	require.NotNil(t, updatedDB.Status.DeletionConfirmation)
+	assert.False(t, updatedDB.Status.DeletionConfirmation.Required)
+	assert.Equal(t, 1, updatedDB.Status.DeletionConfirmation.RemainingCount)
+	assert.Contains(t, updatedDB.Finalizers, util.FinalizerDatabase)
 }
