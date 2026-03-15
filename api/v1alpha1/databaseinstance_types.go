@@ -131,6 +131,10 @@ type DatabaseInstanceStatus struct {
 	// +optional
 	DiscoveredResources *DiscoveredResourcesStatus `json:"discoveredResources,omitempty"`
 
+	// DeletionConfirmation tracks force-delete confirmation state and cascade progress.
+	// +optional
+	DeletionConfirmation *DeletionConfirmation `json:"deletionConfirmation,omitempty"`
+
 	// Conditions represent the latest available observations
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`

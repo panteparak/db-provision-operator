@@ -47,16 +47,39 @@ const (
 type Phase string
 
 const (
-	PhasePending   Phase = "Pending"
-	PhaseCreating  Phase = "Creating"
-	PhaseReady     Phase = "Ready"
-	PhaseFailed    Phase = "Failed"
-	PhaseDeleting  Phase = "Deleting"
-	PhaseRunning   Phase = "Running"
-	PhaseCompleted Phase = "Completed"
-	PhasePaused    Phase = "Paused"
-	PhaseActive    Phase = "Active"
+	PhasePending         Phase = "Pending"
+	PhaseCreating        Phase = "Creating"
+	PhaseReady           Phase = "Ready"
+	PhaseFailed          Phase = "Failed"
+	PhaseDeleting        Phase = "Deleting"
+	PhasePendingDeletion Phase = "PendingDeletion"
+	PhaseRunning         Phase = "Running"
+	PhaseCompleted       Phase = "Completed"
+	PhasePaused          Phase = "Paused"
+	PhaseActive          Phase = "Active"
 )
+
+// DeletionConfirmation tracks the state of a force-delete confirmation
+// and cascade deletion progress.
+type DeletionConfirmation struct {
+	// Required indicates that confirmation is needed before deletion proceeds.
+	Required bool `json:"required"`
+
+	// Hash is the confirmation value the user must set as the
+	// confirm-force-delete annotation to approve cascade deletion.
+	Hash string `json:"hash"`
+
+	// Children lists the child resource names that will be cascade-deleted.
+	// Format: "Kind/Name" (e.g., "Database/mydb", "DatabaseGrant/grant-1").
+	Children []string `json:"children"`
+
+	// RemainingCount tracks how many children are still being deleted
+	// after confirmation. Decreases as child controllers complete deletion.
+	RemainingCount int `json:"remainingCount"`
+
+	// Message is a human-readable explanation of the current state.
+	Message string `json:"message"`
+}
 
 // SecretKeySelector contains a reference to a secret key
 type SecretKeySelector struct {

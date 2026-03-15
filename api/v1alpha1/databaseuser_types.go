@@ -114,6 +114,10 @@ type DatabaseUserStatus struct {
 	// +optional
 	Drift *DriftStatus `json:"drift,omitempty"`
 
+	// DeletionConfirmation tracks force-delete confirmation state and cascade progress.
+	// +optional
+	DeletionConfirmation *DeletionConfirmation `json:"deletionConfirmation,omitempty"`
+
 	// Conditions represent the latest available observations
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
