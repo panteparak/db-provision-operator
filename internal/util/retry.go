@@ -18,6 +18,7 @@ package util
 
 import (
 	"context"
+	"errors"
 	"math/rand"
 	"strings"
 	"time"
@@ -163,14 +164,30 @@ func RetryWithBackoff(ctx context.Context, config RetryConfig, fn func() error) 
 	}
 }
 
-// IsRetryableError determines if an error should trigger a retry
-// Returns true for transient errors (network, timeout, connection refused)
+// RetryableError is an interface that errors can implement to explicitly
+// indicate whether they should be retried. This is preferred over string
+// matching for error classification.
+type RetryableError interface {
+	error
+	IsRetryable() bool
+}
+
+// IsRetryableError determines if an error should trigger a retry.
+// It first checks if the error implements the RetryableError interface,
+// then falls back to string matching for backwards compatibility with
+// third-party and legacy errors.
 func IsRetryableError(err error) bool {
 	if err == nil {
 		return false
 	}
 
-	// Check for known transient error types
+	// Check if the error (or any wrapped error) implements RetryableError
+	var retryable RetryableError
+	if errors.As(err, &retryable) {
+		return retryable.IsRetryable()
+	}
+
+	// Fall back to string matching for third-party/legacy errors
 	errStr := strings.ToLower(err.Error())
 	transientPatterns := []string{
 		"connection refused",

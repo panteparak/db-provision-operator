@@ -19,11 +19,21 @@ package util
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+// testRetryableError is a test helper that implements the RetryableError interface.
+type testRetryableError struct {
+	retryable bool
+	msg       string
+}
+
+func (e *testRetryableError) Error() string     { return e.msg }
+func (e *testRetryableError) IsRetryable() bool { return e.retryable }
 
 var _ = Describe("Retry", func() {
 	Describe("RetryWithBackoff", func() {
@@ -192,6 +202,38 @@ var _ = Describe("Retry", func() {
 			})
 		})
 
+		Context("when error implements RetryableError interface", func() {
+			It("should retry when IsRetryable returns true", func() {
+				callCount := 0
+				fn := func() error {
+					callCount++
+					if callCount < 3 {
+						return &testRetryableError{retryable: true, msg: "transient via interface"}
+					}
+					return nil
+				}
+
+				result := RetryWithBackoff(ctx, config, fn)
+
+				Expect(result.LastError).ToNot(HaveOccurred())
+				Expect(result.Attempts).To(Equal(3))
+			})
+
+			It("should not retry when IsRetryable returns false", func() {
+				callCount := 0
+				fn := func() error {
+					callCount++
+					return &testRetryableError{retryable: false, msg: "permanent via interface"}
+				}
+
+				result := RetryWithBackoff(ctx, config, fn)
+
+				Expect(result.LastError).To(HaveOccurred())
+				Expect(result.Attempts).To(Equal(1))
+				Expect(callCount).To(Equal(1))
+			})
+		})
+
 		Context("with randomization factor", func() {
 			It("should apply jitter to intervals", func() {
 				config.RandomizationFactor = 0.5
@@ -215,6 +257,30 @@ var _ = Describe("Retry", func() {
 		Context("when error is nil", func() {
 			It("should return false", func() {
 				Expect(IsRetryableError(nil)).To(BeFalse())
+			})
+		})
+
+		Context("when error implements RetryableError interface", func() {
+			It("should return true for retryable typed error", func() {
+				err := &testRetryableError{retryable: true, msg: "transient failure"}
+				Expect(IsRetryableError(err)).To(BeTrue())
+			})
+
+			It("should return false for non-retryable typed error", func() {
+				err := &testRetryableError{retryable: false, msg: "permanent failure"}
+				Expect(IsRetryableError(err)).To(BeFalse())
+			})
+
+			It("should check wrapped RetryableError via errors.As", func() {
+				inner := &testRetryableError{retryable: true, msg: "transient"}
+				wrapped := fmt.Errorf("operation failed: %w", inner)
+				Expect(IsRetryableError(wrapped)).To(BeTrue())
+			})
+
+			It("should prefer interface over string matching", func() {
+				// Error message contains "connection refused" but interface says not retryable
+				err := &testRetryableError{retryable: false, msg: "connection refused"}
+				Expect(IsRetryableError(err)).To(BeFalse())
 			})
 		})
 
