@@ -2252,6 +2252,56 @@ func TestController_Reconcile_InitSQLFailurePolicyBlock(t *testing.T) {
 	assert.Equal(t, metav1.ConditionFalse, readyCond.Status)
 }
 
+func TestController_Reconcile_InitSQLSkipsReExecWhenHashMatchesAndAppliedFalse(t *testing.T) {
+	scheme := newTestScheme()
+	database := newTestDatabaseWithInitSQL("testdb", "default", &dbopsv1alpha1.InitSQLConfig{
+		Inline:        []string{"CREATE TABLE init_partial (id INT)"},
+		FailurePolicy: dbopsv1alpha1.InitSQLFailurePolicyContinue,
+	})
+	// Simulate a previous partial failure: Applied=false but hash is set
+	database.Status.InitSQL = &dbopsv1alpha1.InitSQLStatus{
+		Applied:            false,
+		Hash:               "partialhash",
+		StatementsExecuted: 2,
+		Error:              "statement 3 failed",
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(database).
+		WithStatusSubresource(database).
+		Build()
+
+	mockRepo := newInitSQLReadyMockRepo()
+	mockRepo.ResolveInitSQLFunc = func(ctx context.Context, initSQL *dbopsv1alpha1.InitSQLConfig, namespace string) ([]string, string, error) {
+		return []string{"CREATE TABLE init_partial (id INT)"}, "partialhash", nil
+	}
+
+	handler := NewHandler(HandlerConfig{Repository: mockRepo, EventBus: NewMockEventBus(), Logger: logr.Discard()})
+	controller := NewController(ControllerConfig{
+		Client: fakeClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Handler: handler, Logger: logr.Discard(), DefaultDriftInterval: testDefaultDriftInterval,
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testdb", Namespace: "default"},
+	})
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter)
+
+	var updatedDB dbopsv1alpha1.Database
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testdb", Namespace: "default"}, &updatedDB)
+	require.NoError(t, err)
+
+	// ExecInitSQL should NOT be called — hash matches, skip re-execution
+	assert.False(t, mockRepo.WasCalled("ExecInitSQL"))
+
+	// Previous status should be preserved
+	require.NotNil(t, updatedDB.Status.InitSQL)
+	assert.Equal(t, int32(2), updatedDB.Status.InitSQL.StatementsExecuted)
+	assert.Equal(t, "partialhash", updatedDB.Status.InitSQL.Hash)
+}
+
 func TestController_Reconcile_InitSQLNilIsNoop(t *testing.T) {
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")

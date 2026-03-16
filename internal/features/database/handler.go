@@ -402,9 +402,11 @@ func (h *Handler) ApplyInitSQL(ctx context.Context, database *dbopsv1alpha1.Data
 		return &InitSQLResult{Error: err}, err
 	}
 
-	// Skip if already applied with same hash
-	if database.Status.InitSQL != nil && database.Status.InitSQL.Applied && database.Status.InitSQL.Hash == hash {
-		log.V(1).Info("Init SQL already applied, skipping", "hash", hash)
+	// Skip if already processed with same hash (regardless of Applied status).
+	// Re-executing identical SQL after a partial failure would produce the same or worse result.
+	// Users must change the SQL content (which changes the hash) to trigger re-execution.
+	if database.Status.InitSQL != nil && database.Status.InitSQL.Hash == hash {
+		log.V(1).Info("Init SQL already processed with same hash, skipping", "hash", hash)
 		return &InitSQLResult{Skipped: true, Hash: hash}, nil
 	}
 
