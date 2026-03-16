@@ -183,14 +183,12 @@ var _ = Describe("initsql", Ordered, func() {
 			_, err = dynamicClient.Resource(databaseGVR).Namespace(namespace).Update(ctx, obj, metav1.UpdateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
-			By("waiting for reconcile to complete")
-			// Wait a few seconds for reconcile, then verify appliedAt is unchanged
-			time.Sleep(5 * time.Second)
-			waitForReady(databaseGVR, crName, namespace, reconcileTimeout)
-
-			By("verifying appliedAt is unchanged (hash match → skip)")
-			statusAfter := getInitSQLStatus(crName, namespace)
-			Expect(statusAfter["appliedAt"]).To(Equal(originalAppliedAt))
+			By("verifying appliedAt remains unchanged over time (hash match → skip)")
+			Consistently(func() interface{} {
+				waitForReady(databaseGVR, crName, namespace, reconcileTimeout)
+				statusAfter := getInitSQLStatus(crName, namespace)
+				return statusAfter["appliedAt"]
+			}, 5*time.Second, 1*time.Second).Should(Equal(originalAppliedAt))
 		})
 
 		It("PG-INIT-03: re-executes when inline content changes", func() {

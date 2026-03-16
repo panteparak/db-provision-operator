@@ -283,9 +283,6 @@ var _ = Describe("clusterdatabaserole", Ordered, func() {
 			_, err = dynamicClient.Resource(clusterDatabaseRoleGVR).Update(ctx, obj, metav1.UpdateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
-			By("waiting for the update to be applied")
-			time.Sleep(5 * time.Second) // Allow reconciliation
-
 			By("verifying the role has CREATEDB in PostgreSQL")
 			Eventually(func() bool {
 				canCreateDb, err := verifier.RoleHasCreateDb(ctx, updatedDbRoleName)

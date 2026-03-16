@@ -581,9 +581,6 @@ var _ = Describe("clusterdatabasegrant", Ordered, func() {
 			_, err = dynamicClient.Resource(clusterDatabaseGrantGVR).Update(ctx, obj, metav1.UpdateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
-			By("waiting for the update to be applied")
-			time.Sleep(5 * time.Second) // Allow reconciliation
-
 			By("verifying TEMPORARY privilege is now granted")
 			Eventually(func() bool {
 				hasPriv, err := verifier.HasPrivilege(ctx, testDbRoleName, "TEMPORARY", "database", "postgres")
