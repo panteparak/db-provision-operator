@@ -1187,6 +1187,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#force-delete-with-children-cascade-confirmation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Force Delete with Children (Cascade Confirmation)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Force Delete with Children (Cascade Confirmation)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#status-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#condition-reasons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Condition Reasons
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2645,6 +2706,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#force-delete-with-children-cascade-confirmation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Force Delete with Children (Cascade Confirmation)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Force Delete with Children (Cascade Confirmation)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#status-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#condition-reasons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Condition Reasons
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2984,20 +3106,130 @@
 </span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="nv">kube_resource_annotations</span><span class="p">{</span><span class="nl">annotation_dbops_dbprovision_io_force_delete</span><span class="o">=</span><span class="p">&quot;</span><span class="s">true</span><span class="p">&quot;}</span>
 </span></code></pre></div>
 </div>
+<h2 id="force-delete-with-children-cascade-confirmation">Force Delete with Children (Cascade Confirmation)<a class="headerlink" href="#force-delete-with-children-cascade-confirmation" title="Permanent link">&para;</a></h2>
+<p>When you force-delete a parent resource that has child dependencies (e.g., a DatabaseInstance with Databases, Users, and Roles), the operator enters a <strong>cascade confirmation flow</strong> to prevent accidental mass deletion.</p>
+<h3 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h3>
+<ol>
+<li>You add the <code>force-delete</code> annotation to the parent</li>
+<li>The operator detects children exist and enters <code>PhasePendingDeletion</code></li>
+<li><code>status.deletionConfirmation</code> is populated with the list of affected children and a confirmation hash</li>
+<li>You confirm by setting the <code>confirm-force-delete</code> annotation to the hash value</li>
+<li>The operator cascade-deletes each child (respecting each child's own <code>deletionPolicy</code>)</li>
+<li><code>status.deletionConfirmation.remainingCount</code> decreases as children are deleted</li>
+<li>Once all children are gone, the parent's finalizer is removed and the parent is deleted</li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">No children = no confirmation</p>
+<p>If the parent has no child dependencies, force-delete proceeds immediately without the confirmation step.</p>
+</div>
+<h3 id="status-fields">Status Fields<a class="headerlink" href="#status-fields" title="Permanent link">&para;</a></h3>
+<p>The <code>status.deletionConfirmation</code> object contains:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>required</code></td>
+<td>bool</td>
+<td>Whether confirmation is needed</td>
+</tr>
+<tr>
+<td><code>hash</code></td>
+<td>string</td>
+<td>The confirmation value to set as the annotation</td>
+</tr>
+<tr>
+<td><code>children</code></td>
+<td>[]string</td>
+<td>List of affected children (format: <code>Kind/Name</code>)</td>
+</tr>
+<tr>
+<td><code>remainingCount</code></td>
+<td>int</td>
+<td>Number of children still being deleted</td>
+</tr>
+<tr>
+<td><code>message</code></td>
+<td>string</td>
+<td>Human-readable explanation of current state</td>
+</tr>
+</tbody>
+</table>
+<h3 id="condition-reasons">Condition Reasons<a class="headerlink" href="#condition-reasons" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Reason</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PendingDeletionConfirmation</code></td>
+<td>Waiting for user to confirm cascade via annotation</td>
+</tr>
+<tr>
+<td><code>CascadeDeleting</code></td>
+<td>Confirmed; actively deleting children</td>
+</tr>
+</tbody>
+</table>
+<h3 id="example-workflow">Example Workflow<a class="headerlink" href="#example-workflow" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Step 1: Mark a DatabaseInstance for force-delete</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>kubectl<span class="w"> </span>annotate<span class="w"> </span>databaseinstance<span class="w"> </span>postgres-primary<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span>dbops.dbprovision.io/force-delete<span class="o">=</span><span class="s2">&quot;true&quot;</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="c1"># Step 2: Check the status — operator lists children and provides a hash</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>kubectl<span class="w"> </span>get<span class="w"> </span>databaseinstance<span class="w"> </span>postgres-primary<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.status.deletionConfirmation}&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>.
+</span></code></pre></div>
+<p>Example output:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="p">{</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="nt">&quot;required&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="nt">&quot;hash&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;a1b2c3d4&quot;</span><span class="p">,</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">  </span><span class="nt">&quot;children&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">    </span><span class="s2">&quot;Database/myapp-database&quot;</span><span class="p">,</span>
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">    </span><span class="s2">&quot;DatabaseUser/myapp-user&quot;</span><span class="p">,</span>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">    </span><span class="s2">&quot;DatabaseRole/readonly-role&quot;</span>
+</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">  </span><span class="p">],</span>
+</span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">  </span><span class="nt">&quot;remainingCount&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
+</span><span id="__span-15-10"><a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="w">  </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Force-delete requires confirmation: 3 child resources will be cascade-deleted&quot;</span>
+</span><span id="__span-15-11"><a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a><span class="p">}</span>
+</span></code></pre></div>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Step 3: Confirm the cascade by setting the hash</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>kubectl<span class="w"> </span>annotate<span class="w"> </span>databaseinstance<span class="w"> </span>postgres-primary<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span>dbops.dbprovision.io/confirm-force-delete<span class="o">=</span><span class="s2">&quot;a1b2c3d4&quot;</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="c1"># Step 4: Monitor cascade progress</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>kubectl<span class="w"> </span>get<span class="w"> </span>databaseinstance<span class="w"> </span>postgres-primary<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.status.deletionConfirmation.remainingCount}&#39;</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="c1"># Output decreases: 3 → 2 → 1 → 0, then the parent is deleted</span>
+</span></code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Each child's deletion policy is respected</p>
+<p>During cascade deletion, each child resource is deleted according to its own <code>deletionPolicy</code>. A child with <code>deletionPolicy: Retain</code> will have its CR removed but the underlying database object will be kept. A child with <code>deletionPolicy: Delete</code> will have both the CR and the database object removed.</p>
+</div>
+<div class="admonition danger">
+<p class="admonition-title">Wrong hash blocks deletion</p>
+<p>If the <code>confirm-force-delete</code> annotation does not match the hash in <code>status.deletionConfirmation.hash</code>, the operator stays in <code>PhasePendingDeletion</code> and does not proceed. This prevents copy-paste errors from triggering unintended cascades.</p>
+</div>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <h3 id="resource-stuck-in-terminating">Resource Stuck in Terminating<a class="headerlink" href="#resource-stuck-in-terminating" title="Permanent link">&para;</a></h3>
 <p>If a protected resource shows <code>Terminating</code>:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Check events for DeletionBlocked</span>
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>kubectl<span class="w"> </span>describe<span class="w"> </span>database<span class="w"> </span>my-db
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1"># Check if finalizer is still present</span>
-</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>kubectl<span class="w"> </span>get<span class="w"> </span>database<span class="w"> </span>my-db<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.metadata.finalizers}&#39;</span>
-</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>
-</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="c1"># Option 1: Disable protection via spec</span>
-</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>kubectl<span class="w"> </span>patch<span class="w"> </span>database<span class="w"> </span>my-db<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;{&quot;spec&quot;:{&quot;deletionProtection&quot;:false}}&#39;</span>
-</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>
-</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="c1"># Option 2: Force delete</span>
-</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>kubectl<span class="w"> </span>annotate<span class="w"> </span>database<span class="w"> </span>my-db<span class="w"> </span>dbops.dbprovision.io/force-delete<span class="o">=</span><span class="s2">&quot;true&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Check events for DeletionBlocked</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>kubectl<span class="w"> </span>describe<span class="w"> </span>database<span class="w"> </span>my-db
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="c1"># Check if finalizer is still present</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>kubectl<span class="w"> </span>get<span class="w"> </span>database<span class="w"> </span>my-db<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.metadata.finalizers}&#39;</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="c1"># Option 1: Disable protection via spec</span>
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>kubectl<span class="w"> </span>patch<span class="w"> </span>database<span class="w"> </span>my-db<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;{&quot;spec&quot;:{&quot;deletionProtection&quot;:false}}&#39;</span>
+</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>
+</span><span id="__span-17-10"><a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="c1"># Option 2: Force delete</span>
+</span><span id="__span-17-11"><a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>kubectl<span class="w"> </span>annotate<span class="w"> </span>database<span class="w"> </span>my-db<span class="w"> </span>dbops.dbprovision.io/force-delete<span class="o">=</span><span class="s2">&quot;true&quot;</span>
 </span></code></pre></div>
 <h3 id="protection-not-working">Protection Not Working<a class="headerlink" href="#protection-not-working" title="Permanent link">&para;</a></h3>
 <p>If resources are deleted despite protection:</p>
@@ -3007,18 +3239,18 @@
 <li>Ensure the operator has proper RBAC permissions</li>
 <li>Verify the finalizer is being added</li>
 </ol>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># Check finalizer</span>
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>kubectl<span class="w"> </span>get<span class="w"> </span>database<span class="w"> </span>my-db<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.metadata.finalizers}&#39;</span>
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="c1"># Should include: dbops.dbprovision.io/database</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Check finalizer</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>kubectl<span class="w"> </span>get<span class="w"> </span>database<span class="w"> </span>my-db<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.metadata.finalizers}&#39;</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="c1"># Should include: dbops.dbprovision.io/database</span>
 </span></code></pre></div>
 <h3 id="operator-not-running">Operator Not Running<a class="headerlink" href="#operator-not-running" title="Permanent link">&para;</a></h3>
 <p>If the operator is down, protected resources cannot be deleted (finalizers block deletion). To recover:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Option 1: Restart the operator</span>
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>kubectl<span class="w"> </span>rollout<span class="w"> </span>restart<span class="w"> </span>deployment<span class="w"> </span>db-provision-operator-controller-manager<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span>-n<span class="w"> </span>db-provision-operator-system
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>
-</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="c1"># Option 2: Emergency - remove finalizer directly (DANGEROUS)</span>
-</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>kubectl<span class="w"> </span>patch<span class="w"> </span>database<span class="w"> </span>my-db<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;{&quot;metadata&quot;:{&quot;finalizers&quot;:null}}&#39;</span><span class="w"> </span>--type<span class="o">=</span>merge
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Option 1: Restart the operator</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>kubectl<span class="w"> </span>rollout<span class="w"> </span>restart<span class="w"> </span>deployment<span class="w"> </span>db-provision-operator-controller-manager<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">  </span>-n<span class="w"> </span>db-provision-operator-system
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="c1"># Option 2: Emergency - remove finalizer directly (DANGEROUS)</span>
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>kubectl<span class="w"> </span>patch<span class="w"> </span>database<span class="w"> </span>my-db<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;{&quot;metadata&quot;:{&quot;finalizers&quot;:null}}&#39;</span><span class="w"> </span>--type<span class="o">=</span>merge
 </span></code></pre></div>
 <div class="admonition danger">
 <p class="admonition-title">Removing Finalizers</p>
@@ -3136,7 +3368,7 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.code.annotate", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": "0.7.0"}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.code.annotate", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": "0.10.0"}</script>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
