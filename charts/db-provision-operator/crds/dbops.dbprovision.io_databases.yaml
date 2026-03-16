@@ -151,11 +151,11 @@ spec:
                     - enum:
                       - Continue
                       - Block
-                    default: Continue
+                    default: Block
                     description: |-
                       FailurePolicy controls behavior when init SQL execution fails.
-                      Continue (default): database reaches Ready with a Synced=False condition.
-                      Block: database stays in Failed phase and requeues.
+                      Block (default): database stays in Failed phase and requeues.
+                      Continue: database reaches Ready with a Synced=False condition.
                     type: string
                   inline:
                     description: Inline SQL statements to execute in order.

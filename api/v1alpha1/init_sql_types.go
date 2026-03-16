@@ -50,10 +50,10 @@ type InitSQLConfig struct {
 	SecretRef *SecretKeySelector `json:"secretRef,omitempty"`
 
 	// FailurePolicy controls behavior when init SQL execution fails.
-	// Continue (default): database reaches Ready with a Synced=False condition.
-	// Block: database stays in Failed phase and requeues.
+	// Block (default): database stays in Failed phase and requeues.
+	// Continue: database reaches Ready with a Synced=False condition.
 	// +kubebuilder:validation:Enum=Continue;Block
-	// +kubebuilder:default=Continue
+	// +kubebuilder:default=Block
 	// +optional
 	FailurePolicy InitSQLFailurePolicy `json:"failurePolicy,omitempty"`
 }

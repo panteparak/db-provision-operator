@@ -69,8 +69,9 @@ type DatabaseInstanceSpec struct {
 	ResourceTracking *ResourceTrackingConfig `json:"resourceTracking,omitempty"`
 
 	// DeletionProtection prevents accidental deletion
+	// +kubebuilder:default=true
 	// +optional
-	DeletionProtection bool `json:"deletionProtection,omitempty"`
+	DeletionProtection bool `json:"deletionProtection"`
 }
 
 // ConnectionConfig defines the database connection settings

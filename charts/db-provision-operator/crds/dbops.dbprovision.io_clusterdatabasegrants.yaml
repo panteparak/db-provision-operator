@@ -74,6 +74,7 @@ spec:
                 - name
                 type: object
               deletionProtection:
+                default: true
                 description: DeletionProtection prevents accidental deletion
                 type: boolean
               driftPolicy:

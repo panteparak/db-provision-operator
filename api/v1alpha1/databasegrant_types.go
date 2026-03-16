@@ -54,8 +54,9 @@ type DatabaseGrantSpec struct {
 	DriftPolicy *DriftPolicy `json:"driftPolicy,omitempty"`
 
 	// DeletionProtection prevents accidental deletion
+	// +kubebuilder:default=true
 	// +optional
-	DeletionProtection bool `json:"deletionProtection,omitempty"`
+	DeletionProtection bool `json:"deletionProtection"`
 }
 
 // DatabaseGrantStatus defines the observed state of DatabaseGrant.

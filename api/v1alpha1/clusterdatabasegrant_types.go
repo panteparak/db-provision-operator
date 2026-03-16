@@ -55,8 +55,9 @@ type ClusterDatabaseGrantSpec struct {
 	DriftPolicy *DriftPolicy `json:"driftPolicy,omitempty"`
 
 	// DeletionProtection prevents accidental deletion
+	// +kubebuilder:default=true
 	// +optional
-	DeletionProtection bool `json:"deletionProtection,omitempty"`
+	DeletionProtection bool `json:"deletionProtection"`
 }
 
 // NamespacedUserReference references a DatabaseUser with an explicit namespace for cross-namespace access.
