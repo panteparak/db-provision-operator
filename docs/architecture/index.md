@@ -19,6 +19,10 @@ graph TD
             IC[Instance Ctrl]
             DC[Database Ctrl]
             UC[User Ctrl]
+            RC[Role Ctrl]
+            GC[Grant Ctrl]
+            BC["Backup/Schedule/Restore Ctrls"]
+            CC["ClusterInstance/Role/Grant Ctrls"]
         end
         API <--> RL
         CM --> RL
@@ -26,6 +30,8 @@ graph TD
             PG[PostgreSQL Instance]
             MY[MySQL Instance]
             MR[MariaDB Instance]
+            CR[CockroachDB Instance]
+            CH[ClickHouse Instance]
         end
     end
     OP --> DP
@@ -47,6 +53,9 @@ Each CRD has a dedicated controller:
 | DatabaseBackup | Backup execution |
 | DatabaseBackupSchedule | Scheduled backup management |
 | DatabaseRestore | Restore execution |
+| ClusterDatabaseInstance | Cluster-scoped connection management, health checks |
+| ClusterDatabaseRole | Cluster-scoped role management |
+| ClusterDatabaseGrant | Cluster-scoped permission management |
 
 ### Reconciliation Loop
 

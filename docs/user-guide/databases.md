@@ -372,11 +372,16 @@ Use `secretRef` when your init SQL contains sensitive data such as API keys, def
 
 ### Deletion
 
-Based on `deletionPolicy`:
+The full deletion flow for a Database:
 
-- **Retain**: CR is deleted, database remains
-- **Delete**: Database is dropped, then CR is deleted
-- **Snapshot**: Backup is created, database is dropped, CR is deleted
+1. **Deletion protection check**: If `spec.deletionProtection: true`, deletion is blocked unless the `dbops.dbprovision.io/force-delete: "true"` annotation is present.
+2. **Child dependency check**: If DatabaseGrant children reference this Database, deletion is blocked (Phase=Failed, condition=DependenciesExist) unless force-delete is set.
+3. **Cascade confirmation**: When force-delete is set and children exist, the operator enters `PhasePendingDeletion` and requires the `confirm-force-delete` annotation with the hash from `status.deletionConfirmation.hash`. Each child grant is deleted according to its own deletion policy. See [Force Delete with Children](deletion-protection.md#force-delete-with-children-cascade-confirmation).
+4. **Deletion policy**: Controls what happens to the external database:
+    - **Retain** (default): CR is deleted, database remains
+    - **Delete**: Database is dropped, then CR is deleted
+    - **Snapshot**: Backup is created, database is dropped, CR is deleted
+5. **Force-delete and external failures**: If the database drop fails and force-delete is set, the operator continues with finalizer removal anyway (the external database is left as-is).
 
 ### Updates
 

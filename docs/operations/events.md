@@ -85,6 +85,7 @@ kubectl get events -o json | jq '.items[] | select(.involvedObject.kind == "Data
 | `DriftDetected` | Warning | Configuration drift was detected |
 | `DriftCorrected` | Normal | Drift was automatically corrected |
 | `DriftCorrectionFailed` | Warning | Failed to correct detected drift |
+| `SecretRegenerated` | Normal | Credentials secret was regenerated |
 | `ReconcileFailed` | Warning | Reconciliation loop encountered an error |
 
 ### DatabaseRole
@@ -147,6 +148,10 @@ kubectl get events -o json | jq '.items[] | select(.involvedObject.kind == "Data
 | `DeletionBlocked` | Warning | Deletion blocked by deletion protection |
 | `RetentionApplied` | Normal | Retention policy was applied, old backups deleted |
 | `ReconcileFailed` | Warning | Reconciliation loop encountered an error |
+
+### Cluster-Scoped Resources
+
+Cluster-scoped resources (`ClusterDatabaseInstance`, `ClusterDatabaseRole`, `ClusterDatabaseGrant`) emit the same events as their namespaced counterparts (`DatabaseInstance`, `DatabaseRole`, `DatabaseGrant` respectively). The only difference is that cluster-scoped events are not associated with a namespace.
 
 ## Event Categories
 

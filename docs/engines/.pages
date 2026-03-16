@@ -5,3 +5,4 @@ nav:
   - MySQL: mysql.md
   - MariaDB: mariadb.md
   - CockroachDB: cockroachdb.md
+  - ClickHouse: clickhouse.md

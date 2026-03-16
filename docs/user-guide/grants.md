@@ -269,6 +269,79 @@ spec:
         privileges: [SELECT]
 ```
 
+## Deletion
+
+### Deletion Protection
+
+DatabaseGrant uses `spec.deletionProtection`:
+
+```yaml
+spec:
+  deletionProtection: true
+```
+
+### Deletion Policy
+
+DatabaseGrant has a **hardcoded Delete policy** — grants are always revoked when the CR is deleted. This is not configurable because leaving orphaned grants would be a security risk.
+
+### Deletion Flow
+
+1. **Deletion protection check**: Blocked if `spec.deletionProtection: true`, unless `force-delete` annotation is set.
+2. **No dependency check**: DatabaseGrant is a leaf resource with no children, so there is no dependency blocking and no cascade confirmation.
+3. **Revoke grants**: The operator revokes all grants managed by this resource. This always happens (hardcoded Delete policy).
+4. **Force-delete and external failures**: If the REVOKE fails and force-delete is set, the operator continues with finalizer removal (grants may remain in the database).
+
+## Cluster-Scoped Grants
+
+`ClusterDatabaseGrant` is a cluster-scoped variant of `DatabaseGrant` for cross-namespace database access control. It uses `clusterInstanceRef` to reference a `ClusterDatabaseInstance`.
+
+### Key Differences from DatabaseGrant
+
+- **Cross-namespace references**: `userRef` requires an explicit `namespace` field (via `NamespacedUserReference`) to reference a `DatabaseUser` in any namespace.
+- **Flexible role references**: `roleRef` can reference either a `ClusterDatabaseRole` (when `namespace` is empty) or a namespaced `DatabaseRole` (when `namespace` is provided).
+- **Cluster-scoped instance**: Only `clusterInstanceRef` is supported — cluster-scoped grants require cluster-scoped instances.
+
+### Example
+
+```yaml
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: ClusterDatabaseGrant
+metadata:
+  name: team-a-db-access  # No namespace - cluster-scoped
+spec:
+  clusterInstanceRef:
+    name: shared-postgres
+  userRef:
+    name: team-a-user
+    namespace: team-a  # Cross-namespace reference to DatabaseUser
+  postgres:
+    grants:
+      - database: shared_db
+        schema: public
+        tables: ["*"]
+        privileges: [SELECT, INSERT, UPDATE]
+```
+
+### Referencing a ClusterDatabaseRole
+
+```yaml
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: ClusterDatabaseGrant
+metadata:
+  name: platform-role-grant
+spec:
+  clusterInstanceRef:
+    name: shared-postgres
+  roleRef:
+    name: platform-readonly  # ClusterDatabaseRole (no namespace = cluster-scoped)
+  postgres:
+    grants:
+      - database: shared_db
+        schema: public
+        tables: ["*"]
+        privileges: [SELECT]
+```
+
 ## Grant vs Role
 
 | Approach | Pros | Cons |

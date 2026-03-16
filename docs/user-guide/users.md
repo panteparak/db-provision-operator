@@ -330,6 +330,45 @@ data:
   ca.crt: <base64-encoded PEM certificate>
 ```
 
+## Deletion
+
+### Deletion Protection
+
+DatabaseUser uses **annotations** (not spec fields) for deletion protection:
+
+```yaml
+metadata:
+  annotations:
+    dbops.dbprovision.io/deletion-protection: "true"
+```
+
+To remove protection:
+
+```bash
+kubectl annotate databaseuser myapp-user dbops.dbprovision.io/deletion-protection-
+```
+
+### Deletion Policy
+
+DatabaseUser uses an **annotation** for deletion policy:
+
+```yaml
+metadata:
+  annotations:
+    dbops.dbprovision.io/deletion-policy: "Delete"  # or Retain (default)
+```
+
+- **Retain** (default): CR is deleted, but the database user is kept
+- **Delete**: Database user is dropped, then CR is deleted
+
+### Deletion Flow
+
+1. **Deletion protection check**: Blocked if annotation `deletion-protection: "true"` is present, unless `force-delete` annotation is set.
+2. **Child dependency check**: If DatabaseGrant children reference this user, deletion is blocked (Phase=Failed, condition=DependenciesExist) unless force-delete is set.
+3. **Cascade confirmation**: When force-delete is set and grants exist, the operator enters `PhasePendingDeletion` and requires the `confirm-force-delete` annotation with the hash from `status.deletionConfirmation.hash`. See [Force Delete with Children](deletion-protection.md#force-delete-with-children-cascade-confirmation).
+4. **Deletion policy**: The annotation `dbops.dbprovision.io/deletion-policy` controls whether the external user is dropped.
+5. **Force-delete and external failures**: If the user drop fails and force-delete is set, the operator continues with finalizer removal.
+
 ## Password Rotation
 
 The operator automatically recovers when a DatabaseUser's credentials Secret is deleted.

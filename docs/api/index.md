@@ -25,6 +25,9 @@ apiVersion: dbops.dbprovision.io/v1alpha1
 | [`DatabaseBackup`](#databasebackup) | One-time backup | Namespaced |
 | [`DatabaseBackupSchedule`](#databasebackupschedule) | Scheduled backups | Namespaced |
 | [`DatabaseRestore`](#databaserestore) | Restore operation | Namespaced |
+| [`ClusterDatabaseInstance`](#clusterdatabaseinstance) | Cluster-scoped database server connection | Cluster |
+| [`ClusterDatabaseRole`](#clusterdatabaserole) | Cluster-scoped permission group | Cluster |
+| [`ClusterDatabaseGrant`](#clusterdatabasegrant) | Cluster-scoped fine-grained permissions | Cluster |
 
 ---
 
@@ -36,7 +39,7 @@ Represents a connection to a database server.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `engine` | string | Yes | Database engine: `postgres`, `mysql`, `mariadb`, `cockroachdb` |
+| `engine` | string | Yes | Database engine: `postgres`, `mysql`, `mariadb`, `cockroachdb`, `clickhouse` |
 | `connection` | object | Yes | Connection configuration |
 | `healthCheck` | object | No | Health check configuration |
 
@@ -407,3 +410,69 @@ For backup/restore operations:
 | `Running` | Operation in progress |
 | `Completed` | Operation successful |
 | `Failed` | Operation failed |
+
+---
+
+## ClusterDatabaseInstance
+
+Cluster-scoped variant of `DatabaseInstance`. Same spec as `DatabaseInstance` but accessible from any namespace via `clusterInstanceRef`. Short name: `cdbi`.
+
+Uses `DatabaseInstanceSpec` and `DatabaseInstanceStatus` — see [DatabaseInstance](#databaseinstance) for all fields.
+
+---
+
+## ClusterDatabaseRole
+
+Cluster-scoped variant of `DatabaseRole` for shared service accounts and cross-namespace access. Short name: `cdbr`.
+
+### Spec
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `clusterInstanceRef` | object | Yes | Reference to ClusterDatabaseInstance |
+| `roleName` | string | Yes | Role name in database (immutable) |
+| `postgres` | object | No | PostgreSQL-specific options |
+| `mysql` | object | No | MySQL-specific options |
+| `driftPolicy` | object | No | Drift detection policy override |
+| `managedResourceComment` | string | No | Comment applied to role in database |
+
+### Status
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `phase` | string | Current phase |
+| `conditions` | array | Detailed conditions |
+| `role` | object | Role-specific status info |
+| `drift` | object | Drift detection status |
+| `reconcileID` | string | Unique reconciliation ID for tracing |
+
+---
+
+## ClusterDatabaseGrant
+
+Cluster-scoped variant of `DatabaseGrant` for cross-namespace database access control. Short name: `cdbg`.
+
+### Spec
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `clusterInstanceRef` | object | Yes | Reference to ClusterDatabaseInstance |
+| `userRef` | object | Conditional | Reference to DatabaseUser (with namespace) |
+| `roleRef` | object | Conditional | Reference to ClusterDatabaseRole or DatabaseRole |
+| `postgres` | object | No | PostgreSQL grants |
+| `mysql` | object | No | MySQL grants |
+| `driftPolicy` | object | No | Drift detection policy override |
+| `deletionProtection` | bool | No | Prevent accidental deletion |
+
+!!! note "Cross-namespace References"
+    `userRef` requires an explicit `namespace` field. `roleRef` without `namespace` refers to a ClusterDatabaseRole; with `namespace` it refers to a namespaced DatabaseRole.
+
+### Status
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `phase` | string | Current phase |
+| `conditions` | array | Detailed conditions |
+| `appliedGrants` | object | Applied/failed grant counts and details |
+| `targetInfo` | object | Resolved target user/role info |
+| `drift` | object | Drift detection status |

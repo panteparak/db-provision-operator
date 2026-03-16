@@ -20,7 +20,9 @@ Deletion protection provides a safety net against:
 
 ## Enabling Deletion Protection
 
-Add `deletionProtection: true` to any supported resource:
+### Spec-Based Resources
+
+For DatabaseInstance, Database, DatabaseGrant, and DatabaseBackupSchedule, add `deletionProtection: true` to the spec:
 
 ```yaml
 apiVersion: dbops.dbprovision.io/v1alpha1
@@ -34,18 +36,38 @@ spec:
   deletionProtection: true  # Prevents accidental deletion
 ```
 
+### Annotation-Based Resources
+
+For DatabaseUser and DatabaseRole, use the `dbops.dbprovision.io/deletion-protection` annotation:
+
+```yaml
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseUser
+metadata:
+  name: production-user
+  annotations:
+    dbops.dbprovision.io/deletion-protection: "true"
+spec:
+  instanceRef:
+    name: postgres-primary
+  username: production_user
+```
+
+!!! note "Why annotations?"
+    DatabaseUser and DatabaseRole use annotations for both deletion protection and deletion policy. This means protection can be toggled without modifying the resource spec.
+
 ## Supported Resources
 
-| Resource | deletionProtection | Notes |
-|----------|-------------------|-------|
-| DatabaseInstance | Yes | Blocks deletion of the instance connection |
-| Database | Yes | Blocks deletion of the logical database |
-| DatabaseUser | Yes | Blocks deletion of the database user |
-| DatabaseRole | Yes | Blocks deletion of the database role |
-| DatabaseGrant | Yes | Blocks deletion of permission grants |
-| DatabaseBackupSchedule | Yes | Blocks deletion of the backup schedule |
-| DatabaseBackup | No | Backups are typically transient |
-| DatabaseRestore | No | Restores are one-time operations |
+| Resource | Mechanism | Notes |
+|----------|-----------|-------|
+| DatabaseInstance | `spec.deletionProtection` | Blocks deletion of the instance connection |
+| Database | `spec.deletionProtection` | Blocks deletion of the logical database |
+| DatabaseUser | annotation `deletion-protection: "true"` | Blocks deletion of the database user |
+| DatabaseRole | annotation `deletion-protection: "true"` | Blocks deletion of the database role |
+| DatabaseGrant | `spec.deletionProtection` | Blocks deletion of permission grants |
+| DatabaseBackupSchedule | `spec.deletionProtection` | Blocks deletion of the backup schedule |
+| DatabaseBackup | — | Not supported (backups are typically transient) |
+| DatabaseRestore | — | Not supported (restores are one-time operations) |
 
 ## Behavior When Protected
 
@@ -71,18 +93,22 @@ production-db   Failed  Deletion blocked by deletion protection
 Check which resources have deletion protection:
 
 ```bash
-# All databases with deletion protection
+# Spec-based resources (Database, Instance, Grant, BackupSchedule)
 kubectl get databases -o jsonpath='{range .items[?(@.spec.deletionProtection==true)]}{.metadata.name}{"\n"}{end}'
 
-# Using labels (if you label protected resources)
-kubectl get databases -l protected=true
+# Annotation-based resources (DatabaseUser, DatabaseRole)
+kubectl get databaseusers -o json | \
+  jq -r '.items[] | select(.metadata.annotations["dbops.dbprovision.io/deletion-protection"]=="true") | .metadata.name'
+
+kubectl get databaseroles -o json | \
+  jq -r '.items[] | select(.metadata.annotations["dbops.dbprovision.io/deletion-protection"]=="true") | .metadata.name'
 ```
 
 ## Disabling Deletion Protection
 
-### Method 1: Update the Spec
+### Method 1: Update the Resource
 
-Remove or disable the protection:
+**Spec-based resources** — remove or set the field to false:
 
 ```yaml
 spec:
@@ -96,6 +122,14 @@ kubectl apply -f database.yaml
 kubectl delete database production-db
 ```
 
+**Annotation-based resources** (User/Role) — remove the annotation:
+
+```bash
+kubectl annotate databaseuser production-user \
+  dbops.dbprovision.io/deletion-protection-
+kubectl delete databaseuser production-user
+```
+
 ### Method 2: Force Delete Annotation
 
 For emergency situations, add the force-delete annotation:
@@ -105,12 +139,12 @@ kubectl annotate database production-db \
   dbops.dbprovision.io/force-delete="true"
 ```
 
-The resource will be deleted on the next reconciliation loop.
+The resource will be deleted on the next reconciliation.
 
-!!! danger "Force Delete is Immediate"
-    The force-delete annotation bypasses all safety checks. Use only when you're certain the deletion is intentional.
+!!! warning "Force Delete Behavior"
+    Force-delete bypasses deletion protection and external deletion failures. However, **when children exist, force-delete is not immediate** — it triggers a [cascade confirmation flow](#force-delete-with-children-cascade-confirmation). For leaf resources (no children), force-delete proceeds immediately.
 
-### Method 3: Edit and Delete
+### Method 3: Patch and Delete (Spec-Based Only)
 
 Quick one-liner to disable and delete:
 
@@ -119,20 +153,64 @@ kubectl patch database production-db -p '{"spec":{"deletionProtection":false}}' 
 kubectl delete database production-db
 ```
 
+## Dependency Checking
+
+Even without deletion protection, the operator **blocks deletion of parent resources when child dependencies exist**. This is a separate safety mechanism from deletion protection.
+
+### How It Works
+
+- **DatabaseInstance**: blocked if it has Database, DatabaseUser, or DatabaseRole children
+- **Database**: blocked if it has DatabaseGrant children referencing it
+- **DatabaseUser**: blocked if it has DatabaseGrant children referencing it
+- **DatabaseRole**: blocked if it has DatabaseGrant children referencing it
+- **DatabaseGrant**: leaf resource — no dependency checking
+
+When children exist, the parent resource enters `Failed` phase with the `DependenciesExist` condition and requeues after 10 seconds.
+
+### Resolving Dependency Blocks
+
+To delete a parent resource with children:
+
+1. **Delete children first** (recommended): Delete the child resources (grants, then users/roles/databases), then delete the parent.
+2. **Force-delete the parent**: Add the `force-delete` annotation. If children exist, this triggers the [cascade confirmation flow](#force-delete-with-children-cascade-confirmation).
+
+!!! note "Dependency check vs deletion protection"
+    These are **independent** checks. A resource with `deletionProtection: false` will still be blocked by dependency checking. The `force-delete` annotation bypasses **both** checks.
+
 ## Deletion Policies
 
 Deletion protection is separate from deletion policy. The deletion policy controls **what happens** when a resource is deleted; deletion protection controls **whether** it can be deleted.
 
-| Setting | Behavior |
-|---------|----------|
-| `deletionProtection: true` | Cannot delete the CR |
-| `deletionPolicy: Retain` | CR deleted, database object kept |
-| `deletionPolicy: Delete` | CR deleted, database object deleted |
-| `deletionPolicy: Snapshot` | CR deleted after backup created |
+| Resource | Policy Source | Default | Available Policies |
+|----------|-------------|---------|-------------------|
+| Database | `spec.deletionPolicy` | `Retain` | `Retain`, `Delete`, `Snapshot` |
+| DatabaseUser | annotation `dbops.dbprovision.io/deletion-policy` | `Retain` | `Retain`, `Delete` |
+| DatabaseRole | annotation `dbops.dbprovision.io/deletion-policy` | `Retain` | `Retain`, `Delete` |
+| DatabaseGrant | hardcoded | `Delete` | Always `Delete` (grants are always revoked) |
+| DatabaseInstance | — | — | No external resource to delete; always removes finalizer |
+| DatabaseBackupSchedule | `spec.deletionPolicy` | `Retain` | `Retain`, `Delete` |
+
+### Setting Deletion Policy
+
+**Spec-based** (Database, BackupSchedule):
+
+```yaml
+spec:
+  deletionPolicy: Retain  # or Delete, Snapshot
+```
+
+**Annotation-based** (User, Role):
+
+```yaml
+metadata:
+  annotations:
+    dbops.dbprovision.io/deletion-policy: "Delete"  # or Retain
+```
 
 ### Combined Example
 
 ```yaml
+# Database — uses spec fields for both
 apiVersion: dbops.dbprovision.io/v1alpha1
 kind: Database
 metadata:
@@ -143,6 +221,19 @@ spec:
   name: production
   deletionProtection: true   # Can't delete CR accidentally
   deletionPolicy: Retain     # Even if deleted, keep the actual database
+---
+# User — uses annotations for both
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseUser
+metadata:
+  name: production-user
+  annotations:
+    dbops.dbprovision.io/deletion-protection: "true"
+    dbops.dbprovision.io/deletion-policy: "Retain"
+spec:
+  instanceRef:
+    name: postgres-primary
+  username: production_user
 ```
 
 ## Events
@@ -167,9 +258,18 @@ kubectl get events --field-selector reason=DeletionBlocked
 Always enable deletion protection for production databases:
 
 ```yaml
+# Database
 spec:
   deletionProtection: true
   deletionPolicy: Snapshot  # Additional safety: backup before delete
+```
+
+```yaml
+# User — use annotations
+metadata:
+  annotations:
+    dbops.dbprovision.io/deletion-protection: "true"
+    dbops.dbprovision.io/deletion-policy: "Retain"
 ```
 
 ### GitOps Workflows
@@ -187,11 +287,11 @@ spec:
 
 ### Multi-Environment Strategy
 
-| Environment | deletionProtection | deletionPolicy |
-|-------------|-------------------|----------------|
-| Development | `false` | `Delete` |
-| Staging | `true` | `Delete` |
-| Production | `true` | `Retain` or `Snapshot` |
+| Environment | Protection | Deletion Policy |
+|-------------|-----------|----------------|
+| Development | Disabled | `Delete` |
+| Staging | Enabled | `Delete` |
+| Production | Enabled | `Retain` or `Snapshot` |
 
 ### Namespace Deletion
 
@@ -201,9 +301,13 @@ When a namespace is deleted, all resources in it are deleted. Deletion protectio
 # This will hang waiting for protected resources
 kubectl delete namespace production
 
-# Check which resources are blocking
-kubectl get databases,users,roles -n production \
+# Find spec-protected resources
+kubectl get databases,databasegrants -n production \
   -o jsonpath='{range .items[?(@.spec.deletionProtection==true)]}{.kind}/{.metadata.name}{"\n"}{end}'
+
+# Find annotation-protected users/roles
+kubectl get databaseusers,databaseroles -n production -o json | \
+  jq -r '.items[] | select(.metadata.annotations["dbops.dbprovision.io/deletion-protection"]=="true") | "\(.kind)/\(.metadata.name)"'
 ```
 
 To delete the namespace, first remove protection or force-delete each resource.
@@ -223,6 +327,21 @@ for kind in database databaseuser databaserole databasegrant databasebackupsched
     echo "Force deleting $name..."
     kubectl annotate $name -n $NAMESPACE \
       dbops.dbprovision.io/force-delete="true" --overwrite
+  done
+done
+
+echo "Waiting for resources to enter PendingDeletion or be deleted..."
+sleep 5
+
+# Handle cascade confirmation for parent resources with children
+for kind in databaseinstance database databaseuser databaserole; do
+  for name in $(kubectl get $kind -n $NAMESPACE -o name 2>/dev/null); do
+    HASH=$(kubectl get $name -n $NAMESPACE -o jsonpath='{.status.deletionConfirmation.hash}' 2>/dev/null)
+    if [ -n "$HASH" ]; then
+      echo "Confirming cascade for $name (hash: $HASH)..."
+      kubectl annotate $name -n $NAMESPACE \
+        dbops.dbprovision.io/confirm-force-delete="$HASH" --overwrite
+    fi
   done
 done
 
@@ -316,6 +435,16 @@ kubectl get databaseinstance postgres-primary -o jsonpath='{.status.deletionConf
 !!! danger "Wrong hash blocks deletion"
     If the `confirm-force-delete` annotation does not match the hash in `status.deletionConfirmation.hash`, the operator stays in `PhasePendingDeletion` and does not proceed. This prevents copy-paste errors from triggering unintended cascades.
 
+### Force Delete Summary
+
+The `force-delete` annotation is checked at multiple points in the deletion flow:
+
+| Check Point | What force-delete does |
+|-------------|----------------------|
+| Deletion protection | Bypasses `spec.deletionProtection` or annotation-based protection |
+| Child dependency check | Bypasses "children exist → block deletion" and triggers cascade confirmation when children exist |
+| External deletion failure | If the database operation (DROP, REVOKE, etc.) fails, force-delete continues with finalizer removal anyway |
+
 ## Troubleshooting
 
 ### Resource Stuck in Terminating
@@ -329,8 +458,11 @@ kubectl describe database my-db
 # Check if finalizer is still present
 kubectl get database my-db -o jsonpath='{.metadata.finalizers}'
 
-# Option 1: Disable protection via spec
+# Option 1: Disable protection via spec (Database, Instance, Grant)
 kubectl patch database my-db -p '{"spec":{"deletionProtection":false}}'
+
+# Option 1b: Disable protection via annotation (User, Role)
+kubectl annotate databaseuser my-user dbops.dbprovision.io/deletion-protection-
 
 # Option 2: Force delete
 kubectl annotate database my-db dbops.dbprovision.io/force-delete="true"
@@ -340,10 +472,11 @@ kubectl annotate database my-db dbops.dbprovision.io/force-delete="true"
 
 If resources are deleted despite protection:
 
-1. Verify `deletionProtection: true` is in the spec
-2. Check operator logs for errors
-3. Ensure the operator has proper RBAC permissions
-4. Verify the finalizer is being added
+1. **Spec-based resources**: Verify `deletionProtection: true` is in the spec
+2. **Annotation-based resources**: Verify annotation `dbops.dbprovision.io/deletion-protection: "true"` exists
+3. Check operator logs for errors
+4. Ensure the operator has proper RBAC permissions
+5. Verify the finalizer is being added
 
 ```bash
 # Check finalizer

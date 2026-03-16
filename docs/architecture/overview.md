@@ -18,25 +18,42 @@ The **db-provision-operator** is a Kubernetes operator designed to provide unifi
 graph TD
     subgraph K8s["Kubernetes Cluster"]
         subgraph Operator["db-provision-operator"]
-            DIC[DatabaseInstance Controller]
-            DBC[Database Controller]
-            DUC[DatabaseUser Controller]
-            DIC & DBC & DUC --> AL
+            subgraph CoreCtrl["Core Controllers"]
+                DIC[Instance Controller]
+                DBC[Database Controller]
+                DUC[User Controller]
+            end
+            subgraph AccessCtrl["Access Controllers"]
+                DRC[Role Controller]
+                DGC[Grant Controller]
+            end
+            subgraph BackupCtrl["Backup Controllers"]
+                DBKC[Backup Controller]
+                DBSC[Schedule Controller]
+                DRSC[Restore Controller]
+            end
+            subgraph ClusterCtrl["Cluster-Scoped Controllers"]
+                CDIC[ClusterInstance Controller]
+                CDRC[ClusterRole Controller]
+                CDGC[ClusterGrant Controller]
+            end
+            CoreCtrl & AccessCtrl & BackupCtrl & ClusterCtrl --> AL
             subgraph AL["Adapter Layer"]
                 PGA[PostgreSQL Adapter]
-                MYA[MySQL Adapter]
+                MYA[MySQL/MariaDB Adapter]
+                CRA[CockroachDB Adapter]
+                CHA[ClickHouse Adapter]
             end
             SM[Secret Manager] <--> AL
-            UL[Utility Layer] <--> AL
+            SB[SQL Builder] <--> AL
         end
-        CRD1[DatabaseInstance CRD]
-        CRD2[Database CRD]
-        CRD3[DatabaseUser CRD]
     end
     AL --> ExtDB
     subgraph ExtDB["External Databases"]
-        PGS[PostgreSQL Server]
-        MYS[MySQL Server]
+        PGS[PostgreSQL]
+        MYS[MySQL/MariaDB]
+        CRS[CockroachDB]
+        CHS[ClickHouse]
     end
 ```
 
@@ -48,7 +65,8 @@ graph TD
 | Kubernetes Client | controller-runtime | Latest |
 | PostgreSQL Driver | pgx/v5 | v5.x |
 | MySQL Driver | go-sql-driver/mysql | v1.x |
-| Go Version | Go | 1.21+ |
+| ClickHouse Driver | clickhouse-go/v2 | v2.x |
+| Go Version | Go | 1.24+ |
 
 ## Custom Resource Definitions (CRDs)
 
@@ -64,14 +82,27 @@ graph TD
 | `DatabaseBackup` | `dbops.dbprovision.io/v1alpha1` | Represents a backup operation |
 | `DatabaseBackupSchedule` | `dbops.dbprovision.io/v1alpha1` | Represents scheduled backups |
 | `DatabaseRestore` | `dbops.dbprovision.io/v1alpha1` | Represents a restore operation |
+| `ClusterDatabaseInstance` | `dbops.dbprovision.io/v1alpha1` | Cluster-scoped database server connection |
+| `ClusterDatabaseRole` | `dbops.dbprovision.io/v1alpha1` | Cluster-scoped permission group |
+| `ClusterDatabaseGrant` | `dbops.dbprovision.io/v1alpha1` | Cluster-scoped fine-grained access control |
 
 ### Resource Hierarchy
 
 ```mermaid
 graph TD
     DI[DatabaseInstance] --> DB[Database]
-    DB --> DU1[DatabaseUser]
-    DI --> DU2["DatabaseUser (instance-level)"]
+    DI --> DU[DatabaseUser]
+    DI --> DR[DatabaseRole]
+    DB --> DBK[DatabaseBackup]
+    DB --> DBS[DatabaseBackupSchedule]
+    DU --> DG1[DatabaseGrant]
+    DR --> DG2[DatabaseGrant]
+    DBK --> DRE[DatabaseRestore]
+
+    CDI[ClusterDatabaseInstance] --> CDR[ClusterDatabaseRole]
+    CDI -.->|"referenced via clusterInstanceRef"| DB
+    CDI -.->|"referenced via clusterInstanceRef"| DU
+    CDR --> CDG[ClusterDatabaseGrant]
 ```
 
 ## Component Architecture
@@ -201,13 +232,24 @@ graph TD
     A[User Deletes CRD] --> B[Controller Receives Delete Event]
     B --> C{Check Deletion Protection}
     C -->|Protected + No Force| D[Return Error, Keep Resource]
-    C -->|Not Protected or Force| E{Check Deletion Policy}
-    E -->|Retain| F[Remove Finalizer Only]
-    E -->|Delete| G[Connect to Database]
-    G --> H["Drop Resource (DB/User)"]
-    H --> I[Delete Credentials Secret]
-    I --> J[Remove Finalizer]
-    J --> K[Resource Removed from Cluster]
+    C -->|Not Protected or Force| E{Has Child Dependencies?}
+    E -->|Children Exist + No Force| F[Phase=Failed, DependenciesExist, Requeue 10s]
+    E -->|No Children| G{Check Deletion Policy}
+    E -->|Children Exist + Force| H[Enter PhasePendingDeletion]
+    H --> I{confirm-force-delete Hash Matches?}
+    I -->|No| J[Wait for Confirmation]
+    I -->|Yes| K[Cascade Delete Children]
+    K --> L{All Children Gone?}
+    L -->|No| K
+    L -->|Yes| G
+    G -->|Retain| M[Remove Finalizer Only]
+    G -->|Delete| N[Connect to Database]
+    N --> O["Drop Resource (DB/User/Grant)"]
+    O -->|Success| P[Delete Credentials Secret]
+    O -->|Failure + Force| P
+    O -->|Failure + No Force| Q[Return Error]
+    P --> R[Remove Finalizer]
+    R --> S[Resource Removed from Cluster]
 ```
 
 ## Project Structure
@@ -223,9 +265,12 @@ db-provision-operator/
 ├── internal/
 │   ├── adapter/           # Database adapters
 │   │   ├── postgres/      # PostgreSQL implementation
-│   │   ├── mysql/         # MySQL implementation
+│   │   ├── mysql/         # MySQL/MariaDB implementation
+│   │   ├── cockroachdb/   # CockroachDB implementation
+│   │   ├── clickhouse/    # ClickHouse implementation
+│   │   ├── sqlbuilder/    # Centralized SQL builder with dialect escaping
 │   │   └── types/         # Shared adapter types
-│   ├── controller/        # Kubernetes controllers
+│   ├── features/          # Kubernetes controllers (handler + repository per feature)
 │   ├── secret/            # Secret management
 │   └── util/              # Utility functions
 └── docs/                  # Project documentation
@@ -245,3 +290,20 @@ db-provision-operator/
 - User management with resource limits and authentication plugins
 - Grant management at multiple levels (global, database, table, column, routine)
 - Backup/restore using mysqldump
+
+### CockroachDB
+- PostgreSQL wire-compatible via pgx driver
+- Database CRUD operations
+- User/role management (no SUPERUSER, REPLICATION, or BYPASSRLS)
+- Grant management (database, table, schema levels)
+- Native BACKUP/RESTORE commands
+- Multi-region deployment support
+
+### ClickHouse
+- Native protocol via clickhouse-go/v2 with LZ4 compression
+- Database operations with engine selection (Atomic, Lazy, Replicated)
+- User management with allowed hosts and default database
+- Role management with settings
+- Grant management at global, database, and table levels
+- Privilege allowlist validation via SQL builder
+- Backup/restore not yet supported

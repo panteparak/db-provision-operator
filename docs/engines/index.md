@@ -10,19 +10,20 @@ DB Provision Operator supports multiple database engines with a unified API.
 | [MySQL](mysql.md) | ✅ Stable | 5.7, 8.0, 8.4 |
 | [MariaDB](mariadb.md) | ✅ Stable | 10.5, 10.6, 10.11, 11.x |
 | [CockroachDB](cockroachdb.md) | ✅ Stable | 22.x, 23.x, 24.x |
+| [ClickHouse](clickhouse.md) | ✅ Stable | 23.x, 24.x |
 
 ## Engine Comparison
 
-| Feature | PostgreSQL | MySQL | MariaDB | CockroachDB |
-|---------|------------|-------|---------|-------------|
-| Roles | ✅ Native | ✅ 8.0+ | ✅ 10.0.5+ | ✅ Native |
-| Row-Level Security | ✅ | ❌ | ❌ | ❌ |
-| Extensions | ✅ | ❌ | ❌ | ❌ |
-| Schemas | ✅ | ❌ | ❌ | ❌ |
-| Default Privileges | ✅ | ❌ | ❌ | ❌ |
-| Backup | pg_dump | mysqldump | mariadb-dump | Native BACKUP |
-| Multi-Region | ❌ | ❌ | ❌ | ✅ Built-in |
-| Distributed | ❌ | ❌ | ❌ | ✅ Built-in |
+| Feature | PostgreSQL | MySQL | MariaDB | CockroachDB | ClickHouse |
+|---------|------------|-------|---------|-------------|------------|
+| Roles | ✅ Native | ✅ 8.0+ | ✅ 10.0.5+ | ✅ Native | ✅ Native |
+| Row-Level Security | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Extensions | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Schemas | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Default Privileges | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Backup | pg_dump | mysqldump | mariadb-dump | Native BACKUP | SQL-based |
+| Multi-Region | ❌ | ❌ | ❌ | ✅ Built-in | ❌ |
+| Distributed | ❌ | ❌ | ❌ | ✅ Built-in | ✅ Built-in |
 
 ## Choosing an Engine
 
@@ -63,6 +64,16 @@ Best for:
 - Horizontal scalability
 - PostgreSQL wire compatibility
 - Strong consistency guarantees
+
+### ClickHouse
+
+Best for:
+
+- Analytics and OLAP workloads
+- Time-series data
+- Columnar storage and real-time aggregation
+- High-volume data ingestion
+- Log and event analytics
 
 ## Engine-Specific Features
 
@@ -111,6 +122,24 @@ spec:
 !!! note "No Extensions or Schemas"
     CockroachDB does not support PostgreSQL extensions or custom schemas. Use it for distributed SQL without PostgreSQL-specific features.
 
+### ClickHouse
+
+ClickHouse uses its native protocol with column-oriented storage:
+
+```yaml
+spec:
+  engine: clickhouse
+  connection:
+    host: clickhouse.example.com
+    port: 9000  # native protocol
+    database: default
+  clickhouse:
+    secure: true  # TLS for native protocol
+```
+
+!!! note "No ALTER DATABASE or Default Privileges"
+    ClickHouse does not support ALTER DATABASE, object ownership, default privileges, extensions, or schemas. Database engines (Atomic, Lazy, Replicated) are set at creation time and cannot be changed.
+
 ## Connection Configuration
 
 All engines use the same `DatabaseInstance` structure:
@@ -121,11 +150,11 @@ kind: DatabaseInstance
 metadata:
   name: my-database
 spec:
-  engine: postgres  # or mysql, mariadb, cockroachdb
+  engine: postgres  # or mysql, mariadb, cockroachdb, clickhouse
   connection:
     host: database.example.com
-    port: 5432  # 3306 for MySQL/MariaDB, 26257 for CockroachDB
-    database: postgres  # mysql for MySQL/MariaDB, defaultdb for CockroachDB
+    port: 5432  # 3306 for MySQL/MariaDB, 26257 for CockroachDB, 9000 for ClickHouse
+    database: postgres  # mysql for MySQL/MariaDB, defaultdb for CockroachDB, default for ClickHouse
     secretRef:
       name: admin-credentials
 ```
@@ -136,3 +165,4 @@ spec:
 - [MySQL Guide](mysql.md) - MySQL-specific features
 - [MariaDB Guide](mariadb.md) - MariaDB-specific features
 - [CockroachDB Guide](cockroachdb.md) - CockroachDB-specific features
+- [ClickHouse Guide](clickhouse.md) - ClickHouse-specific features

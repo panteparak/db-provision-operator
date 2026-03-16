@@ -314,22 +314,32 @@ kubectl get events --field-selector reason=DriftCorrectionFailed,involvedObject.
 
 **Check if deletion protection is enabled:**
 ```bash
+# Spec-based resources (Database, Instance, Grant, BackupSchedule)
 kubectl get database myapp -o jsonpath='{.spec.deletionProtection}'
+
+# Annotation-based resources (DatabaseUser, DatabaseRole)
+kubectl get databaseuser myapp-user -o jsonpath='{.metadata.annotations.dbops\.dbprovision\.io/deletion-protection}'
 ```
 
-**Method 1: Disable protection in spec:**
+**Method 1: Disable protection:**
 ```bash
+# Spec-based (Database, Instance, Grant)
 kubectl patch database myapp -p '{"spec":{"deletionProtection":false}}'
 kubectl delete database myapp
+
+# Annotation-based (User, Role)
+kubectl annotate databaseuser myapp-user dbops.dbprovision.io/deletion-protection-
+kubectl delete databaseuser myapp-user
 ```
 
 **Method 2: Force delete annotation:**
 ```bash
 kubectl annotate database myapp dbops.dbprovision.io/force-delete="true"
 # Resource will be deleted on next reconciliation
+# Note: if the resource has children, you must also confirm the cascade — see deletion-protection docs
 ```
 
-**Method 3: One-liner:**
+**Method 3: One-liner (spec-based only):**
 ```bash
 kubectl patch database myapp -p '{"spec":{"deletionProtection":false}}' && kubectl delete database myapp
 ```
@@ -361,8 +371,19 @@ kubectl patch database myapp -p '{"metadata":{"finalizers":null}}' --type=merge
 
 **Find protected resources blocking deletion:**
 ```bash
-kubectl get databases,databaseusers,databaseroles,databasegrants -n my-namespace \
+# Spec-protected resources (Database, Instance, Grant, BackupSchedule)
+kubectl get databases,databaseinstances,databasegrants,databasebackupschedules -n my-namespace \
   -o jsonpath='{range .items[?(@.spec.deletionProtection==true)]}{.kind}/{.metadata.name}{"\n"}{end}'
+
+# Annotation-protected resources (User, Role)
+kubectl get databaseusers,databaseroles -n my-namespace -o json | \
+  jq -r '.items[] | select(.metadata.annotations["dbops.dbprovision.io/deletion-protection"]=="true") | "\(.kind)/\(.metadata.name)"'
+```
+
+**Also check for dependency blocks** (resources with children that block deletion even without protection):
+```bash
+kubectl get databases,databaseusers,databaseroles,databaseinstances -n my-namespace \
+  -o jsonpath='{range .items[?(@.status.conditions[?(@.reason=="DependenciesExist")])]}{.kind}/{.metadata.name}{"\n"}{end}'
 ```
 
 **Force delete all protected resources:**
@@ -370,6 +391,17 @@ kubectl get databases,databaseusers,databaseroles,databasegrants -n my-namespace
 for kind in database databaseuser databaserole databasegrant databasebackupschedule; do
   for name in $(kubectl get $kind -n my-namespace -o name 2>/dev/null); do
     kubectl annotate $name -n my-namespace dbops.dbprovision.io/force-delete="true" --overwrite
+  done
+done
+
+# Wait for cascade confirmation hashes to appear, then confirm them
+sleep 5
+for kind in databaseinstance database databaseuser databaserole; do
+  for name in $(kubectl get $kind -n my-namespace -o name 2>/dev/null); do
+    HASH=$(kubectl get $name -n my-namespace -o jsonpath='{.status.deletionConfirmation.hash}' 2>/dev/null)
+    if [ -n "$HASH" ]; then
+      kubectl annotate $name -n my-namespace dbops.dbprovision.io/confirm-force-delete="$HASH" --overwrite
+    fi
   done
 done
 ```

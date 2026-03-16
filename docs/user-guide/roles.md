@@ -209,6 +209,71 @@ spec:
         privileges: [DELETE, TRUNCATE]
 ```
 
+## Deletion
+
+### Deletion Protection
+
+DatabaseRole uses **annotations** (not spec fields) for deletion protection:
+
+```yaml
+metadata:
+  annotations:
+    dbops.dbprovision.io/deletion-protection: "true"
+```
+
+To remove protection:
+
+```bash
+kubectl annotate databaserole readonly-role dbops.dbprovision.io/deletion-protection-
+```
+
+### Deletion Policy
+
+DatabaseRole uses an **annotation** for deletion policy:
+
+```yaml
+metadata:
+  annotations:
+    dbops.dbprovision.io/deletion-policy: "Delete"  # or Retain (default)
+```
+
+- **Retain** (default): CR is deleted, but the database role is kept
+- **Delete**: Database role is dropped, then CR is deleted
+
+### Deletion Flow
+
+1. **Deletion protection check**: Blocked if annotation `deletion-protection: "true"` is present, unless `force-delete` annotation is set.
+2. **Child dependency check**: If DatabaseGrant children reference this role, deletion is blocked (Phase=Failed, condition=DependenciesExist) unless force-delete is set.
+3. **Cascade confirmation**: When force-delete is set and grants exist, the operator enters `PhasePendingDeletion` and requires the `confirm-force-delete` annotation with the hash from `status.deletionConfirmation.hash`. See [Force Delete with Children](deletion-protection.md#force-delete-with-children-cascade-confirmation).
+4. **Deletion policy**: The annotation `dbops.dbprovision.io/deletion-policy` controls whether the external role is dropped.
+5. **Force-delete and external failures**: If the role drop fails and force-delete is set, the operator continues with finalizer removal.
+
+## Cluster-Scoped Roles
+
+`ClusterDatabaseRole` is a cluster-scoped variant of `DatabaseRole`. It uses `clusterInstanceRef` to reference a `ClusterDatabaseInstance` and is useful for shared service accounts and cross-namespace access patterns.
+
+### Example
+
+```yaml
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: ClusterDatabaseRole
+metadata:
+  name: platform-readonly  # No namespace - cluster-scoped
+spec:
+  clusterInstanceRef:
+    name: shared-postgres
+  roleName: platform_readonly
+  postgres:
+    login: false
+    grants:
+      - database: shared_db
+        schema: public
+        tables: ["*"]
+        privileges: [SELECT]
+```
+
+`ClusterDatabaseRole` has its own spec type (`ClusterDatabaseRoleSpec`) but supports the same engine-specific configurations (`postgres`, `mysql`) as `DatabaseRole`. It also supports `driftPolicy` and `managedResourceComment`.
+
 ## Best Practices
 
 1. **Use roles for grouping** - Create roles for permission sets, then assign roles to users

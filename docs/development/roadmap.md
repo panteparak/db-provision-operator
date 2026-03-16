@@ -84,7 +84,7 @@ This document provides the development roadmap and context for the db-provision-
 1. Create type file: `api/v1alpha1/<resource>_types.go`
 2. Run `make generate` to generate DeepCopy methods
 3. Run `make manifests` to generate CRD YAML
-4. Create controller: `internal/controller/<resource>_controller.go`
+4. Create controller: `internal/features/<resource>/controller.go`
 5. Register controller in `cmd/main.go`
 6. Add RBAC markers to controller
 7. Run `make manifests` again to update RBAC
@@ -116,17 +116,23 @@ db-provision-operator/
 │   │   ├── types/types.go        # Adapter interfaces and option types
 │   │   ├── adapter.go            # Factory and helpers
 │   │   ├── postgres/             # PostgreSQL implementation
-│   │   └── mysql/                # MySQL implementation
+│   │   ├── mysql/                # MySQL/MariaDB implementation
+│   │   ├── cockroachdb/          # CockroachDB implementation
+│   │   ├── clickhouse/           # ClickHouse implementation
+│   │   └── sqlbuilder/           # Centralized SQL builder with dialect escaping
 │   │
-│   ├── controller/
-│   │   ├── databaseinstance_controller.go
-│   │   ├── database_controller.go
-│   │   ├── databaseuser_controller.go
-│   │   ├── databaserole_controller.go
-│   │   ├── databasegrant_controller.go
-│   │   ├── databasebackup_controller.go
-│   │   ├── databaserestore_controller.go
-│   │   └── databasebackupschedule_controller.go
+│   ├── features/                 # Controllers (handler + repository per feature)
+│   │   ├── databaseinstance/     # DatabaseInstance controller
+│   │   ├── database/             # Database controller
+│   │   ├── databaseuser/         # DatabaseUser controller
+│   │   ├── databaserole/         # DatabaseRole controller
+│   │   ├── databasegrant/        # DatabaseGrant controller
+│   │   ├── databasebackup/       # DatabaseBackup controller
+│   │   ├── databaserestore/      # DatabaseRestore controller
+│   │   ├── databasebackupschedule/ # DatabaseBackupSchedule controller
+│   │   ├── clusterdatabaseinstance/ # ClusterDatabaseInstance controller
+│   │   ├── clusterdatabaserole/  # ClusterDatabaseRole controller
+│   │   └── clusterdatabasegrant/ # ClusterDatabaseGrant controller
 │   │
 │   ├── metrics/
 │   │   ├── metrics.go            # Prometheus metrics definitions

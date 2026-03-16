@@ -5,7 +5,7 @@ hide:
 
 # DB Provision Operator
 
-**Kubernetes operator for declarative database provisioning across PostgreSQL, MySQL, and MariaDB.**
+**Kubernetes operator for declarative database provisioning across PostgreSQL, MySQL, MariaDB, CockroachDB, and ClickHouse.**
 
 ---
 
@@ -15,7 +15,7 @@ DB Provision Operator is a Kubernetes operator that provides a unified, declarat
 
 ## Features
 
-- **Unified API** - Single CRD-based interface for PostgreSQL, MySQL, and MariaDB
+- **Unified API** - Single CRD-based interface for PostgreSQL, MySQL, MariaDB, CockroachDB, and ClickHouse
 - **Declarative Management** - GitOps-friendly database provisioning
 - **Automatic Credentials** - Secure password generation and Kubernetes Secret management
 - **Fine-grained Access Control** - Users, roles, and grants management
@@ -55,6 +55,9 @@ DB Provision Operator is a Kubernetes operator that provides a unified, declarat
 | `DatabaseBackup` | One-time backup operation | `dbbak` |
 | `DatabaseBackupSchedule` | Scheduled backup configuration | `dbbaksch` |
 | `DatabaseRestore` | Restore from backup | `dbrest` |
+| `ClusterDatabaseInstance` | Cluster-scoped database server connection | `cdbi` |
+| `ClusterDatabaseRole` | Cluster-scoped permission group | `cdbr` |
+| `ClusterDatabaseGrant` | Cluster-scoped permission grants | `cdbg` |
 
 ## Example: Create a PostgreSQL Database
 
@@ -132,7 +135,7 @@ spec:
 
     ---
 
-    Engine-specific features for PostgreSQL, MySQL, and MariaDB.
+    Engine-specific features for PostgreSQL, MySQL, MariaDB, CockroachDB, and ClickHouse.
 
 </div>
 

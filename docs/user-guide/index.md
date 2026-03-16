@@ -28,6 +28,9 @@ graph TD
 | [DatabaseBackup](backups.md) | One-time backup | Database |
 | DatabaseBackupSchedule | Scheduled backups | Database |
 | DatabaseRestore | Restore from backup | DatabaseBackup |
+| ClusterDatabaseInstance | Cluster-scoped database server connection | - |
+| ClusterDatabaseRole | Cluster-scoped permission group | ClusterDatabaseInstance |
+| ClusterDatabaseGrant | Cluster-scoped permission grants | ClusterDatabaseRole or DatabaseUser |
 
 ## Common Patterns
 
@@ -70,9 +73,20 @@ Resources that create external database objects support deletion policies:
 Enable deletion protection to prevent accidental deletion:
 
 ```yaml
+# Database, DatabaseInstance, DatabaseGrant, DatabaseBackupSchedule
 spec:
   deletionProtection: true
 ```
+
+!!! note "DatabaseUser and DatabaseRole"
+    DatabaseUser and DatabaseRole use annotations instead of spec fields:
+
+    ```yaml
+    metadata:
+      annotations:
+        dbops.dbprovision.io/deletion-protection: "true"
+        dbops.dbprovision.io/deletion-policy: "Retain"  # or Delete
+    ```
 
 ### Skip Reconcile
 

@@ -107,7 +107,7 @@ Info metrics expose resource metadata as labels. The value is always `1`, follow
 |-------|-----------------|
 | `status` | `success`, `failure` |
 | `operation` | `create`, `update`, `delete`, `connect`, `backup`, `restore` |
-| `engine` | `postgres`, `mysql`, `mariadb` |
+| `engine` | `postgres`, `mysql`, `mariadb`, `cockroachdb`, `clickhouse` |
 | `phase` | `Pending`, `Ready`, `Failed`, `Deleting` |
 
 ### ServiceMonitor
@@ -280,12 +280,11 @@ Restore operations:
 
 ```yaml
 # values.yaml
-grafana:
-  dashboards:
-    enabled: true
-    provider:
-      name: db-provision-operator
-      folder: DB Provision
+grafanaDashboards:
+  enabled: true
+  provider:
+    name: db-provision-operator
+    folder: DB Provision
 ```
 
 #### Manual Import (All Dashboards)

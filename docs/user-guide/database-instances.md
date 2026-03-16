@@ -28,7 +28,10 @@ The database engine type. Immutable after creation.
 | Value | Description |
 |-------|-------------|
 | `postgres` | PostgreSQL database |
-| `mysql` | MySQL or MariaDB database |
+| `mysql` | MySQL database |
+| `mariadb` | MariaDB database |
+| `cockroachdb` | CockroachDB database |
+| `clickhouse` | ClickHouse database |
 
 ### connection (required)
 
@@ -197,6 +200,68 @@ spec:
 !!! note "RBAC for Cross-Namespace"
     Cross-namespace secret access requires additional RBAC configuration.
     See [Security - Cross-Namespace Mode](../architecture/security.md#cross-namespace-mode).
+
+## Cluster-Scoped Instances
+
+`ClusterDatabaseInstance` is a cluster-scoped variant of `DatabaseInstance`. It has the same spec and behavior but is not namespaced, allowing it to be referenced by resources in any namespace. This is useful for shared database infrastructure managed by platform teams.
+
+### Example
+
+```yaml
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: ClusterDatabaseInstance
+metadata:
+  name: shared-postgres  # No namespace - cluster-scoped
+spec:
+  engine: postgres
+  connection:
+    host: postgres.shared-infra.svc.cluster.local
+    port: 5432
+    secretRef:
+      name: shared-postgres-credentials
+      namespace: db-provision-operator-system  # Must specify namespace for secrets
+```
+
+### Referencing from Namespaced Resources
+
+Namespaced resources (Database, DatabaseUser, DatabaseRole) reference a `ClusterDatabaseInstance` using `clusterInstanceRef` instead of `instanceRef`:
+
+```yaml
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: Database
+metadata:
+  name: myapp-database
+  namespace: app-team  # Any namespace can reference the cluster instance
+spec:
+  clusterInstanceRef:
+    name: shared-postgres  # References the ClusterDatabaseInstance
+  name: myapp
+```
+
+!!! note "Mutual Exclusivity"
+    A resource must specify either `instanceRef` or `clusterInstanceRef`, but not both. The CRD validates this via CEL rules.
+
+## Deletion
+
+### Deletion Protection
+
+DatabaseInstance uses `spec.deletionProtection`:
+
+```yaml
+spec:
+  deletionProtection: true
+```
+
+### Deletion Policy
+
+DatabaseInstance has **no configurable deletion policy**. Since it represents a connection to an external database server (not the server itself), deletion always just removes the finalizer. The external database server is never affected.
+
+### Deletion Flow
+
+1. **Deletion protection check**: Blocked if `spec.deletionProtection: true`, unless `force-delete` annotation is set.
+2. **Child dependency check**: Blocked if Database, DatabaseUser, or DatabaseRole children reference this instance (Phase=Failed, condition=DependenciesExist) unless force-delete is set.
+3. **Cascade confirmation**: When force-delete is set and children exist, the operator enters `PhasePendingDeletion` and requires the `confirm-force-delete` annotation with the hash from `status.deletionConfirmation.hash`. Each child is deleted according to its own deletion policy. See [Force Delete with Children](deletion-protection.md#force-delete-with-children-cascade-confirmation).
+4. **Finalizer removal**: Once all children are gone (or none existed), the finalizer is removed and the CR is deleted.
 
 ## Troubleshooting
 
