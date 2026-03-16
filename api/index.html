@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://panteparak.github.io/db-provision-operator/api/">
       
       
-        <link rel="prev" href="../engines/cockroachdb/">
+        <link rel="prev" href="../engines/clickhouse/">
       
       
         <link rel="next" href="../examples/">
@@ -1130,6 +1130,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engines/clickhouse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ClickHouse
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1652,6 +1680,95 @@
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#clusterdatabaseinstance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ClusterDatabaseInstance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#clusterdatabaserole" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ClusterDatabaseRole
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ClusterDatabaseRole">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#spec_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spec
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#status_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#clusterdatabasegrant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ClusterDatabaseGrant
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ClusterDatabaseGrant">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#spec_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spec
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#status_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2952,6 +3069,95 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#clusterdatabaseinstance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ClusterDatabaseInstance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#clusterdatabaserole" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ClusterDatabaseRole
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ClusterDatabaseRole">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#spec_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spec
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#status_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#clusterdatabasegrant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ClusterDatabaseGrant
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ClusterDatabaseGrant">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#spec_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spec
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#status_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3032,6 +3238,21 @@
 <td>Restore operation</td>
 <td>Namespaced</td>
 </tr>
+<tr>
+<td><a href="#clusterdatabaseinstance"><code>ClusterDatabaseInstance</code></a></td>
+<td>Cluster-scoped database server connection</td>
+<td>Cluster</td>
+</tr>
+<tr>
+<td><a href="#clusterdatabaserole"><code>ClusterDatabaseRole</code></a></td>
+<td>Cluster-scoped permission group</td>
+<td>Cluster</td>
+</tr>
+<tr>
+<td><a href="#clusterdatabasegrant"><code>ClusterDatabaseGrant</code></a></td>
+<td>Cluster-scoped fine-grained permissions</td>
+<td>Cluster</td>
+</tr>
 </tbody>
 </table>
 <hr />
@@ -3052,7 +3273,7 @@
 <td><code>engine</code></td>
 <td>string</td>
 <td>Yes</td>
-<td>Database engine: <code>postgres</code>, <code>mysql</code>, <code>mariadb</code>, <code>cockroachdb</code></td>
+<td>Database engine: <code>postgres</code>, <code>mysql</code>, <code>mariadb</code>, <code>cockroachdb</code>, <code>clickhouse</code></td>
 </tr>
 <tr>
 <td><code>connection</code></td>
@@ -4292,6 +4513,198 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="clusterdatabaseinstance">ClusterDatabaseInstance<a class="headerlink" href="#clusterdatabaseinstance" title="Permanent link">&para;</a></h2>
+<p>Cluster-scoped variant of <code>DatabaseInstance</code>. Same spec as <code>DatabaseInstance</code> but accessible from any namespace via <code>clusterInstanceRef</code>. Short name: <code>cdbi</code>.</p>
+<p>Uses <code>DatabaseInstanceSpec</code> and <code>DatabaseInstanceStatus</code> — see <a href="#databaseinstance">DatabaseInstance</a> for all fields.</p>
+<hr />
+<h2 id="clusterdatabaserole">ClusterDatabaseRole<a class="headerlink" href="#clusterdatabaserole" title="Permanent link">&para;</a></h2>
+<p>Cluster-scoped variant of <code>DatabaseRole</code> for shared service accounts and cross-namespace access. Short name: <code>cdbr</code>.</p>
+<h3 id="spec_8">Spec<a class="headerlink" href="#spec_8" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>clusterInstanceRef</code></td>
+<td>object</td>
+<td>Yes</td>
+<td>Reference to ClusterDatabaseInstance</td>
+</tr>
+<tr>
+<td><code>roleName</code></td>
+<td>string</td>
+<td>Yes</td>
+<td>Role name in database (immutable)</td>
+</tr>
+<tr>
+<td><code>postgres</code></td>
+<td>object</td>
+<td>No</td>
+<td>PostgreSQL-specific options</td>
+</tr>
+<tr>
+<td><code>mysql</code></td>
+<td>object</td>
+<td>No</td>
+<td>MySQL-specific options</td>
+</tr>
+<tr>
+<td><code>driftPolicy</code></td>
+<td>object</td>
+<td>No</td>
+<td>Drift detection policy override</td>
+</tr>
+<tr>
+<td><code>managedResourceComment</code></td>
+<td>string</td>
+<td>No</td>
+<td>Comment applied to role in database</td>
+</tr>
+</tbody>
+</table>
+<h3 id="status_8">Status<a class="headerlink" href="#status_8" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>phase</code></td>
+<td>string</td>
+<td>Current phase</td>
+</tr>
+<tr>
+<td><code>conditions</code></td>
+<td>array</td>
+<td>Detailed conditions</td>
+</tr>
+<tr>
+<td><code>role</code></td>
+<td>object</td>
+<td>Role-specific status info</td>
+</tr>
+<tr>
+<td><code>drift</code></td>
+<td>object</td>
+<td>Drift detection status</td>
+</tr>
+<tr>
+<td><code>reconcileID</code></td>
+<td>string</td>
+<td>Unique reconciliation ID for tracing</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="clusterdatabasegrant">ClusterDatabaseGrant<a class="headerlink" href="#clusterdatabasegrant" title="Permanent link">&para;</a></h2>
+<p>Cluster-scoped variant of <code>DatabaseGrant</code> for cross-namespace database access control. Short name: <code>cdbg</code>.</p>
+<h3 id="spec_9">Spec<a class="headerlink" href="#spec_9" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>clusterInstanceRef</code></td>
+<td>object</td>
+<td>Yes</td>
+<td>Reference to ClusterDatabaseInstance</td>
+</tr>
+<tr>
+<td><code>userRef</code></td>
+<td>object</td>
+<td>Conditional</td>
+<td>Reference to DatabaseUser (with namespace)</td>
+</tr>
+<tr>
+<td><code>roleRef</code></td>
+<td>object</td>
+<td>Conditional</td>
+<td>Reference to ClusterDatabaseRole or DatabaseRole</td>
+</tr>
+<tr>
+<td><code>postgres</code></td>
+<td>object</td>
+<td>No</td>
+<td>PostgreSQL grants</td>
+</tr>
+<tr>
+<td><code>mysql</code></td>
+<td>object</td>
+<td>No</td>
+<td>MySQL grants</td>
+</tr>
+<tr>
+<td><code>driftPolicy</code></td>
+<td>object</td>
+<td>No</td>
+<td>Drift detection policy override</td>
+</tr>
+<tr>
+<td><code>deletionProtection</code></td>
+<td>bool</td>
+<td>No</td>
+<td>Prevent accidental deletion</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Cross-namespace References</p>
+<p><code>userRef</code> requires an explicit <code>namespace</code> field. <code>roleRef</code> without <code>namespace</code> refers to a ClusterDatabaseRole; with <code>namespace</code> it refers to a namespaced DatabaseRole.</p>
+</div>
+<h3 id="status_9">Status<a class="headerlink" href="#status_9" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>phase</code></td>
+<td>string</td>
+<td>Current phase</td>
+</tr>
+<tr>
+<td><code>conditions</code></td>
+<td>array</td>
+<td>Detailed conditions</td>
+</tr>
+<tr>
+<td><code>appliedGrants</code></td>
+<td>object</td>
+<td>Applied/failed grant counts and details</td>
+</tr>
+<tr>
+<td><code>targetInfo</code></td>
+<td>object</td>
+<td>Resolved target user/role info</td>
+</tr>
+<tr>
+<td><code>drift</code></td>
+<td>object</td>
+<td>Drift detection status</td>
+</tr>
+</tbody>
+</table>
 
 
 
@@ -4329,7 +4742,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../engines/cockroachdb/" class="md-footer__link md-footer__link--prev" aria-label="Previous: CockroachDB">
+          <a href="../engines/clickhouse/" class="md-footer__link md-footer__link--prev" aria-label="Previous: ClickHouse">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -4339,7 +4752,7 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                CockroachDB
+                ClickHouse
               </div>
             </div>
           </a>

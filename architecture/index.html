@@ -1130,6 +1130,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engines/clickhouse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ClickHouse
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2520,6 +2548,10 @@
             IC[Instance Ctrl]
             DC[Database Ctrl]
             UC[User Ctrl]
+            RC[Role Ctrl]
+            GC[Grant Ctrl]
+            BC["Backup/Schedule/Restore Ctrls"]
+            CC["ClusterInstance/Role/Grant Ctrls"]
         end
         API &lt;--&gt; RL
         CM --&gt; RL
@@ -2527,6 +2559,8 @@
             PG[PostgreSQL Instance]
             MY[MySQL Instance]
             MR[MariaDB Instance]
+            CR[CockroachDB Instance]
+            CH[ClickHouse Instance]
         end
     end
     OP --&gt; DP</code></pre>
@@ -2572,6 +2606,18 @@
 <tr>
 <td>DatabaseRestore</td>
 <td>Restore execution</td>
+</tr>
+<tr>
+<td>ClusterDatabaseInstance</td>
+<td>Cluster-scoped connection management, health checks</td>
+</tr>
+<tr>
+<td>ClusterDatabaseRole</td>
+<td>Cluster-scoped role management</td>
+</tr>
+<tr>
+<td>ClusterDatabaseGrant</td>
+<td>Cluster-scoped permission management</td>
 </tr>
 </tbody>
 </table>

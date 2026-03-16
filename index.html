@@ -1265,6 +1265,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="engines/clickhouse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ClickHouse
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2360,13 +2388,13 @@
 
 
 <h1 id="db-provision-operator">DB Provision Operator<a class="headerlink" href="#db-provision-operator" title="Permanent link">&para;</a></h1>
-<p><strong>Kubernetes operator for declarative database provisioning across PostgreSQL, MySQL, and MariaDB.</strong></p>
+<p><strong>Kubernetes operator for declarative database provisioning across PostgreSQL, MySQL, MariaDB, CockroachDB, and ClickHouse.</strong></p>
 <hr />
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <p>DB Provision Operator is a Kubernetes operator that provides a unified, declarative interface for managing database resources. Instead of manually creating databases, users, and permissions, you define them as Kubernetes Custom Resources and the operator handles the rest.</p>
 <h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Unified API</strong> - Single CRD-based interface for PostgreSQL, MySQL, and MariaDB</li>
+<li><strong>Unified API</strong> - Single CRD-based interface for PostgreSQL, MySQL, MariaDB, CockroachDB, and ClickHouse</li>
 <li><strong>Declarative Management</strong> - GitOps-friendly database provisioning</li>
 <li><strong>Automatic Credentials</strong> - Secure password generation and Kubernetes Secret management</li>
 <li><strong>Fine-grained Access Control</strong> - Users, roles, and grants management</li>
@@ -2443,6 +2471,21 @@
 <td>Restore from backup</td>
 <td><code>dbrest</code></td>
 </tr>
+<tr>
+<td><code>ClusterDatabaseInstance</code></td>
+<td>Cluster-scoped database server connection</td>
+<td><code>cdbi</code></td>
+</tr>
+<tr>
+<td><code>ClusterDatabaseRole</code></td>
+<td>Cluster-scoped permission group</td>
+<td><code>cdbr</code></td>
+</tr>
+<tr>
+<td><code>ClusterDatabaseGrant</code></td>
+<td>Cluster-scoped permission grants</td>
+<td><code>cdbg</code></td>
+</tr>
 </tbody>
 </table>
 <h2 id="example-create-a-postgresql-database">Example: Create a PostgreSQL Database<a class="headerlink" href="#example-create-a-postgresql-database" title="Permanent link">&para;</a></h2>
@@ -2513,7 +2556,7 @@
 <li>
 <p><span class="twemoji lg middle"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 3C7.58 3 4 4.79 4 7s3.58 4 8 4 8-1.79 8-4-3.58-4-8-4M4 9v3c0 2.21 3.58 4 8 4s8-1.79 8-4V9c0 2.21-3.58 4-8 4s-8-1.79-8-4m0 5v3c0 2.21 3.58 4 8 4s8-1.79 8-4v-3c0 2.21-3.58 4-8 4s-8-1.79-8-4"/></svg></span> <strong><a href="engines/">Engine Guides</a></strong></p>
 <hr />
-<p>Engine-specific features for PostgreSQL, MySQL, and MariaDB.</p>
+<p>Engine-specific features for PostgreSQL, MySQL, MariaDB, CockroachDB, and ClickHouse.</p>
 </li>
 </ul>
 </div>

@@ -1137,6 +1137,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#clickhouse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ClickHouse
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1181,6 +1192,17 @@
     <span class="md-ellipsis">
       
         CockroachDB
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clickhouse_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ClickHouse
       
     </span>
   </a>
@@ -1322,6 +1344,34 @@
     
   
     CockroachDB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="clickhouse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ClickHouse
   
 
     
@@ -2395,6 +2445,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#clickhouse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ClickHouse
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2439,6 +2500,17 @@
     <span class="md-ellipsis">
       
         CockroachDB
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clickhouse_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ClickHouse
       
     </span>
   </a>
@@ -2524,6 +2596,11 @@
 <td>✅ Stable</td>
 <td>22.x, 23.x, 24.x</td>
 </tr>
+<tr>
+<td><a href="clickhouse/">ClickHouse</a></td>
+<td>✅ Stable</td>
+<td>23.x, 24.x</td>
+</tr>
 </tbody>
 </table>
 <h2 id="engine-comparison">Engine Comparison<a class="headerlink" href="#engine-comparison" title="Permanent link">&para;</a></h2>
@@ -2535,6 +2612,7 @@
 <th>MySQL</th>
 <th>MariaDB</th>
 <th>CockroachDB</th>
+<th>ClickHouse</th>
 </tr>
 </thead>
 <tbody>
@@ -2544,10 +2622,12 @@
 <td>✅ 8.0+</td>
 <td>✅ 10.0.5+</td>
 <td>✅ Native</td>
+<td>✅ Native</td>
 </tr>
 <tr>
 <td>Row-Level Security</td>
 <td>✅</td>
+<td>❌</td>
 <td>❌</td>
 <td>❌</td>
 <td>❌</td>
@@ -2558,10 +2638,12 @@
 <td>❌</td>
 <td>❌</td>
 <td>❌</td>
+<td>❌</td>
 </tr>
 <tr>
 <td>Schemas</td>
 <td>✅</td>
+<td>❌</td>
 <td>❌</td>
 <td>❌</td>
 <td>❌</td>
@@ -2572,6 +2654,7 @@
 <td>❌</td>
 <td>❌</td>
 <td>❌</td>
+<td>❌</td>
 </tr>
 <tr>
 <td>Backup</td>
@@ -2579,6 +2662,7 @@
 <td>mysqldump</td>
 <td>mariadb-dump</td>
 <td>Native BACKUP</td>
+<td>SQL-based</td>
 </tr>
 <tr>
 <td>Multi-Region</td>
@@ -2586,12 +2670,14 @@
 <td>❌</td>
 <td>❌</td>
 <td>✅ Built-in</td>
+<td>❌</td>
 </tr>
 <tr>
 <td>Distributed</td>
 <td>❌</td>
 <td>❌</td>
 <td>❌</td>
+<td>✅ Built-in</td>
 <td>✅ Built-in</td>
 </tr>
 </tbody>
@@ -2631,6 +2717,15 @@
 <li>PostgreSQL wire compatibility</li>
 <li>Strong consistency guarantees</li>
 </ul>
+<h3 id="clickhouse">ClickHouse<a class="headerlink" href="#clickhouse" title="Permanent link">&para;</a></h3>
+<p>Best for:</p>
+<ul>
+<li>Analytics and OLAP workloads</li>
+<li>Time-series data</li>
+<li>Columnar storage and real-time aggregation</li>
+<li>High-volume data ingestion</li>
+<li>Log and event analytics</li>
+</ul>
 <h2 id="engine-specific-features">Engine-Specific Features<a class="headerlink" href="#engine-specific-features" title="Permanent link">&para;</a></h2>
 <h3 id="postgresql-only">PostgreSQL Only<a class="headerlink" href="#postgresql-only" title="Permanent link">&para;</a></h3>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">spec</span><span class="p">:</span>
@@ -2668,20 +2763,35 @@
 <p class="admonition-title">No Extensions or Schemas</p>
 <p>CockroachDB does not support PostgreSQL extensions or custom schemas. Use it for distributed SQL without PostgreSQL-specific features.</p>
 </div>
+<h3 id="clickhouse_1">ClickHouse<a class="headerlink" href="#clickhouse_1" title="Permanent link">&para;</a></h3>
+<p>ClickHouse uses its native protocol with column-oriented storage:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">spec</span><span class="p">:</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">clickhouse</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">connection</span><span class="p">:</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">clickhouse.example.com</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9000</span><span class="w">  </span><span class="c1"># native protocol</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">database</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">clickhouse</span><span class="p">:</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="nt">secure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">  </span><span class="c1"># TLS for native protocol</span>
+</span></code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">No ALTER DATABASE or Default Privileges</p>
+<p>ClickHouse does not support ALTER DATABASE, object ownership, default privileges, extensions, or schemas. Database engines (Atomic, Lazy, Replicated) are set at creation time and cannot be changed.</p>
+</div>
 <h2 id="connection-configuration">Connection Configuration<a class="headerlink" href="#connection-configuration" title="Permanent link">&para;</a></h2>
 <p>All engines use the same <code>DatabaseInstance</code> structure:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dbops.dbprovision.io/v1alpha1</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DatabaseInstance</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">metadata</span><span class="p">:</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-database</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="nt">spec</span><span class="p">:</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span><span class="w">  </span><span class="c1"># or mysql, mariadb, cockroachdb</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">connection</span><span class="p">:</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">database.example.com</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5432</span><span class="w">  </span><span class="c1"># 3306 for MySQL/MariaDB, 26257 for CockroachDB</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nt">database</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span><span class="w">  </span><span class="c1"># mysql for MySQL/MariaDB, defaultdb for CockroachDB</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">    </span><span class="nt">secretRef</span><span class="p">:</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">admin-credentials</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dbops.dbprovision.io/v1alpha1</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DatabaseInstance</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nt">metadata</span><span class="p">:</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-database</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="nt">spec</span><span class="p">:</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span><span class="w">  </span><span class="c1"># or mysql, mariadb, cockroachdb, clickhouse</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="nt">connection</span><span class="p">:</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">    </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">database.example.com</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">    </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5432</span><span class="w">  </span><span class="c1"># 3306 for MySQL/MariaDB, 26257 for CockroachDB, 9000 for ClickHouse</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">    </span><span class="nt">database</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span><span class="w">  </span><span class="c1"># mysql for MySQL/MariaDB, defaultdb for CockroachDB, default for ClickHouse</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">    </span><span class="nt">secretRef</span><span class="p">:</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">admin-credentials</span>
 </span></code></pre></div>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
@@ -2689,6 +2799,7 @@
 <li><a href="mysql/">MySQL Guide</a> - MySQL-specific features</li>
 <li><a href="mariadb/">MariaDB Guide</a> - MariaDB-specific features</li>
 <li><a href="cockroachdb/">CockroachDB Guide</a> - CockroachDB-specific features</li>
+<li><a href="clickhouse/">ClickHouse Guide</a> - ClickHouse-specific features</li>
 </ul>
 
 

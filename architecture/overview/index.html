@@ -1130,6 +1130,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../engines/clickhouse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ClickHouse
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1817,6 +1845,28 @@
     <span class="md-ellipsis">
       
         MySQL
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cockroachdb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CockroachDB
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clickhouse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ClickHouse
       
     </span>
   </a>
@@ -2601,6 +2651,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#cockroachdb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CockroachDB
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clickhouse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ClickHouse
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2641,25 +2713,42 @@
 <pre class="mermaid"><code>graph TD
     subgraph K8s["Kubernetes Cluster"]
         subgraph Operator["db-provision-operator"]
-            DIC[DatabaseInstance Controller]
-            DBC[Database Controller]
-            DUC[DatabaseUser Controller]
-            DIC &amp; DBC &amp; DUC --&gt; AL
+            subgraph CoreCtrl["Core Controllers"]
+                DIC[Instance Controller]
+                DBC[Database Controller]
+                DUC[User Controller]
+            end
+            subgraph AccessCtrl["Access Controllers"]
+                DRC[Role Controller]
+                DGC[Grant Controller]
+            end
+            subgraph BackupCtrl["Backup Controllers"]
+                DBKC[Backup Controller]
+                DBSC[Schedule Controller]
+                DRSC[Restore Controller]
+            end
+            subgraph ClusterCtrl["Cluster-Scoped Controllers"]
+                CDIC[ClusterInstance Controller]
+                CDRC[ClusterRole Controller]
+                CDGC[ClusterGrant Controller]
+            end
+            CoreCtrl &amp; AccessCtrl &amp; BackupCtrl &amp; ClusterCtrl --&gt; AL
             subgraph AL["Adapter Layer"]
                 PGA[PostgreSQL Adapter]
-                MYA[MySQL Adapter]
+                MYA[MySQL/MariaDB Adapter]
+                CRA[CockroachDB Adapter]
+                CHA[ClickHouse Adapter]
             end
             SM[Secret Manager] &lt;--&gt; AL
-            UL[Utility Layer] &lt;--&gt; AL
+            SB[SQL Builder] &lt;--&gt; AL
         end
-        CRD1[DatabaseInstance CRD]
-        CRD2[Database CRD]
-        CRD3[DatabaseUser CRD]
     end
     AL --&gt; ExtDB
     subgraph ExtDB["External Databases"]
-        PGS[PostgreSQL Server]
-        MYS[MySQL Server]
+        PGS[PostgreSQL]
+        MYS[MySQL/MariaDB]
+        CRS[CockroachDB]
+        CHS[ClickHouse]
     end</code></pre>
 <h2 id="technology-stack">Technology Stack<a class="headerlink" href="#technology-stack" title="Permanent link">&para;</a></h2>
 <table>
@@ -2692,9 +2781,14 @@
 <td>v1.x</td>
 </tr>
 <tr>
+<td>ClickHouse Driver</td>
+<td>clickhouse-go/v2</td>
+<td>v2.x</td>
+</tr>
+<tr>
 <td>Go Version</td>
 <td>Go</td>
-<td>1.21+</td>
+<td>1.24+</td>
 </tr>
 </tbody>
 </table>
@@ -2749,13 +2843,38 @@
 <td><code>dbops.dbprovision.io/v1alpha1</code></td>
 <td>Represents a restore operation</td>
 </tr>
+<tr>
+<td><code>ClusterDatabaseInstance</code></td>
+<td><code>dbops.dbprovision.io/v1alpha1</code></td>
+<td>Cluster-scoped database server connection</td>
+</tr>
+<tr>
+<td><code>ClusterDatabaseRole</code></td>
+<td><code>dbops.dbprovision.io/v1alpha1</code></td>
+<td>Cluster-scoped permission group</td>
+</tr>
+<tr>
+<td><code>ClusterDatabaseGrant</code></td>
+<td><code>dbops.dbprovision.io/v1alpha1</code></td>
+<td>Cluster-scoped fine-grained access control</td>
+</tr>
 </tbody>
 </table>
 <h3 id="resource-hierarchy">Resource Hierarchy<a class="headerlink" href="#resource-hierarchy" title="Permanent link">&para;</a></h3>
 <pre class="mermaid"><code>graph TD
     DI[DatabaseInstance] --&gt; DB[Database]
-    DB --&gt; DU1[DatabaseUser]
-    DI --&gt; DU2["DatabaseUser (instance-level)"]</code></pre>
+    DI --&gt; DU[DatabaseUser]
+    DI --&gt; DR[DatabaseRole]
+    DB --&gt; DBK[DatabaseBackup]
+    DB --&gt; DBS[DatabaseBackupSchedule]
+    DU --&gt; DG1[DatabaseGrant]
+    DR --&gt; DG2[DatabaseGrant]
+    DBK --&gt; DRE[DatabaseRestore]
+
+    CDI[ClusterDatabaseInstance] --&gt; CDR[ClusterDatabaseRole]
+    CDI -.-&gt;|"referenced via clusterInstanceRef"| DB
+    CDI -.-&gt;|"referenced via clusterInstanceRef"| DU
+    CDR --&gt; CDG[ClusterDatabaseGrant]</code></pre>
 <h2 id="component-architecture">Component Architecture<a class="headerlink" href="#component-architecture" title="Permanent link">&para;</a></h2>
 <h3 id="controllers-layer">Controllers Layer<a class="headerlink" href="#controllers-layer" title="Permanent link">&para;</a></h3>
 <p>Controllers implement the reconciliation loop pattern, watching CRD resources and ensuring the actual state matches the desired state.</p>
@@ -2861,13 +2980,24 @@
     A[User Deletes CRD] --&gt; B[Controller Receives Delete Event]
     B --&gt; C{Check Deletion Protection}
     C --&gt;|Protected + No Force| D[Return Error, Keep Resource]
-    C --&gt;|Not Protected or Force| E{Check Deletion Policy}
-    E --&gt;|Retain| F[Remove Finalizer Only]
-    E --&gt;|Delete| G[Connect to Database]
-    G --&gt; H["Drop Resource (DB/User)"]
-    H --&gt; I[Delete Credentials Secret]
-    I --&gt; J[Remove Finalizer]
-    J --&gt; K[Resource Removed from Cluster]</code></pre>
+    C --&gt;|Not Protected or Force| E{Has Child Dependencies?}
+    E --&gt;|Children Exist + No Force| F[Phase=Failed, DependenciesExist, Requeue 10s]
+    E --&gt;|No Children| G{Check Deletion Policy}
+    E --&gt;|Children Exist + Force| H[Enter PhasePendingDeletion]
+    H --&gt; I{confirm-force-delete Hash Matches?}
+    I --&gt;|No| J[Wait for Confirmation]
+    I --&gt;|Yes| K[Cascade Delete Children]
+    K --&gt; L{All Children Gone?}
+    L --&gt;|No| K
+    L --&gt;|Yes| G
+    G --&gt;|Retain| M[Remove Finalizer Only]
+    G --&gt;|Delete| N[Connect to Database]
+    N --&gt; O["Drop Resource (DB/User/Grant)"]
+    O --&gt;|Success| P[Delete Credentials Secret]
+    O --&gt;|Failure + Force| P
+    O --&gt;|Failure + No Force| Q[Return Error]
+    P --&gt; R[Remove Finalizer]
+    R --&gt; S[Resource Removed from Cluster]</code></pre>
 <h2 id="project-structure">Project Structure<a class="headerlink" href="#project-structure" title="Permanent link">&para;</a></h2>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>db-provision-operator/
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>├── api/v1alpha1/           # CRD type definitions
@@ -2879,12 +3009,15 @@
 </span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>├── internal/
 </span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>│   ├── adapter/           # Database adapters
 </span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>│   │   ├── postgres/      # PostgreSQL implementation
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>│   │   ├── mysql/         # MySQL implementation
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>│   │   └── types/         # Shared adapter types
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>│   ├── controller/        # Kubernetes controllers
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>│   ├── secret/            # Secret management
-</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>│   └── util/              # Utility functions
-</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>└── docs/                  # Project documentation
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>│   │   ├── mysql/         # MySQL/MariaDB implementation
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>│   │   ├── cockroachdb/   # CockroachDB implementation
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>│   │   ├── clickhouse/    # ClickHouse implementation
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>│   │   ├── sqlbuilder/    # Centralized SQL builder with dialect escaping
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>│   │   └── types/         # Shared adapter types
+</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>│   ├── features/          # Kubernetes controllers (handler + repository per feature)
+</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>│   ├── secret/            # Secret management
+</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>│   └── util/              # Utility functions
+</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>└── docs/                  # Project documentation
 </span></code></pre></div>
 <h2 id="supported-database-engines">Supported Database Engines<a class="headerlink" href="#supported-database-engines" title="Permanent link">&para;</a></h2>
 <h3 id="postgresql">PostgreSQL<a class="headerlink" href="#postgresql" title="Permanent link">&para;</a></h3>
@@ -2901,6 +3034,25 @@
 <li>User management with resource limits and authentication plugins</li>
 <li>Grant management at multiple levels (global, database, table, column, routine)</li>
 <li>Backup/restore using mysqldump</li>
+</ul>
+<h3 id="cockroachdb">CockroachDB<a class="headerlink" href="#cockroachdb" title="Permanent link">&para;</a></h3>
+<ul>
+<li>PostgreSQL wire-compatible via pgx driver</li>
+<li>Database CRUD operations</li>
+<li>User/role management (no SUPERUSER, REPLICATION, or BYPASSRLS)</li>
+<li>Grant management (database, table, schema levels)</li>
+<li>Native BACKUP/RESTORE commands</li>
+<li>Multi-region deployment support</li>
+</ul>
+<h3 id="clickhouse">ClickHouse<a class="headerlink" href="#clickhouse" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Native protocol via clickhouse-go/v2 with LZ4 compression</li>
+<li>Database operations with engine selection (Atomic, Lazy, Replicated)</li>
+<li>User management with allowed hosts and default database</li>
+<li>Role management with settings</li>
+<li>Grant management at global, database, and table levels</li>
+<li>Privilege allowlist validation via SQL builder</li>
+<li>Backup/restore not yet supported</li>
 </ul>
 
 

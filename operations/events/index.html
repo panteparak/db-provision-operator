@@ -1130,6 +1130,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../engines/clickhouse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ClickHouse
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1985,6 +2013,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#cluster-scoped-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cluster-Scoped Resources
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2689,6 +2728,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#cluster-scoped-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cluster-Scoped Resources
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3135,6 +3185,11 @@
 <td>Failed to correct detected drift</td>
 </tr>
 <tr>
+<td><code>SecretRegenerated</code></td>
+<td>Normal</td>
+<td>Credentials secret was regenerated</td>
+</tr>
+<tr>
 <td><code>ReconcileFailed</code></td>
 <td>Warning</td>
 <td>Reconciliation loop encountered an error</td>
@@ -3381,6 +3436,8 @@
 </tr>
 </tbody>
 </table>
+<h3 id="cluster-scoped-resources">Cluster-Scoped Resources<a class="headerlink" href="#cluster-scoped-resources" title="Permanent link">&para;</a></h3>
+<p>Cluster-scoped resources (<code>ClusterDatabaseInstance</code>, <code>ClusterDatabaseRole</code>, <code>ClusterDatabaseGrant</code>) emit the same events as their namespaced counterparts (<code>DatabaseInstance</code>, <code>DatabaseRole</code>, <code>DatabaseGrant</code> respectively). The only difference is that cluster-scoped events are not associated with a namespace.</p>
 <h2 id="event-categories">Event Categories<a class="headerlink" href="#event-categories" title="Permanent link">&para;</a></h2>
 <h3 id="lifecycle-events">Lifecycle Events<a class="headerlink" href="#lifecycle-events" title="Permanent link">&para;</a></h3>
 <p>Events related to resource creation and deletion:</p>

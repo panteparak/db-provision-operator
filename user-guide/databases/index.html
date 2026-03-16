@@ -1562,6 +1562,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../engines/clickhouse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ClickHouse
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -3519,12 +3547,19 @@
 <li>Updates status to Ready</li>
 </ol>
 <h3 id="deletion">Deletion<a class="headerlink" href="#deletion" title="Permanent link">&para;</a></h3>
-<p>Based on <code>deletionPolicy</code>:</p>
-<ul>
-<li><strong>Retain</strong>: CR is deleted, database remains</li>
+<p>The full deletion flow for a Database:</p>
+<ol>
+<li><strong>Deletion protection check</strong>: If <code>spec.deletionProtection: true</code>, deletion is blocked unless the <code>dbops.dbprovision.io/force-delete: "true"</code> annotation is present.</li>
+<li><strong>Child dependency check</strong>: If DatabaseGrant children reference this Database, deletion is blocked (Phase=Failed, condition=DependenciesExist) unless force-delete is set.</li>
+<li><strong>Cascade confirmation</strong>: When force-delete is set and children exist, the operator enters <code>PhasePendingDeletion</code> and requires the <code>confirm-force-delete</code> annotation with the hash from <code>status.deletionConfirmation.hash</code>. Each child grant is deleted according to its own deletion policy. See <a href="../deletion-protection/#force-delete-with-children-cascade-confirmation">Force Delete with Children</a>.</li>
+<li><strong>Deletion policy</strong>: Controls what happens to the external database:<ul>
+<li><strong>Retain</strong> (default): CR is deleted, database remains</li>
 <li><strong>Delete</strong>: Database is dropped, then CR is deleted</li>
 <li><strong>Snapshot</strong>: Backup is created, database is dropped, CR is deleted</li>
 </ul>
+</li>
+<li><strong>Force-delete and external failures</strong>: If the database drop fails and force-delete is set, the operator continues with finalizer removal anyway (the external database is left as-is).</li>
+</ol>
 <h3 id="updates">Updates<a class="headerlink" href="#updates" title="Permanent link">&para;</a></h3>
 <p>Most fields are immutable after creation. Supported updates:</p>
 <ul>
