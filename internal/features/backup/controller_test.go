@@ -107,6 +107,7 @@ func newTestInstance(name, namespace string) *dbopsv1alpha1.DatabaseInstance {
 }
 
 func TestController_Reconcile_NewBackup(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	backup := newTestBackupResource("testbackup", "default")
 	database := newTestDatabase("test-db", "default")
@@ -175,6 +176,7 @@ func TestController_Reconcile_NewBackup(t *testing.T) {
 }
 
 func TestController_Reconcile_WaitingForDatabase(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	backup := newTestBackupResource("testbackup", "default")
 	// No database exists - backup should wait
@@ -228,6 +230,7 @@ func TestController_Reconcile_WaitingForDatabase(t *testing.T) {
 }
 
 func TestController_Reconcile_BackupNotFound(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 
 	client := fake.NewClientBuilder().
@@ -262,6 +265,7 @@ func TestController_Reconcile_BackupNotFound(t *testing.T) {
 }
 
 func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	backup := newTestBackupResource("testbackup", "default")
 	backup.Annotations = map[string]string{
@@ -305,6 +309,7 @@ func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
 }
 
 func TestController_Reconcile_Deletion(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	backup := newTestBackupResource("testbackup", "default")
 	backup.Finalizers = []string{util.FinalizerDatabaseBackup}
@@ -352,6 +357,7 @@ func TestController_Reconcile_Deletion(t *testing.T) {
 }
 
 func TestController_Reconcile_FailedBackupNoRetry(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	backup := newTestBackupResource("testbackup", "default")
 	backup.Status.Phase = dbopsv1alpha1.PhaseFailed
@@ -394,6 +400,7 @@ func TestController_Reconcile_FailedBackupNoRetry(t *testing.T) {
 }
 
 func TestController_Reconcile_CompletedWithExpiration(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	backup := newTestBackupResource("testbackup", "default")
 	backup.Status.Phase = dbopsv1alpha1.PhaseCompleted
@@ -438,6 +445,7 @@ func TestController_Reconcile_CompletedWithExpiration(t *testing.T) {
 }
 
 func TestController_Reconcile_WaitingForDatabaseReady(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	backup := newTestBackupResource("testbackup", "default")
 	database := newTestDatabase("test-db", "default")
@@ -491,6 +499,7 @@ func TestController_Reconcile_WaitingForDatabaseReady(t *testing.T) {
 }
 
 func TestController_Reconcile_BackupError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	backup := newTestBackupResource("testbackup", "default")
 	database := newTestDatabase("test-db", "default")
@@ -554,6 +563,7 @@ func TestController_Reconcile_BackupError(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionDeleteError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	backup := newTestBackupResource("testbackup", "default")
 	backup.Finalizers = []string{util.FinalizerDatabaseBackup}
@@ -608,6 +618,7 @@ func TestController_Reconcile_DeletionDeleteError(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionDeleteError_WithForce(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	backup := newTestBackupResource("testbackup", "default")
 	backup.Annotations = map[string]string{

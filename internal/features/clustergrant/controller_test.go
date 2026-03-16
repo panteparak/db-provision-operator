@@ -107,6 +107,7 @@ func newTestController(clientBuilder *fake.ClientBuilder, mockRepo *MockReposito
 // --- Happy path tests ---
 
 func TestController_Reconcile_NewClusterGrant(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 	instance := newTestClusterInstance("test-cluster-instance")
@@ -147,6 +148,7 @@ func TestController_Reconcile_NewClusterGrant(t *testing.T) {
 }
 
 func TestController_Reconcile_ClusterGrantNotFound(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 
 	clientBuilder := fake.NewClientBuilder().
@@ -164,6 +166,7 @@ func TestController_Reconcile_ClusterGrantNotFound(t *testing.T) {
 }
 
 func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 	grant.Annotations = map[string]string{
@@ -191,6 +194,7 @@ func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
 // --- Deletion tests ---
 
 func TestController_Reconcile_Deletion(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 	grant.Finalizers = []string{util.FinalizerClusterDatabaseGrant}
@@ -219,6 +223,7 @@ func TestController_Reconcile_Deletion(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionProtected(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 	grant.Spec.DeletionProtection = true
@@ -249,6 +254,7 @@ func TestController_Reconcile_DeletionProtected(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionProtectedWithForceDelete(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 	grant.Spec.DeletionProtection = true
@@ -283,6 +289,7 @@ func TestController_Reconcile_DeletionProtectedWithForceDelete(t *testing.T) {
 // --- Error path tests ---
 
 func TestController_Reconcile_ApplyError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 	instance := newTestClusterInstance("test-cluster-instance")
@@ -320,6 +327,7 @@ func TestController_Reconcile_ApplyError(t *testing.T) {
 }
 
 func TestController_Reconcile_RevokeError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 	grant.Finalizers = []string{util.FinalizerClusterDatabaseGrant}
@@ -355,6 +363,7 @@ func TestController_Reconcile_RevokeError(t *testing.T) {
 }
 
 func TestController_Reconcile_RevokeError_WithForce(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 	grant.Annotations = map[string]string{
@@ -387,6 +396,7 @@ func TestController_Reconcile_RevokeError_WithForce(t *testing.T) {
 }
 
 func TestController_Reconcile_ResolveTargetError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 	instance := newTestClusterInstance("test-cluster-instance")
@@ -421,6 +431,7 @@ func TestController_Reconcile_ResolveTargetError(t *testing.T) {
 }
 
 func TestController_Reconcile_GetInstanceError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 
@@ -453,6 +464,7 @@ func TestController_Reconcile_GetInstanceError(t *testing.T) {
 // --- Status validation tests ---
 
 func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 	instance := newTestClusterInstance("test-cluster-instance")
@@ -514,6 +526,7 @@ func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
 }
 
 func TestController_Reconcile_WaitingForInstanceReady(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 	instance := newTestClusterInstance("test-cluster-instance")
@@ -549,6 +562,7 @@ func TestController_Reconcile_WaitingForInstanceReady(t *testing.T) {
 // --- Drift detection tests ---
 
 func TestController_Reconcile_DriftDetected_DetectMode(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 	instance := newTestClusterInstance("test-cluster-instance")
@@ -604,6 +618,7 @@ func TestController_Reconcile_DriftDetected_DetectMode(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftDetected_CorrectMode(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 	grant.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{Mode: dbopsv1alpha1.DriftModeCorrect}
@@ -667,6 +682,7 @@ func TestController_Reconcile_DriftDetected_CorrectMode(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_PartialFail(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 	grant.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{Mode: dbopsv1alpha1.DriftModeCorrect}
@@ -733,6 +749,7 @@ func TestController_Reconcile_DriftCorrection_PartialFail(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_AllFailed(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 	grant.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{Mode: dbopsv1alpha1.DriftModeCorrect}
@@ -792,6 +809,7 @@ func TestController_Reconcile_DriftCorrection_AllFailed(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftDetected_IgnoreMode(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 	grant.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{Mode: dbopsv1alpha1.DriftModeIgnore}
@@ -846,6 +864,7 @@ func TestController_Reconcile_DriftDetected_IgnoreMode(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftDetection_Error(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 	instance := newTestClusterInstance("test-cluster-instance")
@@ -891,6 +910,7 @@ func TestController_Reconcile_DriftDetection_Error(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_Destructive(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 	grant.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{Mode: dbopsv1alpha1.DriftModeCorrect}
@@ -955,6 +975,7 @@ func TestController_Reconcile_DriftCorrection_Destructive(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_NoDestructive(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestClusterGrant("testgrant")
 	grant.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{Mode: dbopsv1alpha1.DriftModeCorrect}

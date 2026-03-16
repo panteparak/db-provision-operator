@@ -85,6 +85,7 @@ func newTestInstance(name, namespace string) *dbopsv1alpha1.DatabaseInstance {
 }
 
 func TestController_Reconcile_NewDatabase(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 
@@ -154,6 +155,7 @@ func TestController_Reconcile_NewDatabase(t *testing.T) {
 }
 
 func TestController_Reconcile_ExistingDatabase(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 
@@ -217,6 +219,7 @@ func TestController_Reconcile_ExistingDatabase(t *testing.T) {
 }
 
 func TestController_Reconcile_DatabaseNotFound(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 
 	fakeClient := fake.NewClientBuilder().
@@ -251,6 +254,7 @@ func TestController_Reconcile_DatabaseNotFound(t *testing.T) {
 }
 
 func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 	database.Annotations = map[string]string{
@@ -295,6 +299,7 @@ func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
 }
 
 func TestController_Reconcile_Deletion(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 	database.Spec.DeletionPolicy = dbopsv1alpha1.DeletionPolicyDelete
@@ -349,6 +354,7 @@ func TestController_Reconcile_Deletion(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionProtected(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 	database.Spec.DeletionProtection = true
@@ -397,6 +403,7 @@ func TestController_Reconcile_DeletionProtected(t *testing.T) {
 // drift orchestrator extraction.
 
 func TestController_Reconcile_ExistsError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 
@@ -453,6 +460,7 @@ func TestController_Reconcile_ExistsError(t *testing.T) {
 }
 
 func TestController_Reconcile_CreateError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 
@@ -507,6 +515,7 @@ func TestController_Reconcile_CreateError(t *testing.T) {
 }
 
 func TestController_Reconcile_VerifyAccessError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 
@@ -562,6 +571,7 @@ func TestController_Reconcile_VerifyAccessError(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionDeleteError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 	database.Spec.DeletionPolicy = dbopsv1alpha1.DeletionPolicyDelete
@@ -623,6 +633,7 @@ func TestController_Reconcile_DeletionDeleteError(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionDeleteError_WithForce(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 	database.Spec.DeletionPolicy = dbopsv1alpha1.DeletionPolicyDelete
@@ -687,6 +698,7 @@ func TestController_Reconcile_DeletionDeleteError_WithForce(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionProtectedWithForceDelete(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 	database.Spec.DeletionProtection = true
@@ -750,6 +762,7 @@ func TestController_Reconcile_DeletionProtectedWithForceDelete(t *testing.T) {
 // =============================================================================
 
 func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 
@@ -849,6 +862,7 @@ func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
 // =============================================================================
 
 func TestController_Reconcile_StatusTransition_PendingToReady(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 	// Database starts with no phase set (effectively Pending)
@@ -927,6 +941,7 @@ func TestController_Reconcile_StatusTransition_PendingToReady(t *testing.T) {
 }
 
 func TestController_Reconcile_StatusTransition_ReadyToFailed(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 	// Set status to Ready initially
@@ -984,6 +999,7 @@ func TestController_Reconcile_StatusTransition_ReadyToFailed(t *testing.T) {
 }
 
 func TestController_Reconcile_StatusTransition_FailedToReady(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 	// Set status to Failed initially
@@ -1132,6 +1148,7 @@ func newDriftReadyMockRepo() *MockRepository {
 }
 
 func TestController_Reconcile_DriftDetected_DetectMode(t *testing.T) {
+	t.Parallel()
 	database := newTestDatabaseWithDriftPolicy("testdb", "default", dbopsv1alpha1.DriftModeDetect)
 
 	mockRepo := newDriftReadyMockRepo()
@@ -1173,6 +1190,7 @@ func TestController_Reconcile_DriftDetected_DetectMode(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftDetected_CorrectMode(t *testing.T) {
+	t.Parallel()
 	database := newTestDatabaseWithDriftPolicy("testdb", "default", dbopsv1alpha1.DriftModeCorrect)
 
 	mockRepo := newDriftReadyMockRepo()
@@ -1218,6 +1236,7 @@ func TestController_Reconcile_DriftDetected_CorrectMode(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_PartialFail(t *testing.T) {
+	t.Parallel()
 	database := newTestDatabaseWithDriftPolicy("testdb", "default", dbopsv1alpha1.DriftModeCorrect)
 
 	mockRepo := newDriftReadyMockRepo()
@@ -1266,6 +1285,7 @@ func TestController_Reconcile_DriftCorrection_PartialFail(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_AllFailed(t *testing.T) {
+	t.Parallel()
 	database := newTestDatabaseWithDriftPolicy("testdb", "default", dbopsv1alpha1.DriftModeCorrect)
 
 	mockRepo := newDriftReadyMockRepo()
@@ -1306,6 +1326,7 @@ func TestController_Reconcile_DriftCorrection_AllFailed(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftDetected_IgnoreMode(t *testing.T) {
+	t.Parallel()
 	database := newTestDatabaseWithDriftPolicy("testdb", "default", dbopsv1alpha1.DriftModeIgnore)
 
 	mockRepo := newDriftReadyMockRepo()
@@ -1345,6 +1366,7 @@ func TestController_Reconcile_DriftDetected_IgnoreMode(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftDetection_Error(t *testing.T) {
+	t.Parallel()
 	database := newTestDatabaseWithDriftPolicy("testdb", "default", dbopsv1alpha1.DriftModeDetect)
 
 	mockRepo := newDriftReadyMockRepo()
@@ -1374,6 +1396,7 @@ func TestController_Reconcile_DriftDetection_Error(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_Destructive(t *testing.T) {
+	t.Parallel()
 	database := newTestDatabaseWithDriftPolicy("testdb", "default", dbopsv1alpha1.DriftModeCorrect)
 	// Set the destructive drift annotation
 	database.Annotations = map[string]string{
@@ -1421,6 +1444,7 @@ func TestController_Reconcile_DriftCorrection_Destructive(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_NoDestructive(t *testing.T) {
+	t.Parallel()
 	database := newTestDatabaseWithDriftPolicy("testdb", "default", dbopsv1alpha1.DriftModeCorrect)
 	// NO destructive annotation set (default behavior)
 
@@ -1476,6 +1500,7 @@ func TestController_Reconcile_DriftCorrection_NoDestructive(t *testing.T) {
 // =============================================================================
 
 func TestController_Reconcile_DeletionBlockedByGrantDependencies(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 	database.Finalizers = []string{util.FinalizerDatabase}
@@ -1551,6 +1576,7 @@ func TestController_Reconcile_DeletionBlockedByGrantDependencies(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionSucceedsWhenNoGrants(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 	database.Finalizers = []string{util.FinalizerDatabase}
@@ -1604,6 +1630,7 @@ func TestController_Reconcile_DeletionSucceedsWhenNoGrants(t *testing.T) {
 }
 
 func TestController_Reconcile_ForceDeleteBypassesGrantCheck(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 	database.Finalizers = []string{util.FinalizerDatabase}
@@ -1671,6 +1698,7 @@ func TestController_Reconcile_ForceDeleteBypassesGrantCheck(t *testing.T) {
 }
 
 func TestController_Reconcile_ForceDeleteConfirmedCascadesGrants(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 	database.Finalizers = []string{util.FinalizerDatabase}
@@ -1734,6 +1762,7 @@ func TestController_Reconcile_ForceDeleteConfirmedCascadesGrants(t *testing.T) {
 }
 
 func TestController_Reconcile_ForceDeleteWrongHashBlocksDeletion(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 	database.Finalizers = []string{util.FinalizerDatabase}
@@ -1795,6 +1824,7 @@ func TestController_Reconcile_ForceDeleteWrongHashBlocksDeletion(t *testing.T) {
 }
 
 func TestController_Reconcile_ForceDeleteNoChildrenSkipsConfirmation(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 	database.Finalizers = []string{util.FinalizerDatabase}
@@ -1842,6 +1872,7 @@ func TestController_Reconcile_ForceDeleteNoChildrenSkipsConfirmation(t *testing.
 }
 
 func TestController_Reconcile_ForceDeleteHashChangesWhenChildrenChange(t *testing.T) {
+	t.Parallel()
 	children1 := []string{"DatabaseGrant/grant1"}
 	children2 := []string{"DatabaseGrant/grant1", "DatabaseGrant/grant2"}
 
@@ -1852,6 +1883,7 @@ func TestController_Reconcile_ForceDeleteHashChangesWhenChildrenChange(t *testin
 }
 
 func TestController_Reconcile_ForceDeleteCascadeTracksRemainingGrants(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 	database.Finalizers = []string{util.FinalizerDatabase}
@@ -1942,6 +1974,7 @@ func newInitSQLReadyMockRepo() *MockRepository {
 }
 
 func TestController_Reconcile_InitSQLAppliedSuccessfully(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabaseWithInitSQL("testdb", "default", &dbopsv1alpha1.InitSQLConfig{
 		Inline: []string{"CREATE TABLE foo (id INT)", "INSERT INTO foo VALUES (1)"},
@@ -1992,6 +2025,7 @@ func TestController_Reconcile_InitSQLAppliedSuccessfully(t *testing.T) {
 }
 
 func TestController_Reconcile_InitSQLSkippedWhenAlreadyApplied(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabaseWithInitSQL("testdb", "default", &dbopsv1alpha1.InitSQLConfig{
 		Inline: []string{"CREATE TABLE foo (id INT)"},
@@ -2033,6 +2067,7 @@ func TestController_Reconcile_InitSQLSkippedWhenAlreadyApplied(t *testing.T) {
 }
 
 func TestController_Reconcile_InitSQLReExecOnHashChange(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabaseWithInitSQL("testdb", "default", &dbopsv1alpha1.InitSQLConfig{
 		Inline: []string{"CREATE TABLE bar (id INT)"},
@@ -2080,6 +2115,7 @@ func TestController_Reconcile_InitSQLReExecOnHashChange(t *testing.T) {
 }
 
 func TestController_Reconcile_InitSQLFromConfigMap(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabaseWithInitSQL("testdb", "default", &dbopsv1alpha1.InitSQLConfig{
 		ConfigMapRef: &dbopsv1alpha1.ConfigMapKeySelector{
@@ -2118,6 +2154,7 @@ func TestController_Reconcile_InitSQLFromConfigMap(t *testing.T) {
 }
 
 func TestController_Reconcile_InitSQLFromSecret(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabaseWithInitSQL("testdb", "default", &dbopsv1alpha1.InitSQLConfig{
 		SecretRef: &dbopsv1alpha1.SecretKeySelector{
@@ -2156,6 +2193,7 @@ func TestController_Reconcile_InitSQLFromSecret(t *testing.T) {
 }
 
 func TestController_Reconcile_InitSQLFailurePolicyContinue(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabaseWithInitSQL("testdb", "default", &dbopsv1alpha1.InitSQLConfig{
 		Inline:        []string{"INVALID SQL"},
@@ -2208,6 +2246,7 @@ func TestController_Reconcile_InitSQLFailurePolicyContinue(t *testing.T) {
 }
 
 func TestController_Reconcile_InitSQLFailurePolicyBlock(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabaseWithInitSQL("testdb", "default", &dbopsv1alpha1.InitSQLConfig{
 		Inline:        []string{"INVALID SQL"},
@@ -2253,6 +2292,7 @@ func TestController_Reconcile_InitSQLFailurePolicyBlock(t *testing.T) {
 }
 
 func TestController_Reconcile_InitSQLSkipsReExecWhenHashMatchesAndAppliedFalse(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabaseWithInitSQL("testdb", "default", &dbopsv1alpha1.InitSQLConfig{
 		Inline:        []string{"CREATE TABLE init_partial (id INT)"},
@@ -2303,6 +2343,7 @@ func TestController_Reconcile_InitSQLSkipsReExecWhenHashMatchesAndAppliedFalse(t
 }
 
 func TestController_Reconcile_InitSQLNilIsNoop(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	database := newTestDatabase("testdb", "default")
 	// No initSQL in spec

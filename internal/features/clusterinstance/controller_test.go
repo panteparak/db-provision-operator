@@ -68,6 +68,7 @@ func newTestClusterInstanceResource(name string) *dbopsv1alpha1.ClusterDatabaseI
 }
 
 func TestController_Reconcile_NewClusterInstance(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestClusterInstanceResource("test-cluster-instance")
 
@@ -125,6 +126,7 @@ func TestController_Reconcile_NewClusterInstance(t *testing.T) {
 }
 
 func TestController_Reconcile_ConnectionFailed(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestClusterInstanceResource("test-cluster-instance")
 
@@ -176,6 +178,7 @@ func TestController_Reconcile_ConnectionFailed(t *testing.T) {
 }
 
 func TestController_Reconcile_InstanceNotFound(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 
 	client := fake.NewClientBuilder().
@@ -208,6 +211,7 @@ func TestController_Reconcile_InstanceNotFound(t *testing.T) {
 }
 
 func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestClusterInstanceResource("test-cluster-instance")
 	instance.Annotations = map[string]string{
@@ -249,6 +253,7 @@ func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
 }
 
 func TestController_Reconcile_Deletion(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestClusterInstanceResource("test-cluster-instance")
 	instance.Finalizers = []string{FinalizerClusterDatabaseInstance}
@@ -287,6 +292,7 @@ func TestController_Reconcile_Deletion(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionProtection(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestClusterInstanceResource("test-cluster-instance")
 	instance.Spec.DeletionProtection = true
@@ -336,6 +342,7 @@ func TestController_Reconcile_DeletionProtection(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionProtectionWithForceDelete(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestClusterInstanceResource("test-cluster-instance")
 	instance.Spec.DeletionProtection = true
@@ -379,6 +386,7 @@ func TestController_Reconcile_DeletionProtectionWithForceDelete(t *testing.T) {
 }
 
 func TestController_Reconcile_FinalizerAdded(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestClusterInstanceResource("test-cluster-instance")
 	// No finalizer initially
@@ -430,6 +438,7 @@ func TestController_Reconcile_FinalizerAdded(t *testing.T) {
 }
 
 func TestController_Reconcile_CustomHealthCheckInterval(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestClusterInstanceResource("test-cluster-instance")
 	instance.Spec.HealthCheck = &dbopsv1alpha1.HealthCheckConfig{
@@ -479,6 +488,7 @@ func TestController_Reconcile_CustomHealthCheckInterval(t *testing.T) {
 }
 
 func TestController_Reconcile_ConditionsSet(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestClusterInstanceResource("test-cluster-instance")
 
@@ -549,6 +559,7 @@ func TestController_Reconcile_ConditionsSet(t *testing.T) {
 }
 
 func TestController_Reconcile_EventPublished(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestClusterInstanceResource("test-cluster-instance")
 
@@ -598,6 +609,7 @@ func TestController_Reconcile_EventPublished(t *testing.T) {
 }
 
 func TestController_Reconcile_MySQL(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestClusterInstanceResource("test-mysql-cluster")
 	instance.Spec.Engine = dbopsv1alpha1.EngineTypeMySQL
@@ -653,6 +665,7 @@ func TestController_Reconcile_MySQL(t *testing.T) {
 }
 
 func TestController_Reconcile_ForceDeleteWithChildrenRequiresConfirmation(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestClusterInstanceResource("test-cluster-instance")
 	instance.Finalizers = []string{FinalizerClusterDatabaseInstance}
@@ -720,6 +733,7 @@ func TestController_Reconcile_ForceDeleteWithChildrenRequiresConfirmation(t *tes
 }
 
 func TestController_Reconcile_ForceDeleteConfirmedCascadesChildren(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestClusterInstanceResource("test-cluster-instance")
 	instance.Finalizers = []string{FinalizerClusterDatabaseInstance}
@@ -785,6 +799,7 @@ func TestController_Reconcile_ForceDeleteConfirmedCascadesChildren(t *testing.T)
 }
 
 func TestController_Reconcile_ForceDeleteWrongHashBlocksDeletion(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestClusterInstanceResource("test-cluster-instance")
 	instance.Finalizers = []string{FinalizerClusterDatabaseInstance}
@@ -844,6 +859,7 @@ func TestController_Reconcile_ForceDeleteWrongHashBlocksDeletion(t *testing.T) {
 }
 
 func TestController_Reconcile_ForceDeleteNoChildrenSkipsConfirmation(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestClusterInstanceResource("test-cluster-instance")
 	instance.Finalizers = []string{FinalizerClusterDatabaseInstance}
@@ -889,6 +905,7 @@ func TestController_Reconcile_ForceDeleteNoChildrenSkipsConfirmation(t *testing.
 }
 
 func TestController_Reconcile_ForceDeleteHashChangesWhenChildrenChange(t *testing.T) {
+	t.Parallel()
 	children1 := []string{"Database/ns/db1"}
 	children2 := []string{"Database/ns/db1", "DatabaseUser/ns/user1"}
 
@@ -899,6 +916,7 @@ func TestController_Reconcile_ForceDeleteHashChangesWhenChildrenChange(t *testin
 }
 
 func TestController_Reconcile_ForceDeleteCascadeTracksRemainingChildren(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestClusterInstanceResource("test-cluster-instance")
 	instance.Finalizers = []string{FinalizerClusterDatabaseInstance}

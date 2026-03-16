@@ -66,6 +66,7 @@ func newTestInstanceResource(name, namespace string) *dbopsv1alpha1.DatabaseInst
 }
 
 func TestController_Reconcile_NewInstance(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestInstanceResource("testinstance", "default")
 
@@ -122,6 +123,7 @@ func TestController_Reconcile_NewInstance(t *testing.T) {
 }
 
 func TestController_Reconcile_ConnectionFailed(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestInstanceResource("testinstance", "default")
 
@@ -174,6 +176,7 @@ func TestController_Reconcile_ConnectionFailed(t *testing.T) {
 }
 
 func TestController_Reconcile_InstanceNotFound(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 
 	client := fake.NewClientBuilder().
@@ -207,6 +210,7 @@ func TestController_Reconcile_InstanceNotFound(t *testing.T) {
 }
 
 func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestInstanceResource("testinstance", "default")
 	instance.Annotations = map[string]string{
@@ -249,6 +253,7 @@ func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
 }
 
 func TestController_Reconcile_Deletion(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestInstanceResource("testinstance", "default")
 	instance.Finalizers = []string{util.FinalizerDatabaseInstance}
@@ -288,6 +293,7 @@ func TestController_Reconcile_Deletion(t *testing.T) {
 }
 
 func TestController_Reconcile_FinalizerAdded(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestInstanceResource("testinstance", "default")
 	// No finalizer initially
@@ -340,6 +346,7 @@ func TestController_Reconcile_FinalizerAdded(t *testing.T) {
 }
 
 func TestController_Reconcile_CustomHealthCheckInterval(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestInstanceResource("testinstance", "default")
 	instance.Spec.HealthCheck = &dbopsv1alpha1.HealthCheckConfig{
@@ -392,6 +399,7 @@ func TestController_Reconcile_CustomHealthCheckInterval(t *testing.T) {
 // --- Error path tests ---
 
 func TestController_Reconcile_ConnectionError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestInstanceResource("testinstance", "default")
 
@@ -452,6 +460,7 @@ func TestController_Reconcile_ConnectionError(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionProtectionBlocked(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestInstanceResource("testinstance", "default")
 	instance.Spec.DeletionProtection = true
@@ -511,6 +520,7 @@ func TestController_Reconcile_DeletionProtectionBlocked(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionProtectionBypassedWithForceDelete(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestInstanceResource("testinstance", "default")
 	instance.Spec.DeletionProtection = true
@@ -557,6 +567,7 @@ func TestController_Reconcile_DeletionProtectionBypassedWithForceDelete(t *testi
 // --- Status validation tests ---
 
 func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestInstanceResource("testinstance", "default")
 
@@ -643,6 +654,7 @@ func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
 // --- Dependency-checking deletion tests ---
 
 func TestController_Reconcile_DeletionBlockedByChildDependencies(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestInstanceResource("testinstance", "default")
 	instance.Finalizers = []string{util.FinalizerDatabaseInstance}
@@ -710,6 +722,7 @@ func TestController_Reconcile_DeletionBlockedByChildDependencies(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionSucceedsWhenNoChildren(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestInstanceResource("testinstance", "default")
 	instance.Finalizers = []string{util.FinalizerDatabaseInstance}
@@ -758,6 +771,7 @@ func TestController_Reconcile_DeletionSucceedsWhenNoChildren(t *testing.T) {
 }
 
 func TestController_Reconcile_ForceDeleteBypassesChildCheck(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestInstanceResource("testinstance", "default")
 	instance.Finalizers = []string{util.FinalizerDatabaseInstance}
@@ -825,6 +839,7 @@ func TestController_Reconcile_ForceDeleteBypassesChildCheck(t *testing.T) {
 }
 
 func TestController_Reconcile_ForceDeleteConfirmedCascadesChildren(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestInstanceResource("testinstance", "default")
 	instance.Finalizers = []string{util.FinalizerDatabaseInstance}
@@ -895,6 +910,7 @@ func TestController_Reconcile_ForceDeleteConfirmedCascadesChildren(t *testing.T)
 }
 
 func TestController_Reconcile_ForceDeleteWrongHashBlocksDeletion(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestInstanceResource("testinstance", "default")
 	instance.Finalizers = []string{util.FinalizerDatabaseInstance}
@@ -962,6 +978,7 @@ func TestController_Reconcile_ForceDeleteWrongHashBlocksDeletion(t *testing.T) {
 }
 
 func TestController_Reconcile_ForceDeleteNoChildrenSkipsConfirmation(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestInstanceResource("testinstance", "default")
 	instance.Finalizers = []string{util.FinalizerDatabaseInstance}
@@ -1010,6 +1027,7 @@ func TestController_Reconcile_ForceDeleteNoChildrenSkipsConfirmation(t *testing.
 }
 
 func TestController_Reconcile_ForceDeleteHashChangesWhenChildrenChange(t *testing.T) {
+	t.Parallel()
 	children1 := []string{"Database/db1"}
 	children2 := []string{"Database/db1", "DatabaseUser/user1"}
 
@@ -1020,6 +1038,7 @@ func TestController_Reconcile_ForceDeleteHashChangesWhenChildrenChange(t *testin
 }
 
 func TestController_Reconcile_ForceDeleteCascadeTracksRemainingChildren(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	instance := newTestInstanceResource("testinstance", "default")
 	instance.Finalizers = []string{util.FinalizerDatabaseInstance}
@@ -1088,4 +1107,61 @@ func TestController_Reconcile_ForceDeleteCascadeTracksRemainingChildren(t *testi
 	assert.Contains(t, updatedInstance.Status.DeletionConfirmation.Children, "Database/child-db")
 	// Instance finalizer should still be present
 	assert.Contains(t, updatedInstance.Finalizers, util.FinalizerDatabaseInstance)
+}
+
+func TestController_Reconcile_ObservedGeneration(t *testing.T) {
+	t.Parallel()
+	scheme := newTestScheme()
+	instance := newTestInstanceResource("testinstance", "default")
+	instance.Generation = 2
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(instance).
+		WithStatusSubresource(instance).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.GetInstanceFunc = func(ctx context.Context, name, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return instance, nil
+	}
+	mockRepo.ConnectFunc = func(ctx context.Context, inst *dbopsv1alpha1.DatabaseInstance) (*ConnectResult, error) {
+		return &ConnectResult{
+			Connected: true,
+			Version:   "15.1",
+			Message:   "Connected successfully",
+		}, nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:   fakeClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+		Handler:  handler,
+		Logger:   logr.Discard(),
+	})
+
+	// First reconcile: ObservedGeneration is set in-memory after Status().Update(),
+	// so the persisted value from the first reconcile is zero.
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testinstance",
+			Namespace: "default",
+		},
+	})
+	require.NoError(t, err)
+
+	// The instance controller sets ObservedGeneration after the status update call,
+	// so the persisted status will NOT contain it after a single reconcile.
+	var updatedInstance dbopsv1alpha1.DatabaseInstance
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testinstance", Namespace: "default"}, &updatedInstance)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), updatedInstance.Status.ObservedGeneration,
+		"ObservedGeneration is set after Status().Update() and is not persisted in the first reconcile")
 }

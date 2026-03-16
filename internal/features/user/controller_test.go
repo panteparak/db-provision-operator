@@ -87,6 +87,7 @@ func newTestInstance(name, namespace string) *dbopsv1alpha1.DatabaseInstance {
 }
 
 func TestController_Reconcile_NewUser(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 
@@ -148,6 +149,7 @@ func TestController_Reconcile_NewUser(t *testing.T) {
 }
 
 func TestController_Reconcile_ExistingUser(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 
@@ -203,6 +205,7 @@ func TestController_Reconcile_ExistingUser(t *testing.T) {
 }
 
 func TestController_Reconcile_UserNotFound(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 
 	client := fake.NewClientBuilder().
@@ -238,6 +241,7 @@ func TestController_Reconcile_UserNotFound(t *testing.T) {
 }
 
 func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Annotations = map[string]string{
@@ -283,6 +287,7 @@ func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
 }
 
 func TestController_Reconcile_Deletion(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Annotations = map[string]string{
@@ -340,6 +345,7 @@ func TestController_Reconcile_Deletion(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionProtected(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Annotations = map[string]string{
@@ -387,6 +393,7 @@ func TestController_Reconcile_DeletionProtected(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionProtectedWithForceDelete(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Annotations = map[string]string{
@@ -446,6 +453,7 @@ func TestController_Reconcile_DeletionProtectedWithForceDelete(t *testing.T) {
 }
 
 func TestController_Reconcile_SecretTemplateLabelsAndAnnotations(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -543,6 +551,7 @@ func TestController_Reconcile_SecretTemplateLabelsAndAnnotations(t *testing.T) {
 }
 
 func TestController_Reconcile_SecretTemplateOverridesDefaultLabels(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -626,6 +635,7 @@ func TestController_Reconcile_SecretTemplateOverridesDefaultLabels(t *testing.T)
 }
 
 func TestController_Reconcile_DeletionBlockedByOwnership(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Annotations = map[string]string{
@@ -712,6 +722,7 @@ func TestController_Reconcile_DeletionBlockedByOwnership(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionProceedsNoOwnership(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Annotations = map[string]string{
@@ -777,6 +788,7 @@ func TestController_Reconcile_DeletionProceedsNoOwnership(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionWithForceBypassesOwnership(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Annotations = map[string]string{
@@ -845,6 +857,7 @@ func TestController_Reconcile_DeletionWithForceBypassesOwnership(t *testing.T) {
 }
 
 func TestController_Reconcile_SetsReconcileID(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 
@@ -908,6 +921,7 @@ func TestController_Reconcile_SetsReconcileID(t *testing.T) {
 }
 
 func TestController_Reconcile_ExistsError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 
@@ -967,6 +981,7 @@ func TestController_Reconcile_ExistsError(t *testing.T) {
 }
 
 func TestController_Reconcile_CreateError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 
@@ -1024,6 +1039,7 @@ func TestController_Reconcile_CreateError(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionDeleteError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Annotations = map[string]string{
@@ -1091,6 +1107,7 @@ func TestController_Reconcile_DeletionDeleteError(t *testing.T) {
 }
 
 func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Generation = 3 // Set a non-zero generation to verify ObservedGeneration is not copied
@@ -1190,6 +1207,7 @@ func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionDeleteError_WithForce(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Annotations = map[string]string{
@@ -1254,6 +1272,7 @@ func TestController_Reconcile_DeletionDeleteError_WithForce(t *testing.T) {
 // --- Drift detection tests ---
 
 func TestController_Reconcile_DriftDetected_DetectMode(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	// Default drift policy is detect mode (no DriftPolicy set on spec)
@@ -1322,6 +1341,7 @@ func TestController_Reconcile_DriftDetected_DetectMode(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftDetected_CorrectMode(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
@@ -1392,6 +1412,7 @@ func TestController_Reconcile_DriftDetected_CorrectMode(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_PartialFail(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
@@ -1477,6 +1498,7 @@ func TestController_Reconcile_DriftCorrection_PartialFail(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_AllFailed(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
@@ -1557,6 +1579,7 @@ func TestController_Reconcile_DriftCorrection_AllFailed(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftDetected_IgnoreMode(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
@@ -1612,6 +1635,7 @@ func TestController_Reconcile_DriftDetected_IgnoreMode(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftDetection_Error(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 
@@ -1671,6 +1695,7 @@ func TestController_Reconcile_DriftDetection_Error(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_Destructive(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
@@ -1754,6 +1779,7 @@ func TestController_Reconcile_DriftCorrection_Destructive(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_NoDestructive(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
@@ -1841,6 +1867,7 @@ func TestController_Reconcile_DriftCorrection_NoDestructive(t *testing.T) {
 // --- Grant dependency deletion tests ---
 
 func TestController_Reconcile_DeletionBlockedByGrantDependencies(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	// Default deletion policy is Retain (no annotation), finalizer + deletionTimestamp
@@ -1912,6 +1939,7 @@ func TestController_Reconcile_DeletionBlockedByGrantDependencies(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionSucceedsWhenNoGrants(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	// Default deletion policy is Retain, finalizer + deletionTimestamp, no grants
@@ -1965,6 +1993,7 @@ func TestController_Reconcile_DeletionSucceedsWhenNoGrants(t *testing.T) {
 }
 
 func TestController_Reconcile_ForceDeleteBypassesGrantCheck(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Annotations = map[string]string{
@@ -2044,6 +2073,7 @@ func TestController_Reconcile_ForceDeleteBypassesGrantCheck(t *testing.T) {
 }
 
 func TestController_Reconcile_ForceDeleteConfirmedCascadesGrants(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Finalizers = []string{util.FinalizerDatabaseUser}
@@ -2115,6 +2145,7 @@ func TestController_Reconcile_ForceDeleteConfirmedCascadesGrants(t *testing.T) {
 }
 
 func TestController_Reconcile_ForceDeleteWrongHashBlocksDeletion(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Finalizers = []string{util.FinalizerDatabaseUser}
@@ -2177,6 +2208,7 @@ func TestController_Reconcile_ForceDeleteWrongHashBlocksDeletion(t *testing.T) {
 }
 
 func TestController_Reconcile_ForceDeleteNoChildrenSkipsConfirmation(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Finalizers = []string{util.FinalizerDatabaseUser}
@@ -2225,6 +2257,7 @@ func TestController_Reconcile_ForceDeleteNoChildrenSkipsConfirmation(t *testing.
 }
 
 func TestController_Reconcile_ForceDeleteHashChangesWhenChildrenChange(t *testing.T) {
+	t.Parallel()
 	children1 := []string{"DatabaseGrant/grant1"}
 	children2 := []string{"DatabaseGrant/grant1", "DatabaseGrant/grant2"}
 
@@ -2235,6 +2268,7 @@ func TestController_Reconcile_ForceDeleteHashChangesWhenChildrenChange(t *testin
 }
 
 func TestController_Reconcile_ForceDeleteCascadeTracksRemainingGrants(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 	user.Finalizers = []string{util.FinalizerDatabaseUser}
@@ -2303,6 +2337,7 @@ func TestController_Reconcile_ForceDeleteCascadeTracksRemainingGrants(t *testing
 }
 
 func TestController_Reconcile_SecretTemplateDataReplacesDefaultKeys(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2399,6 +2434,7 @@ func TestController_Reconcile_SecretTemplateDataReplacesDefaultKeys(t *testing.T
 }
 
 func TestController_Reconcile_EmptySecretTemplateDataUsesDefaults(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2472,6 +2508,7 @@ func TestController_Reconcile_EmptySecretTemplateDataUsesDefaults(t *testing.T) 
 }
 
 func TestController_Reconcile_SecretTemplateDataWithTLS(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2579,6 +2616,7 @@ func TestController_Reconcile_SecretTemplateDataWithTLS(t *testing.T) {
 }
 
 func TestController_Reconcile_SecretTemplateDataWithUrlEncode(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2670,6 +2708,7 @@ func TestController_Reconcile_SecretTemplateDataWithUrlEncode(t *testing.T) {
 }
 
 func TestController_Reconcile_TLSSecretMissing_GracefulDegradation(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2768,6 +2807,7 @@ func TestController_Reconcile_TLSSecretMissing_GracefulDegradation(t *testing.T)
 
 // C1: SecretTemplate with multi-key data + labels
 func TestController_Reconcile_SecretTemplateMultiKeyWithLabels(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2852,6 +2892,7 @@ func TestController_Reconcile_SecretTemplateMultiKeyWithLabels(t *testing.T) {
 
 // C2: SecretTemplate with .Database field
 func TestController_Reconcile_SecretTemplateWithDatabaseField(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2926,6 +2967,7 @@ func TestController_Reconcile_SecretTemplateWithDatabaseField(t *testing.T) {
 
 // C3: SecretTemplate update — changed template re-renders secret
 func TestController_Reconcile_SecretTemplateUpdateReRendersSecret(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3014,6 +3056,7 @@ func TestController_Reconcile_SecretTemplateUpdateReRendersSecret(t *testing.T) 
 
 // C4: hasSecretTemplateData with nil PasswordSecret
 func TestHasSecretTemplateData_NilPasswordSecret(t *testing.T) {
+	t.Parallel()
 	user := &dbopsv1alpha1.DatabaseUser{
 		Spec: dbopsv1alpha1.DatabaseUserSpec{
 			PasswordSecret: nil,
@@ -3024,6 +3067,7 @@ func TestHasSecretTemplateData_NilPasswordSecret(t *testing.T) {
 
 // C5: hasSecretTemplateData with empty SecretTemplate
 func TestHasSecretTemplateData_EmptySecretTemplate(t *testing.T) {
+	t.Parallel()
 	user := &dbopsv1alpha1.DatabaseUser{
 		Spec: dbopsv1alpha1.DatabaseUserSpec{
 			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
@@ -3036,6 +3080,7 @@ func TestHasSecretTemplateData_EmptySecretTemplate(t *testing.T) {
 
 // C6: SecretTemplate with .Namespace and .Name
 func TestController_Reconcile_SecretTemplateWithNamespaceAndName(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3102,6 +3147,7 @@ func TestController_Reconcile_SecretTemplateWithNamespaceAndName(t *testing.T) {
 
 // C7: SecretTemplate render failure (invalid syntax)
 func TestController_Reconcile_SecretTemplateInvalidSyntax(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3165,6 +3211,7 @@ func TestController_Reconcile_SecretTemplateInvalidSyntax(t *testing.T) {
 
 // C8: SecretTemplate render failure (undefined field reference)
 func TestController_Reconcile_SecretTemplateUndefinedFieldError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3228,6 +3275,7 @@ func TestController_Reconcile_SecretTemplateUndefinedFieldError(t *testing.T) {
 
 // C9: Instance not found during reconcile
 func TestController_Reconcile_InstanceNotFound(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3281,6 +3329,7 @@ func TestController_Reconcile_InstanceNotFound(t *testing.T) {
 
 // C10: TLS enabled but only CA present (no cert/key in TLS secret)
 func TestController_Reconcile_TLSOnlyCAPresentInSecret(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3374,6 +3423,7 @@ func TestController_Reconcile_TLSOnlyCAPresentInSecret(t *testing.T) {
 
 // C11: TLS disabled but template uses {{ .TLSCert }}
 func TestController_Reconcile_TLSDisabledTemplateUsesTLSFields(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3453,6 +3503,7 @@ func TestController_Reconcile_TLSDisabledTemplateUsesTLSFields(t *testing.T) {
 
 // C14: Instance has empty Host / Port=0 / empty Database
 func TestController_Reconcile_InstanceEmptyConnectionFields(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3529,6 +3580,7 @@ func TestController_Reconcile_InstanceEmptyConnectionFields(t *testing.T) {
 
 // C15: hasSecretTemplateData — SecretTemplate non-nil but Data map is nil
 func TestHasSecretTemplateData_NonNilTemplateNilData(t *testing.T) {
+	t.Parallel()
 	user := &dbopsv1alpha1.DatabaseUser{
 		Spec: dbopsv1alpha1.DatabaseUserSpec{
 			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
@@ -3544,6 +3596,7 @@ func TestHasSecretTemplateData_NonNilTemplateNilData(t *testing.T) {
 
 // C16: hasSecretTemplateData — SecretTemplate.Data is non-nil empty map
 func TestHasSecretTemplateData_EmptyDataMap(t *testing.T) {
+	t.Parallel()
 	user := &dbopsv1alpha1.DatabaseUser{
 		Spec: dbopsv1alpha1.DatabaseUserSpec{
 			PasswordSecret: &dbopsv1alpha1.PasswordConfig{
@@ -3558,6 +3611,7 @@ func TestHasSecretTemplateData_EmptyDataMap(t *testing.T) {
 
 // C17: Secret already exists — update path with SecretTemplate.Data
 func TestController_Reconcile_SecretExistsUpdateWithTemplate(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3648,6 +3702,7 @@ func TestController_Reconcile_SecretExistsUpdateWithTemplate(t *testing.T) {
 // ===== Secret Update Merge Tests =====
 
 func TestController_Reconcile_SecretUpdatePreservesExternalAnnotations(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3731,6 +3786,7 @@ func TestController_Reconcile_SecretUpdatePreservesExternalAnnotations(t *testin
 }
 
 func TestController_Reconcile_SecretUpdatePreservesExternalLabels(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3814,6 +3870,7 @@ func TestController_Reconcile_SecretUpdatePreservesExternalLabels(t *testing.T) 
 }
 
 func TestController_Reconcile_SecretUpdateMergesOperatorAndExternalMetadata(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3905,6 +3962,7 @@ func TestController_Reconcile_SecretUpdateMergesOperatorAndExternalMetadata(t *t
 }
 
 func TestController_Reconcile_SecretUpdateOverwritesOperatorAnnotationValues(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3984,6 +4042,7 @@ func TestController_Reconcile_SecretUpdateOverwritesOperatorAnnotationValues(t *
 }
 
 func TestController_Reconcile_SecretUpdateWithNilAnnotationsOnExisting(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := &dbopsv1alpha1.DatabaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -4060,6 +4119,7 @@ func TestController_Reconcile_SecretUpdateWithNilAnnotationsOnExisting(t *testin
 }
 
 func TestController_Reconcile_ClusterInstanceRefDoesNotPanic(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 
 	// Create a DatabaseUser with clusterInstanceRef (NOT instanceRef)
@@ -4134,6 +4194,7 @@ func TestController_Reconcile_ClusterInstanceRefDoesNotPanic(t *testing.T) {
 // ─── Secret Auto-Recovery Tests ──────────────────────────────────────────────
 
 func TestController_Reconcile_SecretDeletedAutoRecovery(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 
@@ -4211,6 +4272,7 @@ func TestController_Reconcile_SecretDeletedAutoRecovery(t *testing.T) {
 }
 
 func TestController_Reconcile_SecretEmptyPasswordAutoRecovery(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 
@@ -4283,6 +4345,7 @@ func TestController_Reconcile_SecretEmptyPasswordAutoRecovery(t *testing.T) {
 }
 
 func TestController_Reconcile_SecretDeletedSetPasswordFails(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 
@@ -4341,6 +4404,7 @@ func TestController_Reconcile_SecretDeletedSetPasswordFails(t *testing.T) {
 }
 
 func TestController_Reconcile_SecretExistsNoRegeneration(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 
@@ -4405,6 +4469,7 @@ func TestController_Reconcile_SecretExistsNoRegeneration(t *testing.T) {
 }
 
 func TestController_Reconcile_NewUserSecretCreated(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
 

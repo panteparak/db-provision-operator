@@ -70,6 +70,7 @@ func setupTestController(objs ...runtime.Object) (*Controller, *record.FakeRecor
 }
 
 func TestController_Reconcile_NewSchedule(t *testing.T) {
+	t.Parallel()
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-schedule",
@@ -107,6 +108,7 @@ func TestController_Reconcile_NewSchedule(t *testing.T) {
 }
 
 func TestController_Reconcile_NotFound(t *testing.T) {
+	t.Parallel()
 	controller, _, _ := setupTestController()
 
 	result, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -121,6 +123,7 @@ func TestController_Reconcile_NotFound(t *testing.T) {
 }
 
 func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
+	t.Parallel()
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-schedule",
@@ -155,6 +158,7 @@ func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
 }
 
 func TestController_Reconcile_Paused(t *testing.T) {
+	t.Parallel()
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-schedule",
@@ -205,6 +209,7 @@ func TestController_Reconcile_Paused(t *testing.T) {
 }
 
 func TestController_Reconcile_FinalizerAdded(t *testing.T) {
+	t.Parallel()
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-schedule",
@@ -247,6 +252,7 @@ func TestController_Reconcile_FinalizerAdded(t *testing.T) {
 }
 
 func TestController_Reconcile_Deletion(t *testing.T) {
+	t.Parallel()
 	now := metav1.Now()
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
@@ -293,6 +299,7 @@ func TestController_Reconcile_Deletion(t *testing.T) {
 }
 
 func TestController_Reconcile_BackupTriggered(t *testing.T) {
+	t.Parallel()
 	// Schedule with last backup more than 1 day ago
 	lastBackup := metav1.NewTime(time.Now().Add(-25 * time.Hour))
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
@@ -352,6 +359,7 @@ func TestController_Reconcile_BackupTriggered(t *testing.T) {
 }
 
 func TestController_Reconcile_ConcurrencyForbid(t *testing.T) {
+	t.Parallel()
 	lastBackup := metav1.NewTime(time.Now().Add(-25 * time.Hour))
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
@@ -407,6 +415,7 @@ func TestController_Reconcile_ConcurrencyForbid(t *testing.T) {
 }
 
 func TestController_Reconcile_RetentionEnforced(t *testing.T) {
+	t.Parallel()
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-schedule",
@@ -464,6 +473,7 @@ func TestController_Reconcile_RetentionEnforced(t *testing.T) {
 }
 
 func TestController_Reconcile_StatisticsUpdated(t *testing.T) {
+	t.Parallel()
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-schedule",
@@ -528,6 +538,7 @@ func TestController_Reconcile_StatisticsUpdated(t *testing.T) {
 }
 
 func TestController_Reconcile_RecentBackupsUpdated(t *testing.T) {
+	t.Parallel()
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-schedule",
@@ -595,6 +606,7 @@ func TestController_Reconcile_RecentBackupsUpdated(t *testing.T) {
 }
 
 func TestController_Reconcile_ErrorCondition(t *testing.T) {
+	t.Parallel()
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-schedule",
@@ -635,6 +647,7 @@ func TestController_Reconcile_ErrorCondition(t *testing.T) {
 }
 
 func TestController_RequeueTimeCalculation(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name               string
 		nextBackupDuration time.Duration
@@ -659,6 +672,7 @@ func TestController_RequeueTimeCalculation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "test-schedule",
@@ -700,6 +714,7 @@ func TestController_RequeueTimeCalculation(t *testing.T) {
 }
 
 func TestController_Reconcile_EvaluateScheduleError_InvalidTimezone(t *testing.T) {
+	t.Parallel()
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-schedule",
@@ -752,6 +767,7 @@ func TestController_Reconcile_EvaluateScheduleError_InvalidTimezone(t *testing.T
 }
 
 func TestController_Reconcile_TriggerBackupError(t *testing.T) {
+	t.Parallel()
 	// Schedule with a last backup time far enough in the past to trigger a new one
 	lastBackup := metav1.NewTime(time.Now().Add(-25 * time.Hour))
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
@@ -819,6 +835,7 @@ func TestController_Reconcile_TriggerBackupError(t *testing.T) {
 }
 
 func TestController_Reconcile_HandleConcurrencyError(t *testing.T) {
+	t.Parallel()
 	lastBackup := metav1.NewTime(time.Now().Add(-25 * time.Hour))
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
@@ -885,6 +902,7 @@ func TestController_Reconcile_HandleConcurrencyError(t *testing.T) {
 }
 
 func TestController_Reconcile_ListBackupsError(t *testing.T) {
+	t.Parallel()
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-schedule",
@@ -938,6 +956,7 @@ func TestController_Reconcile_ListBackupsError(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionProtectionBlocked(t *testing.T) {
+	t.Parallel()
 	now := metav1.Now()
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
@@ -992,6 +1011,7 @@ func TestController_Reconcile_DeletionProtectionBlocked(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionProtectionBypassedWithForceDelete(t *testing.T) {
+	t.Parallel()
 	now := metav1.Now()
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1041,6 +1061,7 @@ func TestController_Reconcile_DeletionProtectionBypassedWithForceDelete(t *testi
 }
 
 func TestController_Reconcile_DeletionWithoutOurFinalizer(t *testing.T) {
+	t.Parallel()
 	now := metav1.Now()
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1085,6 +1106,7 @@ func TestController_Reconcile_DeletionWithoutOurFinalizer(t *testing.T) {
 }
 
 func TestController_Reconcile_RetentionEnforcementError(t *testing.T) {
+	t.Parallel()
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-schedule",
@@ -1150,6 +1172,7 @@ func TestController_Reconcile_RetentionEnforcementError(t *testing.T) {
 }
 
 func TestController_Reconcile_UpdateStatisticsError(t *testing.T) {
+	t.Parallel()
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-schedule",
@@ -1210,6 +1233,7 @@ func TestController_Reconcile_UpdateStatisticsError(t *testing.T) {
 }
 
 func TestController_Reconcile_ConcurrencyReplaceDeleteError(t *testing.T) {
+	t.Parallel()
 	lastBackup := metav1.NewTime(time.Now().Add(-25 * time.Hour))
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1276,6 +1300,7 @@ func TestController_Reconcile_ConcurrencyReplaceDeleteError(t *testing.T) {
 }
 
 func TestController_Reconcile_EvaluateScheduleListBackupsError(t *testing.T) {
+	t.Parallel()
 	schedule := &dbopsv1alpha1.DatabaseBackupSchedule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-schedule",

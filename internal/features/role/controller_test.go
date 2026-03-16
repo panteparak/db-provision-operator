@@ -85,6 +85,7 @@ func newTestInstance(name, namespace string) *dbopsv1alpha1.DatabaseInstance {
 }
 
 func TestController_Reconcile_NewRole(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 
@@ -144,7 +145,68 @@ func TestController_Reconcile_NewRole(t *testing.T) {
 	assert.True(t, mockRepo.WasCalled("Create"))
 }
 
+func TestController_Reconcile_ObservedGeneration(t *testing.T) {
+	t.Parallel()
+	scheme := newTestScheme()
+	role := newTestRole("testrole", "default")
+	role.Generation = 2
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(role).
+		WithStatusSubresource(role).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, roleName string, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.UpdateFunc = func(ctx context.Context, roleName string, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string) (*Result, error) {
+		return &Result{Updated: false}, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return newTestInstance("test-instance", namespace), nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseRoleSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
+		return drift.NewResult("role", spec.RoleName), nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testrole",
+			Namespace: "default",
+		},
+	})
+
+	require.NoError(t, err)
+
+	var updatedRole dbopsv1alpha1.DatabaseRole
+	err = client.Get(context.Background(), types.NamespacedName{Name: "testrole", Namespace: "default"}, &updatedRole)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), updatedRole.Status.ObservedGeneration,
+		"ObservedGeneration should match the resource Generation")
+}
+
 func TestController_Reconcile_ExistingRole(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 
@@ -199,6 +261,7 @@ func TestController_Reconcile_ExistingRole(t *testing.T) {
 }
 
 func TestController_Reconcile_RoleNotFound(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 
 	client := fake.NewClientBuilder().
@@ -233,6 +296,7 @@ func TestController_Reconcile_RoleNotFound(t *testing.T) {
 }
 
 func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	role.Annotations = map[string]string{
@@ -277,6 +341,7 @@ func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
 }
 
 func TestController_Reconcile_Deletion(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	role.Annotations = map[string]string{
@@ -333,6 +398,7 @@ func TestController_Reconcile_Deletion(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionProtected(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	role.Annotations = map[string]string{
@@ -379,6 +445,7 @@ func TestController_Reconcile_DeletionProtected(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionProtectedWithForceDelete(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	role.Annotations = map[string]string{
@@ -437,6 +504,7 @@ func TestController_Reconcile_DeletionProtectedWithForceDelete(t *testing.T) {
 }
 
 func TestController_Reconcile_ExistsError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 
@@ -493,6 +561,7 @@ func TestController_Reconcile_ExistsError(t *testing.T) {
 }
 
 func TestController_Reconcile_CreateError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 
@@ -549,6 +618,7 @@ func TestController_Reconcile_CreateError(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionDeleteError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	role.Annotations = map[string]string{
@@ -612,6 +682,7 @@ func TestController_Reconcile_DeletionDeleteError(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionDeleteError_WithForce(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	role.Annotations = map[string]string{
@@ -672,6 +743,7 @@ func TestController_Reconcile_DeletionDeleteError_WithForce(t *testing.T) {
 // --- Status validation tests ---
 
 func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 
@@ -761,6 +833,7 @@ func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
 // --- Drift detection tests ---
 
 func TestController_Reconcile_DriftDetected_DetectMode(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	// Default drift policy is detect mode (no DriftPolicy set on spec)
@@ -828,6 +901,7 @@ func TestController_Reconcile_DriftDetected_DetectMode(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftDetected_CorrectMode(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
@@ -897,6 +971,7 @@ func TestController_Reconcile_DriftDetected_CorrectMode(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_PartialFail(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
@@ -981,6 +1056,7 @@ func TestController_Reconcile_DriftCorrection_PartialFail(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_AllFailed(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
@@ -1060,6 +1136,7 @@ func TestController_Reconcile_DriftCorrection_AllFailed(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftDetected_IgnoreMode(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
@@ -1114,6 +1191,7 @@ func TestController_Reconcile_DriftDetected_IgnoreMode(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftDetection_Error(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 
@@ -1172,6 +1250,7 @@ func TestController_Reconcile_DriftDetection_Error(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_Destructive(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
@@ -1254,6 +1333,7 @@ func TestController_Reconcile_DriftCorrection_Destructive(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_NoDestructive(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
@@ -1387,6 +1467,7 @@ func newReconcileSetup(t *testing.T, role *dbopsv1alpha1.DatabaseRole, instance 
 }
 
 func TestController_Reconcile_RequeueAfterDriftInterval_DetectMode(t *testing.T) {
+	t.Parallel()
 	role := newTestRole("testrole", "default")
 	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
 		Mode:     dbopsv1alpha1.DriftModeDetect,
@@ -1401,6 +1482,7 @@ func TestController_Reconcile_RequeueAfterDriftInterval_DetectMode(t *testing.T)
 }
 
 func TestController_Reconcile_RequeueAfterDriftInterval_CorrectMode(t *testing.T) {
+	t.Parallel()
 	role := newTestRole("testrole", "default")
 	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
 		Mode:     dbopsv1alpha1.DriftModeCorrect,
@@ -1415,6 +1497,7 @@ func TestController_Reconcile_RequeueAfterDriftInterval_CorrectMode(t *testing.T
 }
 
 func TestController_Reconcile_RequeueAfterDefault_IgnoreMode(t *testing.T) {
+	t.Parallel()
 	role := newTestRole("testrole", "default")
 	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
 		Mode:     dbopsv1alpha1.DriftModeIgnore,
@@ -1429,6 +1512,7 @@ func TestController_Reconcile_RequeueAfterDefault_IgnoreMode(t *testing.T) {
 }
 
 func TestController_Reconcile_RequeueAfterDefault_NoDriftPolicy(t *testing.T) {
+	t.Parallel()
 	role := newTestRole("testrole", "default")
 	// No DriftPolicy set — falls back to defaultDriftInterval from controller config
 
@@ -1440,6 +1524,7 @@ func TestController_Reconcile_RequeueAfterDefault_NoDriftPolicy(t *testing.T) {
 }
 
 func TestController_Reconcile_RequeueAfterDefault_InvalidInterval(t *testing.T) {
+	t.Parallel()
 	role := newTestRole("testrole", "default")
 	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
 		Mode:     dbopsv1alpha1.DriftModeDetect,
@@ -1454,6 +1539,7 @@ func TestController_Reconcile_RequeueAfterDefault_InvalidInterval(t *testing.T) 
 }
 
 func TestController_Reconcile_RequeueAfterInstanceLevel(t *testing.T) {
+	t.Parallel()
 	role := newTestRole("testrole", "default")
 	// No role-level drift policy — falls back to instance
 
@@ -1473,6 +1559,7 @@ func TestController_Reconcile_RequeueAfterInstanceLevel(t *testing.T) {
 // --- Grant dependency deletion tests ---
 
 func TestController_Reconcile_DeletionBlockedByGrantDependencies(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	role.Finalizers = []string{util.FinalizerDatabaseRole}
@@ -1539,6 +1626,7 @@ func TestController_Reconcile_DeletionBlockedByGrantDependencies(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionSucceedsWhenNoGrants(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	role.Finalizers = []string{util.FinalizerDatabaseRole}
@@ -1585,6 +1673,7 @@ func TestController_Reconcile_DeletionSucceedsWhenNoGrants(t *testing.T) {
 }
 
 func TestController_Reconcile_ForceDeleteBypassesGrantCheck(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	role.Annotations = map[string]string{
@@ -1650,6 +1739,7 @@ func TestController_Reconcile_ForceDeleteBypassesGrantCheck(t *testing.T) {
 }
 
 func TestController_Reconcile_ForceDeleteConfirmedCascadesGrants(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	role.Finalizers = []string{util.FinalizerDatabaseRole}
@@ -1712,6 +1802,7 @@ func TestController_Reconcile_ForceDeleteConfirmedCascadesGrants(t *testing.T) {
 }
 
 func TestController_Reconcile_ForceDeleteWrongHashBlocksDeletion(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	role.Finalizers = []string{util.FinalizerDatabaseRole}
@@ -1773,6 +1864,7 @@ func TestController_Reconcile_ForceDeleteWrongHashBlocksDeletion(t *testing.T) {
 }
 
 func TestController_Reconcile_ForceDeleteNoChildrenSkipsConfirmation(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	role.Finalizers = []string{util.FinalizerDatabaseRole}
@@ -1820,6 +1912,7 @@ func TestController_Reconcile_ForceDeleteNoChildrenSkipsConfirmation(t *testing.
 }
 
 func TestController_Reconcile_ForceDeleteHashChangesWhenChildrenChange(t *testing.T) {
+	t.Parallel()
 	children1 := []string{"DatabaseGrant/grant1"}
 	children2 := []string{"DatabaseGrant/grant1", "DatabaseGrant/grant2"}
 
@@ -1830,6 +1923,7 @@ func TestController_Reconcile_ForceDeleteHashChangesWhenChildrenChange(t *testin
 }
 
 func TestController_Reconcile_ForceDeleteCascadeTracksRemainingGrants(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestRole("testrole", "default")
 	role.Finalizers = []string{util.FinalizerDatabaseRole}
@@ -1897,6 +1991,7 @@ func TestController_Reconcile_ForceDeleteCascadeTracksRemainingGrants(t *testing
 }
 
 func TestController_Reconcile_ClusterInstanceRefDoesNotPanic(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 
 	// Create a DatabaseRole with clusterInstanceRef (NOT instanceRef)

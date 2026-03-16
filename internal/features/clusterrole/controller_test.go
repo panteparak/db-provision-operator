@@ -83,6 +83,7 @@ func newTestController(client *fake.ClientBuilder, mockRepo *MockRepository) *Co
 // --- Happy path tests ---
 
 func TestController_Reconcile_NewClusterRole(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestClusterRole("testrole")
 
@@ -119,6 +120,7 @@ func TestController_Reconcile_NewClusterRole(t *testing.T) {
 }
 
 func TestController_Reconcile_ExistingClusterRole(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestClusterRole("testrole")
 
@@ -148,6 +150,7 @@ func TestController_Reconcile_ExistingClusterRole(t *testing.T) {
 }
 
 func TestController_Reconcile_ClusterRoleNotFound(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 
 	clientBuilder := fake.NewClientBuilder().
@@ -165,6 +168,7 @@ func TestController_Reconcile_ClusterRoleNotFound(t *testing.T) {
 }
 
 func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestClusterRole("testrole")
 	role.Annotations = map[string]string{
@@ -192,6 +196,7 @@ func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
 // --- Deletion tests ---
 
 func TestController_Reconcile_Deletion(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestClusterRole("testrole")
 	role.Annotations = map[string]string{
@@ -223,6 +228,7 @@ func TestController_Reconcile_Deletion(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionProtected(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestClusterRole("testrole")
 	role.Annotations = map[string]string{
@@ -255,6 +261,7 @@ func TestController_Reconcile_DeletionProtected(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionProtectedWithForceDelete(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestClusterRole("testrole")
 	role.Annotations = map[string]string{
@@ -290,6 +297,7 @@ func TestController_Reconcile_DeletionProtectedWithForceDelete(t *testing.T) {
 // --- Error path tests ---
 
 func TestController_Reconcile_ExistsError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestClusterRole("testrole")
 
@@ -322,6 +330,7 @@ func TestController_Reconcile_ExistsError(t *testing.T) {
 }
 
 func TestController_Reconcile_CreateError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestClusterRole("testrole")
 
@@ -355,6 +364,7 @@ func TestController_Reconcile_CreateError(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionDeleteError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestClusterRole("testrole")
 	role.Annotations = map[string]string{
@@ -393,6 +403,7 @@ func TestController_Reconcile_DeletionDeleteError(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionDeleteError_WithForce(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestClusterRole("testrole")
 	role.Annotations = map[string]string{
@@ -428,6 +439,7 @@ func TestController_Reconcile_DeletionDeleteError_WithForce(t *testing.T) {
 // --- Status validation tests ---
 
 func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestClusterRole("testrole")
 
@@ -475,6 +487,7 @@ func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
 // --- Drift detection tests ---
 
 func TestController_Reconcile_DriftDetected_DetectMode(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestClusterRole("testrole")
 
@@ -515,6 +528,7 @@ func TestController_Reconcile_DriftDetected_DetectMode(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftDetected_CorrectMode(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestClusterRole("testrole")
 	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
@@ -558,6 +572,7 @@ func TestController_Reconcile_DriftDetected_CorrectMode(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftDetected_IgnoreMode(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestClusterRole("testrole")
 	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
@@ -586,6 +601,7 @@ func TestController_Reconcile_DriftDetected_IgnoreMode(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftDetection_Error(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestClusterRole("testrole")
 
@@ -618,6 +634,7 @@ func TestController_Reconcile_DriftDetection_Error(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_PartialFail(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestClusterRole("testrole")
 	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
@@ -676,6 +693,7 @@ func TestController_Reconcile_DriftCorrection_PartialFail(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_AllFailed(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestClusterRole("testrole")
 	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
@@ -729,6 +747,7 @@ func TestController_Reconcile_DriftCorrection_AllFailed(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_Destructive(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestClusterRole("testrole")
 	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{
@@ -785,6 +804,7 @@ func TestController_Reconcile_DriftCorrection_Destructive(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_NoDestructive(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	role := newTestClusterRole("testrole")
 	role.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{

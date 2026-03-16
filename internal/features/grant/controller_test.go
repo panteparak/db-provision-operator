@@ -104,6 +104,7 @@ func newTestInstance(name, namespace string) *dbopsv1alpha1.DatabaseInstance {
 }
 
 func TestController_Reconcile_NewGrant(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	user := newTestUser("test-user", "default")
@@ -156,7 +157,64 @@ func TestController_Reconcile_NewGrant(t *testing.T) {
 	assert.True(t, mockRepo.WasCalled("Apply"))
 }
 
+func TestController_Reconcile_ObservedGeneration(t *testing.T) {
+	t.Parallel()
+	scheme := newTestScheme()
+	grant := newTestGrant("testgrant", "default")
+	grant.Generation = 2
+	user := newTestUser("test-user", "default")
+	instance := newTestInstance("test-instance", "default")
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(grant, user, instance).
+		WithStatusSubresource(grant, user, instance).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ApplyFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (*Result, error) {
+		return &Result{Applied: true, Roles: []string{"app_read"}, DirectGrants: 0, Message: "applied"}, nil
+	}
+	mockRepo.GetEngineFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string) (string, error) {
+		return "postgres", nil
+	}
+	mockRepo.DetectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, namespace string, allowDestructive bool) (*drift.Result, error) {
+		return drift.NewResult("grant", "testgrant"), nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:               client,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "testgrant",
+			Namespace: "default",
+		},
+	})
+
+	require.NoError(t, err)
+
+	var updatedGrant dbopsv1alpha1.DatabaseGrant
+	err = client.Get(context.Background(), types.NamespacedName{Name: "testgrant", Namespace: "default"}, &updatedGrant)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), updatedGrant.Status.ObservedGeneration,
+		"ObservedGeneration should match the resource Generation")
+}
+
 func TestController_Reconcile_WaitingForUser(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	// No user exists - grant should wait
@@ -206,6 +264,7 @@ func TestController_Reconcile_WaitingForUser(t *testing.T) {
 }
 
 func TestController_Reconcile_WaitingForUserReady(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	user := newTestUser("test-user", "default")
@@ -256,6 +315,7 @@ func TestController_Reconcile_WaitingForUserReady(t *testing.T) {
 }
 
 func TestController_Reconcile_WaitingForInstance(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	user := newTestUser("test-user", "default")
@@ -303,6 +363,7 @@ func TestController_Reconcile_WaitingForInstance(t *testing.T) {
 }
 
 func TestController_Reconcile_GrantNotFound(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 
 	client := fake.NewClientBuilder().
@@ -337,6 +398,7 @@ func TestController_Reconcile_GrantNotFound(t *testing.T) {
 }
 
 func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	grant.Annotations = map[string]string{
@@ -381,6 +443,7 @@ func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
 }
 
 func TestController_Reconcile_Deletion(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	grant.Finalizers = []string{util.FinalizerDatabaseGrant}
@@ -434,6 +497,7 @@ func TestController_Reconcile_Deletion(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionWithForceDelete(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	grant.Annotations = map[string]string{
@@ -491,6 +555,7 @@ func TestController_Reconcile_DeletionWithForceDelete(t *testing.T) {
 }
 
 func TestController_Reconcile_AppliedGrantsInStatus(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	user := newTestUser("test-user", "default")
@@ -554,6 +619,7 @@ func TestController_Reconcile_AppliedGrantsInStatus(t *testing.T) {
 // --- Error path tests ---
 
 func TestController_Reconcile_ApplyError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	user := newTestUser("test-user", "default")
@@ -607,6 +673,7 @@ func TestController_Reconcile_ApplyError(t *testing.T) {
 }
 
 func TestController_Reconcile_RevokeError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	grant.Finalizers = []string{util.FinalizerDatabaseGrant}
@@ -665,6 +732,7 @@ func TestController_Reconcile_RevokeError(t *testing.T) {
 }
 
 func TestController_Reconcile_RevokeError_WithForce(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	grant.Annotations = map[string]string{
@@ -720,6 +788,7 @@ func TestController_Reconcile_RevokeError_WithForce(t *testing.T) {
 }
 
 func TestController_Reconcile_Deletion_TargetNotReady(t *testing.T) {
+	t.Parallel()
 	// When the target user/role is not ready (e.g., being deleted with DependenciesExist),
 	// the grant controller should treat the revoke as a no-op and proceed with deletion.
 	scheme := newTestScheme()
@@ -780,6 +849,7 @@ func TestController_Reconcile_Deletion_TargetNotReady(t *testing.T) {
 }
 
 func TestController_Reconcile_Deletion_TargetNotFound(t *testing.T) {
+	t.Parallel()
 	// When the target user/role has already been deleted, the grant controller
 	// should treat the revoke as a no-op and proceed with deletion.
 	scheme := newTestScheme()
@@ -842,6 +912,7 @@ func TestController_Reconcile_Deletion_TargetNotFound(t *testing.T) {
 // --- Phase 2: Status validation tests ---
 
 func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	user := newTestUser("test-user", "default")
@@ -933,6 +1004,7 @@ func TestController_Reconcile_StatusFieldsPopulated(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionProtected(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	grant.Spec.DeletionProtection = true
@@ -978,6 +1050,7 @@ func TestController_Reconcile_DeletionProtected(t *testing.T) {
 // --- Drift detection tests ---
 
 func TestController_Reconcile_DriftDetected_DetectMode(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	// Default drift policy is detect mode (no DriftPolicy set)
@@ -1047,6 +1120,7 @@ func TestController_Reconcile_DriftDetected_DetectMode(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftDetected_CorrectMode(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	grant.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{Mode: dbopsv1alpha1.DriftModeCorrect}
@@ -1120,6 +1194,7 @@ func TestController_Reconcile_DriftDetected_CorrectMode(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_PartialFail(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	grant.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{Mode: dbopsv1alpha1.DriftModeCorrect}
@@ -1197,6 +1272,7 @@ func TestController_Reconcile_DriftCorrection_PartialFail(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_AllFailed(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	grant.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{Mode: dbopsv1alpha1.DriftModeCorrect}
@@ -1269,6 +1345,7 @@ func TestController_Reconcile_DriftCorrection_AllFailed(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftDetected_IgnoreMode(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	grant.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{Mode: dbopsv1alpha1.DriftModeIgnore}
@@ -1334,6 +1411,7 @@ func TestController_Reconcile_DriftDetected_IgnoreMode(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftDetection_Error(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	// Default drift policy is detect mode
@@ -1392,6 +1470,7 @@ func TestController_Reconcile_DriftDetection_Error(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_Destructive(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	grant.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{Mode: dbopsv1alpha1.DriftModeCorrect}
@@ -1468,6 +1547,7 @@ func TestController_Reconcile_DriftCorrection_Destructive(t *testing.T) {
 }
 
 func TestController_Reconcile_DriftCorrection_NoDestructive(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	grant := newTestGrant("testgrant", "default")
 	grant.Spec.DriftPolicy = &dbopsv1alpha1.DriftPolicy{Mode: dbopsv1alpha1.DriftModeCorrect}

@@ -125,6 +125,7 @@ func newTestInstanceResource(name, namespace string) *dbopsv1alpha1.DatabaseInst
 }
 
 func TestController_Reconcile_NewRestore(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	restore := newTestRestoreResource("testrestore", "default")
 	// Set phase to Pending to skip initialization step
@@ -188,6 +189,7 @@ func TestController_Reconcile_NewRestore(t *testing.T) {
 }
 
 func TestController_Reconcile_BackupNotCompleted(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	restore := newTestRestoreResource("testrestore", "default")
 	// Set phase to Pending to skip initialization step
@@ -250,6 +252,7 @@ func TestController_Reconcile_BackupNotCompleted(t *testing.T) {
 }
 
 func TestController_Reconcile_RestoreNotFound(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 
 	client := fake.NewClientBuilder().
@@ -283,6 +286,7 @@ func TestController_Reconcile_RestoreNotFound(t *testing.T) {
 }
 
 func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	restore := newTestRestoreResource("testrestore", "default")
 	restore.Annotations = map[string]string{
@@ -325,6 +329,7 @@ func TestController_Reconcile_SkipWithAnnotation(t *testing.T) {
 }
 
 func TestController_Reconcile_Deletion(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	restore := newTestRestoreResource("testrestore", "default")
 	restore.Finalizers = []string{util.FinalizerDatabaseRestore}
@@ -364,6 +369,7 @@ func TestController_Reconcile_Deletion(t *testing.T) {
 }
 
 func TestController_Reconcile_TerminalStateCompleted(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	restore := newTestRestoreResource("testrestore", "default")
 	restore.Status.Phase = dbopsv1alpha1.PhaseCompleted
@@ -405,6 +411,7 @@ func TestController_Reconcile_TerminalStateCompleted(t *testing.T) {
 }
 
 func TestController_Reconcile_TerminalStateFailed(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	restore := newTestRestoreResource("testrestore", "default")
 	restore.Status.Phase = dbopsv1alpha1.PhaseFailed
@@ -446,6 +453,7 @@ func TestController_Reconcile_TerminalStateFailed(t *testing.T) {
 }
 
 func TestController_Reconcile_DeadlineExceeded(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	restore := newTestRestoreResource("testrestore", "default")
 	restore.Spec.ActiveDeadlineSeconds = 60
@@ -497,6 +505,7 @@ func TestController_Reconcile_DeadlineExceeded(t *testing.T) {
 }
 
 func TestController_Reconcile_WaitingForInstance(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	restore := newTestRestoreResource("testrestore", "default")
 	// Set phase to Pending to skip initialization step
@@ -566,6 +575,7 @@ func TestController_Reconcile_WaitingForInstance(t *testing.T) {
 }
 
 func TestController_Reconcile_RestoreError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	restore := newTestRestoreResource("testrestore", "default")
 	// Set phase to Pending to skip initialization step
@@ -631,6 +641,7 @@ func TestController_Reconcile_RestoreError(t *testing.T) {
 }
 
 func TestController_Reconcile_DeletionError(t *testing.T) {
+	t.Parallel()
 	scheme := newTestScheme()
 	restore := newTestRestoreResource("testrestore", "default")
 	restore.Finalizers = []string{util.FinalizerDatabaseRestore}
