@@ -514,7 +514,7 @@ jobs:
       pages: write
       id-token: write
     needs: [guard, github-release]
-    if: needs.guard.outputs.should-release == 'true'
+    if: always() && needs.guard.outputs.should-release == 'true' && !contains(needs.*.result, 'failure')
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
