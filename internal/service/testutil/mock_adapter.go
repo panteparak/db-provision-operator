@@ -40,6 +40,7 @@ type MockAdapter struct {
 	VerifyDatabaseAccessFunc      func(ctx context.Context, name string) error
 	TransferDatabaseOwnershipFunc func(ctx context.Context, dbName, newOwner string) error
 	ExecSQLFunc                   func(ctx context.Context, database string, statement string) error
+	ExecSQLAsRoleFunc             func(ctx context.Context, database, role, statement string) error
 
 	// User operations
 	CreateUserFunc      func(ctx context.Context, opts types.CreateUserOptions) error
@@ -107,6 +108,7 @@ func NewMockAdapter() *MockAdapter {
 	m.VerifyDatabaseAccessFunc = func(ctx context.Context, name string) error { return nil }
 	m.TransferDatabaseOwnershipFunc = func(ctx context.Context, dbName, newOwner string) error { return nil }
 	m.ExecSQLFunc = func(ctx context.Context, database string, statement string) error { return nil }
+	m.ExecSQLAsRoleFunc = func(ctx context.Context, database, role, statement string) error { return nil }
 
 	m.CreateUserFunc = func(ctx context.Context, opts types.CreateUserOptions) error { return nil }
 	m.DropUserFunc = func(ctx context.Context, username string) error { return nil }
@@ -258,6 +260,11 @@ func (m *MockAdapter) TransferDatabaseOwnership(ctx context.Context, dbName, new
 func (m *MockAdapter) ExecSQL(ctx context.Context, database string, statement string) error {
 	m.record("ExecSQL", database, statement)
 	return m.ExecSQLFunc(ctx, database, statement)
+}
+
+func (m *MockAdapter) ExecSQLAsRole(ctx context.Context, database, role, statement string) error {
+	m.record("ExecSQLAsRole", database, role, statement)
+	return m.ExecSQLAsRoleFunc(ctx, database, role, statement)
 }
 
 // User operations implementations

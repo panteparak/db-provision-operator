@@ -156,6 +156,13 @@ func (a *Adapter) ExecSQL(ctx context.Context, database string, statement string
 	return nil
 }
 
+// ExecSQLAsRole executes a SQL statement on the named database.
+// ClickHouse does not support SET ROLE; the role parameter is ignored
+// and the statement executes as the operator user.
+func (a *Adapter) ExecSQLAsRole(ctx context.Context, database, _, statement string) error {
+	return a.ExecSQL(ctx, database, statement)
+}
+
 // UpdateDatabase is a no-op for ClickHouse as ClickHouse does not support
 // ALTER DATABASE for most settings.
 func (a *Adapter) UpdateDatabase(_ context.Context, _ string, _ types.UpdateDatabaseOptions) error {

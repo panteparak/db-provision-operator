@@ -374,11 +374,12 @@ func (r *Repository) ResolveInitSQL(ctx context.Context, initSQL *dbopsv1alpha1.
 }
 
 // ExecInitSQL executes init SQL statements on the named database using the withService pattern.
+// When spec.Owner is set, statements execute as the owner role via SET ROLE for least-privilege.
 func (r *Repository) ExecInitSQL(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec, namespace string, statements []string) (int, error) {
 	var executed int
 	err := r.withService(ctx, spec, namespace, func(svc *service.DatabaseService, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
 		var execErr error
-		executed, execErr = svc.ExecInitSQL(ctx, spec.Name, statements)
+		executed, execErr = svc.ExecInitSQL(ctx, spec.Name, statements, spec.Owner)
 		return execErr
 	})
 	return executed, err

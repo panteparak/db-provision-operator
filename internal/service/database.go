@@ -415,15 +415,17 @@ func (s *DatabaseService) DeleteOwnershipResources(ctx context.Context, roleName
 }
 
 // ExecInitSQL executes a list of SQL statements on the named database.
+// When asRole is non-empty, each statement is executed after SET ROLE to scope
+// privileges to the specified role (typically the database owner).
 // Returns the count of successfully executed statements and the first error encountered.
-func (s *DatabaseService) ExecInitSQL(ctx context.Context, database string, statements []string) (int, error) {
+func (s *DatabaseService) ExecInitSQL(ctx context.Context, database string, statements []string, asRole string) (int, error) {
 	executed := 0
 	for i, stmt := range statements {
 		stmt = strings.TrimSpace(stmt)
 		if stmt == "" {
 			continue
 		}
-		if err := s.adapter.ExecSQL(ctx, database, stmt); err != nil {
+		if err := s.adapter.ExecSQLAsRole(ctx, database, asRole, stmt); err != nil {
 			return executed, fmt.Errorf("statement %d: %w", i+1, err)
 		}
 		executed++

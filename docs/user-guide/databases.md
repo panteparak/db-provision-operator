@@ -97,8 +97,8 @@ Exactly one source must be specified:
 | `Continue` | Yes | Database reaches Ready; `Synced` condition set to `False` with error details |
 | `Block` | No | Database stays in `Failed` phase and requeues until SQL succeeds |
 
-!!! warning "Security: Init SQL runs with operator credentials"
-    Init SQL statements are executed using the operator's database connection credentials (from the DatabaseInstance). Treat `initSQL` content with the same trust level as direct database admin access. Use `secretRef` for sensitive data.
+!!! info "Init SQL execution context"
+    When `spec.owner` is set, init SQL executes as the database owner role via `SET ROLE`. This scopes init SQL to the owner's privileges — it cannot access other databases or perform superuser operations (e.g., `CREATE EXTENSION` should use `spec.postgres.extensions` instead). When no owner is set, init SQL executes with the operator's admin credentials. The operator user must be a superuser or have membership on the owner role for `SET ROLE` to succeed.
 
 !!! tip "Idempotency and re-execution"
     The operator computes a SHA-256 hash of the resolved SQL content and stores it in `status.initSQL.hash`. Init SQL only re-executes when the content hash changes. Write idempotent SQL (e.g., `CREATE TABLE IF NOT EXISTS`, `INSERT ... ON CONFLICT DO NOTHING`) to handle re-execution safely.

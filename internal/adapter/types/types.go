@@ -80,6 +80,11 @@ type DatabaseManager interface {
 	// ExecSQL executes a single SQL statement on the named database.
 	// The statement is executed as-is with the operator's credentials.
 	ExecSQL(ctx context.Context, database string, statement string) error
+
+	// ExecSQLAsRole executes a SQL statement on the named database
+	// after switching to the specified role via SET ROLE (PostgreSQL/CockroachDB)
+	// or equivalent mechanism. If role is empty, executes as the operator user.
+	ExecSQLAsRole(ctx context.Context, database, role, statement string) error
 }
 
 // CreateDatabaseOptions contains options for creating a database

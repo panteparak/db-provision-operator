@@ -187,6 +187,45 @@ func (a *Adapter) ExecSQL(ctx context.Context, database string, statement string
 	return nil
 }
 
+// ExecSQLAsRole executes a SQL statement after switching to the specified role via SET ROLE.
+// MySQL 8.0+ supports SET ROLE. Since MultiStatements is disabled, SET ROLE is executed
+// as a separate ExecContext call on the same connection/session.
+// If role is empty, executes as the operator user.
+func (a *Adapter) ExecSQLAsRole(ctx context.Context, database, role, statement string) error {
+	db, err := a.getDB()
+	if err != nil {
+		return err
+	}
+
+	// Switch to the target database
+	if _, err := db.ExecContext(ctx, fmt.Sprintf("USE %s", escapeIdentifier(database))); err != nil {
+		return fmt.Errorf("failed to switch to database %s: %w", database, err)
+	}
+
+	// Set role if specified
+	if role != "" {
+		if _, err := db.ExecContext(ctx, fmt.Sprintf("SET ROLE %s", escapeIdentifier(role))); err != nil {
+			// Always switch back to admin database before returning
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("USE %s", escapeIdentifier(a.config.Database)))
+			return fmt.Errorf("failed to set role %s on database %s: %w", role, database, err)
+		}
+	}
+
+	// Execute the statement
+	_, execErr := db.ExecContext(ctx, statement)
+
+	// Reset role and switch back to admin database
+	if role != "" {
+		_, _ = db.ExecContext(ctx, "SET ROLE NONE")
+	}
+	_, _ = db.ExecContext(ctx, fmt.Sprintf("USE %s", escapeIdentifier(a.config.Database)))
+
+	if execErr != nil {
+		return fmt.Errorf("failed to execute SQL on database %s: %w", database, execErr)
+	}
+	return nil
+}
+
 // UpdateDatabase updates MySQL database settings
 func (a *Adapter) UpdateDatabase(ctx context.Context, name string, opts types.UpdateDatabaseOptions) error {
 	db, err := a.getDB()

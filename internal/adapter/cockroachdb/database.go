@@ -238,6 +238,17 @@ func (a *Adapter) ExecSQL(ctx context.Context, database string, statement string
 	return a.execWithNewConnection(ctx, database, statement)
 }
 
+// ExecSQLAsRole executes a SQL statement after switching to the specified role via SET ROLE.
+// CockroachDB supports SET ROLE with identical semantics to PostgreSQL.
+// If role is empty, executes as the operator user.
+func (a *Adapter) ExecSQLAsRole(ctx context.Context, database, role, statement string) error {
+	if role == "" {
+		return a.execWithNewConnection(ctx, database, statement)
+	}
+	roleSQL := fmt.Sprintf("SET ROLE %s", escapeIdentifier(role))
+	return a.execWithNewConnection(ctx, database, roleSQL+"; "+statement)
+}
+
 // setDefaultPrivileges sets default privileges in a CockroachDB database.
 // CockroachDB supports ALTER DEFAULT PRIVILEGES with the same syntax as PostgreSQL.
 func (a *Adapter) setDefaultPrivileges(ctx context.Context, database string, dp types.DefaultPrivilegeOptions) error {
