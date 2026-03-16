@@ -1977,7 +1977,7 @@ func TestController_Reconcile_DeletionSucceedsWhenNoGrants(t *testing.T) {
 		},
 	})
 
-	// Should succeed with empty result (Retain policy, no grants, finalizer removed)
+	// Should succeed with empty result (Delete policy, no grants, finalizer removed)
 	require.NoError(t, err)
 	assert.Equal(t, ctrl.Result{}, result)
 

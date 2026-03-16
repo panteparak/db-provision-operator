@@ -88,7 +88,7 @@ spec:
                   - Retain
                   - Delete
                   - Snapshot
-                default: Retain
+                default: Delete
                 description: DeletionPolicy defines what happens on CR deletion
                 type: string
               deletionProtection:

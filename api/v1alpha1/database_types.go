@@ -55,7 +55,7 @@ type DatabaseSpec struct {
 
 	// DeletionPolicy defines what happens on CR deletion
 	// +kubebuilder:validation:Enum=Retain;Delete;Snapshot
-	// +kubebuilder:default=Retain
+	// +kubebuilder:default=Delete
 	DeletionPolicy DeletionPolicy `json:"deletionPolicy,omitempty"`
 
 	// DeletionProtection prevents accidental deletion

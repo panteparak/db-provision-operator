@@ -307,7 +307,7 @@ func (c *Controller) handleDeletion(ctx context.Context, database *dbopsv1alpha1
 	// Check deletion policy
 	deletionPolicy := database.Spec.DeletionPolicy
 	if deletionPolicy == "" {
-		deletionPolicy = dbopsv1alpha1.DeletionPolicyRetain
+		deletionPolicy = dbopsv1alpha1.DeletionPolicyDelete
 	}
 
 	// Check deletion protection

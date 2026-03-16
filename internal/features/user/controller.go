@@ -414,8 +414,8 @@ func (c *Controller) handleDeletion(ctx context.Context, user *dbopsv1alpha1.Dat
 
 	log.Info("Handling deletion of DatabaseUser")
 
-	// Get deletion policy from annotation (default to Retain for users)
-	deletionPolicy := dbopsv1alpha1.DeletionPolicyRetain
+	// Get deletion policy from annotation (default to Delete for users)
+	deletionPolicy := dbopsv1alpha1.DeletionPolicyDelete
 	if policy, ok := user.Annotations["dbops.dbprovision.io/deletion-policy"]; ok {
 		deletionPolicy = dbopsv1alpha1.DeletionPolicy(policy)
 	}

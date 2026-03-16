@@ -378,11 +378,11 @@ func (c *Controller) updatePhase(ctx context.Context, role *dbopsv1alpha1.Databa
 func (c *Controller) getDeletionPolicy(role *dbopsv1alpha1.DatabaseRole) string {
 	annotations := role.GetAnnotations()
 	if annotations == nil {
-		return string(dbopsv1alpha1.DeletionPolicyRetain)
+		return string(dbopsv1alpha1.DeletionPolicyDelete)
 	}
 	policy := annotations[AnnotationDeletionPolicy]
 	if policy == "" {
-		return string(dbopsv1alpha1.DeletionPolicyRetain)
+		return string(dbopsv1alpha1.DeletionPolicyDelete)
 	}
 	return policy
 }

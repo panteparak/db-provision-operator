@@ -1582,7 +1582,7 @@ func TestController_Reconcile_DeletionSucceedsWhenNoGrants(t *testing.T) {
 	database.Finalizers = []string{util.FinalizerDatabase}
 	now := metav1.Now()
 	database.DeletionTimestamp = &now
-	// Default deletion policy is Retain — no external deletion, just finalizer removal
+	// Default deletion policy is Delete — external database is dropped, then finalizer removal
 
 	// No grant resources created — database has no dependencies
 
@@ -1625,8 +1625,8 @@ func TestController_Reconcile_DeletionSucceedsWhenNoGrants(t *testing.T) {
 	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testdb", Namespace: "default"}, &updatedDB)
 	assert.True(t, apierrors.IsNotFound(err), "database should be deleted after finalizer removal")
 
-	// Verify Delete was NOT called (Retain policy)
-	assert.False(t, mockRepo.WasCalled("Delete"))
+	// Verify Delete was called (Delete policy is now the default)
+	assert.True(t, mockRepo.WasCalled("Delete"))
 }
 
 func TestController_Reconcile_ForceDeleteBypassesGrantCheck(t *testing.T) {

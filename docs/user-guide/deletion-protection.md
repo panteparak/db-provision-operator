@@ -183,12 +183,12 @@ Deletion protection is separate from deletion policy. The deletion policy contro
 
 | Resource | Policy Source | Default | Available Policies |
 |----------|-------------|---------|-------------------|
-| Database | `spec.deletionPolicy` | `Retain` | `Retain`, `Delete`, `Snapshot` |
-| DatabaseUser | annotation `dbops.dbprovision.io/deletion-policy` | `Retain` | `Retain`, `Delete` |
-| DatabaseRole | annotation `dbops.dbprovision.io/deletion-policy` | `Retain` | `Retain`, `Delete` |
+| Database | `spec.deletionPolicy` | `Delete` | `Retain`, `Delete`, `Snapshot` |
+| DatabaseUser | annotation `dbops.dbprovision.io/deletion-policy` | `Delete` | `Retain`, `Delete` |
+| DatabaseRole | annotation `dbops.dbprovision.io/deletion-policy` | `Delete` | `Retain`, `Delete` |
 | DatabaseGrant | hardcoded | `Delete` | Always `Delete` (grants are always revoked) |
 | DatabaseInstance | — | — | No external resource to delete; always removes finalizer |
-| DatabaseBackupSchedule | `spec.deletionPolicy` | `Retain` | `Retain`, `Delete` |
+| DatabaseBackupSchedule | `spec.deletionPolicy` | `Delete` | `Retain`, `Delete` |
 
 ### Setting Deletion Policy
 

@@ -50,8 +50,8 @@ What happens to the database when the CR is deleted.
 
 | Value | Description |
 |-------|-------------|
-| `Retain` | Keep the database (default) |
-| `Delete` | Delete the database |
+| `Retain` | Keep the database |
+| `Delete` | Delete the database (default) |
 | `Snapshot` | Create a backup before deletion |
 
 ### deletionProtection (optional)
@@ -187,7 +187,7 @@ spec:
   instanceRef:
     name: postgres-primary
   name: myapp
-  deletionPolicy: Retain
+  deletionPolicy: Delete
   deletionProtection: true
   postgres:
     encoding: UTF8
@@ -378,8 +378,8 @@ The full deletion flow for a Database:
 2. **Child dependency check**: If DatabaseGrant children reference this Database, deletion is blocked (Phase=Failed, condition=DependenciesExist) unless force-delete is set.
 3. **Cascade confirmation**: When force-delete is set and children exist, the operator enters `PhasePendingDeletion` and requires the `confirm-force-delete` annotation with the hash from `status.deletionConfirmation.hash`. Each child grant is deleted according to its own deletion policy. See [Force Delete with Children](deletion-protection.md#force-delete-with-children-cascade-confirmation).
 4. **Deletion policy**: Controls what happens to the external database:
-    - **Retain** (default): CR is deleted, database remains
-    - **Delete**: Database is dropped, then CR is deleted
+    - **Retain**: CR is deleted, database remains
+    - **Delete** (default): Database is dropped, then CR is deleted
     - **Snapshot**: Backup is created, database is dropped, CR is deleted
 5. **Force-delete and external failures**: If the database drop fails and force-delete is set, the operator continues with finalizer removal anyway (the external database is left as-is).
 

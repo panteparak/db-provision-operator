@@ -175,7 +175,7 @@ func NewDatabase(name, namespace string) *DatabaseBuilder {
 			},
 			Spec: dbopsv1alpha1.DatabaseSpec{
 				Name:               name,
-				DeletionPolicy:     dbopsv1alpha1.DeletionPolicyRetain,
+				DeletionPolicy:     dbopsv1alpha1.DeletionPolicyDelete,
 				DeletionProtection: true,
 			},
 		},
