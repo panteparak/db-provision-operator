@@ -20,10 +20,12 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
 	"github.com/db-provision-operator/internal/service/drift"
@@ -782,6 +784,547 @@ func TestHandler_GetOwnedObjects(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHandler_RotateWithStrategy(t *testing.T) {
+	t.Run("role-inheritance creates user with service role", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockEventBus := NewMockEventBus()
+
+		var ensuredRole string
+		mockRepo.EnsureServiceRoleFunc = func(ctx context.Context, roleName string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
+			ensuredRole = roleName
+			return nil
+		}
+		var createdUsername, createdRoleName string
+		mockRepo.CreateUserWithRoleFunc = func(ctx context.Context, username, password, roleName string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
+			createdUsername = username
+			createdRoleName = roleName
+			assert.NotEmpty(t, password, "password should be generated")
+			return nil
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: mockEventBus,
+			logger:   logr.Discard(),
+		}
+
+		user := &dbopsv1alpha1.DatabaseUser{
+			ObjectMeta: metav1.ObjectMeta{Name: "myapp-user", Namespace: "default"},
+			Spec: dbopsv1alpha1.DatabaseUserSpec{
+				Username:    "myapp",
+				InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "test-instance"},
+				PasswordRotation: &dbopsv1alpha1.PasswordRotationConfig{
+					Enabled:  true,
+					Schedule: "0 0 1 * *",
+					Strategy: dbopsv1alpha1.RotationStrategyRoleInheritance,
+					ServiceRole: &dbopsv1alpha1.ServiceRoleConfig{
+						Name:       "svc_myapp",
+						AutoCreate: true,
+					},
+				},
+			},
+		}
+
+		result, err := handler.RotateWithStrategy(context.Background(), user)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		assert.Equal(t, "svc_myapp", ensuredRole)
+		assert.Equal(t, "svc_myapp", result.ServiceRole)
+		assert.Equal(t, "svc_myapp", createdRoleName)
+		assert.Contains(t, createdUsername, "myapp_")
+		assert.Equal(t, createdUsername, result.NewUsername)
+		assert.NotEmpty(t, result.NewPassword)
+
+		// Verify event published
+		assert.Len(t, mockEventBus.PublishedEvents, 1)
+	})
+
+	t.Run("default service role name when not specified", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+
+		var ensuredRole string
+		mockRepo.EnsureServiceRoleFunc = func(ctx context.Context, roleName string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
+			ensuredRole = roleName
+			return nil
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		user := &dbopsv1alpha1.DatabaseUser{
+			ObjectMeta: metav1.ObjectMeta{Name: "myapp-user", Namespace: "default"},
+			Spec: dbopsv1alpha1.DatabaseUserSpec{
+				Username:    "myapp",
+				InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "test-instance"},
+				PasswordRotation: &dbopsv1alpha1.PasswordRotationConfig{
+					Enabled:  true,
+					Schedule: "0 0 1 * *",
+				},
+			},
+		}
+
+		result, err := handler.RotateWithStrategy(context.Background(), user)
+		require.NoError(t, err)
+		assert.Equal(t, "svc_myapp", ensuredRole)
+		assert.Equal(t, "svc_myapp", result.ServiceRole)
+	})
+
+	t.Run("unsupported strategy returns error", func(t *testing.T) {
+		handler := &Handler{
+			repo:     NewMockRepository(),
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		user := &dbopsv1alpha1.DatabaseUser{
+			ObjectMeta: metav1.ObjectMeta{Name: "myapp-user", Namespace: "default"},
+			Spec: dbopsv1alpha1.DatabaseUserSpec{
+				Username:    "myapp",
+				InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "test-instance"},
+				PasswordRotation: &dbopsv1alpha1.PasswordRotationConfig{
+					Enabled:  true,
+					Strategy: "unknown-strategy",
+				},
+			},
+		}
+
+		result, err := handler.RotateWithStrategy(context.Background(), user)
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "unsupported rotation strategy")
+	})
+
+	t.Run("ensure service role error propagates", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.EnsureServiceRoleFunc = func(ctx context.Context, roleName string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
+			return errors.New("connection refused")
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		user := &dbopsv1alpha1.DatabaseUser{
+			ObjectMeta: metav1.ObjectMeta{Name: "myapp-user", Namespace: "default"},
+			Spec: dbopsv1alpha1.DatabaseUserSpec{
+				Username:    "myapp",
+				InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "test-instance"},
+				PasswordRotation: &dbopsv1alpha1.PasswordRotationConfig{
+					Enabled:  true,
+					Schedule: "0 0 1 * *",
+				},
+			},
+		}
+
+		result, err := handler.RotateWithStrategy(context.Background(), user)
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "ensure service role")
+	})
+
+	t.Run("create user with role error propagates", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.CreateUserWithRoleFunc = func(ctx context.Context, username, password, roleName string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
+			return errors.New("role does not exist")
+		}
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		user := &dbopsv1alpha1.DatabaseUser{
+			ObjectMeta: metav1.ObjectMeta{Name: "myapp-user", Namespace: "default"},
+			Spec: dbopsv1alpha1.DatabaseUserSpec{
+				Username:    "myapp",
+				InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "test-instance"},
+				PasswordRotation: &dbopsv1alpha1.PasswordRotationConfig{
+					Enabled:  true,
+					Schedule: "0 0 1 * *",
+				},
+			},
+		}
+
+		result, err := handler.RotateWithStrategy(context.Background(), user)
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "create rotated user")
+	})
+
+	t.Run("skips service role creation when autoCreate is false", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+
+		handler := &Handler{
+			repo:     mockRepo,
+			eventBus: NewMockEventBus(),
+			logger:   logr.Discard(),
+		}
+
+		user := &dbopsv1alpha1.DatabaseUser{
+			ObjectMeta: metav1.ObjectMeta{Name: "myapp-user", Namespace: "default"},
+			Spec: dbopsv1alpha1.DatabaseUserSpec{
+				Username:    "myapp",
+				InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "test-instance"},
+				PasswordRotation: &dbopsv1alpha1.PasswordRotationConfig{
+					Enabled:  true,
+					Schedule: "0 0 1 * *",
+					ServiceRole: &dbopsv1alpha1.ServiceRoleConfig{
+						Name:       "existing_role",
+						AutoCreate: false,
+					},
+				},
+			},
+		}
+
+		_, err := handler.RotateWithStrategy(context.Background(), user)
+		require.NoError(t, err)
+		assert.False(t, mockRepo.WasCalled("EnsureServiceRole"))
+		assert.True(t, mockRepo.WasCalled("CreateUserWithRole"))
+	})
+}
+
+func TestHandler_CleanupDeprecatedUsers(t *testing.T) {
+	pastTime := metav1.NewTime(time.Now().Add(-48 * time.Hour))
+	futureTime := metav1.NewTime(time.Now().Add(48 * time.Hour))
+
+	t.Run("deletes user past grace period", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		var deletedUser string
+		mockRepo.DeleteFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, force bool) error {
+			deletedUser = username
+			return nil
+		}
+
+		handler := &Handler{
+			repo:   mockRepo,
+			logger: logr.Discard(),
+		}
+
+		user := &dbopsv1alpha1.DatabaseUser{
+			ObjectMeta: metav1.ObjectMeta{Name: "myapp-user", Namespace: "default"},
+			Spec: dbopsv1alpha1.DatabaseUserSpec{
+				Username:    "myapp",
+				InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "test-instance"},
+				PasswordRotation: &dbopsv1alpha1.PasswordRotationConfig{
+					Enabled: true,
+					OldUserPolicy: &dbopsv1alpha1.OldUserPolicy{
+						Action:          dbopsv1alpha1.OldUserActionDelete,
+						GracePeriodDays: 7,
+						OwnershipCheck:  false,
+					},
+				},
+			},
+			Status: dbopsv1alpha1.DatabaseUserStatus{
+				Rotation: &dbopsv1alpha1.RotationStatus{
+					PendingDeletion: []dbopsv1alpha1.PendingDeletionInfo{
+						{
+							User:        "myapp_20260301",
+							DeleteAfter: &pastTime,
+							Status:      "pending",
+						},
+					},
+				},
+			},
+		}
+
+		err := handler.CleanupDeprecatedUsers(context.Background(), user)
+		require.NoError(t, err)
+		assert.Equal(t, "myapp_20260301", deletedUser)
+		assert.Empty(t, user.Status.Rotation.PendingDeletion)
+	})
+
+	t.Run("skips user not yet due", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+
+		handler := &Handler{
+			repo:   mockRepo,
+			logger: logr.Discard(),
+		}
+
+		user := &dbopsv1alpha1.DatabaseUser{
+			ObjectMeta: metav1.ObjectMeta{Name: "myapp-user", Namespace: "default"},
+			Spec: dbopsv1alpha1.DatabaseUserSpec{
+				Username:    "myapp",
+				InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "test-instance"},
+				PasswordRotation: &dbopsv1alpha1.PasswordRotationConfig{
+					Enabled: true,
+					OldUserPolicy: &dbopsv1alpha1.OldUserPolicy{
+						Action:          dbopsv1alpha1.OldUserActionDelete,
+						GracePeriodDays: 7,
+					},
+				},
+			},
+			Status: dbopsv1alpha1.DatabaseUserStatus{
+				Rotation: &dbopsv1alpha1.RotationStatus{
+					PendingDeletion: []dbopsv1alpha1.PendingDeletionInfo{
+						{
+							User:        "myapp_20260315",
+							DeleteAfter: &futureTime,
+							Status:      "pending",
+						},
+					},
+				},
+			},
+		}
+
+		err := handler.CleanupDeprecatedUsers(context.Background(), user)
+		require.NoError(t, err)
+		assert.False(t, mockRepo.WasCalled("Delete"))
+		assert.Len(t, user.Status.Rotation.PendingDeletion, 1)
+	})
+
+	t.Run("blocks deletion when user owns objects", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		mockRepo.GetOwnedObjectsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) ([]OwnedObject, error) {
+			return []OwnedObject{
+				{Schema: "public", Name: "vault_kv_store", Type: "table"},
+			}, nil
+		}
+
+		handler := &Handler{
+			repo:   mockRepo,
+			logger: logr.Discard(),
+		}
+
+		user := &dbopsv1alpha1.DatabaseUser{
+			ObjectMeta: metav1.ObjectMeta{Name: "myapp-user", Namespace: "default"},
+			Spec: dbopsv1alpha1.DatabaseUserSpec{
+				Username:    "myapp",
+				InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "test-instance"},
+				PasswordRotation: &dbopsv1alpha1.PasswordRotationConfig{
+					Enabled: true,
+					OldUserPolicy: &dbopsv1alpha1.OldUserPolicy{
+						Action:          dbopsv1alpha1.OldUserActionDelete,
+						GracePeriodDays: 7,
+						OwnershipCheck:  true,
+					},
+				},
+			},
+			Status: dbopsv1alpha1.DatabaseUserStatus{
+				Rotation: &dbopsv1alpha1.RotationStatus{
+					ServiceRole: "svc_myapp",
+					PendingDeletion: []dbopsv1alpha1.PendingDeletionInfo{
+						{
+							User:        "myapp_20260301",
+							DeleteAfter: &pastTime,
+							Status:      "pending",
+						},
+					},
+				},
+			},
+		}
+
+		err := handler.CleanupDeprecatedUsers(context.Background(), user)
+		require.NoError(t, err)
+		assert.False(t, mockRepo.WasCalled("Delete"))
+		require.Len(t, user.Status.Rotation.PendingDeletion, 1)
+		assert.Equal(t, "blocked", user.Status.Rotation.PendingDeletion[0].Status)
+		assert.Contains(t, user.Status.Rotation.PendingDeletion[0].BlockedReason, "owns")
+		assert.Contains(t, user.Status.Rotation.PendingDeletion[0].Resolution, "REASSIGN OWNED BY")
+	})
+
+	t.Run("disables user instead of deleting", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+		var disabledUser string
+		mockRepo.DisableLoginFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
+			disabledUser = username
+			return nil
+		}
+
+		handler := &Handler{
+			repo:   mockRepo,
+			logger: logr.Discard(),
+		}
+
+		user := &dbopsv1alpha1.DatabaseUser{
+			ObjectMeta: metav1.ObjectMeta{Name: "myapp-user", Namespace: "default"},
+			Spec: dbopsv1alpha1.DatabaseUserSpec{
+				Username:    "myapp",
+				InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "test-instance"},
+				PasswordRotation: &dbopsv1alpha1.PasswordRotationConfig{
+					Enabled: true,
+					OldUserPolicy: &dbopsv1alpha1.OldUserPolicy{
+						Action:          dbopsv1alpha1.OldUserActionDisable,
+						GracePeriodDays: 7,
+					},
+				},
+			},
+			Status: dbopsv1alpha1.DatabaseUserStatus{
+				Rotation: &dbopsv1alpha1.RotationStatus{
+					PendingDeletion: []dbopsv1alpha1.PendingDeletionInfo{
+						{
+							User:        "myapp_20260301",
+							DeleteAfter: &pastTime,
+							Status:      "pending",
+						},
+					},
+				},
+			},
+		}
+
+		err := handler.CleanupDeprecatedUsers(context.Background(), user)
+		require.NoError(t, err)
+		assert.Equal(t, "myapp_20260301", disabledUser)
+		assert.False(t, mockRepo.WasCalled("Delete"))
+		assert.Empty(t, user.Status.Rotation.PendingDeletion)
+	})
+
+	t.Run("retains user without action", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+
+		handler := &Handler{
+			repo:   mockRepo,
+			logger: logr.Discard(),
+		}
+
+		user := &dbopsv1alpha1.DatabaseUser{
+			ObjectMeta: metav1.ObjectMeta{Name: "myapp-user", Namespace: "default"},
+			Spec: dbopsv1alpha1.DatabaseUserSpec{
+				Username:    "myapp",
+				InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "test-instance"},
+				PasswordRotation: &dbopsv1alpha1.PasswordRotationConfig{
+					Enabled: true,
+					OldUserPolicy: &dbopsv1alpha1.OldUserPolicy{
+						Action:          dbopsv1alpha1.OldUserActionRetain,
+						GracePeriodDays: 7,
+					},
+				},
+			},
+			Status: dbopsv1alpha1.DatabaseUserStatus{
+				Rotation: &dbopsv1alpha1.RotationStatus{
+					PendingDeletion: []dbopsv1alpha1.PendingDeletionInfo{
+						{
+							User:        "myapp_20260301",
+							DeleteAfter: &pastTime,
+							Status:      "pending",
+						},
+					},
+				},
+			},
+		}
+
+		err := handler.CleanupDeprecatedUsers(context.Background(), user)
+		require.NoError(t, err)
+		assert.False(t, mockRepo.WasCalled("Delete"))
+		assert.False(t, mockRepo.WasCalled("DisableLogin"))
+		assert.Empty(t, user.Status.Rotation.PendingDeletion)
+	})
+
+	t.Run("no-op when rotation status is nil", func(t *testing.T) {
+		handler := &Handler{
+			repo:   NewMockRepository(),
+			logger: logr.Discard(),
+		}
+
+		user := &dbopsv1alpha1.DatabaseUser{
+			ObjectMeta: metav1.ObjectMeta{Name: "myapp-user", Namespace: "default"},
+			Spec: dbopsv1alpha1.DatabaseUserSpec{
+				Username:    "myapp",
+				InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "test-instance"},
+				PasswordRotation: &dbopsv1alpha1.PasswordRotationConfig{
+					Enabled: true,
+				},
+			},
+		}
+
+		err := handler.CleanupDeprecatedUsers(context.Background(), user)
+		require.NoError(t, err)
+	})
+
+	t.Run("skips already deleted entries", func(t *testing.T) {
+		mockRepo := NewMockRepository()
+
+		handler := &Handler{
+			repo:   mockRepo,
+			logger: logr.Discard(),
+		}
+
+		user := &dbopsv1alpha1.DatabaseUser{
+			ObjectMeta: metav1.ObjectMeta{Name: "myapp-user", Namespace: "default"},
+			Spec: dbopsv1alpha1.DatabaseUserSpec{
+				Username:    "myapp",
+				InstanceRef: &dbopsv1alpha1.InstanceReference{Name: "test-instance"},
+				PasswordRotation: &dbopsv1alpha1.PasswordRotationConfig{
+					Enabled: true,
+					OldUserPolicy: &dbopsv1alpha1.OldUserPolicy{
+						Action: dbopsv1alpha1.OldUserActionDelete,
+					},
+				},
+			},
+			Status: dbopsv1alpha1.DatabaseUserStatus{
+				Rotation: &dbopsv1alpha1.RotationStatus{
+					PendingDeletion: []dbopsv1alpha1.PendingDeletionInfo{
+						{
+							User:        "myapp_20260201",
+							DeleteAfter: &pastTime,
+							Status:      "deleted",
+						},
+					},
+				},
+			},
+		}
+
+		err := handler.CleanupDeprecatedUsers(context.Background(), user)
+		require.NoError(t, err)
+		assert.False(t, mockRepo.WasCalled("Delete"))
+		assert.Empty(t, user.Status.Rotation.PendingDeletion)
+	})
+}
+
+func TestHandler_GenerateRotatedUsername(t *testing.T) {
+	handler := &Handler{logger: logr.Discard()}
+
+	t.Run("default pattern uses date", func(t *testing.T) {
+		user := &dbopsv1alpha1.DatabaseUser{
+			Spec: dbopsv1alpha1.DatabaseUserSpec{
+				Username: "myapp",
+				PasswordRotation: &dbopsv1alpha1.PasswordRotationConfig{
+					UserNaming: "",
+				},
+			},
+		}
+
+		name := handler.generateRotatedUsername(user)
+		assert.Contains(t, name, "myapp_")
+		assert.Len(t, name, len("myapp_20260317"))
+	})
+
+	t.Run("custom pattern with timestamp", func(t *testing.T) {
+		user := &dbopsv1alpha1.DatabaseUser{
+			Spec: dbopsv1alpha1.DatabaseUserSpec{
+				Username: "app",
+				PasswordRotation: &dbopsv1alpha1.PasswordRotationConfig{
+					UserNaming: "{{.Username}}_v{{.Timestamp}}",
+				},
+			},
+		}
+
+		name := handler.generateRotatedUsername(user)
+		assert.Contains(t, name, "app_v")
+	})
+
+	t.Run("truncates to 63 chars", func(t *testing.T) {
+		user := &dbopsv1alpha1.DatabaseUser{
+			Spec: dbopsv1alpha1.DatabaseUserSpec{
+				Username: "a_very_long_username_that_exceeds_the_postgresql_limit_of_63_chars",
+				PasswordRotation: &dbopsv1alpha1.PasswordRotationConfig{
+					UserNaming: "{{.Username}}_{{.Date}}",
+				},
+			},
+		}
+
+		name := handler.generateRotatedUsername(user)
+		assert.LessOrEqual(t, len(name), 63)
+	})
 }
 
 func TestHandler_DetectDrift(t *testing.T) {

@@ -35,6 +35,20 @@ DatabaseInstance / ClusterDatabaseInstance
 - `ReasonPendingDeletionConfirmation` - force-delete waiting for user confirmation hash
 - `ReasonCascadeDeleting` - cascade-deleting children after force-delete confirmation
 
+### Ownership Model
+- Bidirectional `ALTER DEFAULT PRIVILEGES`: forward (ownerRole → appUser) AND reverse (appUser → ownerRole)
+- Reverse direction ensures app-created objects (e.g., Vault's `vault_kv_store`) are accessible to rotated users
+- Both directions executed via `ExecSQLAsRole` for proper SET ROLE context
+- `BuildDatabaseUpdateOptions` propagates `spec.Owner` to `opts.Owner` for `setDefaultPrivileges`
+
+### Password Rotation
+- Reconciliation-based cron scheduling (same pattern as BackupSchedule): evaluate schedule, requeue with `time.Until(nextRotationAt)` capped to [10s, 1h]
+- Role-inheritance strategy: NOLOGIN service role + LOGIN users that inherit from it
+- Old user cleanup: configurable action (delete/disable/retain) with grace period and ownership check
+- Controller methods: `handleRotation()` in controller.go, `RotateWithStrategy()` / `CleanupDeprecatedUsers()` in handler.go
+- Repository methods: `EnsureServiceRole()`, `CreateUserWithRole()`, `DisableLogin()`
+- Adapter method: `DisableUser()` (NOLOGIN on PG/CRDB, ACCOUNT LOCK on MySQL, no-op on ClickHouse)
+
 ### Status Update Patterns
 - Always set `Phase`, `Message`, and appropriate conditions before `Status().Update()`
 - Use `util.SetReadyCondition()` for the Ready condition

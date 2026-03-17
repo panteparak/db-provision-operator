@@ -252,6 +252,22 @@ func (a *Adapter) GetUserInfo(ctx context.Context, username string) (*types.User
 	return &info, rows.Err()
 }
 
+// DisableUser disables login for a user by setting NOLOGIN.
+func (a *Adapter) DisableUser(ctx context.Context, username string) error {
+	pool, err := a.getPool()
+	if err != nil {
+		return err
+	}
+
+	query := sqlbuilder.PgAlterRole(username).Login(false).Build()
+	_, err = pool.Exec(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to disable user %s: %w", username, err)
+	}
+
+	return nil
+}
+
 // GetOwnedObjects returns all database objects owned by the specified user.
 // This queries pg_class (for relations: tables, views, sequences, etc.) and
 // pg_proc (for functions) to find objects owned by the user.

@@ -291,6 +291,45 @@ ctrl.Options{
 - Respect database limits
 - Efficient resource use
 
+## Password Rotation Architecture
+
+### Reconciliation-Based Cron Scheduling
+
+Password rotation uses the same scheduling pattern as BackupSchedule: the controller evaluates a cron expression during reconciliation, performs the rotation if due, and uses `RequeueAfter` set to `time.Until(nextRotationAt)` (capped to `[10s, 1h]`) to wake up at the right time.
+
+This approach is crash-safe — all state is persisted in `status.rotation` — and requires no background goroutines or additional leader election coordination.
+
+### Role-Inheritance Rotation Lifecycle
+
+```
+┌──────────────────────────────────────────────────────┐
+│  1. EnsureServiceRole("svc_myapp")                   │
+│     CREATE ROLE svc_myapp NOLOGIN INHERIT             │
+├──────────────────────────────────────────────────────┤
+│  2. CreateUserWithRole("myapp_20260315", svc_myapp)  │
+│     CREATE ROLE myapp_20260315 LOGIN INHERIT          │
+│     GRANT svc_myapp TO myapp_20260315                 │
+├──────────────────────────────────────────────────────┤
+│  3. Update K8s Secret with new username + password    │
+├──────────────────────────────────────────────────────┤
+│  4. Deprecate old user → pendingDeletion              │
+│     (grace period: N days)                            │
+├──────────────────────────────────────────────────────┤
+│  5. After grace period: Delete / Disable / Retain     │
+│     (ownership check blocks deletion if user owns     │
+│      objects — REASSIGN required first)               │
+└──────────────────────────────────────────────────────┘
+```
+
+### Bidirectional Default Privileges
+
+The ownership model sets `ALTER DEFAULT PRIVILEGES` in both directions:
+
+- **Forward** (`FOR ROLE ownerRole GRANT ... TO appUser`): Owner-created objects are accessible to the app user.
+- **Reverse** (`FOR ROLE appUser GRANT ... TO ownerRole`): App-created objects are accessible to the owner role and all its members.
+
+Without the reverse direction, tables created by the app user (e.g., Vault's `vault_kv_store`) are inaccessible to rotated users that inherit from the owner role. Both directions are executed via `ExecSQLAsRole` to ensure proper SET ROLE context.
+
 ## Future Considerations
 
 ### Webhook Validation

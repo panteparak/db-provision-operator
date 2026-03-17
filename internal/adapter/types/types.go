@@ -195,6 +195,11 @@ type UserManager interface {
 	// that own database objects (which would fail or orphan objects).
 	// Returns an empty slice if the user owns no objects.
 	GetOwnedObjects(ctx context.Context, username string) ([]OwnedObject, error)
+
+	// DisableUser disables login for a user by setting NOLOGIN.
+	// This is used during password rotation to prevent old users from connecting
+	// while keeping them alive for ownership and audit purposes.
+	DisableUser(ctx context.Context, username string) error
 }
 
 // CreateUserOptions contains options for creating a user

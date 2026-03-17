@@ -120,6 +120,15 @@ type RepositoryInterface interface {
 
 	// CorrectDrift attempts to correct detected drift by applying necessary changes.
 	CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error)
+
+	// EnsureServiceRole creates a NOLOGIN service role if it doesn't exist.
+	EnsureServiceRole(ctx context.Context, roleName string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error
+
+	// CreateUserWithRole creates a new LOGIN user with membership in the given role.
+	CreateUserWithRole(ctx context.Context, username, password, roleName string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error
+
+	// DisableLogin disables login for a user by setting NOLOGIN.
+	DisableLogin(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error
 }
 
 // Ensure Repository implements RepositoryInterface.

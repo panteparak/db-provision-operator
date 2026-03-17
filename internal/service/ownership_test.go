@@ -208,11 +208,22 @@ func TestTransferOwnership_Error(t *testing.T) {
 func TestSetDefaultPrivileges_AllSchemas(t *testing.T) {
 	adapter := testutil.NewMockAdapter()
 	callCount := 0
+	forwardCount := 0
+	reverseCount := 0
 	adapter.SetDefaultPrivilegesFunc = func(ctx context.Context, grantee string, opts []types.DefaultPrivilegeGrantOptions) error {
 		callCount++
-		assert.Equal(t, "db_myapp_app", grantee)
 		require.Len(t, opts, 1)
-		assert.Equal(t, "db_myapp_owner", opts[0].GrantedBy)
+		if opts[0].GrantedBy == "db_myapp_owner" {
+			// Forward: ownerRole → appUser
+			assert.Equal(t, "db_myapp_app", grantee)
+			forwardCount++
+		} else if opts[0].GrantedBy == "db_myapp_app" {
+			// Reverse: appUser → ownerRole
+			assert.Equal(t, "db_myapp_owner", grantee)
+			reverseCount++
+		} else {
+			t.Errorf("unexpected GrantedBy: %s", opts[0].GrantedBy)
+		}
 		return nil
 	}
 
@@ -220,8 +231,10 @@ func TestSetDefaultPrivileges_AllSchemas(t *testing.T) {
 	err := svc.SetDefaultPrivileges(context.Background(), "myappdb", "db_myapp_owner", "db_myapp_app",
 		[]string{"app", "data"})
 	require.NoError(t, err)
-	// 3 schemas (public, app, data) × 3 object types (tables, sequences, functions) = 9
-	assert.Equal(t, 9, callCount)
+	// 3 schemas (public, app, data) × 3 object types × 2 directions (forward + reverse) = 18
+	assert.Equal(t, 18, callCount)
+	assert.Equal(t, 9, forwardCount)
+	assert.Equal(t, 9, reverseCount)
 }
 
 func TestSetDefaultPrivileges_OnlyPublic(t *testing.T) {
@@ -235,8 +248,8 @@ func TestSetDefaultPrivileges_OnlyPublic(t *testing.T) {
 	svc := newTestOwnershipService(adapter)
 	err := svc.SetDefaultPrivileges(context.Background(), "myappdb", "db_myapp_owner", "db_myapp_app", nil)
 	require.NoError(t, err)
-	// 1 schema (public) × 3 object types = 3
-	assert.Equal(t, 3, callCount)
+	// 1 schema (public) × 3 object types × 2 directions = 6
+	assert.Equal(t, 6, callCount)
 }
 
 // --- DropOwnershipResources ---

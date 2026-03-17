@@ -25,6 +25,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
+	"github.com/db-provision-operator/internal/adapter/types"
 	"github.com/db-provision-operator/internal/secret"
 	"github.com/db-provision-operator/internal/service"
 	"github.com/db-provision-operator/internal/service/drift"
@@ -252,6 +253,57 @@ func (r *Repository) CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.Datab
 	})
 
 	return correctionResult, err
+}
+
+// EnsureServiceRole creates a NOLOGIN service role if it doesn't exist.
+// This follows the same pattern as ownership's EnsureOwnerRole.
+func (r *Repository) EnsureServiceRole(ctx context.Context, roleName string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
+	return r.withService(ctx, spec, namespace, func(svc *service.UserService, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
+		// Check if role already exists
+		exists, err := svc.Adapter().RoleExists(ctx, roleName)
+		if err != nil {
+			return fmt.Errorf("check service role existence: %w", err)
+		}
+		if exists {
+			return nil
+		}
+
+		// Create NOLOGIN INHERIT group role
+		return svc.Adapter().CreateRole(ctx, types.CreateRoleOptions{
+			RoleName: roleName,
+			Login:    false,
+			Inherit:  true,
+		})
+	})
+}
+
+// CreateUserWithRole creates a new LOGIN user with membership in the given role.
+func (r *Repository) CreateUserWithRole(ctx context.Context, username, password, roleName string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
+	return r.withService(ctx, spec, namespace, func(svc *service.UserService, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
+		// Create user with LOGIN and INHERIT
+		if err := svc.Adapter().CreateUser(ctx, types.CreateUserOptions{
+			Username: username,
+			Password: password,
+			Login:    true,
+			Inherit:  true,
+		}); err != nil {
+			return fmt.Errorf("create user: %w", err)
+		}
+
+		// Grant role membership
+		if err := svc.Adapter().GrantRole(ctx, username, []string{roleName}); err != nil {
+			return fmt.Errorf("grant role: %w", err)
+		}
+
+		return nil
+	})
+}
+
+// DisableLogin disables login for a user by setting NOLOGIN.
+func (r *Repository) DisableLogin(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
+	return r.withService(ctx, spec, namespace, func(svc *service.UserService, _ *dbopsv1alpha1.DatabaseInstanceSpec) error {
+		return svc.DisableLogin(ctx, username)
+	})
 }
 
 // OwnedObject represents a database object owned by a user.

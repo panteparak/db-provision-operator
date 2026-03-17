@@ -4536,6 +4536,398 @@ func TestController_Reconcile_NewUserSecretCreated(t *testing.T) {
 	assert.True(t, foundCreated, "Expected Created event for new user")
 }
 
+// --- Password Rotation Controller Tests ---
+
+func TestController_HandleRotation_TriggersWhenDue(t *testing.T) {
+	t.Parallel()
+	scheme := newTestScheme()
+
+	user := newTestUser("testuser", "default")
+	user.Spec.PasswordRotation = &dbopsv1alpha1.PasswordRotationConfig{
+		Enabled:  true,
+		Schedule: "* * * * *", // Every minute — guarantees rotation is due
+		Strategy: dbopsv1alpha1.RotationStrategyRoleInheritance,
+		ServiceRole: &dbopsv1alpha1.ServiceRoleConfig{
+			Name:       "svc_testuser",
+			AutoCreate: true,
+		},
+	}
+
+	// Set last rotation to 2 hours ago so the cron "every minute" is definitely due
+	twoHoursAgo := metav1.NewTime(time.Now().Add(-2 * time.Hour))
+	user.Status.Rotation = &dbopsv1alpha1.RotationStatus{
+		Enabled:       true,
+		LastRotatedAt: &twoHoursAgo,
+		ActiveUser:    "testuser_old",
+	}
+
+	instance := newTestInstance("test-instance", "default")
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, instance).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return instance, nil
+	}
+
+	var rotatedUsername string
+	mockRepo.CreateUserWithRoleFunc = func(ctx context.Context, username, password, roleName string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
+		rotatedUsername = username
+		return nil
+	}
+
+	recorder := record.NewFakeRecorder(10)
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             recorder,
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, result.RequeueAfter > 0, "should requeue")
+
+	// Verify rotation happened
+	assert.True(t, mockRepo.WasCalled("EnsureServiceRole"))
+	assert.True(t, mockRepo.WasCalled("CreateUserWithRole"))
+	assert.NotEmpty(t, rotatedUsername)
+
+	// Verify status updated
+	var updatedUser dbopsv1alpha1.DatabaseUser
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testuser", Namespace: "default"}, &updatedUser)
+	require.NoError(t, err)
+	require.NotNil(t, updatedUser.Status.Rotation)
+	assert.Equal(t, rotatedUsername, updatedUser.Status.Rotation.ActiveUser)
+	assert.Equal(t, "svc_testuser", updatedUser.Status.Rotation.ServiceRole)
+
+	// Verify PasswordRotated event
+	foundRotated := drainAndFind(recorder, "PasswordRotated")
+	assert.True(t, foundRotated, "Expected PasswordRotated event")
+}
+
+func TestController_HandleRotation_NotDueRequeuesCorrectly(t *testing.T) {
+	t.Parallel()
+	scheme := newTestScheme()
+
+	user := newTestUser("testuser", "default")
+	user.Spec.PasswordRotation = &dbopsv1alpha1.PasswordRotationConfig{
+		Enabled:  true,
+		Schedule: "0 0 1 * *", // Monthly — next fire is far in the future
+		Strategy: dbopsv1alpha1.RotationStrategyRoleInheritance,
+	}
+
+	// Last rotation just happened
+	justNow := metav1.NewTime(time.Now())
+	user.Status.Rotation = &dbopsv1alpha1.RotationStatus{
+		Enabled:       true,
+		LastRotatedAt: &justNow,
+		ActiveUser:    "testuser",
+	}
+
+	instance := newTestInstance("test-instance", "default")
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, instance).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return instance, nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+
+	require.NoError(t, err)
+	// Should requeue but rotation should NOT have fired
+	assert.False(t, mockRepo.WasCalled("EnsureServiceRole"))
+	assert.False(t, mockRepo.WasCalled("CreateUserWithRole"))
+	// Requeue capped to rotationMaxRequeue (1h) since next rotation is far in the future
+	assert.LessOrEqual(t, result.RequeueAfter, rotationMaxRequeue)
+	assert.Greater(t, result.RequeueAfter, time.Duration(0))
+}
+
+func TestController_HandleRotation_DisabledIsNoop(t *testing.T) {
+	t.Parallel()
+	scheme := newTestScheme()
+
+	user := newTestUser("testuser", "default")
+	// No PasswordRotation set — rotation disabled
+
+	instance := newTestInstance("test-instance", "default")
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, instance).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return instance, nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+
+	require.NoError(t, err)
+	assert.False(t, mockRepo.WasCalled("EnsureServiceRole"))
+	assert.False(t, mockRepo.WasCalled("CreateUserWithRole"))
+}
+
+func TestController_HandleRotation_InvalidCronEmitsEvent(t *testing.T) {
+	t.Parallel()
+	scheme := newTestScheme()
+
+	user := newTestUser("testuser", "default")
+	user.Spec.PasswordRotation = &dbopsv1alpha1.PasswordRotationConfig{
+		Enabled:  true,
+		Schedule: "not-a-cron",
+	}
+
+	instance := newTestInstance("test-instance", "default")
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, instance).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return instance, nil
+	}
+
+	recorder := record.NewFakeRecorder(10)
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             recorder,
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	// Reconcile should succeed (rotation error is logged, not fatal)
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, result.RequeueAfter > 0)
+
+	// Verify InvalidRotationSchedule event was emitted
+	foundInvalid := drainAndFind(recorder, "InvalidRotationSchedule")
+	assert.True(t, foundInvalid, "Expected InvalidRotationSchedule event")
+}
+
+func TestController_HandleRotation_FirstEnablementSetsInitialStatus(t *testing.T) {
+	t.Parallel()
+	scheme := newTestScheme()
+
+	user := newTestUser("testuser", "default")
+	user.Spec.PasswordRotation = &dbopsv1alpha1.PasswordRotationConfig{
+		Enabled:  true,
+		Schedule: "0 0 1 * *", // Monthly
+	}
+	// No Status.Rotation set — first enablement
+
+	instance := newTestInstance("test-instance", "default")
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, instance).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return instance, nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+
+	require.NoError(t, err)
+
+	// First enablement should NOT trigger rotation (first rotation happens after one interval)
+	assert.False(t, mockRepo.WasCalled("EnsureServiceRole"))
+	assert.False(t, mockRepo.WasCalled("CreateUserWithRole"))
+
+	// Verify status was initialized
+	var updatedUser dbopsv1alpha1.DatabaseUser
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testuser", Namespace: "default"}, &updatedUser)
+	require.NoError(t, err)
+	require.NotNil(t, updatedUser.Status.Rotation)
+	assert.NotNil(t, updatedUser.Status.Rotation.LastRotatedAt)
+	assert.NotNil(t, updatedUser.Status.Rotation.NextRotationAt)
+	assert.Equal(t, "testuser", updatedUser.Status.Rotation.ActiveUser)
+}
+
+func TestController_HandleRotation_OldUserAddedToPendingDeletion(t *testing.T) {
+	t.Parallel()
+	scheme := newTestScheme()
+
+	user := newTestUser("testuser", "default")
+	user.Spec.PasswordRotation = &dbopsv1alpha1.PasswordRotationConfig{
+		Enabled:  true,
+		Schedule: "* * * * *", // Every minute
+		OldUserPolicy: &dbopsv1alpha1.OldUserPolicy{
+			Action:          dbopsv1alpha1.OldUserActionDelete,
+			GracePeriodDays: 3,
+		},
+	}
+
+	// Set last rotation to 2 hours ago so rotation is due
+	twoHoursAgo := metav1.NewTime(time.Now().Add(-2 * time.Hour))
+	user.Status.Rotation = &dbopsv1alpha1.RotationStatus{
+		Enabled:       true,
+		LastRotatedAt: &twoHoursAgo,
+		ActiveUser:    "testuser_20260315",
+	}
+
+	instance := newTestInstance("test-instance", "default")
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(user, instance).
+		WithStatusSubresource(user).
+		Build()
+
+	mockRepo := NewMockRepository()
+	mockRepo.ExistsFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error) {
+		return true, nil
+	}
+	mockRepo.GetInstanceFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error) {
+		return instance, nil
+	}
+
+	handler := &Handler{
+		repo:     mockRepo,
+		eventBus: NewMockEventBus(),
+		logger:   logr.Discard(),
+	}
+
+	controller := NewController(ControllerConfig{
+		Client:               fakeClient,
+		Scheme:               scheme,
+		Recorder:             record.NewFakeRecorder(10),
+		Handler:              handler,
+		SecretManager:        secret.NewManager(fakeClient),
+		DefaultDriftInterval: testDefaultDriftInterval,
+		Logger:               logr.Discard(),
+	})
+
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
+	})
+
+	require.NoError(t, err)
+
+	// Verify old user added to pending deletion
+	var updatedUser dbopsv1alpha1.DatabaseUser
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testuser", Namespace: "default"}, &updatedUser)
+	require.NoError(t, err)
+	require.NotNil(t, updatedUser.Status.Rotation)
+	require.Len(t, updatedUser.Status.Rotation.PendingDeletion, 1)
+	assert.Equal(t, "testuser_20260315", updatedUser.Status.Rotation.PendingDeletion[0].User)
+	assert.Equal(t, "pending", updatedUser.Status.Rotation.PendingDeletion[0].Status)
+	// Grace period should be ~3 days from now
+	assert.NotNil(t, updatedUser.Status.Rotation.PendingDeletion[0].DeleteAfter)
+}
+
 // containsSubstring checks if a string contains a substring.
 func containsSubstring(s, substr string) bool {
 	return len(s) >= len(substr) && searchSubstring(s, substr)

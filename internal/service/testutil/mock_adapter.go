@@ -50,6 +50,7 @@ type MockAdapter struct {
 	UpdatePasswordFunc  func(ctx context.Context, username, password string) error
 	GetUserInfoFunc     func(ctx context.Context, username string) (*types.UserInfo, error)
 	GetOwnedObjectsFunc func(ctx context.Context, username string) ([]types.OwnedObject, error)
+	DisableUserFunc     func(ctx context.Context, username string) error
 
 	// Role operations
 	CreateRoleFunc  func(ctx context.Context, opts types.CreateRoleOptions) error
@@ -121,6 +122,7 @@ func NewMockAdapter() *MockAdapter {
 	m.GetOwnedObjectsFunc = func(ctx context.Context, username string) ([]types.OwnedObject, error) {
 		return []types.OwnedObject{}, nil
 	}
+	m.DisableUserFunc = func(ctx context.Context, username string) error { return nil }
 
 	m.CreateRoleFunc = func(ctx context.Context, opts types.CreateRoleOptions) error { return nil }
 	m.DropRoleFunc = func(ctx context.Context, roleName string) error { return nil }
@@ -301,6 +303,11 @@ func (m *MockAdapter) GetUserInfo(ctx context.Context, username string) (*types.
 func (m *MockAdapter) GetOwnedObjects(ctx context.Context, username string) ([]types.OwnedObject, error) {
 	m.record("GetOwnedObjects", username)
 	return m.GetOwnedObjectsFunc(ctx, username)
+}
+
+func (m *MockAdapter) DisableUser(ctx context.Context, username string) error {
+	m.record("DisableUser", username)
+	return m.DisableUserFunc(ctx, username)
 }
 
 // Role operations implementations

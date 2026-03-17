@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/robfig/cron/v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,6 +49,10 @@ const (
 	RequeueAfterError   = 30 * time.Second
 	RequeueAfterPending = 10 * time.Second
 
+	// Rotation requeue bounds (same as BackupSchedule)
+	rotationMinRequeue = 10 * time.Second
+	rotationMaxRequeue = 1 * time.Hour
+
 	annotationManagedPassword = "dbops.dbprovision.io/managed-password"
 )
 
@@ -62,6 +67,7 @@ type Controller struct {
 	predicates           []predicate.Predicate
 	logger               logr.Logger
 	driftOrchestrator    *controllerdrift.Orchestrator
+	cronParser           cron.Parser
 }
 
 // ControllerConfig holds dependencies for the controller.
@@ -91,6 +97,7 @@ func NewController(cfg ControllerConfig) *Controller {
 			Recorder:             cfg.Recorder,
 			DefaultDriftInterval: cfg.DefaultDriftInterval,
 		},
+		cronParser: cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow),
 	}
 }
 
@@ -229,6 +236,18 @@ func (c *Controller) reconcile(ctx context.Context, user *dbopsv1alpha1.Database
 		&userDriftDetector{handler: c.handler, spec: &user.Spec, namespace: user.Namespace},
 	)
 
+	// Evaluate password rotation (after user is confirmed ready)
+	var rotationRequeue time.Duration
+	if user.Spec.PasswordRotation != nil && user.Spec.PasswordRotation.Enabled {
+		rotationResult, rotErr := c.handleRotation(ctx, user, log)
+		if rotErr != nil {
+			log.Error(rotErr, "Rotation check failed")
+		}
+		if rotationResult != nil {
+			rotationRequeue = rotationResult.RequeueAfter
+		}
+	}
+
 	// Update status
 	user.Status.Phase = dbopsv1alpha1.PhaseReady
 	user.Status.Message = "User is ready"
@@ -256,11 +275,18 @@ func (c *Controller) reconcile(ctx context.Context, user *dbopsv1alpha1.Database
 	// Update info metric for Grafana table views
 	c.handler.UpdateInfoMetric(user)
 
-	log.Info("Successfully reconciled DatabaseUser", "username", user.Spec.Username)
-	return ctrl.Result{RequeueAfter: c.driftOrchestrator.GetRequeueInterval(
+	// Calculate requeue: use the shorter of drift or rotation intervals
+	driftRequeue := c.driftOrchestrator.GetRequeueInterval(
 		&userDriftableResource{user},
 		&controllerdrift.NamespacedInstancePolicy{Instance: driftInstance},
-	)}, nil
+	)
+	requeueAfter := driftRequeue
+	if rotationRequeue > 0 && rotationRequeue < requeueAfter {
+		requeueAfter = rotationRequeue
+	}
+
+	log.Info("Successfully reconciled DatabaseUser", "username", user.Spec.Username)
+	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
 
 func (c *Controller) ensureCredentialsSecret(ctx context.Context, user *dbopsv1alpha1.DatabaseUser, password, secretName string) error {
@@ -403,6 +429,117 @@ func hasSecretTemplateData(user *dbopsv1alpha1.DatabaseUser) bool {
 	return user.Spec.PasswordSecret != nil &&
 		user.Spec.PasswordSecret.SecretTemplate != nil &&
 		len(user.Spec.PasswordSecret.SecretTemplate.Data) > 0
+}
+
+// handleRotation evaluates the rotation schedule and performs rotation if due.
+// Returns a RotationResult with the suggested requeue interval, or nil if rotation is not applicable.
+func (c *Controller) handleRotation(ctx context.Context, user *dbopsv1alpha1.DatabaseUser, log logr.Logger) (*RotationResult, error) {
+	rotCfg := user.Spec.PasswordRotation
+	if rotCfg == nil || !rotCfg.Enabled || rotCfg.Schedule == "" {
+		return nil, nil
+	}
+
+	// Parse cron schedule
+	cronSchedule, err := c.cronParser.Parse(rotCfg.Schedule)
+	if err != nil {
+		c.Recorder.Eventf(user, corev1.EventTypeWarning, "InvalidRotationSchedule",
+			"Invalid cron schedule %q: %v", rotCfg.Schedule, err)
+		return nil, fmt.Errorf("invalid cron schedule %q: %w", rotCfg.Schedule, err)
+	}
+
+	// Initialize rotation status if needed
+	if user.Status.Rotation == nil {
+		user.Status.Rotation = &dbopsv1alpha1.RotationStatus{
+			Enabled:  true,
+			Strategy: rotCfg.Strategy,
+		}
+	}
+
+	now := time.Now()
+
+	// First enablement: set LastRotatedAt to now so first rotation happens after one full interval
+	if user.Status.Rotation.LastRotatedAt == nil {
+		metaNow := metav1.NewTime(now)
+		user.Status.Rotation.LastRotatedAt = &metaNow
+		user.Status.Rotation.ActiveUser = user.Spec.Username
+		nextTime := cronSchedule.Next(now)
+		metaNext := metav1.NewTime(nextTime)
+		user.Status.Rotation.NextRotationAt = &metaNext
+		log.Info("Rotation enabled, first rotation scheduled", "nextRotation", nextTime)
+	}
+
+	// Calculate next rotation from last rotated time
+	nextRotationAt := cronSchedule.Next(user.Status.Rotation.LastRotatedAt.Time)
+	metaNext := metav1.NewTime(nextRotationAt)
+	user.Status.Rotation.NextRotationAt = &metaNext
+
+	// Check if rotation is due
+	if now.After(nextRotationAt) {
+		log.Info("Rotation is due", "lastRotatedAt", user.Status.Rotation.LastRotatedAt, "nextRotationAt", nextRotationAt)
+
+		result, err := c.handler.RotateWithStrategy(ctx, user)
+		if err != nil {
+			c.Recorder.Eventf(user, corev1.EventTypeWarning, "RotationFailed",
+				"Password rotation failed: %v", err)
+			return nil, fmt.Errorf("rotate: %w", err)
+		}
+
+		// Update credentials secret with new user/password
+		secretName := user.Spec.Username + "-credentials"
+		if user.Spec.PasswordSecret != nil && user.Spec.PasswordSecret.SecretName != "" {
+			secretName = user.Spec.PasswordSecret.SecretName
+		}
+		if err := c.ensureCredentialsSecret(ctx, user, result.NewPassword, secretName); err != nil {
+			log.Error(err, "Failed to update credentials secret after rotation")
+		}
+
+		// Add previous active user to pending deletion
+		if user.Status.Rotation.ActiveUser != "" && user.Status.Rotation.ActiveUser != user.Spec.Username {
+			graceDays := int32(7)
+			if rotCfg.OldUserPolicy != nil {
+				graceDays = rotCfg.OldUserPolicy.GracePeriodDays
+			}
+			deprecatedAt := metav1.NewTime(now)
+			deleteAfter := metav1.NewTime(now.Add(time.Duration(graceDays) * 24 * time.Hour))
+			user.Status.Rotation.PendingDeletion = append(user.Status.Rotation.PendingDeletion,
+				dbopsv1alpha1.PendingDeletionInfo{
+					User:         user.Status.Rotation.ActiveUser,
+					DeprecatedAt: &deprecatedAt,
+					DeleteAfter:  &deleteAfter,
+					Status:       "pending",
+				})
+		}
+
+		// Update rotation status
+		metaNow := metav1.NewTime(now)
+		user.Status.Rotation.LastRotatedAt = &metaNow
+		user.Status.Rotation.ActiveUser = result.NewUsername
+		user.Status.Rotation.ServiceRole = result.ServiceRole
+		user.Status.Rotation.Strategy = rotCfg.Strategy
+
+		// Recalculate next rotation
+		newNext := cronSchedule.Next(now)
+		metaNewNext := metav1.NewTime(newNext)
+		user.Status.Rotation.NextRotationAt = &metaNewNext
+
+		c.Recorder.Eventf(user, corev1.EventTypeNormal, "PasswordRotated",
+			"Password rotated: new user %s, service role %s", result.NewUsername, result.ServiceRole)
+	}
+
+	// Process pending deletions
+	if err := c.handler.CleanupDeprecatedUsers(ctx, user); err != nil {
+		log.Error(err, "Failed to cleanup deprecated users")
+	}
+
+	// Calculate requeue interval
+	requeueAfter := time.Until(user.Status.Rotation.NextRotationAt.Time)
+	if requeueAfter < rotationMinRequeue {
+		requeueAfter = rotationMinRequeue
+	} else if requeueAfter > rotationMaxRequeue {
+		requeueAfter = rotationMaxRequeue
+	}
+
+	return &RotationResult{RequeueAfter: requeueAfter}, nil
 }
 
 func (c *Controller) handleDeletion(ctx context.Context, user *dbopsv1alpha1.DatabaseUser) (ctrl.Result, error) {

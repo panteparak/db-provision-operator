@@ -190,7 +190,7 @@ func (a *Adapter) UpdateDatabase(ctx context.Context, name string, opts types.Up
 
 	// Handle default privileges
 	for _, dp := range opts.DefaultPrivileges {
-		if err := a.setDefaultPrivileges(ctx, name, dp); err != nil {
+		if err := a.setDefaultPrivileges(ctx, name, opts.Owner, dp); err != nil {
 			return fmt.Errorf("failed to set default privileges: %w", err)
 		}
 	}
@@ -251,7 +251,8 @@ func (a *Adapter) ExecSQLAsRole(ctx context.Context, database, role, statement s
 
 // setDefaultPrivileges sets default privileges in a CockroachDB database.
 // CockroachDB supports ALTER DEFAULT PRIVILEGES with the same syntax as PostgreSQL.
-func (a *Adapter) setDefaultPrivileges(ctx context.Context, database string, dp types.DefaultPrivilegeOptions) error {
+// If owner is non-empty, the statement is executed as that role via SET ROLE.
+func (a *Adapter) setDefaultPrivileges(ctx context.Context, database, owner string, dp types.DefaultPrivilegeOptions) error {
 	b := sqlbuilder.NewPg().AlterDefaultPrivileges(dp.Role, dp.Schema).
 		Grant(dp.Privileges...).To(dp.Role)
 
@@ -273,5 +274,5 @@ func (a *Adapter) setDefaultPrivileges(ctx context.Context, database string, dp 
 		return fmt.Errorf("failed to build alter default privileges: %w", err)
 	}
 
-	return a.execWithNewConnection(ctx, database, q)
+	return a.ExecSQLAsRole(ctx, database, owner, q)
 }

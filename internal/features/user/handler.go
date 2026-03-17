@@ -19,6 +19,8 @@ package user
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -272,6 +274,203 @@ func (h *Handler) UpdateInfoMetric(user *dbopsv1alpha1.DatabaseUser) {
 // CleanupInfoMetric removes the info metric for a deleted user.
 func (h *Handler) CleanupInfoMetric(user *dbopsv1alpha1.DatabaseUser) {
 	metrics.DeleteUserInfo(user.Name, user.Namespace)
+}
+
+// RotationResult contains the outcome of a rotation operation.
+type RotationResult struct {
+	// NewUsername is the newly created user
+	NewUsername string
+	// NewPassword is the generated password for the new user
+	NewPassword string
+	// ServiceRole is the service role used
+	ServiceRole string
+	// RequeueAfter is the suggested requeue interval
+	RequeueAfter time.Duration
+}
+
+// RotateWithStrategy performs password rotation using the configured strategy.
+func (h *Handler) RotateWithStrategy(ctx context.Context, user *dbopsv1alpha1.DatabaseUser) (*RotationResult, error) {
+	strategy := user.Spec.PasswordRotation.Strategy
+	if strategy == "" {
+		strategy = dbopsv1alpha1.RotationStrategyRoleInheritance
+	}
+
+	switch strategy {
+	case dbopsv1alpha1.RotationStrategyRoleInheritance:
+		return h.rotateRoleInheritance(ctx, user)
+	default:
+		return nil, fmt.Errorf("unsupported rotation strategy: %s", strategy)
+	}
+}
+
+// rotateRoleInheritance creates a new login user with membership in a service role.
+func (h *Handler) rotateRoleInheritance(ctx context.Context, user *dbopsv1alpha1.DatabaseUser) (*RotationResult, error) {
+	log := logf.FromContext(ctx).WithValues("user", user.Name, "namespace", user.Namespace)
+
+	// Derive service role name
+	serviceRoleName := fmt.Sprintf("svc_%s", user.Spec.Username)
+	if user.Spec.PasswordRotation.ServiceRole != nil && user.Spec.PasswordRotation.ServiceRole.Name != "" {
+		serviceRoleName = user.Spec.PasswordRotation.ServiceRole.Name
+	}
+
+	// Ensure service role exists (AutoCreate defaults to true)
+	autoCreate := true
+	if user.Spec.PasswordRotation.ServiceRole != nil {
+		autoCreate = user.Spec.PasswordRotation.ServiceRole.AutoCreate
+	}
+	if autoCreate {
+		if err := h.repo.EnsureServiceRole(ctx, serviceRoleName, &user.Spec, user.Namespace); err != nil {
+			return nil, fmt.Errorf("ensure service role: %w", err)
+		}
+	}
+
+	// Generate new username from naming template
+	newUsername := h.generateRotatedUsername(user)
+	log.Info("Rotating user", "newUsername", newUsername, "serviceRole", serviceRoleName)
+
+	// Generate password
+	var passwordConfig *dbopsv1alpha1.PasswordConfig
+	if user.Spec.PasswordSecret != nil {
+		passwordConfig = user.Spec.PasswordSecret
+	}
+	newPassword, err := secret.GeneratePassword(passwordConfig)
+	if err != nil {
+		return nil, fmt.Errorf("generate password: %w", err)
+	}
+
+	// Create new login user with role membership
+	if err := h.repo.CreateUserWithRole(ctx, newUsername, newPassword, serviceRoleName, &user.Spec, user.Namespace); err != nil {
+		return nil, fmt.Errorf("create rotated user: %w", err)
+	}
+
+	// Publish event
+	if h.eventBus != nil {
+		h.eventBus.PublishAsync(ctx, eventbus.NewPasswordRotated(
+			newUsername,
+			user.Namespace,
+			"",
+			"scheduled",
+		))
+	}
+
+	engine, _ := h.repo.GetEngine(ctx, &user.Spec, user.Namespace)
+	metrics.RecordUserOperation(metrics.OperationUpdate, engine, user.Namespace, metrics.StatusSuccess)
+
+	log.Info("Password rotation completed", "newUsername", newUsername, "serviceRole", serviceRoleName)
+
+	return &RotationResult{
+		NewUsername: newUsername,
+		NewPassword: newPassword,
+		ServiceRole: serviceRoleName,
+	}, nil
+}
+
+// generateRotatedUsername generates a username for a rotated user based on the naming template.
+func (h *Handler) generateRotatedUsername(user *dbopsv1alpha1.DatabaseUser) string {
+	pattern := user.Spec.PasswordRotation.UserNaming
+	if pattern == "" {
+		pattern = "{{.Username}}_{{.Date}}"
+	}
+
+	now := time.Now()
+	name := pattern
+	name = strings.ReplaceAll(name, "{{.Username}}", user.Spec.Username)
+	name = strings.ReplaceAll(name, "{{.Date}}", now.Format("20060102"))
+	name = strings.ReplaceAll(name, "{{.Timestamp}}", fmt.Sprintf("%d", now.Unix()))
+
+	// Truncate to PostgreSQL's 63 char limit
+	if len(name) > 63 {
+		name = name[:63]
+	}
+
+	return name
+}
+
+// CleanupDeprecatedUsers processes users pending deletion based on the old user policy.
+func (h *Handler) CleanupDeprecatedUsers(ctx context.Context, user *dbopsv1alpha1.DatabaseUser) error {
+	log := logf.FromContext(ctx).WithValues("user", user.Name, "namespace", user.Namespace)
+
+	policy := user.Spec.PasswordRotation.OldUserPolicy
+	if policy == nil {
+		policy = &dbopsv1alpha1.OldUserPolicy{
+			Action:          dbopsv1alpha1.OldUserActionDelete,
+			GracePeriodDays: 7,
+			OwnershipCheck:  true,
+		}
+	}
+
+	if user.Status.Rotation == nil {
+		return nil
+	}
+
+	now := time.Now()
+	var remaining []dbopsv1alpha1.PendingDeletionInfo
+
+	for _, pending := range user.Status.Rotation.PendingDeletion {
+		// Skip already completed entries
+		if pending.Status == "deleted" || pending.Status == "disabled" {
+			continue
+		}
+
+		// Not yet due
+		if pending.DeleteAfter != nil && now.Before(pending.DeleteAfter.Time) {
+			remaining = append(remaining, pending)
+			continue
+		}
+
+		switch policy.Action {
+		case dbopsv1alpha1.OldUserActionDelete:
+			// Check ownership if enabled
+			if policy.OwnershipCheck {
+				owned, err := h.repo.GetOwnedObjects(ctx, pending.User, &user.Spec, user.Namespace)
+				if err != nil {
+					log.Error(err, "Failed to check ownership for pending deletion", "pendingUser", pending.User)
+					remaining = append(remaining, pending)
+					continue
+				}
+				if len(owned) > 0 {
+					log.Info("Deletion blocked: user owns objects", "pendingUser", pending.User, "objectCount", len(owned))
+					pending.Status = "blocked"
+					pending.BlockedReason = fmt.Sprintf("owns %d objects", len(owned))
+					// Convert to API OwnedObjects
+					apiObjects := make([]dbopsv1alpha1.OwnedObject, len(owned))
+					for i, obj := range owned {
+						apiObjects[i] = dbopsv1alpha1.OwnedObject{
+							Schema: obj.Schema,
+							Name:   obj.Name,
+							Type:   obj.Type,
+						}
+					}
+					pending.OwnedObjects = apiObjects
+					pending.Resolution = fmt.Sprintf("REASSIGN OWNED BY %s TO %s", pending.User, user.Status.Rotation.ServiceRole)
+					remaining = append(remaining, pending)
+					continue
+				}
+			}
+
+			if err := h.repo.Delete(ctx, pending.User, &user.Spec, user.Namespace, true); err != nil {
+				log.Error(err, "Failed to delete deprecated user", "pendingUser", pending.User)
+				remaining = append(remaining, pending)
+				continue
+			}
+			log.Info("Deprecated user deleted", "pendingUser", pending.User)
+
+		case dbopsv1alpha1.OldUserActionDisable:
+			if err := h.repo.DisableLogin(ctx, pending.User, &user.Spec, user.Namespace); err != nil {
+				log.Error(err, "Failed to disable deprecated user", "pendingUser", pending.User)
+				remaining = append(remaining, pending)
+				continue
+			}
+			log.Info("Deprecated user disabled", "pendingUser", pending.User)
+
+		case dbopsv1alpha1.OldUserActionRetain:
+			// No-op, remove from pending list
+			log.V(1).Info("Retaining deprecated user", "pendingUser", pending.User)
+		}
+	}
+
+	user.Status.Rotation.PendingDeletion = remaining
+	return nil
 }
 
 // DetectDrift compares the CR spec to the actual user state and returns any differences.

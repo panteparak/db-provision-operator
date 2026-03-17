@@ -279,6 +279,28 @@ func (s *UserService) Exists(ctx context.Context, username string) (bool, error)
 	return exists, nil
 }
 
+// DisableLogin disables login for a user by setting NOLOGIN.
+// This is used during password rotation to prevent old users from connecting.
+func (s *UserService) DisableLogin(ctx context.Context, username string) error {
+	if username == "" {
+		return &ValidationError{Field: "username", Message: "username is required"}
+	}
+
+	op := s.startOp("DisableLogin", username)
+
+	// Apply operation timeout
+	ctx, cancel := s.config.Timeouts.WithOperationTimeout(ctx)
+	defer cancel()
+
+	if err := s.adapter.DisableUser(ctx, username); err != nil {
+		op.Error(err, "failed to disable user")
+		return s.wrapError(ctx, s.config, "disable login", username, err)
+	}
+
+	op.Success("login disabled")
+	return nil
+}
+
 // GetOwnedObjects retrieves all database objects owned by the specified user.
 // This is used for pre-deletion safety checks to prevent dropping users
 // that own database objects.

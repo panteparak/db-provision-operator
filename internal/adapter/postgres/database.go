@@ -219,7 +219,7 @@ func (a *Adapter) UpdateDatabase(ctx context.Context, name string, opts types.Up
 
 	// Handle default privileges
 	for _, dp := range opts.DefaultPrivileges {
-		if err := a.setDefaultPrivileges(ctx, name, dp); err != nil {
+		if err := a.setDefaultPrivileges(ctx, name, opts.Owner, dp); err != nil {
 			return fmt.Errorf("failed to set default privileges: %w", err)
 		}
 	}
@@ -296,8 +296,10 @@ func (a *Adapter) ExecSQLAsRole(ctx context.Context, database, role, statement s
 	return a.execWithNewConnection(ctx, database, roleSQL+"; "+statement)
 }
 
-// setDefaultPrivileges sets default privileges in a database
-func (a *Adapter) setDefaultPrivileges(ctx context.Context, database string, dp types.DefaultPrivilegeOptions) error {
+// setDefaultPrivileges sets default privileges in a database.
+// If owner is non-empty, the statement is executed as that role via SET ROLE
+// so that ALTER DEFAULT PRIVILEGES FOR ROLE works correctly.
+func (a *Adapter) setDefaultPrivileges(ctx context.Context, database, owner string, dp types.DefaultPrivilegeOptions) error {
 	b := sqlbuilder.NewPg().AlterDefaultPrivileges(dp.Role, dp.Schema).
 		Grant(dp.Privileges...).To(dp.Role)
 
@@ -319,5 +321,5 @@ func (a *Adapter) setDefaultPrivileges(ctx context.Context, database string, dp 
 		return fmt.Errorf("failed to build alter default privileges: %w", err)
 	}
 
-	return a.execWithNewConnection(ctx, database, q)
+	return a.ExecSQLAsRole(ctx, database, owner, q)
 }

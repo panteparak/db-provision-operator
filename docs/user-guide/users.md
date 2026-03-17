@@ -371,21 +371,107 @@ metadata:
 
 ## Password Rotation
 
-The operator automatically recovers when a DatabaseUser's credentials Secret is deleted.
-The flow works as follows:
+### Automatic Rotation
+
+The operator supports scheduled password rotation via `spec.passwordRotation`. When enabled, the controller evaluates the cron schedule during each reconciliation and performs rotation when due.
+
+```yaml
+apiVersion: dbops.dbprovision.io/v1alpha1
+kind: DatabaseUser
+metadata:
+  name: myapp-user
+spec:
+  username: myapp
+  instanceRef:
+    name: prod-pg
+  passwordRotation:
+    enabled: true
+    schedule: "0 0 1 * *"   # Monthly at midnight
+    strategy: role-inheritance
+    serviceRole:
+      name: svc_myapp       # Optional, defaults to svc_<username>
+      autoCreate: true
+    userNaming: "{{.Username}}_{{.Date}}"
+    oldUserPolicy:
+      action: delete         # delete | disable | retain
+      gracePeriodDays: 7
+      ownershipCheck: true
+```
+
+### Role-Inheritance Strategy (PostgreSQL / CockroachDB)
+
+The `role-inheritance` strategy creates a NOLOGIN **service role** that holds all privileges, and LOGIN users that inherit from it:
+
+1. **Service role created** — `svc_myapp` (NOLOGIN, INHERIT). Holds privilege grants.
+2. **New login user created** — e.g., `myapp_20260315` with membership in `svc_myapp`.
+3. **Password generated** — stored in the credentials Secret (same Secret key layout).
+4. **Old user deprecated** — added to `status.rotation.pendingDeletion` with a grace period.
+5. **Old user cleaned up** — after `gracePeriodDays`, the action (`delete`/`disable`/`retain`) is applied.
+
+Existing connections using the old user continue working during the grace period. New connections use the updated Secret.
+
+### Configuration Reference
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | bool | `false` | Enable automatic rotation |
+| `schedule` | string | — | Cron expression (5-field: min hour dom month dow) |
+| `strategy` | string | `role-inheritance` | Rotation strategy (`role-inheritance` or `dual-password`) |
+| `serviceRole.name` | string | `svc_<username>` | Service role name for PostgreSQL |
+| `serviceRole.autoCreate` | bool | `true` | Create service role if it doesn't exist |
+| `userNaming` | string | `{{.Username}}_{{.Date}}` | Template for rotated usernames. Variables: `{{.Username}}`, `{{.Date}}`, `{{.Timestamp}}` |
+| `oldUserPolicy.action` | string | `delete` | What to do with old users: `delete`, `disable`, or `retain` |
+| `oldUserPolicy.gracePeriodDays` | int | `7` | Days before applying the action |
+| `oldUserPolicy.ownershipCheck` | bool | `true` | Block deletion if user owns database objects |
+
+### Status Tracking
+
+Rotation state is tracked in `status.rotation`:
+
+| Field | Description |
+|-------|-------------|
+| `lastRotatedAt` | Timestamp of last rotation |
+| `nextRotationAt` | Scheduled next rotation |
+| `activeUser` | Currently active database username |
+| `serviceRole` | Service role name |
+| `pendingDeletion` | List of users awaiting cleanup, with status (`pending`/`blocked`/`deleted`) |
+
+### Old User Cleanup
+
+After the grace period expires, the configured action is applied:
+
+- **delete**: Drops the user from the database. Blocked if `ownershipCheck` is enabled and the user owns objects — status shows `blocked` with the REASSIGN command.
+- **disable**: Sets NOLOGIN on the user, preventing new connections but preserving the role for audit.
+- **retain**: No action taken; the user remains as-is.
+
+### Manual Rotation (Fallback)
+
+The operator also automatically recovers when a DatabaseUser's credentials Secret is deleted:
 
 1. The credentials Secret is deleted (manually or by an external process).
 2. The `Owns(&corev1.Secret{})` Watch detects the deletion and triggers an immediate reconciliation.
 3. The controller generates a new password, calls `SetPassword()` to sync it to the database, and recreates the Secret via `ensureCredentialsSecret()`.
 4. A `SecretRegenerated` event is emitted on the DatabaseUser resource.
 
-To manually rotate a password, delete the existing Secret:
-
 ```bash
 kubectl delete secret <user>-credentials -n <namespace>
 ```
 
 The operator will regenerate the password and recreate the Secret within seconds.
+
+### Troubleshooting Rotation
+
+**Rotation not triggering:**
+
+- Verify `spec.passwordRotation.enabled: true`
+- Check the cron expression is valid (5-field format)
+- Look for `InvalidRotationSchedule` events on the resource
+
+**Old user stuck in pending:**
+
+- Check `status.rotation.pendingDeletion[].status` — if `blocked`, the user owns objects
+- Run the REASSIGN command from `status.rotation.pendingDeletion[].resolution`
+- Or set `ownershipCheck: false` to skip the check
 
 ## Troubleshooting
 

@@ -121,6 +121,11 @@ func (a *Adapter) GetUserInfo(ctx context.Context, username string) (*types.User
 	return &info, nil
 }
 
+// DisableUser is a no-op for ClickHouse as it does not support NOLOGIN semantics.
+func (a *Adapter) DisableUser(_ context.Context, _ string) error {
+	return nil
+}
+
 // GetOwnedObjects returns an empty slice for ClickHouse as ClickHouse does not
 // have object ownership semantics like PostgreSQL or MySQL.
 func (a *Adapter) GetOwnedObjects(_ context.Context, _ string) ([]types.OwnedObject, error) {

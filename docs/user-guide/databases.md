@@ -44,6 +44,15 @@ The database owner (role name). If not specified, the database is owned by the c
 !!! tip "Role-based ownership for credential rotation"
     When using [password rotation](users.md#password-rotation) with the `role-inheritance` strategy, set `owner` to the **service role** (not a specific user). The service role persists across rotations while individual login users are created and retired. This prevents ownership from pointing to a deleted user.
 
+#### Bidirectional Default Privileges
+
+When `postgres.ownership.setDefaultPrivileges` is enabled (the default), the operator sets **bidirectional** `ALTER DEFAULT PRIVILEGES`:
+
+- **Forward**: Objects created by the owner role → accessible to the app user
+- **Reverse**: Objects created by the app user → accessible to the owner role (and all its members)
+
+The reverse direction is critical for applications that create their own tables (e.g., Vault creates `vault_kv_store`). Without it, other role members — including rotated users — cannot access app-created objects. Both directions are applied to the `public` schema and all schemas listed in `postgres.schemas`.
+
 ### deletionPolicy (optional)
 
 What happens to the database when the CR is deleted.

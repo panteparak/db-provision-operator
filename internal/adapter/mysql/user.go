@@ -340,6 +340,22 @@ func (a *Adapter) GetUserInfo(ctx context.Context, username string) (*types.User
 	return &info, nil
 }
 
+// DisableUser locks a MySQL user account to prevent login.
+func (a *Adapter) DisableUser(ctx context.Context, username string) error {
+	db, err := a.getDB()
+	if err != nil {
+		return err
+	}
+
+	query := fmt.Sprintf("ALTER USER %s ACCOUNT LOCK", escapeIdentifier(username))
+	_, err = db.ExecContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to disable user %s: %w", username, err)
+	}
+
+	return nil
+}
+
 // GetOwnedObjects returns database objects where the user is the DEFINER.
 // In MySQL, objects don't have traditional "owners" like PostgreSQL, but
 // views, routines, triggers, and events have a DEFINER attribute.

@@ -27,17 +27,20 @@ import (
 
 // MockRepository is a mock implementation of user repository operations for testing.
 type MockRepository struct {
-	CreateFunc          func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error)
-	ExistsFunc          func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error)
-	UpdateFunc          func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error)
-	DeleteFunc          func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, force bool) error
-	SetPasswordFunc     func(ctx context.Context, username, password string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error
-	GetInstanceFunc     func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error)
-	ResolveInstanceFunc func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*instanceresolver.ResolvedInstance, error)
-	GetEngineFunc       func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error)
-	GetOwnedObjectsFunc func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) ([]OwnedObject, error)
-	DetectDriftFunc     func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, allowDestructive bool) (*drift.Result, error)
-	CorrectDriftFunc    func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error)
+	CreateFunc             func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace, password string) (*Result, error)
+	ExistsFunc             func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (bool, error)
+	UpdateFunc             func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*Result, error)
+	DeleteFunc             func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, force bool) error
+	SetPasswordFunc        func(ctx context.Context, username, password string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error
+	GetInstanceFunc        func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*dbopsv1alpha1.DatabaseInstance, error)
+	ResolveInstanceFunc    func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (*instanceresolver.ResolvedInstance, error)
+	GetEngineFunc          func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) (string, error)
+	GetOwnedObjectsFunc    func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) ([]OwnedObject, error)
+	DetectDriftFunc        func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, allowDestructive bool) (*drift.Result, error)
+	CorrectDriftFunc       func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error)
+	EnsureServiceRoleFunc  func(ctx context.Context, roleName string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error
+	CreateUserWithRoleFunc func(ctx context.Context, username, password, roleName string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error
+	DisableLoginFunc       func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error
 
 	// Call tracking
 	Calls []MockCall
@@ -102,6 +105,15 @@ func NewMockRepository() *MockRepository {
 	}
 	m.CorrectDriftFunc = func(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
 		return &drift.CorrectionResult{}, nil
+	}
+	m.EnsureServiceRoleFunc = func(ctx context.Context, roleName string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
+		return nil
+	}
+	m.CreateUserWithRoleFunc = func(ctx context.Context, username, password, roleName string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
+		return nil
+	}
+	m.DisableLoginFunc = func(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
+		return nil
 	}
 
 	return m
@@ -176,6 +188,24 @@ func (m *MockRepository) DetectDrift(ctx context.Context, spec *dbopsv1alpha1.Da
 func (m *MockRepository) CorrectDrift(ctx context.Context, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string, driftResult *drift.Result, allowDestructive bool) (*drift.CorrectionResult, error) {
 	m.recordCall("CorrectDrift", spec, namespace, driftResult, allowDestructive)
 	return m.CorrectDriftFunc(ctx, spec, namespace, driftResult, allowDestructive)
+}
+
+// EnsureServiceRole implements the ensure service role operation.
+func (m *MockRepository) EnsureServiceRole(ctx context.Context, roleName string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
+	m.recordCall("EnsureServiceRole", roleName, spec, namespace)
+	return m.EnsureServiceRoleFunc(ctx, roleName, spec, namespace)
+}
+
+// CreateUserWithRole implements the create user with role operation.
+func (m *MockRepository) CreateUserWithRole(ctx context.Context, username, password, roleName string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
+	m.recordCall("CreateUserWithRole", username, password, roleName, spec, namespace)
+	return m.CreateUserWithRoleFunc(ctx, username, password, roleName, spec, namespace)
+}
+
+// DisableLogin implements the disable login operation.
+func (m *MockRepository) DisableLogin(ctx context.Context, username string, spec *dbopsv1alpha1.DatabaseUserSpec, namespace string) error {
+	m.recordCall("DisableLogin", username, spec, namespace)
+	return m.DisableLoginFunc(ctx, username, spec, namespace)
 }
 
 // WasCalled checks if a method was called.

@@ -52,7 +52,9 @@ func (b *postgresSpecBuilder) BuildDatabaseCreateOptions(spec *dbopsv1alpha1.Dat
 
 // BuildDatabaseUpdateOptions builds UpdateDatabaseOptions from a DatabaseSpec.
 func (b *postgresSpecBuilder) BuildDatabaseUpdateOptions(spec *dbopsv1alpha1.DatabaseSpec) types.UpdateDatabaseOptions {
-	opts := types.UpdateDatabaseOptions{}
+	opts := types.UpdateDatabaseOptions{
+		Owner: spec.Owner,
+	}
 
 	if spec.Postgres != nil {
 		// Extensions

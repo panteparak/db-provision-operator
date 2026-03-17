@@ -148,8 +148,16 @@ func (s *OwnershipService) TransferOwnership(ctx context.Context, dbName, roleNa
 	return nil
 }
 
-// SetDefaultPrivileges sets ALTER DEFAULT PRIVILEGES so objects created by the owner role
-// are accessible to the app user. Applied to the public schema plus all specified schemas.
+// SetDefaultPrivileges sets bidirectional ALTER DEFAULT PRIVILEGES so objects created by
+// either the owner role or the app user are accessible to the other. This ensures:
+//   - Forward: objects created by ownerRole → accessible to appUser
+//   - Reverse: objects created by appUser → accessible to ownerRole (and all its members)
+//
+// The reverse direction is critical for zero-downtime password rotation: when an app user
+// (e.g., Vault) creates tables, the owner role and all rotated users that inherit from it
+// can still access those tables.
+//
+// Applied to the public schema plus all specified schemas.
 func (s *OwnershipService) SetDefaultPrivileges(ctx context.Context, dbName, ownerRole, appUser string, schemas []string) error {
 	op := s.startOp("SetDefaultPrivileges", dbName)
 
@@ -172,7 +180,8 @@ func (s *OwnershipService) SetDefaultPrivileges(ctx context.Context, dbName, own
 
 	for schemaName := range schemaSet {
 		for _, dp := range privDefs {
-			opts := []types.DefaultPrivilegeGrantOptions{
+			// Forward: objects created by ownerRole → grant to appUser
+			forwardOpts := []types.DefaultPrivilegeGrantOptions{
 				{
 					Database:   dbName,
 					Schema:     schemaName,
@@ -181,15 +190,31 @@ func (s *OwnershipService) SetDefaultPrivileges(ctx context.Context, dbName, own
 					Privileges: dp.privileges,
 				},
 			}
-			if err := s.adapter.SetDefaultPrivileges(ctx, appUser, opts); err != nil {
-				op.Error(err, fmt.Sprintf("failed to set default privileges for %s in schema %s", dp.objectType, schemaName))
-				return fmt.Errorf("set default privileges for %s in %s: %w",
+			if err := s.adapter.SetDefaultPrivileges(ctx, appUser, forwardOpts); err != nil {
+				op.Error(err, fmt.Sprintf("failed to set forward default privileges for %s in schema %s", dp.objectType, schemaName))
+				return fmt.Errorf("set forward default privileges for %s in %s: %w",
+					dp.objectType, schemaName, err)
+			}
+
+			// Reverse: objects created by appUser → grant to ownerRole
+			reverseOpts := []types.DefaultPrivilegeGrantOptions{
+				{
+					Database:   dbName,
+					Schema:     schemaName,
+					GrantedBy:  appUser,
+					ObjectType: dp.objectType,
+					Privileges: dp.privileges,
+				},
+			}
+			if err := s.adapter.SetDefaultPrivileges(ctx, ownerRole, reverseOpts); err != nil {
+				op.Error(err, fmt.Sprintf("failed to set reverse default privileges for %s in schema %s", dp.objectType, schemaName))
+				return fmt.Errorf("set reverse default privileges for %s in %s: %w",
 					dp.objectType, schemaName, err)
 			}
 		}
 	}
 
-	op.Success("default privileges set")
+	op.Success("bidirectional default privileges set")
 	return nil
 }
 

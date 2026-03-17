@@ -179,8 +179,13 @@ type PostgresOwnershipConfig struct {
 	// +optional
 	DropOnDelete bool `json:"dropOnDelete,omitempty"`
 
-	// SetDefaultPrivileges controls whether ALTER DEFAULT PRIVILEGES are applied
-	// so objects created by the owner role are accessible to the app user.
+	// SetDefaultPrivileges controls whether bidirectional ALTER DEFAULT PRIVILEGES
+	// are applied. When enabled, two directions are configured per schema:
+	//   - Forward: objects created by the owner role are accessible to the app user
+	//   - Reverse: objects created by the app user are accessible to the owner role
+	// The reverse direction is critical for zero-downtime password rotation, where
+	// app-created objects (e.g., Vault's vault_kv_store) must be accessible to
+	// rotated users that inherit from the owner role.
 	// Applies to all specified schemas plus public.
 	// +kubebuilder:default=true
 	// +optional
