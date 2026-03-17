@@ -262,8 +262,9 @@ var _ = Describe("drift/database", Ordered, func() {
 		deletionTimeout := getDeletionTimeout()
 
 		// Sweep any leftover child resources (handles test-failure scenarios)
-		// Database CRs default to deletionProtection=true, so add force-delete annotation first.
+		// Grant and Database CRs default to deletionProtection=true, so add force-delete annotation first.
 		By("sweeping leftover child resources")
+		addForceDeleteToAll(ctx, databaseGrantGVR, namespace)
 		addForceDeleteToAll(ctx, databaseGVR, namespace)
 		_ = dynamicClient.Resource(databaseGrantGVR).Namespace(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
 		_ = dynamicClient.Resource(databaseRoleGVR).Namespace(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
@@ -279,7 +280,9 @@ var _ = Describe("drift/database", Ordered, func() {
 			return len(grants.Items) == 0 && len(roles.Items) == 0 && len(users.Items) == 0 && len(dbs.Items) == 0
 		}, deletionTimeout, driftPollingInterval).Should(BeTrue(), "child resources should be deleted")
 
+		// Instance CRs default to deletionProtection=true, so add force-delete annotation first.
 		By("deleting DatabaseInstance and waiting")
+		addForceDeleteAnnotation(ctx, databaseInstanceGVR, namespace, instanceName)
 		_ = dynamicClient.Resource(databaseInstanceGVR).Namespace(namespace).Delete(ctx, instanceName, metav1.DeleteOptions{})
 		Eventually(func() bool {
 			_, err := dynamicClient.Resource(databaseInstanceGVR).Namespace(namespace).Get(ctx, instanceName, metav1.GetOptions{})

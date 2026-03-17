@@ -595,6 +595,7 @@ var _ = Describe("mysql", Ordered, func() {
 			}, timeout, interval).Should(BeTrue(), "User '%s' should be a member of role '%s'", memberUser, roleName)
 
 			By("cleaning up role grant and waiting")
+			addForceDeleteAnnotation(ctx, databaseGrantGVR, testNamespace, roleGrantName)
 			deleteAndWait(ctx, databaseGrantGVR, testNamespace, roleGrantName, timeout, interval)
 
 			By("cleaning up member user and waiting")
@@ -612,7 +613,9 @@ var _ = Describe("mysql", Ordered, func() {
 		deletionTimeout := getDeletionTimeout()
 
 		// Level 1: Delete ALL leaf resources (grants have no children)
+		// Grant CRs default to deletionProtection=true, so add force-delete annotation first.
 		By("deleting all DatabaseGrants and waiting")
+		addForceDeleteToAll(ctx, databaseGrantGVR, testNamespace)
 		_ = dynamicClient.Resource(databaseGrantGVR).Namespace(testNamespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
 		Eventually(func() bool {
 			list, err := dynamicClient.Resource(databaseGrantGVR).Namespace(testNamespace).List(ctx, metav1.ListOptions{})
@@ -637,7 +640,9 @@ var _ = Describe("mysql", Ordered, func() {
 		}, deletionTimeout, interval).Should(BeTrue(), "Role, Users, and Database should be deleted")
 
 		// Level 3: Delete root resource (its children are now gone)
+		// Instance CRs default to deletionProtection=true, so add force-delete annotation first.
 		By("deleting DatabaseInstance and waiting")
+		addForceDeleteAnnotation(ctx, databaseInstanceGVR, testNamespace, instanceName)
 		deleteAndWait(ctx, databaseInstanceGVR, testNamespace, instanceName, deletionTimeout, interval)
 	})
 })

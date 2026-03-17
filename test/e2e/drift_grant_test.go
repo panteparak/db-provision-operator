@@ -272,7 +272,9 @@ var _ = Describe("drift/grant", Ordered, func() {
 		deletionTimeout := getDeletionTimeout()
 
 		// Level 1: Delete leaf resources (grants)
+		// Grant CRs default to deletionProtection=true, so add force-delete annotation first.
 		By("deleting all DatabaseGrants and waiting")
+		addForceDeleteToAll(ctx, databaseGrantGVR, namespace)
 		_ = dynamicClient.Resource(databaseGrantGVR).Namespace(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
 		Eventually(func() bool {
 			list, _ := dynamicClient.Resource(databaseGrantGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
@@ -296,7 +298,9 @@ var _ = Describe("drift/grant", Ordered, func() {
 		}, deletionTimeout, driftPollingInterval).Should(BeTrue(), "Roles and Database should be deleted")
 
 		// Level 3: Delete root resource (instance)
+		// Instance CRs default to deletionProtection=true, so add force-delete annotation first.
 		By("deleting DatabaseInstance and waiting")
+		addForceDeleteAnnotation(ctx, databaseInstanceGVR, namespace, instanceName)
 		_ = dynamicClient.Resource(databaseInstanceGVR).Namespace(namespace).Delete(ctx, instanceName, metav1.DeleteOptions{})
 		Eventually(func() bool {
 			_, err := dynamicClient.Resource(databaseInstanceGVR).Namespace(namespace).Get(ctx, instanceName, metav1.GetOptions{})

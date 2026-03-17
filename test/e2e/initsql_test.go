@@ -680,7 +680,9 @@ var _ = Describe("initsql", Ordered, func() {
 			return true
 		}, deletionTimeout, pollInterval).Should(BeTrue(), "initsql Database CRs should be deleted")
 
+		// Instance CRs default to deletionProtection=true, so add force-delete annotation first.
 		By("deleting DatabaseInstance")
+		addForceDeleteAnnotation(ctx, databaseInstanceGVR, namespace, instanceName)
 		_ = dynamicClient.Resource(databaseInstanceGVR).Namespace(namespace).Delete(ctx, instanceName, metav1.DeleteOptions{})
 		Eventually(func() bool {
 			_, err := dynamicClient.Resource(databaseInstanceGVR).Namespace(namespace).Get(ctx, instanceName, metav1.GetOptions{})

@@ -591,7 +591,8 @@ func addForceDeleteAnnotation(ctx context.Context, gvr schema.GroupVersionResour
 }
 
 // addForceDeleteToAll adds the force-delete annotation to all resources of the given type
-// in the namespace. Used in cleanup to bypass deletion protection on Database CRs.
+// in the namespace. Used in cleanup to bypass deletion protection on CRs that default to
+// deletionProtection=true (DatabaseGrant, Database, DatabaseInstance).
 func addForceDeleteToAll(ctx context.Context, gvr schema.GroupVersionResource, namespace string) {
 	list, err := dynamicClient.Resource(gvr).Namespace(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -619,7 +620,9 @@ func (cfg *DatabaseTestConfig) CleanupTestResources(ctx context.Context) {
 	interval := cfg.DefaultInterval()
 
 	// Level 1: Delete leaf resources (grants have no children)
+	// Grant CRs default to deletionProtection=true, so add force-delete annotation first.
 	By("deleting DatabaseGrant and waiting")
+	addForceDeleteAnnotation(ctx, databaseGrantGVR, cfg.TestNamespace, cfg.GrantName)
 	deleteAndWait(ctx, databaseGrantGVR, cfg.TestNamespace, cfg.GrantName, deletionTimeout, interval)
 
 	// Level 2: Delete middle resources (their grant children are now gone)
@@ -639,7 +642,9 @@ func (cfg *DatabaseTestConfig) CleanupTestResources(ctx context.Context) {
 	}, deletionTimeout, interval).Should(BeTrue(), "Role, User, and Database should be deleted")
 
 	// Level 3: Delete root resource (its children are now gone)
+	// Instance CRs default to deletionProtection=true, so add force-delete annotation first.
 	By("deleting DatabaseInstance and waiting")
+	addForceDeleteAnnotation(ctx, databaseInstanceGVR, cfg.TestNamespace, cfg.InstanceName)
 	deleteAndWait(ctx, databaseInstanceGVR, cfg.TestNamespace, cfg.InstanceName, deletionTimeout, interval)
 }
 
