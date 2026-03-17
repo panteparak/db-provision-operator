@@ -1110,6 +1110,89 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Password Rotation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automatic-rotation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatic Rotation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#role-inheritance-strategy-postgresql-cockroachdb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Role-Inheritance Strategy (PostgreSQL / CockroachDB)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#status-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status Tracking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#old-user-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Old User Cleanup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-rotation-fallback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual Rotation (Fallback)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#troubleshooting-rotation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting Rotation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2802,6 +2885,89 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Password Rotation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automatic-rotation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatic Rotation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#role-inheritance-strategy-postgresql-cockroachdb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Role-Inheritance Strategy (PostgreSQL / CockroachDB)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#status-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status Tracking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#old-user-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Old User Cleanup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-rotation-fallback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual Rotation (Fallback)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#troubleshooting-rotation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting Rotation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3469,18 +3635,169 @@
 <li><strong>Force-delete and external failures</strong>: If the user drop fails and force-delete is set, the operator continues with finalizer removal.</li>
 </ol>
 <h2 id="password-rotation">Password Rotation<a class="headerlink" href="#password-rotation" title="Permanent link">&para;</a></h2>
-<p>The operator automatically recovers when a DatabaseUser's credentials Secret is deleted.
-The flow works as follows:</p>
+<h3 id="automatic-rotation">Automatic Rotation<a class="headerlink" href="#automatic-rotation" title="Permanent link">&para;</a></h3>
+<p>The operator supports scheduled password rotation via <code>spec.passwordRotation</code>. When enabled, the controller evaluates the cron schedule during each reconciliation and performs rotation when due.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dbops.dbprovision.io/v1alpha1</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DatabaseUser</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="nt">metadata</span><span class="p">:</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp-user</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="nt">spec</span><span class="p">:</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">  </span><span class="nt">instanceRef</span><span class="p">:</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prod-pg</span>
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="w">  </span><span class="nt">passwordRotation</span><span class="p">:</span>
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="w">    </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="w">    </span><span class="nt">schedule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0</span><span class="nv"> </span><span class="s">0</span><span class="nv"> </span><span class="s">1</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*&quot;</span><span class="w">   </span><span class="c1"># Monthly at midnight</span>
+</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a><span class="w">    </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">role-inheritance</span>
+</span><span id="__span-14-13"><a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="w">    </span><span class="nt">serviceRole</span><span class="p">:</span>
+</span><span id="__span-14-14"><a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">svc_myapp</span><span class="w">       </span><span class="c1"># Optional, defaults to svc_&lt;username&gt;</span>
+</span><span id="__span-14-15"><a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a><span class="w">      </span><span class="nt">autoCreate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span><span id="__span-14-16"><a id="__codelineno-14-16" name="__codelineno-14-16" href="#__codelineno-14-16"></a><span class="w">    </span><span class="nt">userNaming</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{.Username}}_{{.Date}}&quot;</span>
+</span><span id="__span-14-17"><a id="__codelineno-14-17" name="__codelineno-14-17" href="#__codelineno-14-17"></a><span class="w">    </span><span class="nt">oldUserPolicy</span><span class="p">:</span>
+</span><span id="__span-14-18"><a id="__codelineno-14-18" name="__codelineno-14-18" href="#__codelineno-14-18"></a><span class="w">      </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delete</span><span class="w">         </span><span class="c1"># delete | disable | retain</span>
+</span><span id="__span-14-19"><a id="__codelineno-14-19" name="__codelineno-14-19" href="#__codelineno-14-19"></a><span class="w">      </span><span class="nt">gracePeriodDays</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">7</span>
+</span><span id="__span-14-20"><a id="__codelineno-14-20" name="__codelineno-14-20" href="#__codelineno-14-20"></a><span class="w">      </span><span class="nt">ownershipCheck</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span></code></pre></div>
+<h3 id="role-inheritance-strategy-postgresql-cockroachdb">Role-Inheritance Strategy (PostgreSQL / CockroachDB)<a class="headerlink" href="#role-inheritance-strategy-postgresql-cockroachdb" title="Permanent link">&para;</a></h3>
+<p>The <code>role-inheritance</code> strategy creates a NOLOGIN <strong>service role</strong> that holds all privileges, and LOGIN users that inherit from it:</p>
+<ol>
+<li><strong>Service role created</strong> — <code>svc_myapp</code> (NOLOGIN, INHERIT). Holds privilege grants.</li>
+<li><strong>New login user created</strong> — e.g., <code>myapp_20260315</code> with membership in <code>svc_myapp</code>.</li>
+<li><strong>Password generated</strong> — stored in the credentials Secret (same Secret key layout).</li>
+<li><strong>Old user deprecated</strong> — added to <code>status.rotation.pendingDeletion</code> with a grace period.</li>
+<li><strong>Old user cleaned up</strong> — after <code>gracePeriodDays</code>, the action (<code>delete</code>/<code>disable</code>/<code>retain</code>) is applied.</li>
+</ol>
+<p>Existing connections using the old user continue working during the grace period. New connections use the updated Secret.</p>
+<h3 id="configuration-reference">Configuration Reference<a class="headerlink" href="#configuration-reference" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code></td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>Enable automatic rotation</td>
+</tr>
+<tr>
+<td><code>schedule</code></td>
+<td>string</td>
+<td>—</td>
+<td>Cron expression (5-field: min hour dom month dow)</td>
+</tr>
+<tr>
+<td><code>strategy</code></td>
+<td>string</td>
+<td><code>role-inheritance</code></td>
+<td>Rotation strategy (<code>role-inheritance</code> or <code>dual-password</code>)</td>
+</tr>
+<tr>
+<td><code>serviceRole.name</code></td>
+<td>string</td>
+<td><code>svc_&lt;username&gt;</code></td>
+<td>Service role name for PostgreSQL</td>
+</tr>
+<tr>
+<td><code>serviceRole.autoCreate</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>Create service role if it doesn't exist</td>
+</tr>
+<tr>
+<td><code>userNaming</code></td>
+<td>string</td>
+<td><code>{{.Username}}_{{.Date}}</code></td>
+<td>Template for rotated usernames. Variables: <code>{{.Username}}</code>, <code>{{.Date}}</code>, <code>{{.Timestamp}}</code></td>
+</tr>
+<tr>
+<td><code>oldUserPolicy.action</code></td>
+<td>string</td>
+<td><code>delete</code></td>
+<td>What to do with old users: <code>delete</code>, <code>disable</code>, or <code>retain</code></td>
+</tr>
+<tr>
+<td><code>oldUserPolicy.gracePeriodDays</code></td>
+<td>int</td>
+<td><code>7</code></td>
+<td>Days before applying the action</td>
+</tr>
+<tr>
+<td><code>oldUserPolicy.ownershipCheck</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>Block deletion if user owns database objects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="status-tracking">Status Tracking<a class="headerlink" href="#status-tracking" title="Permanent link">&para;</a></h3>
+<p>Rotation state is tracked in <code>status.rotation</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>lastRotatedAt</code></td>
+<td>Timestamp of last rotation</td>
+</tr>
+<tr>
+<td><code>nextRotationAt</code></td>
+<td>Scheduled next rotation</td>
+</tr>
+<tr>
+<td><code>activeUser</code></td>
+<td>Currently active database username</td>
+</tr>
+<tr>
+<td><code>serviceRole</code></td>
+<td>Service role name</td>
+</tr>
+<tr>
+<td><code>pendingDeletion</code></td>
+<td>List of users awaiting cleanup, with status (<code>pending</code>/<code>blocked</code>/<code>deleted</code>)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="old-user-cleanup">Old User Cleanup<a class="headerlink" href="#old-user-cleanup" title="Permanent link">&para;</a></h3>
+<p>After the grace period expires, the configured action is applied:</p>
+<ul>
+<li><strong>delete</strong>: Drops the user from the database. Blocked if <code>ownershipCheck</code> is enabled and the user owns objects — status shows <code>blocked</code> with the REASSIGN command.</li>
+<li><strong>disable</strong>: Sets NOLOGIN on the user, preventing new connections but preserving the role for audit.</li>
+<li><strong>retain</strong>: No action taken; the user remains as-is.</li>
+</ul>
+<h3 id="manual-rotation-fallback">Manual Rotation (Fallback)<a class="headerlink" href="#manual-rotation-fallback" title="Permanent link">&para;</a></h3>
+<p>The operator also automatically recovers when a DatabaseUser's credentials Secret is deleted:</p>
 <ol>
 <li>The credentials Secret is deleted (manually or by an external process).</li>
 <li>The <code>Owns(&amp;corev1.Secret{})</code> Watch detects the deletion and triggers an immediate reconciliation.</li>
 <li>The controller generates a new password, calls <code>SetPassword()</code> to sync it to the database, and recreates the Secret via <code>ensureCredentialsSecret()</code>.</li>
 <li>A <code>SecretRegenerated</code> event is emitted on the DatabaseUser resource.</li>
 </ol>
-<p>To manually rotate a password, delete the existing Secret:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>kubectl<span class="w"> </span>delete<span class="w"> </span>secret<span class="w"> </span>&lt;user&gt;-credentials<span class="w"> </span>-n<span class="w"> </span>&lt;namespace&gt;
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>kubectl<span class="w"> </span>delete<span class="w"> </span>secret<span class="w"> </span>&lt;user&gt;-credentials<span class="w"> </span>-n<span class="w"> </span>&lt;namespace&gt;
 </span></code></pre></div>
 <p>The operator will regenerate the password and recreate the Secret within seconds.</p>
+<h3 id="troubleshooting-rotation">Troubleshooting Rotation<a class="headerlink" href="#troubleshooting-rotation" title="Permanent link">&para;</a></h3>
+<p><strong>Rotation not triggering:</strong></p>
+<ul>
+<li>Verify <code>spec.passwordRotation.enabled: true</code></li>
+<li>Check the cron expression is valid (5-field format)</li>
+<li>Look for <code>InvalidRotationSchedule</code> events on the resource</li>
+</ul>
+<p><strong>Old user stuck in pending:</strong></p>
+<ul>
+<li>Check <code>status.rotation.pendingDeletion[].status</code> — if <code>blocked</code>, the user owns objects</li>
+<li>Run the REASSIGN command from <code>status.rotation.pendingDeletion[].resolution</code></li>
+<li>Or set <code>ownershipCheck: false</code> to skip the check</li>
+</ul>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <h3 id="user-stuck-in-pending">User stuck in Pending<a class="headerlink" href="#user-stuck-in-pending" title="Permanent link">&para;</a></h3>
 <ul>

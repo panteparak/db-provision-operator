@@ -2075,6 +2075,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#password-rotation-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Password Rotation Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Password Rotation Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reconciliation-based-cron-scheduling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reconciliation-Based Cron Scheduling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#role-inheritance-rotation-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Role-Inheritance Rotation Lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bidirectional-default-privileges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bidirectional Default Privileges
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#future-considerations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3065,6 +3115,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#password-rotation-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Password Rotation Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Password Rotation Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reconciliation-based-cron-scheduling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reconciliation-Based Cron Scheduling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#role-inheritance-rotation-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Role-Inheritance Rotation Lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bidirectional-default-privileges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bidirectional Default Privileges
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#future-considerations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3331,6 +3431,36 @@
 - Reduce connection overhead
 - Respect database limits
 - Efficient resource use</p>
+<h2 id="password-rotation-architecture">Password Rotation Architecture<a class="headerlink" href="#password-rotation-architecture" title="Permanent link">&para;</a></h2>
+<h3 id="reconciliation-based-cron-scheduling">Reconciliation-Based Cron Scheduling<a class="headerlink" href="#reconciliation-based-cron-scheduling" title="Permanent link">&para;</a></h3>
+<p>Password rotation uses the same scheduling pattern as BackupSchedule: the controller evaluates a cron expression during reconciliation, performs the rotation if due, and uses <code>RequeueAfter</code> set to <code>time.Until(nextRotationAt)</code> (capped to <code>[10s, 1h]</code>) to wake up at the right time.</p>
+<p>This approach is crash-safe — all state is persisted in <code>status.rotation</code> — and requires no background goroutines or additional leader election coordination.</p>
+<h3 id="role-inheritance-rotation-lifecycle">Role-Inheritance Rotation Lifecycle<a class="headerlink" href="#role-inheritance-rotation-lifecycle" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>┌──────────────────────────────────────────────────────┐
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>│  1. EnsureServiceRole(&quot;svc_myapp&quot;)                   │
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>│     CREATE ROLE svc_myapp NOLOGIN INHERIT             │
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>├──────────────────────────────────────────────────────┤
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>│  2. CreateUserWithRole(&quot;myapp_20260315&quot;, svc_myapp)  │
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>│     CREATE ROLE myapp_20260315 LOGIN INHERIT          │
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>│     GRANT svc_myapp TO myapp_20260315                 │
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>├──────────────────────────────────────────────────────┤
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>│  3. Update K8s Secret with new username + password    │
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>├──────────────────────────────────────────────────────┤
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>│  4. Deprecate old user → pendingDeletion              │
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>│     (grace period: N days)                            │
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>├──────────────────────────────────────────────────────┤
+</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>│  5. After grace period: Delete / Disable / Retain     │
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>│     (ownership check blocks deletion if user owns     │
+</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>│      objects — REASSIGN required first)               │
+</span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>└──────────────────────────────────────────────────────┘
+</span></code></pre></div>
+<h3 id="bidirectional-default-privileges">Bidirectional Default Privileges<a class="headerlink" href="#bidirectional-default-privileges" title="Permanent link">&para;</a></h3>
+<p>The ownership model sets <code>ALTER DEFAULT PRIVILEGES</code> in both directions:</p>
+<ul>
+<li><strong>Forward</strong> (<code>FOR ROLE ownerRole GRANT ... TO appUser</code>): Owner-created objects are accessible to the app user.</li>
+<li><strong>Reverse</strong> (<code>FOR ROLE appUser GRANT ... TO ownerRole</code>): App-created objects are accessible to the owner role and all its members.</li>
+</ul>
+<p>Without the reverse direction, tables created by the app user (e.g., Vault's <code>vault_kv_store</code>) are inaccessible to rotated users that inherit from the owner role. Both directions are executed via <code>ExecSQLAsRole</code> to ensure proper SET ROLE context.</p>
 <h2 id="future-considerations">Future Considerations<a class="headerlink" href="#future-considerations" title="Permanent link">&para;</a></h2>
 <h3 id="webhook-validation">Webhook Validation<a class="headerlink" href="#webhook-validation" title="Permanent link">&para;</a></h3>
 <p>Planned: Admission webhooks for:

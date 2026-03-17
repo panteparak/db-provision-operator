@@ -3043,6 +3043,13 @@
 <p class="admonition-title">Role-based ownership for credential rotation</p>
 <p>When using <a href="../users/#password-rotation">password rotation</a> with the <code>role-inheritance</code> strategy, set <code>owner</code> to the <strong>service role</strong> (not a specific user). The service role persists across rotations while individual login users are created and retired. This prevents ownership from pointing to a deleted user.</p>
 </div>
+<h4 id="bidirectional-default-privileges">Bidirectional Default Privileges<a class="headerlink" href="#bidirectional-default-privileges" title="Permanent link">&para;</a></h4>
+<p>When <code>postgres.ownership.setDefaultPrivileges</code> is enabled (the default), the operator sets <strong>bidirectional</strong> <code>ALTER DEFAULT PRIVILEGES</code>:</p>
+<ul>
+<li><strong>Forward</strong>: Objects created by the owner role → accessible to the app user</li>
+<li><strong>Reverse</strong>: Objects created by the app user → accessible to the owner role (and all its members)</li>
+</ul>
+<p>The reverse direction is critical for applications that create their own tables (e.g., Vault creates <code>vault_kv_store</code>). Without it, other role members — including rotated users — cannot access app-created objects. Both directions are applied to the <code>public</code> schema and all schemas listed in <code>postgres.schemas</code>.</p>
 <h3 id="deletionpolicy-optional">deletionPolicy (optional)<a class="headerlink" href="#deletionpolicy-optional" title="Permanent link">&para;</a></h3>
 <p>What happens to the database when the CR is deleted.</p>
 <table>
