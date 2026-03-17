@@ -18,6 +18,7 @@ package logging
 
 import (
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -83,15 +84,27 @@ func (b *ControllerBuilder) WithEventFilter(p predicate.Predicate) *ControllerBu
 //  1. ReconcileID injection — unique correlation ID per reconciliation cycle
 //
 // Add future middleware here — tracing, metrics, audit, etc.
+//
+// Predicate placement:
+//   - For() (primary CRD): user predicates + GenerationChangedPredicate.
+//     GenerationChangedPredicate filters status-only updates (which don't bump
+//     metadata.generation), preventing an infinite reconcile loop where each
+//     reconcile writes ReconcileID/LastReconcileTime to status and re-triggers
+//     the watch. Timer-based RequeueAfter (drift detection) is unaffected.
+//   - Owns() (owned resources): user predicates only, so owned resource
+//     changes (e.g. Secret rotation) still trigger reconciliation.
 func (b *ControllerBuilder) Complete(r reconcile.Reconciler) error {
-	builder := ctrl.NewControllerManagedBy(b.mgr).
-		For(b.obj).
+	forPreds := make([]predicate.Predicate, 0, len(b.predicates)+1)
+	forPreds = append(forPreds, b.predicates...)
+	forPreds = append(forPreds, predicate.GenerationChangedPredicate{})
+
+	bldr := ctrl.NewControllerManagedBy(b.mgr).
+		For(b.obj, builder.WithPredicates(forPreds...)).
 		Named(b.name)
+
 	for _, o := range b.owns {
-		builder = builder.Owns(o)
+		bldr = bldr.Owns(o, builder.WithPredicates(b.predicates...))
 	}
-	for _, p := range b.predicates {
-		builder = builder.WithEventFilter(p)
-	}
-	return builder.Complete(&withReconcileID{inner: r})
+
+	return bldr.Complete(&withReconcileID{inner: r})
 }
