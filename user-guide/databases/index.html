@@ -3055,11 +3055,11 @@
 <tbody>
 <tr>
 <td><code>Retain</code></td>
-<td>Keep the database (default)</td>
+<td>Keep the database</td>
 </tr>
 <tr>
 <td><code>Delete</code></td>
-<td>Delete the database</td>
+<td>Delete the database (default)</td>
 </tr>
 <tr>
 <td><code>Snapshot</code></td>
@@ -3173,9 +3173,9 @@
 </tr>
 </tbody>
 </table>
-<div class="admonition warning">
-<p class="admonition-title">Security: Init SQL runs with operator credentials</p>
-<p>Init SQL statements are executed using the operator's database connection credentials (from the DatabaseInstance). Treat <code>initSQL</code> content with the same trust level as direct database admin access. Use <code>secretRef</code> for sensitive data.</p>
+<div class="admonition info">
+<p class="admonition-title">Init SQL execution context</p>
+<p>When <code>spec.owner</code> is set, init SQL executes as the database owner role via <code>SET ROLE</code>. This scopes init SQL to the owner's privileges — it cannot access other databases or perform superuser operations (e.g., <code>CREATE EXTENSION</code> should use <code>spec.postgres.extensions</code> instead). When no owner is set, init SQL executes with the operator's admin credentials. The operator user must be a superuser or have membership on the owner role for <code>SET ROLE</code> to succeed.</p>
 </div>
 <div class="admonition tip">
 <p class="admonition-title">Idempotency and re-execution</p>
@@ -3386,7 +3386,7 @@
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">instanceRef</span><span class="p">:</span>
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres-primary</span>
 </span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapp</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">  </span><span class="nt">deletionPolicy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Retain</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">  </span><span class="nt">deletionPolicy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Delete</span>
 </span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">  </span><span class="nt">deletionProtection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">  </span><span class="nt">postgres</span><span class="p">:</span>
 </span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">    </span><span class="nt">encoding</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">UTF8</span>
@@ -3553,8 +3553,8 @@
 <li><strong>Child dependency check</strong>: If DatabaseGrant children reference this Database, deletion is blocked (Phase=Failed, condition=DependenciesExist) unless force-delete is set.</li>
 <li><strong>Cascade confirmation</strong>: When force-delete is set and children exist, the operator enters <code>PhasePendingDeletion</code> and requires the <code>confirm-force-delete</code> annotation with the hash from <code>status.deletionConfirmation.hash</code>. Each child grant is deleted according to its own deletion policy. See <a href="../deletion-protection/#force-delete-with-children-cascade-confirmation">Force Delete with Children</a>.</li>
 <li><strong>Deletion policy</strong>: Controls what happens to the external database:<ul>
-<li><strong>Retain</strong> (default): CR is deleted, database remains</li>
-<li><strong>Delete</strong>: Database is dropped, then CR is deleted</li>
+<li><strong>Retain</strong>: CR is deleted, database remains</li>
+<li><strong>Delete</strong> (default): Database is dropped, then CR is deleted</li>
 <li><strong>Snapshot</strong>: Backup is created, database is dropped, CR is deleted</li>
 </ul>
 </li>
