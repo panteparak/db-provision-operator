@@ -4,6 +4,9 @@
 # -- Number of replicas for the operator deployment
 replicaCount: 1
 
+# -- Number of old ReplicaSets to retain for rollback
+revisionHistoryLimit: 4
+
 image:
   # -- Image repository
   repository: ghcr.io/panteparak/db-provision-operator

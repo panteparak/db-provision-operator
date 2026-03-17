@@ -17,6 +17,7 @@ metadata:
     app.kubernetes.io/name: db-provision-operator
     app.kubernetes.io/managed-by: kustomize
 spec:
+  revisionHistoryLimit: 4
   selector:
     matchLabels:
       control-plane: controller-manager

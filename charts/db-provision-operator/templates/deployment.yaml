@@ -6,6 +6,7 @@ metadata:
   labels:
     {{- include "db-provision-operator.labels" . | nindent 4 }}
 spec:
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
