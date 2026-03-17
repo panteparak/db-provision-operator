@@ -149,6 +149,17 @@ kubectl get events -o json | jq '.items[] | select(.involvedObject.kind == "Data
 | `RetentionApplied` | Normal | Retention policy was applied, old backups deleted |
 | `ReconcileFailed` | Warning | Reconciliation loop encountered an error |
 
+### dbctl migrate (CLI Tool)
+
+Events emitted by the `dbctl migrate` command on target resources. These use the event source `dbctl-migrate`.
+
+| Event | Type | Description |
+|-------|------|-------------|
+| `OwnershipDriftDetected` | Warning | Migration detected ownership drift (dry-run, not corrected) |
+| `OwnershipDriftCorrected` | Normal | Migration corrected ownership drift |
+
+See [Migrations](migrations.md) for details.
+
 ### Cluster-Scoped Resources
 
 Cluster-scoped resources (`ClusterDatabaseInstance`, `ClusterDatabaseRole`, `ClusterDatabaseGrant`) emit the same events as their namespaced counterparts (`DatabaseInstance`, `DatabaseRole`, `DatabaseGrant` respectively). The only difference is that cluster-scoped events are not associated with a namespace.

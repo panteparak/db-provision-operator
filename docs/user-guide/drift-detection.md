@@ -374,6 +374,20 @@ kubectl logs -l app.kubernetes.io/name=db-provision-operator -n db-provision-ope
 2. Check if destructive corrections need the annotation
 3. Verify database permissions
 
+### Ownership Drift (Roles, Membership, Default Privileges)
+
+The operator's drift detection checks database-level properties (owner, extensions, schemas) but does **not** re-verify role existence, membership, or default privileges after initial creation. If these are broken (e.g., after manual role deletion), use the `dbctl migrate reverse-privileges` command to diagnose and repair:
+
+```bash
+# Diagnose
+dbctl migrate reverse-privileges my-database -n my-namespace --dry-run
+
+# Repair
+dbctl migrate reverse-privileges my-database -n my-namespace
+```
+
+See [Migrations](../operations/migrations.md) for full documentation.
+
 ### Drift Detected but Expected
 
 For known differences that should be ignored, consider:

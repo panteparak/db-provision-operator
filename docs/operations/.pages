@@ -2,6 +2,7 @@ title: Operations
 nav:
   - Overview: index.md
   - Admin Account Setup: admin-account-setup.md
+  - Migrations: migrations.md
   - Monitoring: monitoring.md
   - Events: events.md
   - Troubleshooting: troubleshooting.md
