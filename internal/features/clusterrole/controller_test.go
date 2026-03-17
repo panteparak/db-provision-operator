@@ -317,9 +317,9 @@ func TestController_Reconcile_ExistsError(t *testing.T) {
 		NamespacedName: types.NamespacedName{Name: "testrole"},
 	})
 
-	// handleError uses ClassifyRequeue — transient errors return err with RequeueAfter
-	assert.Error(t, err)
-	assert.NotEqual(t, ctrl.Result{}, result)
+	// handleError uses ClassifyRequeue — transient errors return nil error with RequeueAfter
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter, "should requeue after error")
 
 	var updatedRole dbopsv1alpha1.ClusterDatabaseRole
 	err = controller.Get(context.Background(), types.NamespacedName{Name: "testrole"}, &updatedRole)
@@ -353,8 +353,8 @@ func TestController_Reconcile_CreateError(t *testing.T) {
 		NamespacedName: types.NamespacedName{Name: "testrole"},
 	})
 
-	assert.Error(t, err)
-	assert.NotEqual(t, ctrl.Result{}, result)
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter, "should requeue after error")
 
 	var updatedRole dbopsv1alpha1.ClusterDatabaseRole
 	err = controller.Get(context.Background(), types.NamespacedName{Name: "testrole"}, &updatedRole)

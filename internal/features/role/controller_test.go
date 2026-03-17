@@ -540,14 +540,17 @@ func TestController_Reconcile_ExistsError(t *testing.T) {
 		Logger:               logr.Discard(),
 	})
 
-	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: types.NamespacedName{
 			Name:      "testrole",
 			Namespace: "default",
 		},
 	})
 
-	require.Error(t, err)
+	// ClassifyRequeue returns nil error with RequeueAfter so controller-runtime
+	// uses the intended interval instead of exponential backoff.
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter, "should requeue after exists check error")
 
 	// Verify the role status was updated with failure
 	var updatedRole dbopsv1alpha1.DatabaseRole
@@ -600,14 +603,15 @@ func TestController_Reconcile_CreateError(t *testing.T) {
 		Logger:               logr.Discard(),
 	})
 
-	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: types.NamespacedName{
 			Name:      "testrole",
 			Namespace: "default",
 		},
 	})
 
-	require.Error(t, err)
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter, "should requeue after error")
 
 	// Verify the role status was updated with failure
 	var updatedRole dbopsv1alpha1.DatabaseRole

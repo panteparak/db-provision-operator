@@ -440,8 +440,8 @@ func TestController_Reconcile_ConnectionError(t *testing.T) {
 		},
 	})
 
-	// handleError -> ClassifyRequeue: transient error returns err with RequeueAfter
-	assert.Error(t, err)
+	// handleError -> ClassifyRequeue: transient error returns nil error with RequeueAfter
+	require.NoError(t, err)
 	assert.NotEqual(t, ctrl.Result{}, result)
 	assert.True(t, result.RequeueAfter > 0, "should requeue after error")
 

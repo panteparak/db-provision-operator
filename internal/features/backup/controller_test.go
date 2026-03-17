@@ -214,10 +214,9 @@ func TestController_Reconcile_WaitingForDatabase(t *testing.T) {
 		},
 	})
 
-	// Controller returns error for requeue and sets status to Failed
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not found")
-	assert.NotEqual(t, ctrl.Result{}, result) // Should requeue
+	// ClassifyRequeue returns nil error with RequeueAfter for transient errors
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter, "should requeue after error")
 
 	// Verify the backup is in failed state (database not found is an error)
 	var updatedBackup dbopsv1alpha1.DatabaseBackup
@@ -547,8 +546,8 @@ func TestController_Reconcile_BackupError(t *testing.T) {
 		},
 	})
 
-	// Error should be returned for requeue
-	require.Error(t, err)
+	// ClassifyRequeue returns nil error with RequeueAfter for transient errors
+	require.NoError(t, err)
 	assert.Greater(t, result.RequeueAfter, time.Duration(0))
 
 	// Verify ExecuteBackup WAS called

@@ -143,16 +143,16 @@ func TestClassifyRequeue(t *testing.T) {
 			expectedErr:    false,
 		},
 		{
-			name:           "connection error: longer requeue",
+			name:           "connection error: longer requeue, nil error for deterministic interval",
 			err:            service.ErrConnectionFailed,
 			expectedResult: ctrl.Result{RequeueAfter: RequeueConnection},
-			expectedErr:    true,
+			expectedErr:    false,
 		},
 		{
-			name:           "transient error: standard requeue",
+			name:           "transient error: standard requeue, nil error for deterministic interval",
 			err:            fmt.Errorf("something went wrong"),
 			expectedResult: ctrl.Result{RequeueAfter: RequeueDefault},
-			expectedErr:    true,
+			expectedErr:    false,
 		},
 		{
 			name:           "unsupported engine: no requeue",
@@ -161,10 +161,10 @@ func TestClassifyRequeue(t *testing.T) {
 			expectedErr:    false,
 		},
 		{
-			name:           "timeout error: connection-level requeue",
+			name:           "timeout error: connection-level requeue, nil error for deterministic interval",
 			err:            service.NewTimeoutError("backup", "mydb", "30s", fmt.Errorf("ctx deadline")),
 			expectedResult: ctrl.Result{RequeueAfter: RequeueConnection},
-			expectedErr:    true,
+			expectedErr:    false,
 		},
 	}
 

@@ -316,8 +316,8 @@ func TestController_Reconcile_ApplyError(t *testing.T) {
 		NamespacedName: types.NamespacedName{Name: "testgrant"},
 	})
 
-	assert.Error(t, err)
-	assert.NotEqual(t, ctrl.Result{}, result)
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter, "should requeue after error")
 
 	var updatedGrant dbopsv1alpha1.ClusterDatabaseGrant
 	err = controller.Get(context.Background(), types.NamespacedName{Name: "testgrant"}, &updatedGrant)
@@ -420,8 +420,8 @@ func TestController_Reconcile_ResolveTargetError(t *testing.T) {
 		NamespacedName: types.NamespacedName{Name: "testgrant"},
 	})
 
-	assert.Error(t, err)
-	assert.NotEqual(t, ctrl.Result{}, result)
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter, "should requeue after error")
 
 	var updatedGrant dbopsv1alpha1.ClusterDatabaseGrant
 	err = controller.Get(context.Background(), types.NamespacedName{Name: "testgrant"}, &updatedGrant)
@@ -451,8 +451,8 @@ func TestController_Reconcile_GetInstanceError(t *testing.T) {
 		NamespacedName: types.NamespacedName{Name: "testgrant"},
 	})
 
-	assert.Error(t, err)
-	assert.NotEqual(t, ctrl.Result{}, result)
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter, "should requeue after error")
 
 	var updatedGrant dbopsv1alpha1.ClusterDatabaseGrant
 	err = controller.Get(context.Background(), types.NamespacedName{Name: "testgrant"}, &updatedGrant)

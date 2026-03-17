@@ -440,8 +440,8 @@ func TestController_Reconcile_ExistsError(t *testing.T) {
 		},
 	})
 
-	require.Error(t, err)
-	assert.NotEqual(t, time.Duration(0), result.RequeueAfter)
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter, "should requeue after error")
 
 	// Verify the database status was updated
 	var updatedDB dbopsv1alpha1.Database
@@ -500,8 +500,8 @@ func TestController_Reconcile_CreateError(t *testing.T) {
 		},
 	})
 
-	require.Error(t, err)
-	assert.NotEqual(t, time.Duration(0), result.RequeueAfter)
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter, "should requeue after error")
 
 	// Verify the database status was updated
 	var updatedDB dbopsv1alpha1.Database
@@ -982,8 +982,8 @@ func TestController_Reconcile_StatusTransition_ReadyToFailed(t *testing.T) {
 		},
 	})
 
-	require.Error(t, err)
-	assert.NotEqual(t, time.Duration(0), result.RequeueAfter)
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter, "should requeue after error")
 
 	// Verify transition: Ready -> Failed
 	var updatedDB dbopsv1alpha1.Database
@@ -2273,10 +2273,11 @@ func TestController_Reconcile_InitSQLFailurePolicyBlock(t *testing.T) {
 		Handler: handler, Logger: logr.Discard(), DefaultDriftInterval: testDefaultDriftInterval,
 	})
 
-	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: types.NamespacedName{Name: "testdb", Namespace: "default"},
 	})
-	require.Error(t, err)
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter, "should requeue after error")
 
 	var updatedDB dbopsv1alpha1.Database
 	err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "testdb", Namespace: "default"}, &updatedDB)

@@ -94,8 +94,8 @@ func ClassifyRequeue(err error) (ctrl.Result, error) {
 		// Return nil error so controller-runtime doesn't requeue.
 		return ctrl.Result{}, nil
 	case ErrorClassConnection:
-		return ctrl.Result{RequeueAfter: RequeueConnection}, err
+		return ctrl.Result{RequeueAfter: RequeueConnection}, nil
 	default:
-		return ctrl.Result{RequeueAfter: RequeueDefault}, err
+		return ctrl.Result{RequeueAfter: RequeueDefault}, nil
 	}
 }

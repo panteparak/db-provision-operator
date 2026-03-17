@@ -85,6 +85,7 @@ func NewController(cfg ControllerConfig) *Controller {
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseinstances/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseinstances/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databases,verbs=get;list;delete
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseusers,verbs=get;list;delete
 // +kubebuilder:rbac:groups=dbops.dbprovision.io,resources=databaseroles,verbs=get;list;delete

@@ -3201,12 +3201,13 @@ func TestController_Reconcile_SecretTemplateInvalidSyntax(t *testing.T) {
 		DefaultDriftInterval: testDefaultDriftInterval, Logger: logr.Discard(),
 	})
 
-	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
 	})
-	// Template parse error should propagate
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "render secret template")
+	// ClassifyRequeue returns nil error with RequeueAfter so controller-runtime
+	// uses the intended interval instead of exponential backoff.
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter, "should requeue after template parse error")
 }
 
 // C8: SecretTemplate render failure (undefined field reference)
@@ -3265,12 +3266,14 @@ func TestController_Reconcile_SecretTemplateUndefinedFieldError(t *testing.T) {
 		DefaultDriftInterval: testDefaultDriftInterval, Logger: logr.Discard(),
 	})
 
-	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
 	})
-	// Undefined field reference should cause template execution error
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "render secret template")
+	// ClassifyRequeue returns nil error with RequeueAfter so controller-runtime
+	// uses the intended interval instead of exponential backoff.
+	// The template error is logged by handleError before ClassifyRequeue.
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter, "should requeue after template error")
 }
 
 // C9: Instance not found during reconcile
@@ -3320,11 +3323,13 @@ func TestController_Reconcile_InstanceNotFound(t *testing.T) {
 		DefaultDriftInterval: testDefaultDriftInterval, Logger: logr.Discard(),
 	})
 
-	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
 	})
-	// Instance not found should cause reconcile error
-	require.Error(t, err)
+	// ClassifyRequeue returns nil error with RequeueAfter so controller-runtime
+	// uses the intended interval instead of exponential backoff.
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter, "should requeue after instance not found")
 }
 
 // C10: TLS enabled but only CA present (no cert/key in TLS secret)
@@ -4384,12 +4389,14 @@ func TestController_Reconcile_SecretDeletedSetPasswordFails(t *testing.T) {
 		Logger:               logr.Discard(),
 	})
 
-	_, err := controller.Reconcile(context.Background(), ctrl.Request{
+	result, err := controller.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: types.NamespacedName{Name: "testuser", Namespace: "default"},
 	})
 
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "connection refused")
+	// ClassifyRequeue returns nil error with RequeueAfter so controller-runtime
+	// uses the intended interval instead of exponential backoff.
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter, "should requeue after connection error")
 
 	// User status should be Failed
 	var updatedUser dbopsv1alpha1.DatabaseUser

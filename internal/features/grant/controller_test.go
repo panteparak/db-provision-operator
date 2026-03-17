@@ -661,8 +661,8 @@ func TestController_Reconcile_ApplyError(t *testing.T) {
 		},
 	})
 
-	require.Error(t, err)
-	assert.NotEqual(t, ctrl.Result{}, result)
+	require.NoError(t, err)
+	assert.NotZero(t, result.RequeueAfter, "should requeue after error")
 
 	// Verify the grant status reflects the failure
 	var updatedGrant dbopsv1alpha1.DatabaseGrant
