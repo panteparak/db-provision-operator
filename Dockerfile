@@ -18,6 +18,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # Copy the go source
 COPY cmd/main.go cmd/main.go
+COPY cmd/dbctl/ cmd/dbctl/
 COPY api/ api/
 COPY internal/ internal/
 
@@ -27,7 +28,8 @@ COPY internal/ internal/
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
-    go build -a -o manager cmd/main.go
+    go build -a -o manager cmd/main.go && \
+    go build -a -o dbctl ./cmd/dbctl/main.go
 
 # Production image with database client tools for backup/restore operations
 # Using Alpine instead of distroless to include pg_dump, mysqldump, etc.
@@ -47,6 +49,7 @@ RUN adduser -D -u 65532 -g 65532 nonroot
 
 WORKDIR /
 COPY --from=builder /workspace/manager .
+COPY --from=builder /workspace/dbctl .
 
 # Run as non-root user
 USER 65532:65532
