@@ -30,6 +30,32 @@ The command performs 5 integrity check groups in order:
 
 After integrity checks, the command applies both **forward** and **reverse** default privilege grants across all configured schemas for tables, sequences, and functions.
 
+### Destructive vs Non-Destructive Checks
+
+Of the 5 integrity checks, only **database owner transfer** is destructive:
+
+| Check | Classification | Risk |
+|-------|---------------|------|
+| Create owner role | Non-destructive | Adds a new `NOLOGIN INHERIT` role. No effect on existing objects. |
+| Create app user | Non-destructive | Adds a new `LOGIN INHERIT` role. No effect on existing objects. |
+| Grant role membership | Non-destructive | Adds the app user to the owner role's member list. Existing memberships are unaffected. |
+| Transfer database ownership | **Destructive** | `ALTER DATABASE ... OWNER TO ...` changes who owns the database. See below. |
+| Apply forward default privileges | Non-destructive | `ALTER DEFAULT PRIVILEGES` is idempotent — granting an already-granted privilege is a no-op. |
+
+#### Why database owner transfer is destructive
+
+Transferring database ownership (`ALTER DATABASE mydb OWNER TO db_mydb_owner`) has these implications:
+
+- **Permissions tied to the current owner may break.** If other roles have been granted privileges `WITH GRANT OPTION` by the current owner, those grant chains are unaffected — but scripts or tooling that assumes a specific owner may fail.
+- **Only the new owner (or a superuser) can `DROP` the database** after the transfer.
+- **`pg_dump` ownership metadata changes.** Backups taken after the transfer will record the new owner, which may differ from what downstream restore processes expect.
+- **Connection limits set on the old owner role** no longer apply to the database if access was based on ownership rather than explicit grants.
+
+In practice, this is almost always the correct fix for a database whose owner drifted to `postgres` or another unintended role. The migration command applies it without requiring the `allow-destructive-drift` annotation because running `dbctl migrate` is already an explicit operator action (unlike the operator's automatic drift correction, which requires the annotation as a safety gate).
+
+!!! tip "Use dry-run to preview"
+    Always run with `--dry-run` first to see whether a database owner transfer would occur and what the current vs expected owner is.
+
 ### Usage
 
 ```bash

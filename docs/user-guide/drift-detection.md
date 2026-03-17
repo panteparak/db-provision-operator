@@ -158,12 +158,32 @@ spec:
 
 ### Destructive vs Non-Destructive Changes
 
+#### Operator Drift Corrections (automatic)
+
+These are checked by the operator's reconciliation loop and require the `allow-destructive-drift` annotation for destructive corrections:
+
 | Resource | Non-Destructive | Destructive |
 |----------|-----------------|-------------|
 | Database | Owner, connection limit | Encoding, collation, template |
 | User | Password, connection limit, roles | Username |
 | Role | Privileges, role membership | Role name |
 | Grant | Adding privileges | Revoking privileges |
+
+#### Migration Tool Corrections (`dbctl migrate`)
+
+The [`dbctl migrate reverse-privileges`](../operations/migrations.md) command performs ownership integrity checks that go beyond what the operator checks during reconciliation. These run only when explicitly invoked:
+
+| Check | Classification | Details |
+|-------|---------------|---------|
+| Owner role existence | Non-destructive | Creates missing `NOLOGIN INHERIT` role |
+| App user existence | Non-destructive | Creates missing `LOGIN INHERIT` role |
+| Role membership | Non-destructive | Grants app user membership in owner role |
+| Database owner | **Destructive** | Transfers ownership via `ALTER DATABASE ... OWNER TO ...` |
+| Forward default privileges | Non-destructive | Idempotent `ALTER DEFAULT PRIVILEGES` |
+| Reverse default privileges | Non-destructive | Idempotent `ALTER DEFAULT PRIVILEGES` |
+
+!!! info "No annotation required for migration tool"
+    Unlike the operator's automatic drift correction, the migration command does **not** require the `allow-destructive-drift` annotation. Running `dbctl migrate` is an explicit operator action — the user has already opted in by invoking the command. Use `--dry-run` to preview destructive changes before applying.
 
 ## Immutable Fields
 
