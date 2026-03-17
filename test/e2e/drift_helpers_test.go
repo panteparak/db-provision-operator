@@ -246,6 +246,29 @@ func assertNoDriftDetected(gvr schema.GroupVersionResource, name, namespace stri
 	}, duration, driftPollingInterval).Should(BeTrue(), "Drift should NOT be detected in ignore mode for %s/%s", namespace, name)
 }
 
+// assertNoReconcileLoop verifies that a resource's reconcileID remains stable
+// (no unnecessary reconciles) for the given duration after reaching Ready.
+func assertNoReconcileLoop(gvr schema.GroupVersionResource, name, namespace string, duration time.Duration) {
+	obj, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(
+		context.Background(), name, metav1.GetOptions{},
+	)
+	Expect(err).NotTo(HaveOccurred(), "should get resource %s/%s", namespace, name)
+	initialReconcileID, _, _ := unstructured.NestedString(obj.Object, "status", "reconcileID")
+	Expect(initialReconcileID).NotTo(BeEmpty(), "reconcileID should be set")
+
+	Consistently(func() string {
+		obj, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(
+			context.Background(), name, metav1.GetOptions{},
+		)
+		if err != nil {
+			return ""
+		}
+		rid, _, _ := unstructured.NestedString(obj.Object, "status", "reconcileID")
+		return rid
+	}, duration, driftPollingInterval).Should(Equal(initialReconcileID),
+		"reconcileID should remain stable (no reconcile loop) for %s/%s", namespace, name)
+}
+
 // getDriftDiffs reads status.drift.diffs from a CR.
 func getDriftDiffs(gvr schema.GroupVersionResource, name, namespace string) ([]map[string]interface{}, error) {
 	var obj *unstructured.Unstructured
