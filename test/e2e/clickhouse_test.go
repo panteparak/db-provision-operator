@@ -580,6 +580,15 @@ var _ = Describe("clickhouse", Ordered, func() {
 
 	Context("Drift Correction", func() {
 		It("should recreate database after manual drop", func() {
+			By("enabling drift correction with a short interval")
+			updateCRSpec(databaseGVR, databaseName, testNamespace, func(spec map[string]interface{}) {
+				spec["driftPolicy"] = map[string]interface{}{
+					"mode":     "correct",
+					"interval": "10s",
+				}
+			})
+			waitForReady(databaseGVR, databaseName, testNamespace, timeout)
+
 			By("verifying database exists before drift")
 			exists, err := verifier.DatabaseExists(ctx, databaseName)
 			Expect(err).NotTo(HaveOccurred(), "Should check database existence")
