@@ -1870,7 +1870,7 @@ func TestController_Reconcile_DeletionBlockedByGrantDependencies(t *testing.T) {
 	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
-	// Default deletion policy is Retain (no annotation), finalizer + deletionTimestamp
+	// Default deletion policy is Delete (no annotation), finalizer + deletionTimestamp
 	user.Finalizers = []string{util.FinalizerDatabaseUser}
 	now := metav1.Now()
 	user.DeletionTimestamp = &now
@@ -1942,7 +1942,7 @@ func TestController_Reconcile_DeletionSucceedsWhenNoGrants(t *testing.T) {
 	t.Parallel()
 	scheme := newTestScheme()
 	user := newTestUser("testuser", "default")
-	// Default deletion policy is Retain, finalizer + deletionTimestamp, no grants
+	// Default deletion policy is Delete, finalizer + deletionTimestamp, no grants
 	user.Finalizers = []string{util.FinalizerDatabaseUser}
 	now := metav1.Now()
 	user.DeletionTimestamp = &now

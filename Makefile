@@ -143,7 +143,8 @@ define get-adapter-path
 $(if $(filter postgresql postgres,$(1)),./internal/adapter/postgres/...,\
 $(if $(filter mysql mariadb,$(1)),./internal/adapter/mysql/...,\
 $(if $(filter cockroachdb,$(1)),./internal/adapter/cockroachdb/...,\
-./internal/adapter/...)))
+$(if $(filter clickhouse,$(1)),./internal/adapter/clickhouse/...,\
+./internal/adapter/...))))
 endef
 
 .PHONY: test-integration-security
