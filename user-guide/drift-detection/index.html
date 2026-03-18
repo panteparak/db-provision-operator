@@ -1271,6 +1271,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#ownership-drift-roles-membership-default-privileges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ownership Drift (Roles, Membership, Default Privileges)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#drift-detected-but-expected" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2167,6 +2178,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operations/migrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operations/monitoring/" class="md-nav__link">
         
   
@@ -2863,6 +2902,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#ownership-drift-roles-membership-default-privileges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ownership Drift (Roles, Membership, Default Privileges)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#drift-detected-but-expected" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3105,6 +3155,8 @@
 </ul>
 </div>
 <h3 id="destructive-vs-non-destructive-changes">Destructive vs Non-Destructive Changes<a class="headerlink" href="#destructive-vs-non-destructive-changes" title="Permanent link">&para;</a></h3>
+<h4 id="operator-drift-corrections-automatic">Operator Drift Corrections (automatic)<a class="headerlink" href="#operator-drift-corrections-automatic" title="Permanent link">&para;</a></h4>
+<p>These are checked by the operator's reconciliation loop and require the <code>allow-destructive-drift</code> annotation for destructive corrections:</p>
 <table>
 <thead>
 <tr>
@@ -3136,6 +3188,53 @@
 </tr>
 </tbody>
 </table>
+<h4 id="migration-tool-corrections-dbctl-migrate">Migration Tool Corrections (<code>dbctl migrate</code>)<a class="headerlink" href="#migration-tool-corrections-dbctl-migrate" title="Permanent link">&para;</a></h4>
+<p>The <a href="../../operations/migrations/"><code>dbctl migrate reverse-privileges</code></a> command performs ownership integrity checks that go beyond what the operator checks during reconciliation. These run only when explicitly invoked:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Classification</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Owner role existence</td>
+<td>Non-destructive</td>
+<td>Creates missing <code>NOLOGIN INHERIT</code> role</td>
+</tr>
+<tr>
+<td>App user existence</td>
+<td>Non-destructive</td>
+<td>Creates missing <code>LOGIN INHERIT</code> role</td>
+</tr>
+<tr>
+<td>Role membership</td>
+<td>Non-destructive</td>
+<td>Grants app user membership in owner role</td>
+</tr>
+<tr>
+<td>Database owner</td>
+<td><strong>Destructive</strong></td>
+<td>Transfers ownership via <code>ALTER DATABASE ... OWNER TO ...</code></td>
+</tr>
+<tr>
+<td>Forward default privileges</td>
+<td>Non-destructive</td>
+<td>Idempotent <code>ALTER DEFAULT PRIVILEGES</code></td>
+</tr>
+<tr>
+<td>Reverse default privileges</td>
+<td>Non-destructive</td>
+<td>Idempotent <code>ALTER DEFAULT PRIVILEGES</code></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition info">
+<p class="admonition-title">No annotation required for migration tool</p>
+<p>Unlike the operator's automatic drift correction, the migration command does <strong>not</strong> require the <code>allow-destructive-drift</code> annotation. Running <code>dbctl migrate</code> is an explicit operator action — the user has already opted in by invoking the command. Use <code>--dry-run</code> to preview destructive changes before applying.</p>
+</div>
 <h2 id="immutable-fields">Immutable Fields<a class="headerlink" href="#immutable-fields" title="Permanent link">&para;</a></h2>
 <p>Some fields cannot be changed after resource creation:</p>
 <table>
@@ -3367,6 +3466,15 @@
 <li>Check if destructive corrections need the annotation</li>
 <li>Verify database permissions</li>
 </ol>
+<h3 id="ownership-drift-roles-membership-default-privileges">Ownership Drift (Roles, Membership, Default Privileges)<a class="headerlink" href="#ownership-drift-roles-membership-default-privileges" title="Permanent link">&para;</a></h3>
+<p>The operator's drift detection checks database-level properties (owner, extensions, schemas) but does <strong>not</strong> re-verify role existence, membership, or default privileges after initial creation. If these are broken (e.g., after manual role deletion), use the <code>dbctl migrate reverse-privileges</code> command to diagnose and repair:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># Diagnose</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>dbctl<span class="w"> </span>migrate<span class="w"> </span>reverse-privileges<span class="w"> </span>my-database<span class="w"> </span>-n<span class="w"> </span>my-namespace<span class="w"> </span>--dry-run
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="c1"># Repair</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>dbctl<span class="w"> </span>migrate<span class="w"> </span>reverse-privileges<span class="w"> </span>my-database<span class="w"> </span>-n<span class="w"> </span>my-namespace
+</span></code></pre></div>
+<p>See <a href="../../operations/migrations/">Migrations</a> for full documentation.</p>
 <h3 id="drift-detected-but-expected">Drift Detected but Expected<a class="headerlink" href="#drift-detected-but-expected" title="Permanent link">&para;</a></h3>
 <p>For known differences that should be ignored, consider:</p>
 <ol>
@@ -3486,7 +3594,7 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.code.annotate", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": "0.10.0"}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.code.annotate", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": "0.14.0"}</script>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>

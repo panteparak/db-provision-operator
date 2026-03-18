@@ -1776,6 +1776,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../migrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../monitoring/" class="md-nav__link">
         
   
@@ -2007,6 +2035,17 @@
     <span class="md-ellipsis">
       
         DatabaseBackupSchedule
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dbctl-migrate-cli-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dbctl migrate (CLI Tool)
       
     </span>
   </a>
@@ -2729,6 +2768,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#dbctl-migrate-cli-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dbctl migrate (CLI Tool)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#cluster-scoped-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3436,6 +3486,30 @@
 </tr>
 </tbody>
 </table>
+<h3 id="dbctl-migrate-cli-tool">dbctl migrate (CLI Tool)<a class="headerlink" href="#dbctl-migrate-cli-tool" title="Permanent link">&para;</a></h3>
+<p>Events emitted by the <code>dbctl migrate</code> command on target resources. These use the event source <code>dbctl-migrate</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OwnershipDriftDetected</code></td>
+<td>Warning</td>
+<td>Migration detected ownership drift (dry-run, not corrected)</td>
+</tr>
+<tr>
+<td><code>OwnershipDriftCorrected</code></td>
+<td>Normal</td>
+<td>Migration corrected ownership drift</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="../migrations/">Migrations</a> for details.</p>
 <h3 id="cluster-scoped-resources">Cluster-Scoped Resources<a class="headerlink" href="#cluster-scoped-resources" title="Permanent link">&para;</a></h3>
 <p>Cluster-scoped resources (<code>ClusterDatabaseInstance</code>, <code>ClusterDatabaseRole</code>, <code>ClusterDatabaseGrant</code>) emit the same events as their namespaced counterparts (<code>DatabaseInstance</code>, <code>DatabaseRole</code>, <code>DatabaseGrant</code> respectively). The only difference is that cluster-scoped events are not associated with a namespace.</p>
 <h2 id="event-categories">Event Categories<a class="headerlink" href="#event-categories" title="Permanent link">&para;</a></h2>
@@ -3746,7 +3820,7 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.code.annotate", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": "0.10.0"}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.code.annotate", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": "0.14.0"}</script>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>

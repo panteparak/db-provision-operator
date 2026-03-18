@@ -12,13 +12,13 @@
         <meta name="author" content="panteparak">
       
       
-        <link rel="canonical" href="https://panteparak.github.io/db-provision-operator/getting-started/installation/">
+        <link rel="canonical" href="https://panteparak.github.io/db-provision-operator/operations/migrations/">
       
       
-        <link rel="prev" href="../">
+        <link rel="prev" href="../admin-account-setup/">
       
       
-        <link rel="next" href="../quickstart/">
+        <link rel="next" href="../monitoring/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Installation - DB Provision Operator</title>
+        <title>Migrations - DB Provision Operator</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#installation" class="md-skip">
+        <a href="#migrations" class="md-skip">
           Skip to content
         </a>
       
@@ -118,7 +118,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Installation
+              Migrations
             
           </span>
         </div>
@@ -248,13 +248,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
           
   
   
@@ -370,11 +368,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../operations/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
           
   
   
@@ -482,31 +482,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
             
   
   
@@ -524,7 +521,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -542,7 +539,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
+      <a href="../../getting-started/" class="md-nav__link">
         
   
   
@@ -567,37 +564,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Installation
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -613,248 +583,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Prerequisites
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#helm-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Helm Installation
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Helm Installation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#add-the-helm-repository" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Add the Helm Repository
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#install-with-default-values" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Install with Default Values
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#install-with-custom-values" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Install with Custom Values
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#upgrade-an-existing-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Upgrade an Existing Installation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#uninstall" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Uninstall
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#kustomize-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Kustomize Installation
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Kustomize Installation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#install-latest-release" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Install Latest Release
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#install-specific-version" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Install Specific Version
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#customize-with-kustomize-overlay" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Customize with Kustomize Overlay
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#verify-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Verify Installation
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Verify Installation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#check-the-deployment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Check the Deployment
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#check-crds" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Check CRDs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#check-logs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Check Logs
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#configuration-options" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration Options
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Configuration Options">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#helm-values-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Helm Values Reference
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -867,7 +595,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../quickstart/" class="md-nav__link">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
         
   
   
@@ -1932,28 +1660,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
-        
-          
-          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
             
   
   
@@ -1971,7 +1702,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1989,7 +1720,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operations/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   
@@ -2017,7 +1748,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operations/admin-account-setup/" class="md-nav__link">
+      <a href="../admin-account-setup/" class="md-nav__link">
         
   
   
@@ -2042,10 +1773,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../operations/migrations/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrations
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2061,6 +1819,175 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#reverse-privileges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        reverse-privileges
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="reverse-privileges">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#background" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-it-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What It Checks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#destructive-vs-non-destructive-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Destructive vs Non-Destructive Checks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example Output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#k8s-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        K8s Events
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#status-updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status Updates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#supported-engines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported Engines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to Run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2073,7 +2000,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operations/monitoring/" class="md-nav__link">
+      <a href="../monitoring/" class="md-nav__link">
         
   
   
@@ -2101,7 +2028,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operations/events/" class="md-nav__link">
+      <a href="../events/" class="md-nav__link">
         
   
   
@@ -2129,7 +2056,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operations/troubleshooting/" class="md-nav__link">
+      <a href="../troubleshooting/" class="md-nav__link">
         
   
   
@@ -2441,6 +2368,117 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#reverse-privileges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        reverse-privileges
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="reverse-privileges">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#background" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-it-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What It Checks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#destructive-vs-non-destructive-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Destructive vs Non-Destructive Checks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example Output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#k8s-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        K8s Events
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#status-updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status Updates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#supported-engines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported Engines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2450,24 +2488,12 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#helm-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Helm Installation
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Helm Installation">
-      <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#add-the-helm-repository" class="md-nav__link">
+  <a href="#when-to-run" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Add the Helm Repository
+        When to Run
       
     </span>
   </a>
@@ -2475,43 +2501,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#install-with-default-values" class="md-nav__link">
+  <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Install with Default Values
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#install-with-custom-values" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Install with Custom Values
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#upgrade-an-existing-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Upgrade an Existing Installation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#uninstall" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Uninstall
+        Troubleshooting
       
     </span>
   </a>
@@ -2520,145 +2513,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#kustomize-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Kustomize Installation
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Kustomize Installation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#install-latest-release" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Install Latest Release
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#install-specific-version" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Install Specific Version
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#customize-with-kustomize-overlay" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Customize with Kustomize Overlay
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#verify-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Verify Installation
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Verify Installation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#check-the-deployment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Check the Deployment
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#check-crds" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Check CRDs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#check-logs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Check Logs
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#configuration-options" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration Options
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Configuration Options">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#helm-values-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Helm Values Reference
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
   
 </li>
       
@@ -2682,195 +2536,334 @@
   
 
 
-<h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
-<p>This guide covers all installation methods for DB Provision Operator.</p>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Kubernetes 1.26+</li>
-<li>kubectl configured</li>
-<li>Helm 3.x (for Helm installation)</li>
-<li>cluster-admin privileges (for CRD installation)</li>
-</ul>
-<h2 id="helm-installation">Helm Installation<a class="headerlink" href="#helm-installation" title="Permanent link">&para;</a></h2>
-<p>Helm is the recommended installation method for production deployments.</p>
-<h3 id="add-the-helm-repository">Add the Helm Repository<a class="headerlink" href="#add-the-helm-repository" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>helm<span class="w"> </span>repo<span class="w"> </span>add<span class="w"> </span>db-provision<span class="w"> </span>https://panteparak.github.io/db-provision-operator/charts
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>helm<span class="w"> </span>repo<span class="w"> </span>update
-</span></code></pre></div>
-<h3 id="install-with-default-values">Install with Default Values<a class="headerlink" href="#install-with-default-values" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>helm<span class="w"> </span>install<span class="w"> </span>db-provision-operator<span class="w"> </span>db-provision/db-provision-operator<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--namespace<span class="w"> </span>db-provision-operator-system<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>--create-namespace
-</span></code></pre></div>
-<h3 id="install-with-custom-values">Install with Custom Values<a class="headerlink" href="#install-with-custom-values" title="Permanent link">&para;</a></h3>
-<p>Create a <code>values.yaml</code> file:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># values.yaml</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">replicaCount</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="nt">resources</span><span class="p">:</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="nt">limits</span><span class="p">:</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">500m</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">256Mi</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="nt">requests</span><span class="p">:</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100m</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">128Mi</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="nt">metrics</span><span class="p">:</span>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">  </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="nt">serviceMonitor</span><span class="p">:</span>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">  </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span></code></pre></div>
-<p>Then install:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>helm<span class="w"> </span>install<span class="w"> </span>db-provision-operator<span class="w"> </span>db-provision/db-provision-operator<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--namespace<span class="w"> </span>db-provision-operator-system<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--create-namespace<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>-f<span class="w"> </span>values.yaml
-</span></code></pre></div>
-<h3 id="upgrade-an-existing-installation">Upgrade an Existing Installation<a class="headerlink" href="#upgrade-an-existing-installation" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>helm<span class="w"> </span>repo<span class="w"> </span>update
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>helm<span class="w"> </span>upgrade<span class="w"> </span>db-provision-operator<span class="w"> </span>db-provision/db-provision-operator<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--namespace<span class="w"> </span>db-provision-operator-system
-</span></code></pre></div>
-<h3 id="uninstall">Uninstall<a class="headerlink" href="#uninstall" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>helm<span class="w"> </span>uninstall<span class="w"> </span>db-provision-operator<span class="w"> </span>--namespace<span class="w"> </span>db-provision-operator-system
-</span></code></pre></div>
-<div class="admonition warning">
-<p class="admonition-title">CRDs are not removed</p>
-<p>Helm does not remove CRDs on uninstall to prevent data loss. To remove CRDs manually:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>kubectl<span class="w"> </span>delete<span class="w"> </span>crds<span class="w"> </span>-l<span class="w"> </span>app.kubernetes.io/name<span class="o">=</span>db-provision-operator
-</span></code></pre></div></p>
-</div>
-<h2 id="kustomize-installation">Kustomize Installation<a class="headerlink" href="#kustomize-installation" title="Permanent link">&para;</a></h2>
-<p>Kustomize is ideal for GitOps workflows.</p>
-<h3 id="install-latest-release">Install Latest Release<a class="headerlink" href="#install-latest-release" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>https://github.com/panteparak/db-provision-operator/releases/latest/download/install.yaml
-</span></code></pre></div>
-<h3 id="install-specific-version">Install Specific Version<a class="headerlink" href="#install-specific-version" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nv">VERSION</span><span class="o">=</span>v0.1.0
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>https://github.com/panteparak/db-provision-operator/releases/download/<span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span>/db-provision-operator-<span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span>.yaml
-</span></code></pre></div>
-<h3 id="customize-with-kustomize-overlay">Customize with Kustomize Overlay<a class="headerlink" href="#customize-with-kustomize-overlay" title="Permanent link">&para;</a></h3>
-<p>Create a <code>kustomization.yaml</code>:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kustomize.config.k8s.io/v1beta1</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Kustomization</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="nt">resources</span><span class="p">:</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/panteparak/db-provision-operator/config/default?ref=main</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">db-provision-operator-system</span>
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="nt">patches</span><span class="p">:</span>
-</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">patch</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|-</span>
-</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">      </span><span class="no">- op: replace</span>
-</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">        </span><span class="no">path: /spec/template/spec/containers/0/resources/limits/memory</span>
-</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">        </span><span class="no">value: 256Mi</span>
-</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="w">    </span><span class="nt">target</span><span class="p">:</span>
-</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="w">      </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
-</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">db-provision-operator-controller-manager</span>
-</span></code></pre></div>
-<p>Apply:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>kubectl<span class="w"> </span>apply<span class="w"> </span>-k<span class="w"> </span>.
-</span></code></pre></div>
-<h2 id="verify-installation">Verify Installation<a class="headerlink" href="#verify-installation" title="Permanent link">&para;</a></h2>
-<h3 id="check-the-deployment">Check the Deployment<a class="headerlink" href="#check-the-deployment" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>pods<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system
-</span></code></pre></div>
-<p>Expected output:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>NAME                                                     READY   STATUS    RESTARTS   AGE
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>db-provision-operator-controller-manager-xxxxx-xxxxx     1/1     Running   0          1m
-</span></code></pre></div>
-<h3 id="check-crds">Check CRDs<a class="headerlink" href="#check-crds" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>crds<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>dbops
-</span></code></pre></div>
-<p>Expected output:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>databasebackups.dbops.dbprovision.io          2024-01-01T00:00:00Z
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>databasebackupschedules.dbops.dbprovision.io  2024-01-01T00:00:00Z
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>databasegrants.dbops.dbprovision.io           2024-01-01T00:00:00Z
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>databaseinstances.dbops.dbprovision.io        2024-01-01T00:00:00Z
-</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>databaserestores.dbops.dbprovision.io         2024-01-01T00:00:00Z
-</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>databaseroles.dbops.dbprovision.io            2024-01-01T00:00:00Z
-</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>databases.dbops.dbprovision.io                2024-01-01T00:00:00Z
-</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>databaseusers.dbops.dbprovision.io            2024-01-01T00:00:00Z
-</span></code></pre></div>
-<h3 id="check-logs">Check Logs<a class="headerlink" href="#check-logs" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-n<span class="w"> </span>db-provision-operator-system<span class="w"> </span>deployment/db-provision-operator-controller-manager
-</span></code></pre></div>
-<h2 id="configuration-options">Configuration Options<a class="headerlink" href="#configuration-options" title="Permanent link">&para;</a></h2>
-<h3 id="helm-values-reference">Helm Values Reference<a class="headerlink" href="#helm-values-reference" title="Permanent link">&para;</a></h3>
+<h1 id="migrations">Migrations<a class="headerlink" href="#migrations" title="Permanent link">&para;</a></h1>
+<p>The <code>dbctl migrate</code> command group provides data migrations for operator version upgrades. These migrations are <strong>idempotent</strong> and safe to re-run.</p>
+<h2 id="reverse-privileges">reverse-privileges<a class="headerlink" href="#reverse-privileges" title="Permanent link">&para;</a></h2>
+<p><strong>Introduced in:</strong> v0.13.0</p>
+<p>Repairs the full ownership model for databases created before v0.13.0. This command performs comprehensive integrity checks and applies missing default privilege grants.</p>
+<h3 id="background">Background<a class="headerlink" href="#background" title="Permanent link">&para;</a></h3>
+<p>Before v0.13.0, <code>SetDefaultPrivileges</code> only applied <strong>forward grants</strong> (ownerRole → appUser). Starting in v0.13.0, the operator applies <strong>bidirectional</strong> grants so that objects created by the app user are accessible to the owner role and all rotated users that inherit from it.</p>
+<p>The operator only runs ownership setup during <strong>initial database creation</strong> — it does not re-verify role existence, membership, or default privileges on subsequent reconciles. This means databases in a partially broken state (e.g., after manual role deletion or a failed initial setup) cannot self-heal through normal reconciliation.</p>
+<p>This migration command fills that gap by acting as a <strong>complete ownership repair tool</strong>.</p>
+<h3 id="what-it-checks">What It Checks<a class="headerlink" href="#what-it-checks" title="Permanent link">&para;</a></h3>
+<p>The command performs 5 integrity check groups in order:</p>
 <table>
 <thead>
 <tr>
-<th>Parameter</th>
-<th>Description</th>
-<th>Default</th>
+<th>#</th>
+<th>Check</th>
+<th>Fix</th>
+<th>Destructive</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>replicaCount</code></td>
-<td>Number of operator replicas</td>
-<td><code>1</code></td>
+<td>1</td>
+<td>Owner role exists</td>
+<td>Creates role with <code>NOLOGIN INHERIT</code></td>
+<td>No</td>
 </tr>
 <tr>
-<td><code>image.repository</code></td>
-<td>Container image repository</td>
-<td><code>ghcr.io/panteparak/db-provision-operator</code></td>
+<td>2</td>
+<td>App user exists</td>
+<td>Creates role with <code>LOGIN INHERIT</code></td>
+<td>No</td>
 </tr>
 <tr>
-<td><code>image.tag</code></td>
-<td>Container image tag</td>
-<td>Chart appVersion</td>
+<td>3</td>
+<td>Role membership (app user inherits from owner role)</td>
+<td>Grants role membership</td>
+<td>No</td>
 </tr>
 <tr>
-<td><code>resources.limits.cpu</code></td>
-<td>CPU limit</td>
-<td><code>500m</code></td>
+<td>4</td>
+<td>Database owner matches owner role</td>
+<td>Transfers database ownership</td>
+<td>Yes</td>
 </tr>
 <tr>
-<td><code>resources.limits.memory</code></td>
-<td>Memory limit</td>
-<td><code>128Mi</code></td>
-</tr>
-<tr>
-<td><code>resources.requests.cpu</code></td>
-<td>CPU request</td>
-<td><code>10m</code></td>
-</tr>
-<tr>
-<td><code>resources.requests.memory</code></td>
-<td>Memory request</td>
-<td><code>64Mi</code></td>
-</tr>
-<tr>
-<td><code>metrics.enabled</code></td>
-<td>Enable metrics endpoint</td>
-<td><code>false</code></td>
-</tr>
-<tr>
-<td><code>serviceMonitor.enabled</code></td>
-<td>Create ServiceMonitor</td>
-<td><code>false</code></td>
-</tr>
-<tr>
-<td><code>grafanaDashboards.enabled</code></td>
-<td>Install Grafana dashboards</td>
-<td><code>false</code></td>
-</tr>
-<tr>
-<td><code>leaderElection.enabled</code></td>
-<td>Enable leader election</td>
-<td><code>true</code></td>
+<td>5</td>
+<td>Forward default privileges</td>
+<td>Re-applies all forward grants (idempotent)</td>
+<td>No</td>
 </tr>
 </tbody>
 </table>
-<p>For the complete list of values, see the <a href="https://github.com/panteparak/db-provision-operator/blob/main/charts/db-provision-operator/values.yaml">Helm chart values.yaml</a>.</p>
-<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<p>After integrity checks, the command applies both <strong>forward</strong> and <strong>reverse</strong> default privilege grants across all configured schemas for tables, sequences, and functions.</p>
+<h3 id="destructive-vs-non-destructive-checks">Destructive vs Non-Destructive Checks<a class="headerlink" href="#destructive-vs-non-destructive-checks" title="Permanent link">&para;</a></h3>
+<p>Of the 5 integrity checks, only <strong>database owner transfer</strong> is destructive:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Classification</th>
+<th>Risk</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Create owner role</td>
+<td>Non-destructive</td>
+<td>Adds a new <code>NOLOGIN INHERIT</code> role. No effect on existing objects.</td>
+</tr>
+<tr>
+<td>Create app user</td>
+<td>Non-destructive</td>
+<td>Adds a new <code>LOGIN INHERIT</code> role. No effect on existing objects.</td>
+</tr>
+<tr>
+<td>Grant role membership</td>
+<td>Non-destructive</td>
+<td>Adds the app user to the owner role's member list. Existing memberships are unaffected.</td>
+</tr>
+<tr>
+<td>Transfer database ownership</td>
+<td><strong>Destructive</strong></td>
+<td><code>ALTER DATABASE ... OWNER TO ...</code> changes who owns the database. See below.</td>
+</tr>
+<tr>
+<td>Apply forward default privileges</td>
+<td>Non-destructive</td>
+<td><code>ALTER DEFAULT PRIVILEGES</code> is idempotent — granting an already-granted privilege is a no-op.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="why-database-owner-transfer-is-destructive">Why database owner transfer is destructive<a class="headerlink" href="#why-database-owner-transfer-is-destructive" title="Permanent link">&para;</a></h4>
+<p>Transferring database ownership (<code>ALTER DATABASE mydb OWNER TO db_mydb_owner</code>) has these implications:</p>
 <ul>
-<li><a href="../quickstart/">Quick Start Tutorial</a> - Create your first database</li>
-<li><a href="../../user-guide/">User Guide</a> - Learn about all CRDs</li>
-<li><a href="../../examples/">Examples</a> - Ready-to-use configurations</li>
+<li><strong>Permissions tied to the current owner may break.</strong> If other roles have been granted privileges <code>WITH GRANT OPTION</code> by the current owner, those grant chains are unaffected — but scripts or tooling that assumes a specific owner may fail.</li>
+<li><strong>Only the new owner (or a superuser) can <code>DROP</code> the database</strong> after the transfer.</li>
+<li><strong><code>pg_dump</code> ownership metadata changes.</strong> Backups taken after the transfer will record the new owner, which may differ from what downstream restore processes expect.</li>
+<li><strong>Connection limits set on the old owner role</strong> no longer apply to the database if access was based on ownership rather than explicit grants.</li>
 </ul>
+<p>In practice, this is almost always the correct fix for a database whose owner drifted to <code>postgres</code> or another unintended role. The migration command applies it without requiring the <code>allow-destructive-drift</code> annotation because running <code>dbctl migrate</code> is already an explicit operator action (unlike the operator's automatic drift correction, which requires the annotation as a safety gate).</p>
+<div class="admonition tip">
+<p class="admonition-title">Use dry-run to preview</p>
+<p>Always run with <code>--dry-run</code> first to see whether a database owner transfer would occur and what the current vs expected owner is.</p>
+</div>
+<h3 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Dry-run first — see what would be changed</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>dbctl<span class="w"> </span>migrate<span class="w"> </span>reverse-privileges<span class="w"> </span>my-database-cr<span class="w"> </span>-n<span class="w"> </span>my-namespace<span class="w"> </span>--dry-run
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Apply fixes</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>dbctl<span class="w"> </span>migrate<span class="w"> </span>reverse-privileges<span class="w"> </span>my-database-cr<span class="w"> </span>-n<span class="w"> </span>my-namespace
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># With verbose output</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>dbctl<span class="w"> </span>migrate<span class="w"> </span>reverse-privileges<span class="w"> </span>my-database-cr<span class="w"> </span>-n<span class="w"> </span>my-namespace<span class="w"> </span>-v
+</span></code></pre></div>
+<h3 id="flags">Flags<a class="headerlink" href="#flags" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Short</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--namespace</code></td>
+<td><code>-n</code></td>
+<td>Current kubeconfig context</td>
+<td>Kubernetes namespace of the Database CR</td>
+</tr>
+<tr>
+<td><code>--kubeconfig</code></td>
+<td></td>
+<td><code>$KUBECONFIG</code> or <code>~/.kube/config</code></td>
+<td>Path to kubeconfig file</td>
+</tr>
+<tr>
+<td><code>--dry-run</code></td>
+<td></td>
+<td><code>false</code></td>
+<td>Print what would be done without executing</td>
+</tr>
+<tr>
+<td><code>--verbose</code></td>
+<td><code>-v</code></td>
+<td><code>false</code></td>
+<td>Enable verbose output</td>
+</tr>
+</tbody>
+</table>
+<h3 id="example-output">Example Output<a class="headerlink" href="#example-output" title="Permanent link">&para;</a></h3>
+<h4 id="healthy-database-no-drift">Healthy database (no drift)<a class="headerlink" href="#healthy-database-no-drift" title="Permanent link">&para;</a></h4>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Integrity checks:
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  [CHECK] Owner role &quot;db_myapp_owner&quot; .............. OK
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  [CHECK] App user &quot;db_myapp_app&quot; .............. OK
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  [CHECK] Role membership app→owner ................ OK
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  [CHECK] Database &quot;myapp&quot; owner ................... OK
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>  Forward default privileges: applied 9 grants across 3 schema(s)
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>Ownership drift: no issues found
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>Forward default privileges:
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>  Applied 9 forward grants across 3 schema(s)
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>Reverse default privileges:
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>  Applied 9 reverse grants across 3 schema(s)
+</span></code></pre></div>
+<h4 id="database-with-drift-auto-fixed">Database with drift (auto-fixed)<a class="headerlink" href="#database-with-drift-auto-fixed" title="Permanent link">&para;</a></h4>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Integrity checks:
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  [CHECK] Owner role &quot;db_myapp_owner&quot; .............. OK
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  [CHECK] App user &quot;db_myapp_app&quot; .................. MISSING → created (LOGIN INHERIT)
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  [CHECK] Role membership app→owner ................ MISSING → granted
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  [CHECK] Database &quot;myapp&quot; owner ................... DRIFT (current: &quot;postgres&quot;, expected: &quot;db_myapp_owner&quot;) → transferred
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  Forward default privileges: applied 9 grants across 3 schema(s)
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>Ownership drift: 3 issue(s) fixed
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>Forward default privileges:
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>  Applied 9 forward grants across 3 schema(s)
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>Reverse default privileges:
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>  Applied 9 reverse grants across 3 schema(s)
+</span></code></pre></div>
+<h4 id="dry-run-mode">Dry-run mode<a class="headerlink" href="#dry-run-mode" title="Permanent link">&para;</a></h4>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Integrity checks:
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  [CHECK] Owner role &quot;db_myapp_owner&quot; .............. MISSING (would create with NOLOGIN INHERIT)
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  [CHECK] App user &quot;db_myapp_app&quot; .................. OK
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  [CHECK] Role membership app→owner ................ OK
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>  [CHECK] Database &quot;myapp&quot; owner ................... DRIFT (current: &quot;postgres&quot;, expected: &quot;db_myapp_owner&quot;) — would transfer
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>  Forward default privileges: would apply 9 grants across 3 schema(s)
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>Ownership drift: 2 issue(s) detected (dry-run, not corrected)
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>Forward default privileges (dry-run):
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>  ALTER DEFAULT PRIVILEGES FOR ROLE db_myapp_owner IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO db_myapp_app;
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>  ...
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>Reverse default privileges (dry-run):
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>  ALTER DEFAULT PRIVILEGES FOR ROLE db_myapp_app IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO db_myapp_owner;
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>  ...
+</span></code></pre></div>
+<h3 id="k8s-events">K8s Events<a class="headerlink" href="#k8s-events" title="Permanent link">&para;</a></h3>
+<p>The command emits events on the Database CR for audit visibility:</p>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Type</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OwnershipDriftDetected</code></td>
+<td>Warning</td>
+<td>Drift found in dry-run mode</td>
+</tr>
+<tr>
+<td><code>OwnershipDriftCorrected</code></td>
+<td>Normal</td>
+<td>Drift found and fixed</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition info">
+<p class="admonition-title">Ownership events vs operator drift events</p>
+<p>These events use the <code>Ownership</code> prefix to distinguish them from the operator's regular <code>DriftDetected</code> / <code>DriftCorrected</code> events. The event source is <code>dbctl-migrate</code> rather than the operator controller.</p>
+</div>
+<p>View migration events:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>events<span class="w"> </span>--field-selector<span class="w"> </span><span class="nv">reason</span><span class="o">=</span>OwnershipDriftCorrected
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>kubectl<span class="w"> </span>get<span class="w"> </span>events<span class="w"> </span>--field-selector<span class="w"> </span><span class="nv">reason</span><span class="o">=</span>OwnershipDriftDetected
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Or filter by source</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>kubectl<span class="w"> </span>get<span class="w"> </span>events<span class="w"> </span>--field-selector<span class="w"> </span><span class="nv">source</span><span class="o">=</span>dbctl-migrate
+</span></code></pre></div>
+<h3 id="status-updates">Status Updates<a class="headerlink" href="#status-updates" title="Permanent link">&para;</a></h3>
+<p>The command updates <code>status.drift</code> on the Database CR:</p>
+<p><strong>When drift is found (dry-run):</strong></p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">status</span><span class="p">:</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">drift</span><span class="p">:</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">detected</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">lastChecked</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2026-03-18T10:30:00Z&quot;</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="nt">diffs</span><span class="p">:</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">field</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ownership.role&quot;</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">        </span><span class="nt">expected</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;db_myapp_owner&quot;</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">        </span><span class="nt">actual</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;missing&gt;&quot;</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">field</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ownership.dbOwner&quot;</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">        </span><span class="nt">expected</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;db_myapp_owner&quot;</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">        </span><span class="nt">actual</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;postgres&quot;</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">        </span><span class="nt">destructive</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span></code></pre></div>
+<p><strong>After successful fix (non-dry-run):</strong></p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">status</span><span class="p">:</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">drift</span><span class="p">:</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="nt">detected</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="nt">lastChecked</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2026-03-18T10:30:00Z&quot;</span>
+</span></code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Status overwrite on next reconcile</p>
+<p>The operator's next reconcile will overwrite <code>status.drift</code> with its own drift detection results. The migration's status write is immediately useful for visibility (e.g., dashboards polling CR status) but is not persistent.</p>
+</div>
+<h3 id="supported-engines">Supported Engines<a class="headerlink" href="#supported-engines" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Engine</th>
+<th>Supported</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PostgreSQL</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>CockroachDB</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>MySQL</td>
+<td>No (no <code>ALTER DEFAULT PRIVILEGES</code> support)</td>
+</tr>
+<tr>
+<td>ClickHouse</td>
+<td>No (no <code>ALTER DEFAULT PRIVILEGES</code> support)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>kubectl</code> access to the cluster with permissions to read Database CRs, DatabaseInstance/ClusterDatabaseInstance resources, and Secrets</li>
+<li>Network access from the machine running <code>dbctl</code> to the database server</li>
+<li>The Database CR must use auto-ownership (<code>spec.postgres.ownership.autoOwnership: true</code>)</li>
+</ul>
+<h3 id="when-to-run">When to Run<a class="headerlink" href="#when-to-run" title="Permanent link">&para;</a></h3>
+<p>Run this migration when:</p>
+<ul>
+<li><strong>Upgrading from pre-v0.13.0</strong> — to add missing reverse default privileges</li>
+<li><strong>After manual role deletion</strong> — to recreate missing roles and re-establish membership</li>
+<li><strong>Investigating ownership issues</strong> — use <code>--dry-run</code> to diagnose without making changes</li>
+<li><strong>After failed initial database creation</strong> — to complete the ownership setup that was interrupted</li>
+</ul>
+<div class="admonition tip">
+<p class="admonition-title">Safe to re-run</p>
+<p>All operations are idempotent. <code>ALTER DEFAULT PRIVILEGES</code> grants that already exist are silently skipped by PostgreSQL. Role creation and membership grants check for existence before acting.</p>
+</div>
+<h3 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h3>
+<h4 id="no-ownership-model-configured-nothing-to-migrate">"No ownership model configured — nothing to migrate."<a class="headerlink" href="#no-ownership-model-configured-nothing-to-migrate" title="Permanent link">&para;</a></h4>
+<p>The Database CR does not have <code>spec.postgres.ownership.autoOwnership: true</code>. This command only works with auto-ownership databases.</p>
+<h4 id="engine-does-not-support-alter-default-privileges">"Engine does not support ALTER DEFAULT PRIVILEGES"<a class="headerlink" href="#engine-does-not-support-alter-default-privileges" title="Permanent link">&para;</a></h4>
+<p>The referenced DatabaseInstance uses MySQL or ClickHouse. Ownership management is only supported on PostgreSQL and CockroachDB.</p>
+<h4 id="default-privileges-are-explicitly-disabled">"Default privileges are explicitly disabled"<a class="headerlink" href="#default-privileges-are-explicitly-disabled" title="Permanent link">&para;</a></h4>
+<p>The Database CR has <code>spec.postgres.ownership.setDefaultPrivileges: false</code>. Default privileges are intentionally disabled for this database.</p>
+<h4 id="connection-errors">Connection errors<a class="headerlink" href="#connection-errors" title="Permanent link">&para;</a></h4>
+<p>Ensure the machine running <code>dbctl</code> has network access to the database server. The command connects using the credentials from the DatabaseInstance's <code>secretRef</code>.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Verify the instance connection details</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>kubectl<span class="w"> </span>get<span class="w"> </span>databaseinstance<span class="w"> </span>my-instance<span class="w"> </span>-o<span class="w"> </span>yaml
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># Check the credentials secret exists</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>kubectl<span class="w"> </span>get<span class="w"> </span>secret<span class="w"> </span>my-instance-credentials
+</span></code></pre></div>
+<h4 id="rbac-errors-on-event-emission">RBAC errors on event emission<a class="headerlink" href="#rbac-errors-on-event-emission" title="Permanent link">&para;</a></h4>
+<p>If the command prints a warning about event recording, ensure the kubeconfig user has permissions to create events. The command will still apply fixes even if event emission fails.</p>
 
 
 
@@ -2908,7 +2901,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../" class="md-footer__link md-footer__link--prev" aria-label="Previous: Overview">
+          <a href="../admin-account-setup/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Admin Account Setup">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2918,20 +2911,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Overview
+                Admin Account Setup
               </div>
             </div>
           </a>
         
         
           
-          <a href="../quickstart/" class="md-footer__link md-footer__link--next" aria-label="Next: Quick Start">
+          <a href="../monitoring/" class="md-footer__link md-footer__link--next" aria-label="Next: Monitoring">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Quick Start
+                Monitoring
               </div>
             </div>
             <div class="md-footer__button md-icon">
