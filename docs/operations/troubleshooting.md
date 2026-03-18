@@ -81,7 +81,30 @@ kubectl describe databaseinstance postgres-primary | grep -A10 "Events:"
 
 ### Database Issues
 
-#### Database Not Created
+##### "database is being accessed by other users"
+
+This error occurs when running `DROP DATABASE` directly via SQL. The operator handles this
+automatically by terminating connections before dropping.
+
+If you need to drop manually:
+
+**PostgreSQL:**
+```sql
+SELECT pg_terminate_backend(pid)
+FROM pg_stat_activity
+WHERE datname = 'mydb' AND pid <> pg_backend_pid();
+DROP DATABASE mydb;
+```
+
+**MySQL:**
+```sql
+-- Find and kill connections
+SELECT CONCAT('KILL ', id, ';') FROM information_schema.processlist WHERE db = 'mydb';
+-- Execute each KILL statement, then:
+DROP DATABASE mydb;
+```
+
+### Database Not Created
 
 **Check dependencies:**
 ```bash

@@ -392,6 +392,22 @@ The full deletion flow for a Database:
     - **Snapshot**: Backup is created, database is dropped, CR is deleted
 5. **Force-delete and external failures**: If the database drop fails and force-delete is set, the operator continues with finalizer removal anyway (the external database is left as-is).
 
+### Active Connections
+
+The operator automatically terminates active database connections before dropping a database.
+This prevents the common `"database is being accessed by other users"` error that occurs
+when running `DROP DATABASE` directly.
+
+| Engine | Method |
+|--------|--------|
+| PostgreSQL | `pg_terminate_backend()` for all sessions |
+| CockroachDB | `DROP DATABASE ... CASCADE` handles connections |
+| MySQL | `KILL` for all sessions via `information_schema.processlist` |
+| ClickHouse | `DROP DATABASE` succeeds regardless of connections |
+
+Applications connected to the database will lose their connections immediately.
+If graceful draining is important, scale down application pods before deleting the Database CR.
+
 ### Updates
 
 Most fields are immutable after creation. Supported updates:
@@ -418,7 +434,7 @@ Most fields are immutable after creation. Supported updates:
 ### Cannot delete database
 
 - Check if `deletionProtection` is enabled
-- Verify no active connections to the database
+- The operator automatically terminates active connections before dropping — see [Active Connections](#active-connections)
 - For PostgreSQL, ensure no other databases depend on it
 
 ### Init SQL failed with Continue policy
