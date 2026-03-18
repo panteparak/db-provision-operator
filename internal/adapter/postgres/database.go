@@ -67,14 +67,14 @@ func (a *Adapter) CreateDatabase(ctx context.Context, opts types.CreateDatabaseO
 	return nil
 }
 
-// DropDatabase drops an existing PostgreSQL database
-func (a *Adapter) DropDatabase(ctx context.Context, name string, opts types.DropDatabaseOptions) error {
+// TerminateDatabaseConnections terminates all active connections to the named database.
+// PostgreSQL uses pg_terminate_backend() to force-close all sessions except the current one.
+func (a *Adapter) TerminateDatabaseConnections(ctx context.Context, name string) error {
 	pool, err := a.getPool()
 	if err != nil {
 		return err
 	}
 
-	// Terminate active connections before dropping.
 	terminateQuery := `
 		SELECT pg_terminate_backend(pid)
 		FROM pg_stat_activity
@@ -82,6 +82,17 @@ func (a *Adapter) DropDatabase(ctx context.Context, name string, opts types.Drop
 	_, err = pool.Exec(ctx, terminateQuery, name)
 	if err != nil {
 		return fmt.Errorf("failed to terminate connections to database %s: %w", name, err)
+	}
+
+	return nil
+}
+
+// DropDatabase drops an existing PostgreSQL database.
+// Callers should invoke TerminateDatabaseConnections before DropDatabase.
+func (a *Adapter) DropDatabase(ctx context.Context, name string, _ types.DropDatabaseOptions) error {
+	pool, err := a.getPool()
+	if err != nil {
+		return err
 	}
 
 	query := sqlbuilder.PgDropDatabase(name).IfExists().Build()

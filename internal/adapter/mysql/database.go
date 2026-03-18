@@ -48,29 +48,40 @@ func (a *Adapter) CreateDatabase(ctx context.Context, opts types.CreateDatabaseO
 	return nil
 }
 
-// DropDatabase drops an existing MySQL database
-func (a *Adapter) DropDatabase(ctx context.Context, name string, opts types.DropDatabaseOptions) error {
+// TerminateDatabaseConnections terminates all active connections to the named database.
+// MySQL uses KILL to terminate each session found in information_schema.processlist.
+func (a *Adapter) TerminateDatabaseConnections(ctx context.Context, name string) error {
 	db, err := a.getDB()
 	if err != nil {
 		return err
 	}
 
-	// Force drop: kill active connections first
-	if opts.Force {
-		killQuery := `
-			SELECT CONCAT('KILL ', id, ';')
-			FROM information_schema.processlist
-			WHERE db = ?`
-		rows, err := db.QueryContext(ctx, killQuery, name)
-		if err == nil {
-			defer func() { _ = rows.Close() }()
-			for rows.Next() {
-				var killCmd string
-				if err := rows.Scan(&killCmd); err == nil {
-					_, _ = db.ExecContext(ctx, killCmd)
-				}
-			}
+	killQuery := `
+		SELECT CONCAT('KILL ', id, ';')
+		FROM information_schema.processlist
+		WHERE db = ?`
+	rows, err := db.QueryContext(ctx, killQuery, name)
+	if err != nil {
+		return fmt.Errorf("failed to query connections for database %s: %w", name, err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var killCmd string
+		if err := rows.Scan(&killCmd); err == nil {
+			_, _ = db.ExecContext(ctx, killCmd)
 		}
+	}
+
+	return rows.Err()
+}
+
+// DropDatabase drops an existing MySQL database.
+// Callers should invoke TerminateDatabaseConnections before DropDatabase.
+func (a *Adapter) DropDatabase(ctx context.Context, name string, _ types.DropDatabaseOptions) error {
+	db, err := a.getDB()
+	if err != nil {
+		return err
 	}
 
 	query := sqlbuilder.MySQLDropDatabase(name).IfExists().Build()

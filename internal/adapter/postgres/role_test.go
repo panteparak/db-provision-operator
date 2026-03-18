@@ -151,20 +151,30 @@ var _ = Describe("Role Operations", func() {
 			})
 		})
 
-		It("should drop role", func() {
-			// Verify the SQL generation logic - the function should:
-			// 1. REASSIGN OWNED BY "rolename" TO CURRENT_USER
-			// 2. DROP OWNED BY "rolename"
-			// 3. DROP ROLE IF EXISTS "rolename"
+		It("should generate DROP ROLE IF EXISTS (atomic)", func() {
+			// DropRole is now atomic - just DROP ROLE IF EXISTS.
+			// REASSIGN/DROP OWNED are handled separately by ReassignOwnedObjects.
 			roleName := "testrole"
-			Expect(escapeIdentifier(roleName)).To(Equal(`"testrole"`))
+			expectedDrop := fmt.Sprintf("DROP ROLE IF EXISTS %s", escapeIdentifier(roleName))
+			Expect(expectedDrop).To(ContainSubstring(`"testrole"`))
+		})
+	})
+
+	Describe("ReassignOwnedObjects (for roles)", func() {
+		Context("when not connected", func() {
+			It("should return error", func() {
+				err := adapter.ReassignOwnedObjects(ctx, "testrole")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("not connected"))
+			})
 		})
 
-		It("should reassign owned objects before drop", func() {
-			// The function should call REASSIGN OWNED BY before DROP
+		It("should generate REASSIGN OWNED BY and DROP OWNED BY for roles", func() {
 			roleName := "app_role"
 			expectedReassign := fmt.Sprintf("REASSIGN OWNED BY %s TO CURRENT_USER", escapeIdentifier(roleName))
+			expectedDropOwned := fmt.Sprintf("DROP OWNED BY %s", escapeIdentifier(roleName))
 			Expect(expectedReassign).To(ContainSubstring(`"app_role"`))
+			Expect(expectedDropOwned).To(ContainSubstring(`"app_role"`))
 		})
 	})
 
@@ -371,17 +381,46 @@ var _ = Describe("Role Operations", func() {
 		})
 
 		Describe("DropRole with mock", func() {
-			It("should execute DROP ROLE query", func() {
-				mock.ExpectExec(`REASSIGN OWNED BY "testrole"`).
-					WillReturnResult(pgxmock.NewResult("REASSIGN", 0))
-				mock.ExpectExec(`DROP OWNED BY "testrole"`).
-					WillReturnResult(pgxmock.NewResult("DROP", 0))
+			It("should execute only DROP ROLE IF EXISTS (atomic)", func() {
 				mock.ExpectExec(`DROP ROLE IF EXISTS "testrole"`).
 					WillReturnResult(pgxmock.NewResult("DROP ROLE", 0))
 
 				err := dropRoleWithMock(ctx, mock, "testrole")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(mock.ExpectationsWereMet()).NotTo(HaveOccurred())
+			})
+		})
+
+		Describe("ReassignOwnedObjects with mock (for roles)", func() {
+			It("should execute REASSIGN OWNED BY and DROP OWNED BY", func() {
+				mock.ExpectExec(`REASSIGN OWNED BY "testrole" TO CURRENT_USER`).
+					WillReturnResult(pgxmock.NewResult("REASSIGN", 0))
+				mock.ExpectExec(`DROP OWNED BY "testrole"`).
+					WillReturnResult(pgxmock.NewResult("DROP", 0))
+
+				err := reassignOwnedObjectsWithRoleMock(ctx, mock, "testrole")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(mock.ExpectationsWereMet()).NotTo(HaveOccurred())
+			})
+
+			It("should return error if REASSIGN fails", func() {
+				mock.ExpectExec(`REASSIGN OWNED BY "testrole" TO CURRENT_USER`).
+					WillReturnError(fmt.Errorf("permission denied"))
+
+				err := reassignOwnedObjectsWithRoleMock(ctx, mock, "testrole")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("failed to reassign owned objects"))
+			})
+
+			It("should return error if DROP OWNED fails", func() {
+				mock.ExpectExec(`REASSIGN OWNED BY "testrole" TO CURRENT_USER`).
+					WillReturnResult(pgxmock.NewResult("REASSIGN", 0))
+				mock.ExpectExec(`DROP OWNED BY "testrole"`).
+					WillReturnError(fmt.Errorf("permission denied"))
+
+				err := reassignOwnedObjectsWithRoleMock(ctx, mock, "testrole")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("failed to drop owned objects"))
 			})
 		})
 
@@ -541,15 +580,24 @@ func createRoleWithMock(ctx context.Context, pool pgxmock.PgxPoolIface, opts typ
 	return nil
 }
 
-// dropRoleWithMock executes DROP ROLE using a mock pool
+// dropRoleWithMock executes DROP ROLE using a mock pool (atomic - just DROP ROLE IF EXISTS)
 func dropRoleWithMock(ctx context.Context, pool pgxmock.PgxPoolIface, roleName string) error {
-	_, _ = pool.Exec(ctx, fmt.Sprintf("REASSIGN OWNED BY %s TO CURRENT_USER", escapeIdentifier(roleName)))
-	_, _ = pool.Exec(ctx, fmt.Sprintf("DROP OWNED BY %s", escapeIdentifier(roleName)))
-
 	query := fmt.Sprintf("DROP ROLE IF EXISTS %s", escapeIdentifier(roleName))
 	_, err := pool.Exec(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to drop role %s: %w", roleName, err)
+	}
+
+	return nil
+}
+
+// reassignOwnedObjectsWithRoleMock executes REASSIGN OWNED BY + DROP OWNED BY using a mock pool
+func reassignOwnedObjectsWithRoleMock(ctx context.Context, pool pgxmock.PgxPoolIface, name string) error {
+	if _, err := pool.Exec(ctx, fmt.Sprintf("REASSIGN OWNED BY %s TO CURRENT_USER", escapeIdentifier(name))); err != nil {
+		return fmt.Errorf("failed to reassign owned objects for %s: %w", name, err)
+	}
+	if _, err := pool.Exec(ctx, fmt.Sprintf("DROP OWNED BY %s", escapeIdentifier(name))); err != nil {
+		return fmt.Errorf("failed to drop owned objects for %s: %w", name, err)
 	}
 
 	return nil

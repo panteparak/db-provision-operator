@@ -101,6 +101,18 @@ func (a *Adapter) SetDefaultPrivileges(ctx context.Context, grantee string, opts
 	return nil
 }
 
+// FlushPrivileges is a no-op for CockroachDB.
+// CockroachDB applies privilege changes immediately.
+func (a *Adapter) FlushPrivileges(_ context.Context) error {
+	return nil
+}
+
+// ValidatePrivileges is a no-op for CockroachDB.
+// CockroachDB validates privileges at execution time.
+func (a *Adapter) ValidatePrivileges(_ context.Context, _ []string) error {
+	return nil
+}
+
 // GetGrants retrieves grants for a user or role in CockroachDB.
 // Queries each database for grants to the specified grantee.
 func (a *Adapter) GetGrants(ctx context.Context, grantee string) ([]types.GrantInfo, error) {

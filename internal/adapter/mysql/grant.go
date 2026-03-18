@@ -55,14 +55,6 @@ func (a *Adapter) Grant(ctx context.Context, grantee string, opts []types.GrantO
 		}
 	}
 
-	// Flush privileges to ensure changes take effect
-	log.V(2).Info("Flushing privileges")
-	_, err = db.ExecContext(ctx, "FLUSH PRIVILEGES")
-	if err != nil {
-		log.Error(err, "Failed to flush privileges")
-		return fmt.Errorf("failed to flush privileges: %w", err)
-	}
-
 	log.V(1).Info("Successfully granted privileges")
 	return nil
 }
@@ -90,14 +82,6 @@ func (a *Adapter) Revoke(ctx context.Context, grantee string, opts []types.Grant
 			log.Error(err, "Failed to execute revoke query", "query", query)
 			return fmt.Errorf("failed to revoke privileges from %s: %w", grantee, err)
 		}
-	}
-
-	// Flush privileges
-	log.V(2).Info("Flushing privileges")
-	_, err = db.ExecContext(ctx, "FLUSH PRIVILEGES")
-	if err != nil {
-		log.Error(err, "Failed to flush privileges")
-		return fmt.Errorf("failed to flush privileges: %w", err)
 	}
 
 	log.V(1).Info("Successfully revoked privileges")
@@ -189,6 +173,27 @@ func (a *Adapter) RevokeRole(ctx context.Context, grantee string, roles []string
 	}
 
 	log.Info("Successfully revoked all role memberships")
+	return nil
+}
+
+// FlushPrivileges reloads the MySQL grant tables so that privilege changes take effect.
+func (a *Adapter) FlushPrivileges(ctx context.Context) error {
+	db, err := a.getDB()
+	if err != nil {
+		return err
+	}
+
+	_, err = db.ExecContext(ctx, "FLUSH PRIVILEGES")
+	if err != nil {
+		return fmt.Errorf("failed to flush privileges: %w", err)
+	}
+
+	return nil
+}
+
+// ValidatePrivileges is a no-op for MySQL.
+// MySQL validates privileges at execution time.
+func (a *Adapter) ValidatePrivileges(_ context.Context, _ []string) error {
 	return nil
 }
 

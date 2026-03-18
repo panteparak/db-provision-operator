@@ -140,27 +140,12 @@ var _ = Describe("Database Operations", func() {
 		})
 	})
 
-	Describe("DropDatabase", func() {
-		Context("when dropping database", func() {
-			It("should execute DROP DATABASE query", func() {
+	Describe("TerminateDatabaseConnections", func() {
+		Context("when there are active connections", func() {
+			It("should query processlist and kill connections", func() {
 				adapter = NewAdapter(testutil.DefaultConnectionConfig())
 				adapter.db = db
 
-				mock.ExpectExec("DROP DATABASE IF EXISTS `testdb`").
-					WillReturnResult(sqlmock.NewResult(0, 0))
-
-				err := adapter.DropDatabase(ctx, "testdb", testutil.DropDatabaseOpts(false))
-				Expect(err).NotTo(HaveOccurred())
-				Expect(mock.ExpectationsWereMet()).NotTo(HaveOccurred())
-			})
-		})
-
-		Context("when force dropping with killing connections", func() {
-			It("should query processlist and kill connections before dropping", func() {
-				adapter = NewAdapter(testutil.DefaultConnectionConfig())
-				adapter.db = db
-
-				// Expect query for active connections
 				rows := sqlmock.NewRows([]string{"kill_cmd"}).
 					AddRow("KILL 123;").
 					AddRow("KILL 456;")
@@ -168,54 +153,69 @@ var _ = Describe("Database Operations", func() {
 					WithArgs("testdb").
 					WillReturnRows(rows)
 
-				// Expect kill commands
 				mock.ExpectExec("KILL 123;").
 					WillReturnResult(sqlmock.NewResult(0, 0))
 				mock.ExpectExec("KILL 456;").
 					WillReturnResult(sqlmock.NewResult(0, 0))
 
-				// Expect drop database
-				mock.ExpectExec("DROP DATABASE IF EXISTS `testdb`").
-					WillReturnResult(sqlmock.NewResult(0, 0))
-
-				err := adapter.DropDatabase(ctx, "testdb", testutil.DropDatabaseOpts(true))
+				err := adapter.TerminateDatabaseConnections(ctx, "testdb")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(mock.ExpectationsWereMet()).NotTo(HaveOccurred())
 			})
+		})
 
-			It("should continue if processlist query fails", func() {
+		Context("when there are no active connections", func() {
+			It("should succeed with empty processlist", func() {
 				adapter = NewAdapter(testutil.DefaultConnectionConfig())
 				adapter.db = db
 
-				// Expect query for active connections to fail
-				mock.ExpectQuery("SELECT CONCAT\\('KILL ', id, ';'\\).*FROM information_schema.processlist.*WHERE db = \\?").
-					WithArgs("testdb").
-					WillReturnError(fmt.Errorf("permission denied"))
-
-				// Should still drop database
-				mock.ExpectExec("DROP DATABASE IF EXISTS `testdb`").
-					WillReturnResult(sqlmock.NewResult(0, 0))
-
-				err := adapter.DropDatabase(ctx, "testdb", testutil.DropDatabaseOpts(true))
-				Expect(err).NotTo(HaveOccurred())
-				Expect(mock.ExpectationsWereMet()).NotTo(HaveOccurred())
-			})
-
-			It("should continue if no active connections found", func() {
-				adapter = NewAdapter(testutil.DefaultConnectionConfig())
-				adapter.db = db
-
-				// Expect empty result set
 				rows := sqlmock.NewRows([]string{"kill_cmd"})
 				mock.ExpectQuery("SELECT CONCAT\\('KILL ', id, ';'\\).*FROM information_schema.processlist.*WHERE db = \\?").
 					WithArgs("testdb").
 					WillReturnRows(rows)
 
-				// Expect drop database
+				err := adapter.TerminateDatabaseConnections(ctx, "testdb")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(mock.ExpectationsWereMet()).NotTo(HaveOccurred())
+			})
+		})
+
+		Context("when processlist query fails", func() {
+			It("should return error", func() {
+				adapter = NewAdapter(testutil.DefaultConnectionConfig())
+				adapter.db = db
+
+				mock.ExpectQuery("SELECT CONCAT\\('KILL ', id, ';'\\).*FROM information_schema.processlist.*WHERE db = \\?").
+					WithArgs("testdb").
+					WillReturnError(fmt.Errorf("permission denied"))
+
+				err := adapter.TerminateDatabaseConnections(ctx, "testdb")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("failed to query connections"))
+			})
+		})
+
+		Context("when not connected", func() {
+			It("should return error", func() {
+				adapter = NewAdapter(testutil.DefaultConnectionConfig())
+
+				err := adapter.TerminateDatabaseConnections(ctx, "testdb")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("not connected"))
+			})
+		})
+	})
+
+	Describe("DropDatabase", func() {
+		Context("when dropping database", func() {
+			It("should execute DROP DATABASE", func() {
+				adapter = NewAdapter(testutil.DefaultConnectionConfig())
+				adapter.db = db
+
 				mock.ExpectExec("DROP DATABASE IF EXISTS `testdb`").
 					WillReturnResult(sqlmock.NewResult(0, 0))
 
-				err := adapter.DropDatabase(ctx, "testdb", testutil.DropDatabaseOpts(true))
+				err := adapter.DropDatabase(ctx, "testdb", testutil.DropDatabaseOpts(false))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(mock.ExpectationsWereMet()).NotTo(HaveOccurred())
 			})

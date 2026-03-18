@@ -95,6 +95,18 @@ func (a *Adapter) SetDefaultPrivileges(ctx context.Context, grantee string, opts
 	return nil
 }
 
+// FlushPrivileges is a no-op for PostgreSQL.
+// PostgreSQL applies privilege changes immediately.
+func (a *Adapter) FlushPrivileges(_ context.Context) error {
+	return nil
+}
+
+// ValidatePrivileges is a no-op for PostgreSQL.
+// PostgreSQL validates privileges at execution time.
+func (a *Adapter) ValidatePrivileges(_ context.Context, _ []string) error {
+	return nil
+}
+
 // GetGrants retrieves grants for a user or role
 func (a *Adapter) GetGrants(ctx context.Context, grantee string) ([]types.GrantInfo, error) {
 	pool, err := a.getPool()

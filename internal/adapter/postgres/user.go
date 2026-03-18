@@ -70,17 +70,13 @@ func (a *Adapter) CreateUser(ctx context.Context, opts types.CreateUserOptions) 
 	return nil
 }
 
-// DropUser drops an existing PostgreSQL user
+// DropUser drops an existing PostgreSQL user.
+// Callers should invoke ReassignOwnedObjects before DropUser for safe cleanup.
 func (a *Adapter) DropUser(ctx context.Context, username string) error {
 	pool, err := a.getPool()
 	if err != nil {
 		return err
 	}
-
-	// First revoke all privileges and reassign owned objects
-	// This is necessary before dropping a role
-	_, _ = pool.Exec(ctx, fmt.Sprintf("REASSIGN OWNED BY %s TO CURRENT_USER", escapeIdentifier(username)))
-	_, _ = pool.Exec(ctx, fmt.Sprintf("DROP OWNED BY %s", escapeIdentifier(username)))
 
 	query := sqlbuilder.PgDropRole(username).IfExists().Build()
 	_, err = pool.Exec(ctx, query)
@@ -88,6 +84,30 @@ func (a *Adapter) DropUser(ctx context.Context, username string) error {
 		return fmt.Errorf("failed to drop user %s: %w", username, err)
 	}
 
+	return nil
+}
+
+// ReassignOwnedObjects transfers all objects owned by the specified user/role to
+// CURRENT_USER, then drops remaining owned objects (privileges, etc.).
+func (a *Adapter) ReassignOwnedObjects(ctx context.Context, name string) error {
+	pool, err := a.getPool()
+	if err != nil {
+		return err
+	}
+
+	if _, err := pool.Exec(ctx, fmt.Sprintf("REASSIGN OWNED BY %s TO CURRENT_USER", escapeIdentifier(name))); err != nil {
+		return fmt.Errorf("failed to reassign owned objects for %s: %w", name, err)
+	}
+	if _, err := pool.Exec(ctx, fmt.Sprintf("DROP OWNED BY %s", escapeIdentifier(name))); err != nil {
+		return fmt.Errorf("failed to drop owned objects for %s: %w", name, err)
+	}
+
+	return nil
+}
+
+// RevokeDatabaseGrants is a no-op for PostgreSQL.
+// PostgreSQL's DROP OWNED BY handles database-level grant revocation.
+func (a *Adapter) RevokeDatabaseGrants(_ context.Context, _ string) error {
 	return nil
 }
 

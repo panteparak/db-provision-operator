@@ -199,15 +199,40 @@ var _ = Describe("User Operations", func() {
 			})
 		})
 
-		It("should use safe drop pattern: REASSIGN + DROP OWNED + DROP ROLE", func() {
+		It("should generate DROP ROLE IF EXISTS (atomic)", func() {
+			// DropUser is now atomic - just DROP ROLE IF EXISTS.
+			// RevokeDatabaseGrants and ReassignOwnedObjects are called separately by the caller.
+			username := "appuser"
+			expectedDropRole := fmt.Sprintf("DROP ROLE IF EXISTS %s", escapeIdentifier(username))
+			Expect(expectedDropRole).To(ContainSubstring(`"appuser"`))
+		})
+	})
+
+	Describe("ReassignOwnedObjects", func() {
+		Context("when not connected", func() {
+			It("should return error", func() {
+				err := adapter.ReassignOwnedObjects(ctx, "testuser")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("not connected"))
+			})
+		})
+
+		It("should generate REASSIGN OWNED BY and DROP OWNED BY", func() {
 			username := "appuser"
 			expectedReassign := fmt.Sprintf("REASSIGN OWNED BY %s TO CURRENT_USER", escapeIdentifier(username))
 			expectedDropOwned := fmt.Sprintf("DROP OWNED BY %s", escapeIdentifier(username))
-			expectedDropRole := fmt.Sprintf("DROP ROLE IF EXISTS %s", escapeIdentifier(username))
-
 			Expect(expectedReassign).To(ContainSubstring(`"appuser"`))
 			Expect(expectedDropOwned).To(ContainSubstring(`"appuser"`))
-			Expect(expectedDropRole).To(ContainSubstring(`"appuser"`))
+		})
+	})
+
+	Describe("RevokeDatabaseGrants", func() {
+		Context("when not connected", func() {
+			It("should return error", func() {
+				err := adapter.RevokeDatabaseGrants(ctx, "testuser")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("not connected"))
+			})
 		})
 	})
 
@@ -392,15 +417,94 @@ var _ = Describe("User Operations", func() {
 		})
 
 		Describe("DropUser with mock", func() {
-			It("should execute REASSIGN + DROP OWNED + DROP ROLE", func() {
-				mock.ExpectExec(`REASSIGN OWNED BY "testuser"`).
-					WillReturnResult(pgxmock.NewResult("REASSIGN", 0))
-				mock.ExpectExec(`DROP OWNED BY "testuser"`).
-					WillReturnResult(pgxmock.NewResult("DROP", 0))
+			It("should execute only DROP ROLE IF EXISTS (atomic)", func() {
 				mock.ExpectExec(`DROP ROLE IF EXISTS "testuser"`).
 					WillReturnResult(pgxmock.NewResult("DROP ROLE", 0))
 
 				err := dropUserWithCRDBMock(ctx, mock, "testuser")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(mock.ExpectationsWereMet()).NotTo(HaveOccurred())
+			})
+		})
+
+		Describe("ReassignOwnedObjects with mock", func() {
+			It("should execute REASSIGN OWNED BY and DROP OWNED BY", func() {
+				mock.ExpectExec(`REASSIGN OWNED BY "testuser" TO CURRENT_USER`).
+					WillReturnResult(pgxmock.NewResult("REASSIGN", 0))
+				mock.ExpectExec(`DROP OWNED BY "testuser"`).
+					WillReturnResult(pgxmock.NewResult("DROP", 0))
+
+				err := reassignOwnedObjectsWithCRDBMock(ctx, mock, "testuser")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(mock.ExpectationsWereMet()).NotTo(HaveOccurred())
+			})
+
+			It("should return error if REASSIGN fails", func() {
+				mock.ExpectExec(`REASSIGN OWNED BY "testuser" TO CURRENT_USER`).
+					WillReturnError(fmt.Errorf("permission denied"))
+
+				err := reassignOwnedObjectsWithCRDBMock(ctx, mock, "testuser")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("failed to reassign owned objects"))
+			})
+
+			It("should return error if DROP OWNED fails", func() {
+				mock.ExpectExec(`REASSIGN OWNED BY "testuser" TO CURRENT_USER`).
+					WillReturnResult(pgxmock.NewResult("REASSIGN", 0))
+				mock.ExpectExec(`DROP OWNED BY "testuser"`).
+					WillReturnError(fmt.Errorf("permission denied"))
+
+				err := reassignOwnedObjectsWithCRDBMock(ctx, mock, "testuser")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("failed to drop owned objects"))
+			})
+		})
+
+		Describe("RevokeDatabaseGrants with mock", func() {
+			It("should list databases and revoke all grants", func() {
+				dbRows := pgxmock.NewRows([]string{"name"}).
+					AddRow("defaultdb").
+					AddRow("myapp")
+				mock.ExpectQuery(`SELECT name FROM crdb_internal\.databases`).
+					WillReturnRows(dbRows)
+				mock.ExpectExec(`REVOKE ALL ON DATABASE "defaultdb" FROM "testuser"`).
+					WillReturnResult(pgxmock.NewResult("REVOKE", 0))
+				mock.ExpectExec(`REVOKE ALL ON DATABASE "myapp" FROM "testuser"`).
+					WillReturnResult(pgxmock.NewResult("REVOKE", 0))
+
+				err := revokeDatabaseGrantsWithCRDBMock(ctx, mock, "testuser")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(mock.ExpectationsWereMet()).NotTo(HaveOccurred())
+			})
+
+			It("should return error if database listing fails", func() {
+				mock.ExpectQuery(`SELECT name FROM crdb_internal\.databases`).
+					WillReturnError(fmt.Errorf("connection error"))
+
+				err := revokeDatabaseGrantsWithCRDBMock(ctx, mock, "testuser")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("failed to list databases"))
+			})
+
+			It("should return error if REVOKE fails", func() {
+				dbRows := pgxmock.NewRows([]string{"name"}).
+					AddRow("defaultdb")
+				mock.ExpectQuery(`SELECT name FROM crdb_internal\.databases`).
+					WillReturnRows(dbRows)
+				mock.ExpectExec(`REVOKE ALL ON DATABASE "defaultdb" FROM "testuser"`).
+					WillReturnError(fmt.Errorf("permission denied"))
+
+				err := revokeDatabaseGrantsWithCRDBMock(ctx, mock, "testuser")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("failed to revoke grants"))
+			})
+
+			It("should succeed with no databases", func() {
+				dbRows := pgxmock.NewRows([]string{"name"})
+				mock.ExpectQuery(`SELECT name FROM crdb_internal\.databases`).
+					WillReturnRows(dbRows)
+
+				err := revokeDatabaseGrantsWithCRDBMock(ctx, mock, "testuser")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(mock.ExpectationsWereMet()).NotTo(HaveOccurred())
 			})
@@ -647,14 +751,48 @@ func createUserWithCRDBMock(ctx context.Context, pool pgxmock.PgxPoolIface, opts
 }
 
 func dropUserWithCRDBMock(ctx context.Context, pool pgxmock.PgxPoolIface, username string) error {
-	_, _ = pool.Exec(ctx, fmt.Sprintf("REASSIGN OWNED BY %s TO CURRENT_USER", escapeIdentifier(username)))
-	_, _ = pool.Exec(ctx, fmt.Sprintf("DROP OWNED BY %s", escapeIdentifier(username)))
-
 	query := fmt.Sprintf("DROP ROLE IF EXISTS %s", escapeIdentifier(username))
 	_, err := pool.Exec(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to drop user %s: %w", username, err)
 	}
+	return nil
+}
+
+func reassignOwnedObjectsWithCRDBMock(ctx context.Context, pool pgxmock.PgxPoolIface, name string) error {
+	if _, err := pool.Exec(ctx, fmt.Sprintf("REASSIGN OWNED BY %s TO CURRENT_USER", escapeIdentifier(name))); err != nil {
+		return fmt.Errorf("failed to reassign owned objects for %s: %w", name, err)
+	}
+	if _, err := pool.Exec(ctx, fmt.Sprintf("DROP OWNED BY %s", escapeIdentifier(name))); err != nil {
+		return fmt.Errorf("failed to drop owned objects for %s: %w", name, err)
+	}
+	return nil
+}
+
+func revokeDatabaseGrantsWithCRDBMock(ctx context.Context, pool pgxmock.PgxPoolIface, name string) error {
+	dbRows, err := pool.Query(ctx, "SELECT name FROM crdb_internal.databases WHERE name NOT IN ('system')")
+	if err != nil {
+		return fmt.Errorf("failed to list databases for grant revocation: %w", err)
+	}
+
+	var databases []string
+	for dbRows.Next() {
+		var dbName string
+		if err := dbRows.Scan(&dbName); err != nil {
+			dbRows.Close()
+			return fmt.Errorf("failed to scan database name: %w", err)
+		}
+		databases = append(databases, dbName)
+	}
+	dbRows.Close()
+
+	for _, dbName := range databases {
+		if _, err := pool.Exec(ctx, fmt.Sprintf("REVOKE ALL ON DATABASE %s FROM %s",
+			escapeIdentifier(dbName), escapeIdentifier(name))); err != nil {
+			return fmt.Errorf("failed to revoke grants on database %s from %s: %w", dbName, name, err)
+		}
+	}
+
 	return nil
 }
 

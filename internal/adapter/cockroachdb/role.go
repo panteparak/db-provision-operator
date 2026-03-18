@@ -72,17 +72,12 @@ func (a *Adapter) CreateRole(ctx context.Context, opts types.CreateRoleOptions) 
 }
 
 // DropRole drops an existing CockroachDB role.
-// Uses the same safe cleanup pattern as DropUser:
-// REASSIGN OWNED BY + DROP OWNED BY before DROP ROLE.
+// Callers should invoke RevokeDatabaseGrants and ReassignOwnedObjects before DropRole.
 func (a *Adapter) DropRole(ctx context.Context, roleName string) error {
 	pool, err := a.getPool()
 	if err != nil {
 		return err
 	}
-
-	// Reassign and drop owned objects before dropping the role
-	_, _ = pool.Exec(ctx, fmt.Sprintf("REASSIGN OWNED BY %s TO CURRENT_USER", escapeIdentifier(roleName)))
-	_, _ = pool.Exec(ctx, fmt.Sprintf("DROP OWNED BY %s", escapeIdentifier(roleName)))
 
 	query := sqlbuilder.PgDropRole(roleName).IfExists().Build()
 	_, err = pool.Exec(ctx, query)

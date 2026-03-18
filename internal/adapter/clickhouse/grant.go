@@ -41,11 +41,6 @@ func (a *Adapter) Grant(ctx context.Context, grantee string, opts []types.GrantO
 	}
 
 	for i, opt := range opts {
-		if err := sqlbuilder.ValidatePrivileges(opt.Privileges, sqlbuilder.ClickHouseDialect{}.ValidPrivileges()); err != nil {
-			log.Error(err, "Invalid privileges", "index", i)
-			return fmt.Errorf("failed to build grant query: %w", err)
-		}
-
 		privList := make([]string, len(opt.Privileges))
 		for j, p := range opt.Privileges {
 			privList[j] = strings.ToUpper(strings.TrimSpace(p))
@@ -80,11 +75,6 @@ func (a *Adapter) Revoke(ctx context.Context, grantee string, opts []types.Grant
 	}
 
 	for i, opt := range opts {
-		if err := sqlbuilder.ValidatePrivileges(opt.Privileges, sqlbuilder.ClickHouseDialect{}.ValidPrivileges()); err != nil {
-			log.Error(err, "Invalid privileges", "index", i)
-			return fmt.Errorf("failed to build revoke query: %w", err)
-		}
-
 		privList := make([]string, len(opt.Privileges))
 		for j, p := range opt.Privileges {
 			privList[j] = strings.ToUpper(strings.TrimSpace(p))
@@ -161,6 +151,17 @@ func (a *Adapter) RevokeRole(ctx context.Context, grantee string, roles []string
 
 	log.Info("Successfully revoked all role memberships")
 	return nil
+}
+
+// FlushPrivileges is a no-op for ClickHouse.
+// ClickHouse does not have a grant table reload mechanism.
+func (a *Adapter) FlushPrivileges(_ context.Context) error {
+	return nil
+}
+
+// ValidatePrivileges checks whether the given privileges are valid for ClickHouse.
+func (a *Adapter) ValidatePrivileges(_ context.Context, privileges []string) error {
+	return sqlbuilder.ValidatePrivileges(privileges, sqlbuilder.ClickHouseDialect{}.ValidPrivileges())
 }
 
 // SetDefaultPrivileges is a no-op for ClickHouse as it does not support default privileges.

@@ -48,6 +48,12 @@ func (a *Adapter) CreateDatabase(ctx context.Context, opts types.CreateDatabaseO
 	return nil
 }
 
+// TerminateDatabaseConnections is a no-op for ClickHouse.
+// ClickHouse does not require connection termination before dropping a database.
+func (a *Adapter) TerminateDatabaseConnections(_ context.Context, _ string) error {
+	return nil
+}
+
 // DropDatabase drops an existing ClickHouse database
 func (a *Adapter) DropDatabase(ctx context.Context, name string, opts types.DropDatabaseOptions) error {
 	db, err := a.getDB()

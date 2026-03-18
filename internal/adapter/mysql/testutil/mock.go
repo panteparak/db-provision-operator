@@ -118,6 +118,29 @@ func ExpectDropDatabase(mock sqlmock.Sqlmock, name string) {
 		WillReturnResult(sqlmock.NewResult(0, 0))
 }
 
+// ExpectTerminateConnections sets up expectations for terminating database connections.
+// It expects the processlist query and returns the specified kill commands.
+func ExpectTerminateConnections(mock sqlmock.Sqlmock, name string, killCmds []string) {
+	rows := sqlmock.NewRows([]string{"kill_cmd"})
+	for _, cmd := range killCmds {
+		rows.AddRow(cmd)
+	}
+	mock.ExpectQuery(`SELECT CONCAT\('KILL ', id, ';'\).*FROM information_schema\.processlist.*WHERE db = \?`).
+		WithArgs(name).
+		WillReturnRows(rows)
+
+	for _, cmd := range killCmds {
+		mock.ExpectExec(cmd).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+	}
+}
+
+// ExpectTerminateConnectionsEmpty sets up expectations for terminating connections
+// when no active connections exist.
+func ExpectTerminateConnectionsEmpty(mock sqlmock.Sqlmock, name string) {
+	ExpectTerminateConnections(mock, name, nil)
+}
+
 // ExpectCreateUser sets up an expectation for creating a user.
 func ExpectCreateUser(mock sqlmock.Sqlmock, username string) {
 	mock.ExpectExec(`CREATE USER.*` + username + `.*`).

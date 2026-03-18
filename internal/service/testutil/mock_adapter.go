@@ -32,15 +32,16 @@ type MockAdapter struct {
 	GetVersionFunc func(ctx context.Context) (string, error)
 
 	// Database operations
-	CreateDatabaseFunc            func(ctx context.Context, opts types.CreateDatabaseOptions) error
-	DropDatabaseFunc              func(ctx context.Context, name string, opts types.DropDatabaseOptions) error
-	DatabaseExistsFunc            func(ctx context.Context, name string) (bool, error)
-	GetDatabaseInfoFunc           func(ctx context.Context, name string) (*types.DatabaseInfo, error)
-	UpdateDatabaseFunc            func(ctx context.Context, name string, opts types.UpdateDatabaseOptions) error
-	VerifyDatabaseAccessFunc      func(ctx context.Context, name string) error
-	TransferDatabaseOwnershipFunc func(ctx context.Context, dbName, newOwner string) error
-	ExecSQLFunc                   func(ctx context.Context, database string, statement string) error
-	ExecSQLAsRoleFunc             func(ctx context.Context, database, role, statement string) error
+	CreateDatabaseFunc               func(ctx context.Context, opts types.CreateDatabaseOptions) error
+	DropDatabaseFunc                 func(ctx context.Context, name string, opts types.DropDatabaseOptions) error
+	DatabaseExistsFunc               func(ctx context.Context, name string) (bool, error)
+	GetDatabaseInfoFunc              func(ctx context.Context, name string) (*types.DatabaseInfo, error)
+	UpdateDatabaseFunc               func(ctx context.Context, name string, opts types.UpdateDatabaseOptions) error
+	VerifyDatabaseAccessFunc         func(ctx context.Context, name string) error
+	TransferDatabaseOwnershipFunc    func(ctx context.Context, dbName, newOwner string) error
+	TerminateDatabaseConnectionsFunc func(ctx context.Context, name string) error
+	ExecSQLFunc                      func(ctx context.Context, database string, statement string) error
+	ExecSQLAsRoleFunc                func(ctx context.Context, database, role, statement string) error
 
 	// User operations
 	CreateUserFunc      func(ctx context.Context, opts types.CreateUserOptions) error
@@ -66,6 +67,12 @@ type MockAdapter struct {
 	RevokeRoleFunc           func(ctx context.Context, grantee string, roles []string) error
 	SetDefaultPrivilegesFunc func(ctx context.Context, grantee string, opts []types.DefaultPrivilegeGrantOptions) error
 	GetGrantsFunc            func(ctx context.Context, grantee string) ([]types.GrantInfo, error)
+	FlushPrivilegesFunc      func(ctx context.Context) error
+	ValidatePrivilegesFunc   func(ctx context.Context, privileges []string) error
+
+	// User/Role cleanup operations
+	ReassignOwnedObjectsFunc func(ctx context.Context, name string) error
+	RevokeDatabaseGrantsFunc func(ctx context.Context, name string) error
 
 	// Backup operations
 	BackupFunc            func(ctx context.Context, opts types.BackupOptions) (*types.BackupResult, error)
@@ -108,6 +115,7 @@ func NewMockAdapter() *MockAdapter {
 	m.UpdateDatabaseFunc = func(ctx context.Context, name string, opts types.UpdateDatabaseOptions) error { return nil }
 	m.VerifyDatabaseAccessFunc = func(ctx context.Context, name string) error { return nil }
 	m.TransferDatabaseOwnershipFunc = func(ctx context.Context, dbName, newOwner string) error { return nil }
+	m.TerminateDatabaseConnectionsFunc = func(ctx context.Context, name string) error { return nil }
 	m.ExecSQLFunc = func(ctx context.Context, database string, statement string) error { return nil }
 	m.ExecSQLAsRoleFunc = func(ctx context.Context, database, role, statement string) error { return nil }
 
@@ -142,6 +150,10 @@ func NewMockAdapter() *MockAdapter {
 	m.GetGrantsFunc = func(ctx context.Context, grantee string) ([]types.GrantInfo, error) {
 		return []types.GrantInfo{}, nil
 	}
+	m.FlushPrivilegesFunc = func(ctx context.Context) error { return nil }
+	m.ValidatePrivilegesFunc = func(ctx context.Context, privileges []string) error { return nil }
+	m.ReassignOwnedObjectsFunc = func(ctx context.Context, name string) error { return nil }
+	m.RevokeDatabaseGrantsFunc = func(ctx context.Context, name string) error { return nil }
 
 	m.BackupFunc = func(ctx context.Context, opts types.BackupOptions) (*types.BackupResult, error) {
 		return &types.BackupResult{BackupID: opts.BackupID}, nil
@@ -177,6 +189,16 @@ func (m *MockAdapter) GetCallCount(method string) int {
 		}
 	}
 	return count
+}
+
+// GetCalledMethods returns the ordered list of method names that were called.
+// Useful for verifying call ordering in orchestration tests.
+func (m *MockAdapter) GetCalledMethods() []string {
+	methods := make([]string, len(m.Calls))
+	for i, call := range m.Calls {
+		methods[i] = call.Method
+	}
+	return methods
 }
 
 // WasCalledWith checks if a method was called with specific arguments.
@@ -257,6 +279,11 @@ func (m *MockAdapter) VerifyDatabaseAccess(ctx context.Context, name string) err
 func (m *MockAdapter) TransferDatabaseOwnership(ctx context.Context, dbName, newOwner string) error {
 	m.record("TransferDatabaseOwnership", dbName, newOwner)
 	return m.TransferDatabaseOwnershipFunc(ctx, dbName, newOwner)
+}
+
+func (m *MockAdapter) TerminateDatabaseConnections(ctx context.Context, name string) error {
+	m.record("TerminateDatabaseConnections", name)
+	return m.TerminateDatabaseConnectionsFunc(ctx, name)
 }
 
 func (m *MockAdapter) ExecSQL(ctx context.Context, database string, statement string) error {
@@ -365,6 +392,26 @@ func (m *MockAdapter) SetDefaultPrivileges(ctx context.Context, grantee string, 
 func (m *MockAdapter) GetGrants(ctx context.Context, grantee string) ([]types.GrantInfo, error) {
 	m.record("GetGrants", grantee)
 	return m.GetGrantsFunc(ctx, grantee)
+}
+
+func (m *MockAdapter) FlushPrivileges(ctx context.Context) error {
+	m.record("FlushPrivileges")
+	return m.FlushPrivilegesFunc(ctx)
+}
+
+func (m *MockAdapter) ValidatePrivileges(ctx context.Context, privileges []string) error {
+	m.record("ValidatePrivileges", privileges)
+	return m.ValidatePrivilegesFunc(ctx, privileges)
+}
+
+func (m *MockAdapter) ReassignOwnedObjects(ctx context.Context, name string) error {
+	m.record("ReassignOwnedObjects", name)
+	return m.ReassignOwnedObjectsFunc(ctx, name)
+}
+
+func (m *MockAdapter) RevokeDatabaseGrants(ctx context.Context, name string) error {
+	m.record("RevokeDatabaseGrants", name)
+	return m.RevokeDatabaseGrantsFunc(ctx, name)
 }
 
 // Backup operations implementations

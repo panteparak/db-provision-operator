@@ -340,6 +340,18 @@ func (a *Adapter) GetUserInfo(ctx context.Context, username string) (*types.User
 	return &info, nil
 }
 
+// ReassignOwnedObjects is a no-op for MySQL.
+// MySQL's DROP USER handles cleanup internally.
+func (a *Adapter) ReassignOwnedObjects(_ context.Context, _ string) error {
+	return nil
+}
+
+// RevokeDatabaseGrants is a no-op for MySQL.
+// MySQL's DROP USER handles cleanup internally.
+func (a *Adapter) RevokeDatabaseGrants(_ context.Context, _ string) error {
+	return nil
+}
+
 // DisableUser locks a MySQL user account to prevent login.
 func (a *Adapter) DisableUser(ctx context.Context, username string) error {
 	db, err := a.getDB()

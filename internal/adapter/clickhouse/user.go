@@ -121,6 +121,18 @@ func (a *Adapter) GetUserInfo(ctx context.Context, username string) (*types.User
 	return &info, nil
 }
 
+// ReassignOwnedObjects is a no-op for ClickHouse.
+// ClickHouse does not have object ownership semantics.
+func (a *Adapter) ReassignOwnedObjects(_ context.Context, _ string) error {
+	return nil
+}
+
+// RevokeDatabaseGrants is a no-op for ClickHouse.
+// ClickHouse does not have database-level grant revocation needs.
+func (a *Adapter) RevokeDatabaseGrants(_ context.Context, _ string) error {
+	return nil
+}
+
 // DisableUser is a no-op for ClickHouse as it does not support NOLOGIN semantics.
 func (a *Adapter) DisableUser(_ context.Context, _ string) error {
 	return nil

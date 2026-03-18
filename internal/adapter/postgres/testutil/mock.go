@@ -192,6 +192,14 @@ func ExpectUserInfo(mock pgxmock.PgxPoolIface, username string, connLimit int32,
 		WillReturnRows(rows)
 }
 
+// ExpectReassignOwnedObjects sets up expectations for REASSIGN OWNED BY + DROP OWNED BY.
+func ExpectReassignOwnedObjects(mock pgxmock.PgxPoolIface, name string) {
+	mock.ExpectExec(`REASSIGN OWNED BY .* TO CURRENT_USER`).
+		WillReturnResult(pgxmock.NewResult("REASSIGN", 0))
+	mock.ExpectExec(`DROP OWNED BY .*`).
+		WillReturnResult(pgxmock.NewResult("DROP", 0))
+}
+
 // ExpectRoleInfo sets up expectations for retrieving role information.
 func ExpectRoleInfo(mock pgxmock.PgxPoolIface, rolename string, login, inherit, createDB, createRole, superuser, replication, bypassRLS bool) {
 	rows := pgxmock.NewRows([]string{

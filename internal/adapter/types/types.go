@@ -77,6 +77,12 @@ type DatabaseManager interface {
 	// On MySQL this is a no-op since MySQL does not support database ownership.
 	TransferDatabaseOwnership(ctx context.Context, dbName, newOwner string) error
 
+	// TerminateDatabaseConnections terminates all active connections to the named database.
+	// This is called before DropDatabase to prevent "database is being accessed" errors.
+	// Implementations should be best-effort — errors are logged but do not block deletion.
+	// Engines that handle connections internally during DROP (e.g., ClickHouse) should no-op.
+	TerminateDatabaseConnections(ctx context.Context, name string) error
+
 	// ExecSQL executes a single SQL statement on the named database.
 	// The statement is executed as-is with the operator's credentials.
 	ExecSQL(ctx context.Context, database string, statement string) error
@@ -200,6 +206,17 @@ type UserManager interface {
 	// This is used during password rotation to prevent old users from connecting
 	// while keeping them alive for ownership and audit purposes.
 	DisableUser(ctx context.Context, username string) error
+
+	// ReassignOwnedObjects transfers all objects owned by the specified user/role to the
+	// current operator user, then drops remaining owned objects (privileges, etc.).
+	// On PostgreSQL/CockroachDB: REASSIGN OWNED BY + DROP OWNED BY.
+	// On MySQL/ClickHouse: no-op (DROP USER handles cleanup internally).
+	ReassignOwnedObjects(ctx context.Context, name string) error
+
+	// RevokeDatabaseGrants revokes all database-level grants for the specified user/role.
+	// Needed on engines where DROP OWNED BY does not handle database-level grants (CockroachDB).
+	// PostgreSQL handles this via DROP OWNED BY; MySQL/ClickHouse are no-ops.
+	RevokeDatabaseGrants(ctx context.Context, name string) error
 }
 
 // CreateUserOptions contains options for creating a user
@@ -217,8 +234,11 @@ type CreateUserOptions struct {
 	Login           bool
 	Replication     bool
 	BypassRLS       bool
-	InRoles         []string
-	ConfigParams    map[string]string
+	// InRoles grants membership in these roles during creation.
+	// Adapters SHOULD handle InRoles by granting role membership during creation.
+	// If InRoles is not supported (MySQL), callers should use GrantRole() separately.
+	InRoles      []string
+	ConfigParams map[string]string
 
 	// MySQL-specific
 	MaxQueriesPerHour     int32
@@ -244,8 +264,11 @@ type UpdateUserOptions struct {
 	Login           *bool
 	Replication     *bool
 	BypassRLS       *bool
-	InRoles         []string
-	ConfigParams    map[string]string
+	// InRoles grants membership in these roles during update.
+	// Adapters SHOULD handle InRoles by granting role membership.
+	// If InRoles is not supported (MySQL), callers should use GrantRole() separately.
+	InRoles      []string
+	ConfigParams map[string]string
 
 	// MySQL-specific
 	MaxQueriesPerHour     *int32
@@ -382,6 +405,15 @@ type GrantManager interface {
 
 	// GetGrants retrieves grants for a user/role
 	GetGrants(ctx context.Context, grantee string) ([]GrantInfo, error)
+
+	// FlushPrivileges reloads the grant tables so that privilege changes take effect.
+	// MySQL requires this after GRANT/REVOKE; other engines return nil.
+	FlushPrivileges(ctx context.Context) error
+
+	// ValidatePrivileges checks whether the given privileges are valid for this engine.
+	// Returns an error describing invalid privileges.
+	// Engines with privilege allowlists (ClickHouse) validate strictly; others return nil.
+	ValidatePrivileges(ctx context.Context, privileges []string) error
 }
 
 // GrantOptions contains options for granting privileges

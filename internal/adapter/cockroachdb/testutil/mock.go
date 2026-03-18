@@ -147,6 +147,30 @@ func ExpectUserInfo(mock pgxmock.PgxPoolIface, username string, login, createDB,
 		WillReturnRows(rows)
 }
 
+// ExpectReassignOwnedObjects sets up expectations for REASSIGN OWNED BY + DROP OWNED BY.
+func ExpectReassignOwnedObjects(mock pgxmock.PgxPoolIface, name string) {
+	mock.ExpectExec(`REASSIGN OWNED BY .* TO CURRENT_USER`).
+		WillReturnResult(pgxmock.NewResult("REASSIGN", 0))
+	mock.ExpectExec(`DROP OWNED BY .*`).
+		WillReturnResult(pgxmock.NewResult("DROP", 0))
+}
+
+// ExpectRevokeDatabaseGrants sets up expectations for revoking all database-level grants.
+// It expects a database list query and a REVOKE ALL for each database.
+func ExpectRevokeDatabaseGrants(mock pgxmock.PgxPoolIface, name string, databases []string) {
+	dbRows := pgxmock.NewRows([]string{"name"})
+	for _, db := range databases {
+		dbRows.AddRow(db)
+	}
+	mock.ExpectQuery(`SELECT name FROM crdb_internal\.databases.*`).
+		WillReturnRows(dbRows)
+
+	for range databases {
+		mock.ExpectExec(`REVOKE ALL ON DATABASE .* FROM .*`).
+			WillReturnResult(pgxmock.NewResult("REVOKE", 0))
+	}
+}
+
 // ExpectRoleInfo sets up expectations for retrieving role information.
 func ExpectRoleInfo(mock pgxmock.PgxPoolIface, rolename string, login, createDB, createRole bool) {
 	rows := pgxmock.NewRows([]string{

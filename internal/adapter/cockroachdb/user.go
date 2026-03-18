@@ -124,48 +124,70 @@ func isInsecureModeError(err error) bool {
 }
 
 // DropUser drops an existing CockroachDB user.
-// Follows the safe cleanup pattern:
-//  1. Revoke all database-level grants (CockroachDB requires this explicitly)
-//  2. REASSIGN OWNED BY + DROP OWNED BY
-//  3. DROP ROLE
-//
-// This ensures all objects owned by the user are transferred to CURRENT_USER
-// and all privileges are revoked before the role is dropped.
+// Callers should invoke RevokeDatabaseGrants and ReassignOwnedObjects before DropUser.
 func (a *Adapter) DropUser(ctx context.Context, username string) error {
 	pool, err := a.getPool()
 	if err != nil {
 		return err
 	}
 
-	// First, revoke all database-level grants for this user
-	// CockroachDB's DROP OWNED BY doesn't handle database grants like PostgreSQL does
-	// Get list of all databases and revoke grants from each
-	dbRows, err := pool.Query(ctx, "SELECT name FROM crdb_internal.databases WHERE name NOT IN ('system')")
-	if err == nil {
-		var databases []string
-		for dbRows.Next() {
-			var dbName string
-			if err := dbRows.Scan(&dbName); err == nil {
-				databases = append(databases, dbName)
-			}
-		}
-		dbRows.Close()
-
-		// Revoke grants from each database
-		for _, dbName := range databases {
-			_, _ = pool.Exec(ctx, fmt.Sprintf("REVOKE ALL ON DATABASE %s FROM %s",
-				escapeIdentifier(dbName), escapeIdentifier(username)))
-		}
-	}
-
-	// Reassign owned objects to current user, then drop remaining owned objects
-	_, _ = pool.Exec(ctx, fmt.Sprintf("REASSIGN OWNED BY %s TO CURRENT_USER", escapeIdentifier(username)))
-	_, _ = pool.Exec(ctx, fmt.Sprintf("DROP OWNED BY %s", escapeIdentifier(username)))
-
 	query := sqlbuilder.PgDropRole(username).IfExists().Build()
 	_, err = pool.Exec(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to drop user %s: %w", username, err)
+	}
+
+	return nil
+}
+
+// ReassignOwnedObjects transfers all objects owned by the specified user/role to
+// CURRENT_USER, then drops remaining owned objects (privileges, etc.).
+func (a *Adapter) ReassignOwnedObjects(ctx context.Context, name string) error {
+	pool, err := a.getPool()
+	if err != nil {
+		return err
+	}
+
+	if _, err := pool.Exec(ctx, fmt.Sprintf("REASSIGN OWNED BY %s TO CURRENT_USER", escapeIdentifier(name))); err != nil {
+		return fmt.Errorf("failed to reassign owned objects for %s: %w", name, err)
+	}
+	if _, err := pool.Exec(ctx, fmt.Sprintf("DROP OWNED BY %s", escapeIdentifier(name))); err != nil {
+		return fmt.Errorf("failed to drop owned objects for %s: %w", name, err)
+	}
+
+	return nil
+}
+
+// RevokeDatabaseGrants revokes all database-level grants for the specified user/role.
+// CockroachDB's DROP OWNED BY does NOT handle database-level grants, so this must
+// be called explicitly before ReassignOwnedObjects.
+func (a *Adapter) RevokeDatabaseGrants(ctx context.Context, name string) error {
+	pool, err := a.getPool()
+	if err != nil {
+		return err
+	}
+
+	dbRows, err := pool.Query(ctx, "SELECT name FROM crdb_internal.databases WHERE name NOT IN ('system')")
+	if err != nil {
+		return fmt.Errorf("failed to list databases for grant revocation: %w", err)
+	}
+
+	var databases []string
+	for dbRows.Next() {
+		var dbName string
+		if err := dbRows.Scan(&dbName); err != nil {
+			dbRows.Close()
+			return fmt.Errorf("failed to scan database name: %w", err)
+		}
+		databases = append(databases, dbName)
+	}
+	dbRows.Close()
+
+	for _, dbName := range databases {
+		if _, err := pool.Exec(ctx, fmt.Sprintf("REVOKE ALL ON DATABASE %s FROM %s",
+			escapeIdentifier(dbName), escapeIdentifier(name))); err != nil {
+			return fmt.Errorf("failed to revoke grants on database %s from %s: %w", dbName, name, err)
+		}
 	}
 
 	return nil

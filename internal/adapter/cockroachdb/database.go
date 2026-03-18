@@ -59,9 +59,14 @@ func (a *Adapter) CreateDatabase(ctx context.Context, opts types.CreateDatabaseO
 	return nil
 }
 
+// TerminateDatabaseConnections is a no-op for CockroachDB.
+// CockroachDB's DROP DATABASE ... CASCADE handles active connections gracefully.
+func (a *Adapter) TerminateDatabaseConnections(_ context.Context, _ string) error {
+	return nil
+}
+
 // DropDatabase drops an existing CockroachDB database.
-// When Force is true, active sessions are cancelled before dropping.
-// CockroachDB uses CANCEL SESSION instead of pg_terminate_backend.
+// CockroachDB uses CASCADE which handles active connections and dependencies.
 func (a *Adapter) DropDatabase(ctx context.Context, name string, opts types.DropDatabaseOptions) error {
 	pool, err := a.getPool()
 	if err != nil {
