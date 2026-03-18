@@ -82,6 +82,14 @@ func (s *GrantService) Apply(ctx context.Context, opts ApplyGrantServiceOptions)
 		AppliedRoles: []string{},
 	}
 
+	// Validate privileges before granting
+	allPrivs := extractPrivilegesFromSpec(opts.Spec, s.config.GetEngineType())
+	if len(allPrivs) > 0 {
+		if err := s.adapter.ValidatePrivileges(ctx, allPrivs); err != nil {
+			return nil, s.wrapError(ctx, s.config, "validate privileges", opts.Username, err)
+		}
+	}
+
 	switch s.config.GetEngineType() {
 	case dbopsv1alpha1.EngineTypePostgres, dbopsv1alpha1.EngineTypeCockroachDB:
 		// CockroachDB uses PostgreSQL wire protocol and the same grant syntax
@@ -169,6 +177,11 @@ func (s *GrantService) Apply(ctx context.Context, opts ApplyGrantServiceOptions)
 		}
 	}
 
+	// Flush privileges after granting (best-effort)
+	if err := s.adapter.FlushPrivileges(ctx); err != nil {
+		op.Warn("failed to flush privileges (best-effort)", "error", err)
+	}
+
 	op.Success("grants applied successfully")
 	return result, nil
 }
@@ -190,6 +203,14 @@ func (s *GrantService) Revoke(ctx context.Context, opts ApplyGrantServiceOptions
 	defer cancel()
 
 	var revokedCount int
+
+	// Validate privileges before revoking
+	allPrivs := extractPrivilegesFromSpec(opts.Spec, s.config.GetEngineType())
+	if len(allPrivs) > 0 {
+		if err := s.adapter.ValidatePrivileges(ctx, allPrivs); err != nil {
+			return nil, s.wrapError(ctx, s.config, "validate privileges", opts.Username, err)
+		}
+	}
 
 	switch s.config.GetEngineType() {
 	case dbopsv1alpha1.EngineTypePostgres, dbopsv1alpha1.EngineTypeCockroachDB:
@@ -265,6 +286,11 @@ func (s *GrantService) Revoke(ctx context.Context, opts ApplyGrantServiceOptions
 				revokedCount += len(opts.Spec.ClickHouse.Grants)
 			}
 		}
+	}
+
+	// Flush privileges after revoking (best-effort)
+	if err := s.adapter.FlushPrivileges(ctx); err != nil {
+		op.Warn("failed to flush privileges (best-effort)", "error", err)
 	}
 
 	op.Success("grants revoked successfully")
@@ -393,6 +419,32 @@ func (s *GrantService) buildClickHouseGrantOptions(grants []dbopsv1alpha1.ClickH
 		})
 	}
 	return opts
+}
+
+// extractPrivilegesFromSpec collects all privilege strings from engine-specific grants in the spec.
+func extractPrivilegesFromSpec(spec *dbopsv1alpha1.DatabaseGrantSpec, engine dbopsv1alpha1.EngineType) []string {
+	var privs []string
+	switch engine {
+	case dbopsv1alpha1.EngineTypePostgres, dbopsv1alpha1.EngineTypeCockroachDB:
+		if spec.Postgres != nil {
+			for _, g := range spec.Postgres.Grants {
+				privs = append(privs, g.Privileges...)
+			}
+		}
+	case dbopsv1alpha1.EngineTypeMySQL, dbopsv1alpha1.EngineTypeMariaDB:
+		if spec.MySQL != nil {
+			for _, g := range spec.MySQL.Grants {
+				privs = append(privs, g.Privileges...)
+			}
+		}
+	case dbopsv1alpha1.EngineTypeClickHouse:
+		if spec.ClickHouse != nil {
+			for _, g := range spec.ClickHouse.Grants {
+				privs = append(privs, g.Privileges...)
+			}
+		}
+	}
+	return privs
 }
 
 // buildDefaultPrivilegeOptions converts PostgresDefaultPrivilegeGrant specs to adapter options.

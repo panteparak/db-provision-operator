@@ -972,3 +972,214 @@ func TestGrantService_CallTracking(t *testing.T) {
 		assert.True(t, mock.WasCalledWith("Grant", "testuser"))
 	})
 }
+
+func TestGrantService_Apply_Orchestration(t *testing.T) {
+	t.Run("calls ValidatePrivileges before Grant and FlushPrivileges after", func(t *testing.T) {
+		mock := testutil.NewMockAdapter()
+
+		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
+		svc := NewGrantServiceWithAdapter(mock, cfg)
+
+		opts := ApplyGrantServiceOptions{
+			Username: "testuser",
+			Spec: &dbopsv1alpha1.DatabaseGrantSpec{
+				Postgres: &dbopsv1alpha1.PostgresGrantConfig{
+					Grants: []dbopsv1alpha1.PostgresGrant{
+						{
+							Database:   "testdb",
+							Privileges: []string{"SELECT", "INSERT"},
+						},
+					},
+				},
+			},
+		}
+
+		result, err := svc.Apply(context.Background(), opts)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		methods := mock.GetCalledMethods()
+		assert.Equal(t, 1, mock.GetCallCount("ValidatePrivileges"))
+		assert.Equal(t, 1, mock.GetCallCount("Grant"))
+		assert.Equal(t, 1, mock.GetCallCount("FlushPrivileges"))
+
+		var validateIdx, grantIdx, flushIdx int
+		for i, m := range methods {
+			switch m {
+			case "ValidatePrivileges":
+				validateIdx = i
+			case "Grant":
+				grantIdx = i
+			case "FlushPrivileges":
+				flushIdx = i
+			}
+		}
+		assert.Less(t, validateIdx, grantIdx, "ValidatePrivileges must precede Grant")
+		assert.Less(t, grantIdx, flushIdx, "Grant must precede FlushPrivileges")
+	})
+
+	t.Run("ValidatePrivileges error blocks Grant from executing", func(t *testing.T) {
+		mock := testutil.NewMockAdapter()
+		mock.ValidatePrivilegesFunc = func(ctx context.Context, privileges []string) error {
+			return errors.New("invalid privilege: SUPERUSER")
+		}
+
+		cfg := &Config{Engine: "clickhouse", Host: "localhost", Port: 9000}
+		svc := NewGrantServiceWithAdapter(mock, cfg)
+
+		opts := ApplyGrantServiceOptions{
+			Username: "testuser",
+			Spec: &dbopsv1alpha1.DatabaseGrantSpec{
+				ClickHouse: &dbopsv1alpha1.ClickHouseGrantConfig{
+					Grants: []dbopsv1alpha1.ClickHouseGrant{
+						{
+							Database:   "testdb",
+							Privileges: []string{"SUPERUSER"},
+						},
+					},
+				},
+			},
+		}
+
+		_, err := svc.Apply(context.Background(), opts)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "validate privileges")
+
+		// Grant should NOT have been called
+		assert.Equal(t, 0, mock.GetCallCount("Grant"))
+		assert.Equal(t, 0, mock.GetCallCount("FlushPrivileges"))
+	})
+
+	t.Run("FlushPrivileges error is best-effort and doesnt fail Apply", func(t *testing.T) {
+		mock := testutil.NewMockAdapter()
+		mock.FlushPrivilegesFunc = func(ctx context.Context) error {
+			return errors.New("flush failed")
+		}
+
+		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
+		svc := NewGrantServiceWithAdapter(mock, cfg)
+
+		opts := ApplyGrantServiceOptions{
+			Username: "testuser",
+			Spec: &dbopsv1alpha1.DatabaseGrantSpec{
+				Postgres: &dbopsv1alpha1.PostgresGrantConfig{
+					Grants: []dbopsv1alpha1.PostgresGrant{
+						{
+							Database:   "testdb",
+							Privileges: []string{"SELECT"},
+						},
+					},
+				},
+			},
+		}
+
+		result, err := svc.Apply(context.Background(), opts)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, 1, result.AppliedDirectGrants)
+	})
+}
+
+func TestGrantService_Revoke_Orchestration(t *testing.T) {
+	t.Run("calls ValidatePrivileges before Revoke and FlushPrivileges after", func(t *testing.T) {
+		mock := testutil.NewMockAdapter()
+
+		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
+		svc := NewGrantServiceWithAdapter(mock, cfg)
+
+		opts := ApplyGrantServiceOptions{
+			Username: "testuser",
+			Spec: &dbopsv1alpha1.DatabaseGrantSpec{
+				Postgres: &dbopsv1alpha1.PostgresGrantConfig{
+					Grants: []dbopsv1alpha1.PostgresGrant{
+						{
+							Database:   "testdb",
+							Privileges: []string{"SELECT"},
+						},
+					},
+				},
+			},
+		}
+
+		result, err := svc.Revoke(context.Background(), opts)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		methods := mock.GetCalledMethods()
+		assert.Equal(t, 1, mock.GetCallCount("ValidatePrivileges"))
+		assert.Equal(t, 1, mock.GetCallCount("Revoke"))
+		assert.Equal(t, 1, mock.GetCallCount("FlushPrivileges"))
+
+		var validateIdx, revokeIdx, flushIdx int
+		for i, m := range methods {
+			switch m {
+			case "ValidatePrivileges":
+				validateIdx = i
+			case "Revoke":
+				revokeIdx = i
+			case "FlushPrivileges":
+				flushIdx = i
+			}
+		}
+		assert.Less(t, validateIdx, revokeIdx, "ValidatePrivileges must precede Revoke")
+		assert.Less(t, revokeIdx, flushIdx, "Revoke must precede FlushPrivileges")
+	})
+
+	t.Run("ValidatePrivileges error blocks Revoke from executing", func(t *testing.T) {
+		mock := testutil.NewMockAdapter()
+		mock.ValidatePrivilegesFunc = func(ctx context.Context, privileges []string) error {
+			return errors.New("invalid privilege")
+		}
+
+		cfg := &Config{Engine: "clickhouse", Host: "localhost", Port: 9000}
+		svc := NewGrantServiceWithAdapter(mock, cfg)
+
+		opts := ApplyGrantServiceOptions{
+			Username: "testuser",
+			Spec: &dbopsv1alpha1.DatabaseGrantSpec{
+				ClickHouse: &dbopsv1alpha1.ClickHouseGrantConfig{
+					Grants: []dbopsv1alpha1.ClickHouseGrant{
+						{
+							Database:   "testdb",
+							Privileges: []string{"BAD_PRIV"},
+						},
+					},
+				},
+			},
+		}
+
+		_, err := svc.Revoke(context.Background(), opts)
+		require.Error(t, err)
+
+		assert.Equal(t, 0, mock.GetCallCount("Revoke"))
+		assert.Equal(t, 0, mock.GetCallCount("FlushPrivileges"))
+	})
+
+	t.Run("FlushPrivileges error is best-effort and doesnt fail Revoke", func(t *testing.T) {
+		mock := testutil.NewMockAdapter()
+		mock.FlushPrivilegesFunc = func(ctx context.Context) error {
+			return errors.New("flush failed")
+		}
+
+		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
+		svc := NewGrantServiceWithAdapter(mock, cfg)
+
+		opts := ApplyGrantServiceOptions{
+			Username: "testuser",
+			Spec: &dbopsv1alpha1.DatabaseGrantSpec{
+				Postgres: &dbopsv1alpha1.PostgresGrantConfig{
+					Grants: []dbopsv1alpha1.PostgresGrant{
+						{
+							Database:   "testdb",
+							Privileges: []string{"SELECT"},
+						},
+					},
+				},
+			},
+		}
+
+		result, err := svc.Revoke(context.Background(), opts)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+	})
+}

@@ -247,7 +247,15 @@ func (s *UserService) Delete(ctx context.Context, username string) (*Result, err
 		return NewSuccessResult(fmt.Sprintf("User '%s' does not exist", username)), nil
 	}
 
-	// Drop the user
+	// Cleanup before dropping — best-effort, errors logged but don't block deletion
+	if err := s.adapter.RevokeDatabaseGrants(ctx, username); err != nil {
+		op.Warn("failed to revoke database grants (best-effort)", "error", err)
+	}
+	if err := s.adapter.ReassignOwnedObjects(ctx, username); err != nil {
+		op.Warn("failed to reassign owned objects (best-effort)", "error", err)
+	}
+
+	// Drop the user (atomic)
 	if err := s.adapter.DropUser(ctx, username); err != nil {
 		op.Error(err, "failed to drop user")
 		return nil, s.wrapError(ctx, s.config, "delete", username, err)

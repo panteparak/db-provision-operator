@@ -78,6 +78,12 @@ func (ol *operationLogger) Info(msg string, keysAndValues ...interface{}) {
 	ol.log.Info(msg, keysAndValues...)
 }
 
+// Warn logs a warning-level message.
+// Use this for best-effort operations that failed but don't block the overall flow.
+func (ol *operationLogger) Warn(msg string, keysAndValues ...interface{}) {
+	ol.log.Info("WARN: "+msg, keysAndValues...)
+}
+
 // WithValues returns a new operationLogger with additional key-value pairs.
 func (ol *operationLogger) WithValues(keysAndValues ...interface{}) *operationLogger {
 	return &operationLogger{

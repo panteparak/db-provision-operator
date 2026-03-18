@@ -248,11 +248,16 @@ func (s *DatabaseService) Delete(ctx context.Context, name string, force bool) (
 		return NewSuccessResult(fmt.Sprintf("Database '%s' does not exist", name)), nil
 	}
 
-	// Drop the database
-	opts := types.DropDatabaseOptions{
+	// Terminate connections before dropping — best-effort
+	if err := s.adapter.TerminateDatabaseConnections(ctx, name); err != nil {
+		op.Warn("failed to terminate connections (best-effort)", "error", err)
+	}
+
+	// Drop the database (atomic)
+	dropOpts := types.DropDatabaseOptions{
 		Force: force,
 	}
-	if err := s.adapter.DropDatabase(ctx, name, opts); err != nil {
+	if err := s.adapter.DropDatabase(ctx, name, dropOpts); err != nil {
 		op.Error(err, "failed to drop database")
 		return nil, s.wrapError(ctx, s.config, "delete", name, err)
 	}

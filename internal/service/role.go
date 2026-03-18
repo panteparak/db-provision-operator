@@ -194,7 +194,15 @@ func (s *RoleService) Delete(ctx context.Context, roleName string) (*Result, err
 		return NewSuccessResult(fmt.Sprintf("Role '%s' does not exist", roleName)), nil
 	}
 
-	// Drop the role
+	// Cleanup before dropping — best-effort, errors logged but don't block deletion
+	if err := s.adapter.RevokeDatabaseGrants(ctx, roleName); err != nil {
+		op.Warn("failed to revoke database grants (best-effort)", "error", err)
+	}
+	if err := s.adapter.ReassignOwnedObjects(ctx, roleName); err != nil {
+		op.Warn("failed to reassign owned objects (best-effort)", "error", err)
+	}
+
+	// Drop the role (atomic)
 	if err := s.adapter.DropRole(ctx, roleName); err != nil {
 		op.Error(err, "failed to drop role")
 		return nil, s.wrapError(ctx, s.config, "delete", roleName, err)

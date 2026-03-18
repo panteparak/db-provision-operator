@@ -705,3 +705,82 @@ func TestRoleService_CallTracking(t *testing.T) {
 		assert.True(t, mock.WasCalledWith("CreateRole", "testrole"))
 	})
 }
+
+func TestRoleService_Delete_Orchestration(t *testing.T) {
+	t.Run("calls RevokeDatabaseGrants then ReassignOwnedObjects then DropRole", func(t *testing.T) {
+		mock := testutil.NewMockAdapter()
+		mock.RoleExistsFunc = func(ctx context.Context, roleName string) (bool, error) {
+			return true, nil
+		}
+
+		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
+		svc := NewRoleServiceWithAdapter(mock, cfg)
+
+		result, err := svc.Delete(context.Background(), "testrole")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.Success)
+
+		// Verify call ordering: cleanup before drop
+		methods := mock.GetCalledMethods()
+		assert.Equal(t, 1, mock.GetCallCount("RevokeDatabaseGrants"))
+		assert.Equal(t, 1, mock.GetCallCount("ReassignOwnedObjects"))
+		assert.Equal(t, 1, mock.GetCallCount("DropRole"))
+
+		var revokeIdx, reassignIdx, dropIdx int
+		for i, m := range methods {
+			switch m {
+			case "RevokeDatabaseGrants":
+				revokeIdx = i
+			case "ReassignOwnedObjects":
+				reassignIdx = i
+			case "DropRole":
+				dropIdx = i
+			}
+		}
+		assert.Less(t, revokeIdx, reassignIdx, "RevokeDatabaseGrants must precede ReassignOwnedObjects")
+		assert.Less(t, reassignIdx, dropIdx, "ReassignOwnedObjects must precede DropRole")
+	})
+
+	t.Run("cleanup errors are best-effort and dont block deletion", func(t *testing.T) {
+		mock := testutil.NewMockAdapter()
+		mock.RoleExistsFunc = func(ctx context.Context, roleName string) (bool, error) {
+			return true, nil
+		}
+		mock.RevokeDatabaseGrantsFunc = func(ctx context.Context, name string) error {
+			return errors.New("revoke grants failed")
+		}
+		mock.ReassignOwnedObjectsFunc = func(ctx context.Context, name string) error {
+			return errors.New("reassign failed")
+		}
+
+		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
+		svc := NewRoleServiceWithAdapter(mock, cfg)
+
+		result, err := svc.Delete(context.Background(), "testrole")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.Success)
+
+		// DropRole still called despite cleanup errors
+		assert.Equal(t, 1, mock.GetCallCount("DropRole"))
+	})
+
+	t.Run("role not found skips cleanup and drop", func(t *testing.T) {
+		mock := testutil.NewMockAdapter()
+		mock.RoleExistsFunc = func(ctx context.Context, roleName string) (bool, error) {
+			return false, nil
+		}
+
+		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
+		svc := NewRoleServiceWithAdapter(mock, cfg)
+
+		result, err := svc.Delete(context.Background(), "testrole")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		assert.Equal(t, 0, mock.GetCallCount("RevokeDatabaseGrants"))
+		assert.Equal(t, 0, mock.GetCallCount("ReassignOwnedObjects"))
+		assert.Equal(t, 0, mock.GetCallCount("DropRole"))
+	})
+}

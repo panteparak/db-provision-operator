@@ -819,3 +819,74 @@ func TestDatabaseService_CallTracking(t *testing.T) {
 		assert.True(t, mock.WasCalledWith("VerifyDatabaseAccess", "testdb"))
 	})
 }
+
+func TestDatabaseService_Delete_Orchestration(t *testing.T) {
+	t.Run("calls TerminateDatabaseConnections then DropDatabase", func(t *testing.T) {
+		mock := testutil.NewMockAdapter()
+		mock.DatabaseExistsFunc = func(ctx context.Context, name string) (bool, error) {
+			return true, nil
+		}
+
+		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
+		svc := NewDatabaseServiceWithAdapter(mock, cfg)
+
+		result, err := svc.Delete(context.Background(), "testdb", false)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.Success)
+
+		// Verify call ordering
+		methods := mock.GetCalledMethods()
+		assert.Equal(t, 1, mock.GetCallCount("TerminateDatabaseConnections"))
+		assert.Equal(t, 1, mock.GetCallCount("DropDatabase"))
+
+		var terminateIdx, dropIdx int
+		for i, m := range methods {
+			switch m {
+			case "TerminateDatabaseConnections":
+				terminateIdx = i
+			case "DropDatabase":
+				dropIdx = i
+			}
+		}
+		assert.Less(t, terminateIdx, dropIdx, "TerminateDatabaseConnections must precede DropDatabase")
+	})
+
+	t.Run("terminate error is best-effort and doesnt block deletion", func(t *testing.T) {
+		mock := testutil.NewMockAdapter()
+		mock.DatabaseExistsFunc = func(ctx context.Context, name string) (bool, error) {
+			return true, nil
+		}
+		mock.TerminateDatabaseConnectionsFunc = func(ctx context.Context, name string) error {
+			return errors.New("terminate failed")
+		}
+
+		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
+		svc := NewDatabaseServiceWithAdapter(mock, cfg)
+
+		result, err := svc.Delete(context.Background(), "testdb", false)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.Success)
+
+		// DropDatabase still called despite terminate error
+		assert.Equal(t, 1, mock.GetCallCount("DropDatabase"))
+	})
+
+	t.Run("database not found skips terminate and drop", func(t *testing.T) {
+		mock := testutil.NewMockAdapter()
+		mock.DatabaseExistsFunc = func(ctx context.Context, name string) (bool, error) {
+			return false, nil
+		}
+
+		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
+		svc := NewDatabaseServiceWithAdapter(mock, cfg)
+
+		result, err := svc.Delete(context.Background(), "testdb", false)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		assert.Equal(t, 0, mock.GetCallCount("TerminateDatabaseConnections"))
+		assert.Equal(t, 0, mock.GetCallCount("DropDatabase"))
+	})
+}

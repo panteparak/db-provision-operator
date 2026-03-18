@@ -858,3 +858,83 @@ func TestUserService_CallTracking(t *testing.T) {
 		assert.True(t, mock.WasCalledWith("CreateUser", "testuser"))
 	})
 }
+
+func TestUserService_Delete_Orchestration(t *testing.T) {
+	t.Run("calls RevokeDatabaseGrants then ReassignOwnedObjects then DropUser", func(t *testing.T) {
+		mock := testutil.NewMockAdapter()
+		mock.UserExistsFunc = func(ctx context.Context, username string) (bool, error) {
+			return true, nil
+		}
+
+		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
+		svc := NewUserServiceWithAdapter(mock, cfg)
+
+		result, err := svc.Delete(context.Background(), "testuser")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.Success)
+
+		// Verify call ordering: cleanup before drop
+		methods := mock.GetCalledMethods()
+		assert.Equal(t, 1, mock.GetCallCount("RevokeDatabaseGrants"))
+		assert.Equal(t, 1, mock.GetCallCount("ReassignOwnedObjects"))
+		assert.Equal(t, 1, mock.GetCallCount("DropUser"))
+
+		// Find positions to verify ordering
+		var revokeIdx, reassignIdx, dropIdx int
+		for i, m := range methods {
+			switch m {
+			case "RevokeDatabaseGrants":
+				revokeIdx = i
+			case "ReassignOwnedObjects":
+				reassignIdx = i
+			case "DropUser":
+				dropIdx = i
+			}
+		}
+		assert.Less(t, revokeIdx, reassignIdx, "RevokeDatabaseGrants must precede ReassignOwnedObjects")
+		assert.Less(t, reassignIdx, dropIdx, "ReassignOwnedObjects must precede DropUser")
+	})
+
+	t.Run("cleanup errors are best-effort and dont block deletion", func(t *testing.T) {
+		mock := testutil.NewMockAdapter()
+		mock.UserExistsFunc = func(ctx context.Context, username string) (bool, error) {
+			return true, nil
+		}
+		mock.RevokeDatabaseGrantsFunc = func(ctx context.Context, name string) error {
+			return errors.New("revoke grants failed")
+		}
+		mock.ReassignOwnedObjectsFunc = func(ctx context.Context, name string) error {
+			return errors.New("reassign failed")
+		}
+
+		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
+		svc := NewUserServiceWithAdapter(mock, cfg)
+
+		result, err := svc.Delete(context.Background(), "testuser")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.Success)
+
+		// DropUser still called despite cleanup errors
+		assert.Equal(t, 1, mock.GetCallCount("DropUser"))
+	})
+
+	t.Run("user not found skips cleanup and drop", func(t *testing.T) {
+		mock := testutil.NewMockAdapter()
+		mock.UserExistsFunc = func(ctx context.Context, username string) (bool, error) {
+			return false, nil
+		}
+
+		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
+		svc := NewUserServiceWithAdapter(mock, cfg)
+
+		result, err := svc.Delete(context.Background(), "testuser")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		assert.Equal(t, 0, mock.GetCallCount("RevokeDatabaseGrants"))
+		assert.Equal(t, 0, mock.GetCallCount("ReassignOwnedObjects"))
+		assert.Equal(t, 0, mock.GetCallCount("DropUser"))
+	})
+}
