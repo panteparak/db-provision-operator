@@ -44,6 +44,9 @@ The database owner (role name). If not specified, the database is owned by the c
 !!! tip "Role-based ownership for credential rotation"
     When using [password rotation](users.md#password-rotation) with the `role-inheritance` strategy, set `owner` to the **service role** (not a specific user). The service role persists across rotations while individual login users are created and retired. This prevents ownership from pointing to a deleted user.
 
+!!! info "Owner reconciliation"
+    When `owner` differs from the database's current PostgreSQL owner, the operator runs `ALTER DATABASE <name> OWNER TO <owner>` on the next reconcile. This covers databases that were created out-of-band (e.g., by Vault's init or a prior install) and databases whose `spec.owner` was added after creation. Because `schema public` in PostgreSQL 15+ is owned by the pseudo-role `pg_database_owner`, transferring ownership also gives the new owner `CREATE` on `public` transitively — no separate `GRANT` is required for the common case.
+
 #### Bidirectional Default Privileges
 
 When `postgres.ownership.setDefaultPrivileges` is enabled (the default), the operator sets **bidirectional** `ALTER DEFAULT PRIVILEGES`:
@@ -392,22 +395,6 @@ The full deletion flow for a Database:
     - **Snapshot**: Backup is created, database is dropped, CR is deleted
 5. **Force-delete and external failures**: If the database drop fails and force-delete is set, the operator continues with finalizer removal anyway (the external database is left as-is).
 
-### Active Connections
-
-The operator automatically terminates active database connections before dropping a database.
-This prevents the common `"database is being accessed by other users"` error that occurs
-when running `DROP DATABASE` directly.
-
-| Engine | Method |
-|--------|--------|
-| PostgreSQL | `pg_terminate_backend()` for all sessions |
-| CockroachDB | `DROP DATABASE ... CASCADE` handles connections |
-| MySQL | `KILL` for all sessions via `information_schema.processlist` |
-| ClickHouse | `DROP DATABASE` succeeds regardless of connections |
-
-Applications connected to the database will lose their connections immediately.
-If graceful draining is important, scale down application pods before deleting the Database CR.
-
 ### Updates
 
 Most fields are immutable after creation. Supported updates:
@@ -434,7 +421,7 @@ Most fields are immutable after creation. Supported updates:
 ### Cannot delete database
 
 - Check if `deletionProtection` is enabled
-- The operator automatically terminates active connections before dropping — see [Active Connections](#active-connections)
+- Verify no active connections to the database
 - For PostgreSQL, ensure no other databases depend on it
 
 ### Init SQL failed with Continue policy

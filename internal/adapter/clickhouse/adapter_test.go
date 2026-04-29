@@ -950,71 +950,34 @@ func TestDBRequiringOps_WhenNotConnected_ReturnError(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// ValidatePrivileges — extracted from Grant/Revoke so the service layer
-// can validate before calling the adapter.
+// Grant privilege validation (no DB required — fails on invalid priv before
+// attempting any connection)
 // ---------------------------------------------------------------------------
 
-func TestValidatePrivileges_RejectsInvalidPrivileges(t *testing.T) {
-	a := NewAdapter(types.ConnectionConfig{})
-	ctx := context.Background()
-
-	err := a.ValidatePrivileges(ctx, []string{"SELECT", "INVALID_PRIV"})
-	if err == nil {
-		t.Error("expected error for invalid privilege, got nil")
-	}
-	if !strings.Contains(err.Error(), "INVALID_PRIV") {
-		t.Errorf("error %q should mention the invalid privilege", err.Error())
-	}
-}
-
-func TestValidatePrivileges_AcceptsValidPrivileges(t *testing.T) {
-	a := NewAdapter(types.ConnectionConfig{})
-	ctx := context.Background()
-
-	err := a.ValidatePrivileges(ctx, []string{"SELECT", "INSERT", "CREATE TABLE"})
-	if err != nil {
-		t.Errorf("expected no error for valid privileges, got: %v", err)
-	}
-}
-
-func TestValidatePrivileges_EmptyList(t *testing.T) {
-	a := NewAdapter(types.ConnectionConfig{})
-	ctx := context.Background()
-
-	err := a.ValidatePrivileges(ctx, []string{})
-	if err == nil {
-		t.Error("expected error for empty privilege list, got nil")
-	}
-}
-
-func TestFlushPrivileges_NoOp(t *testing.T) {
-	a := NewAdapter(types.ConnectionConfig{})
-	ctx := context.Background()
-
-	err := a.FlushPrivileges(ctx)
-	if err != nil {
-		t.Errorf("expected FlushPrivileges to be a no-op, got: %v", err)
-	}
-}
-
-func TestGrant_NotConnected_ReturnsError(t *testing.T) {
+func TestGrant_InvalidPrivilege_ReturnsErrorBeforeConnecting(t *testing.T) {
 	a := NewAdapter(types.ConnectionConfig{})
 	ctx := context.Background()
 
 	err := a.Grant(ctx, "testuser", []types.GrantOptions{
-		{Level: "global", Privileges: []string{"SELECT"}},
+		{Level: "global", Privileges: []string{"INVALID_PRIV"}},
 	})
-	assertNotConnectedError(t, err)
+
+	if err == nil {
+		t.Error("expected error for invalid privilege, got nil")
+	}
 }
 
-func TestRevoke_NotConnected_ReturnsError(t *testing.T) {
+func TestRevoke_InvalidPrivilege_ReturnsErrorBeforeConnecting(t *testing.T) {
 	a := NewAdapter(types.ConnectionConfig{})
 	ctx := context.Background()
 
 	err := a.Revoke(ctx, "testuser", []types.GrantOptions{
-		{Level: "global", Privileges: []string{"SELECT"}},
+		{Level: "global", Privileges: []string{"INVALID_PRIV"}},
 	})
-	assertNotConnectedError(t, err)
+
+	if err == nil {
+		t.Error("expected error for invalid privilege, got nil")
+	}
 }
 
 // ---------------------------------------------------------------------------

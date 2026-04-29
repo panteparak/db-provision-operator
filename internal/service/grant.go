@@ -74,112 +74,17 @@ func (s *GrantService) Apply(ctx context.Context, opts ApplyGrantServiceOptions)
 
 	op := s.startOp("Apply", opts.Username)
 
-	// Apply operation timeout
 	ctx, cancel := s.config.Timeouts.WithOperationTimeout(ctx)
 	defer cancel()
 
-	result := &GrantResult{
-		AppliedRoles: []string{},
+	strategy, err := s.strategyFor(s.config.GetEngineType())
+	if err != nil {
+		return nil, err
 	}
 
-	// Validate privileges before granting
-	allPrivs := extractPrivilegesFromSpec(opts.Spec, s.config.GetEngineType())
-	if len(allPrivs) > 0 {
-		if err := s.adapter.ValidatePrivileges(ctx, allPrivs); err != nil {
-			return nil, s.wrapError(ctx, s.config, "validate privileges", opts.Username, err)
-		}
-	}
-
-	switch s.config.GetEngineType() {
-	case dbopsv1alpha1.EngineTypePostgres, dbopsv1alpha1.EngineTypeCockroachDB:
-		// CockroachDB uses PostgreSQL wire protocol and the same grant syntax
-		if opts.Spec.Postgres != nil {
-			// Grant roles
-			if len(opts.Spec.Postgres.Roles) > 0 {
-				op.Debug("granting roles", "roles", opts.Spec.Postgres.Roles)
-				if err := s.adapter.GrantRole(ctx, opts.Username, opts.Spec.Postgres.Roles); err != nil {
-					op.Error(err, "failed to grant roles")
-					return nil, s.wrapError(ctx, s.config, "grant roles", opts.Username, err)
-				}
-				result.AppliedRoles = append(result.AppliedRoles, opts.Spec.Postgres.Roles...)
-			}
-
-			// Apply direct grants
-			if len(opts.Spec.Postgres.Grants) > 0 {
-				op.Debug("applying direct grants", "count", len(opts.Spec.Postgres.Grants))
-				grantOpts := s.buildPostgresGrantOptions(opts.Spec.Postgres.Grants)
-				if err := s.adapter.Grant(ctx, opts.Username, grantOpts); err != nil {
-					op.Error(err, "failed to apply grants")
-					return nil, s.wrapError(ctx, s.config, "apply grants", opts.Username, err)
-				}
-				result.AppliedDirectGrants = len(opts.Spec.Postgres.Grants)
-			}
-
-			// Apply default privileges (Note: CockroachDB has limited default privilege support)
-			if len(opts.Spec.Postgres.DefaultPrivileges) > 0 {
-				op.Debug("setting default privileges", "count", len(opts.Spec.Postgres.DefaultPrivileges))
-				defPrivOpts := s.buildDefaultPrivilegeOptions(opts.Spec.Postgres.DefaultPrivileges)
-				if err := s.adapter.SetDefaultPrivileges(ctx, opts.Username, defPrivOpts); err != nil {
-					op.Error(err, "failed to set default privileges")
-					return nil, s.wrapError(ctx, s.config, "set default privileges", opts.Username, err)
-				}
-				result.AppliedDefaultPrivileges = len(opts.Spec.Postgres.DefaultPrivileges)
-			}
-		}
-
-	case dbopsv1alpha1.EngineTypeMySQL, dbopsv1alpha1.EngineTypeMariaDB:
-		// MariaDB uses the same MySQL wire protocol and grant syntax
-		if opts.Spec.MySQL != nil {
-			// Grant roles
-			if len(opts.Spec.MySQL.Roles) > 0 {
-				op.Debug("granting roles", "roles", opts.Spec.MySQL.Roles)
-				if err := s.adapter.GrantRole(ctx, opts.Username, opts.Spec.MySQL.Roles); err != nil {
-					op.Error(err, "failed to grant roles")
-					return nil, s.wrapError(ctx, s.config, "grant roles", opts.Username, err)
-				}
-				result.AppliedRoles = append(result.AppliedRoles, opts.Spec.MySQL.Roles...)
-			}
-
-			// Apply direct grants
-			if len(opts.Spec.MySQL.Grants) > 0 {
-				op.Debug("applying direct grants", "count", len(opts.Spec.MySQL.Grants))
-				grantOpts := s.buildMySQLGrantOptions(opts.Spec.MySQL.Grants)
-				if err := s.adapter.Grant(ctx, opts.Username, grantOpts); err != nil {
-					op.Error(err, "failed to apply grants")
-					return nil, s.wrapError(ctx, s.config, "apply grants", opts.Username, err)
-				}
-				result.AppliedDirectGrants = len(opts.Spec.MySQL.Grants)
-			}
-		}
-
-	case dbopsv1alpha1.EngineTypeClickHouse:
-		if opts.Spec.ClickHouse != nil {
-			// Grant roles
-			if len(opts.Spec.ClickHouse.Roles) > 0 {
-				op.Debug("granting roles", "roles", opts.Spec.ClickHouse.Roles)
-				if err := s.adapter.GrantRole(ctx, opts.Username, opts.Spec.ClickHouse.Roles); err != nil {
-					op.Error(err, "failed to grant roles")
-					return nil, s.wrapError(ctx, s.config, "grant roles", opts.Username, err)
-				}
-				result.AppliedRoles = append(result.AppliedRoles, opts.Spec.ClickHouse.Roles...)
-			}
-
-			// Apply direct grants
-			if len(opts.Spec.ClickHouse.Grants) > 0 {
-				op.Debug("applying direct grants", "count", len(opts.Spec.ClickHouse.Grants))
-				grantOpts := s.buildClickHouseGrantOptions(opts.Spec.ClickHouse.Grants)
-				if err := s.adapter.Grant(ctx, opts.Username, grantOpts); err != nil {
-					op.Error(err, "failed to apply grants")
-					return nil, s.wrapError(ctx, s.config, "apply grants", opts.Username, err)
-				}
-				result.AppliedDirectGrants = len(opts.Spec.ClickHouse.Grants)
-			}
-		}
-	}
-
-	// Flush privileges after granting (best-effort)
-	if err := s.adapter.FlushPrivileges(ctx); err != nil {
-		op.Warn("failed to flush privileges (best-effort)", "error", err)
+	result, err := strategy.apply(ctx, opts.Username, opts.Spec, op)
+	if err != nil {
+		return nil, err
 	}
 
 	op.Success("grants applied successfully")
@@ -198,99 +103,17 @@ func (s *GrantService) Revoke(ctx context.Context, opts ApplyGrantServiceOptions
 
 	op := s.startOp("Revoke", opts.Username)
 
-	// Apply operation timeout
 	ctx, cancel := s.config.Timeouts.WithOperationTimeout(ctx)
 	defer cancel()
 
-	var revokedCount int
-
-	// Validate privileges before revoking
-	allPrivs := extractPrivilegesFromSpec(opts.Spec, s.config.GetEngineType())
-	if len(allPrivs) > 0 {
-		if err := s.adapter.ValidatePrivileges(ctx, allPrivs); err != nil {
-			return nil, s.wrapError(ctx, s.config, "validate privileges", opts.Username, err)
-		}
+	strategy, err := s.strategyFor(s.config.GetEngineType())
+	if err != nil {
+		return nil, err
 	}
 
-	switch s.config.GetEngineType() {
-	case dbopsv1alpha1.EngineTypePostgres, dbopsv1alpha1.EngineTypeCockroachDB:
-		// CockroachDB uses PostgreSQL wire protocol and the same grant syntax
-		if opts.Spec.Postgres != nil {
-			// Revoke roles
-			if len(opts.Spec.Postgres.Roles) > 0 {
-				op.Debug("revoking roles", "roles", opts.Spec.Postgres.Roles)
-				if err := s.adapter.RevokeRole(ctx, opts.Username, opts.Spec.Postgres.Roles); err != nil {
-					op.Error(err, "failed to revoke roles")
-					return nil, s.wrapError(ctx, s.config, "revoke roles", opts.Username, err)
-				}
-				revokedCount += len(opts.Spec.Postgres.Roles)
-			}
-
-			// Revoke direct grants
-			if len(opts.Spec.Postgres.Grants) > 0 {
-				op.Debug("revoking direct grants", "count", len(opts.Spec.Postgres.Grants))
-				grantOpts := s.buildPostgresGrantOptions(opts.Spec.Postgres.Grants)
-				if err := s.adapter.Revoke(ctx, opts.Username, grantOpts); err != nil {
-					op.Error(err, "failed to revoke grants")
-					return nil, s.wrapError(ctx, s.config, "revoke grants", opts.Username, err)
-				}
-				revokedCount += len(opts.Spec.Postgres.Grants)
-			}
-		}
-
-	case dbopsv1alpha1.EngineTypeMySQL, dbopsv1alpha1.EngineTypeMariaDB:
-		// MariaDB uses the same MySQL wire protocol and grant syntax
-		if opts.Spec.MySQL != nil {
-			// Revoke roles
-			if len(opts.Spec.MySQL.Roles) > 0 {
-				op.Debug("revoking roles", "roles", opts.Spec.MySQL.Roles)
-				if err := s.adapter.RevokeRole(ctx, opts.Username, opts.Spec.MySQL.Roles); err != nil {
-					op.Error(err, "failed to revoke roles")
-					return nil, s.wrapError(ctx, s.config, "revoke roles", opts.Username, err)
-				}
-				revokedCount += len(opts.Spec.MySQL.Roles)
-			}
-
-			// Revoke direct grants
-			if len(opts.Spec.MySQL.Grants) > 0 {
-				op.Debug("revoking direct grants", "count", len(opts.Spec.MySQL.Grants))
-				grantOpts := s.buildMySQLGrantOptions(opts.Spec.MySQL.Grants)
-				if err := s.adapter.Revoke(ctx, opts.Username, grantOpts); err != nil {
-					op.Error(err, "failed to revoke grants")
-					return nil, s.wrapError(ctx, s.config, "revoke grants", opts.Username, err)
-				}
-				revokedCount += len(opts.Spec.MySQL.Grants)
-			}
-		}
-
-	case dbopsv1alpha1.EngineTypeClickHouse:
-		if opts.Spec.ClickHouse != nil {
-			// Revoke roles
-			if len(opts.Spec.ClickHouse.Roles) > 0 {
-				op.Debug("revoking roles", "roles", opts.Spec.ClickHouse.Roles)
-				if err := s.adapter.RevokeRole(ctx, opts.Username, opts.Spec.ClickHouse.Roles); err != nil {
-					op.Error(err, "failed to revoke roles")
-					return nil, s.wrapError(ctx, s.config, "revoke roles", opts.Username, err)
-				}
-				revokedCount += len(opts.Spec.ClickHouse.Roles)
-			}
-
-			// Revoke direct grants
-			if len(opts.Spec.ClickHouse.Grants) > 0 {
-				op.Debug("revoking direct grants", "count", len(opts.Spec.ClickHouse.Grants))
-				grantOpts := s.buildClickHouseGrantOptions(opts.Spec.ClickHouse.Grants)
-				if err := s.adapter.Revoke(ctx, opts.Username, grantOpts); err != nil {
-					op.Error(err, "failed to revoke grants")
-					return nil, s.wrapError(ctx, s.config, "revoke grants", opts.Username, err)
-				}
-				revokedCount += len(opts.Spec.ClickHouse.Grants)
-			}
-		}
-	}
-
-	// Flush privileges after revoking (best-effort)
-	if err := s.adapter.FlushPrivileges(ctx); err != nil {
-		op.Warn("failed to flush privileges (best-effort)", "error", err)
+	revokedCount, err := strategy.revoke(ctx, opts.Username, opts.Spec, op)
+	if err != nil {
+		return nil, err
 	}
 
 	op.Success("grants revoked successfully")
@@ -367,98 +190,4 @@ func (s *GrantService) GetGrants(ctx context.Context, grantee string) ([]types.G
 
 	op.Success("retrieved grants")
 	return grants, nil
-}
-
-// buildPostgresGrantOptions converts PostgresGrant specs to adapter GrantOptions.
-// This logic was extracted from databasegrant_controller.go
-func (s *GrantService) buildPostgresGrantOptions(grants []dbopsv1alpha1.PostgresGrant) []types.GrantOptions {
-	opts := make([]types.GrantOptions, 0, len(grants))
-	for _, g := range grants {
-		opts = append(opts, types.GrantOptions{
-			Database:        g.Database,
-			Schema:          g.Schema,
-			Tables:          g.Tables,
-			Sequences:       g.Sequences,
-			Functions:       g.Functions,
-			Privileges:      g.Privileges,
-			WithGrantOption: g.WithGrantOption,
-		})
-	}
-	return opts
-}
-
-// buildMySQLGrantOptions converts MySQLGrant specs to adapter GrantOptions.
-// This logic was extracted from databasegrant_controller.go
-func (s *GrantService) buildMySQLGrantOptions(grants []dbopsv1alpha1.MySQLGrant) []types.GrantOptions {
-	opts := make([]types.GrantOptions, 0, len(grants))
-	for _, g := range grants {
-		opts = append(opts, types.GrantOptions{
-			Level:           string(g.Level),
-			Database:        g.Database,
-			Table:           g.Table,
-			Columns:         g.Columns,
-			Procedure:       g.Procedure,
-			Function:        g.Function,
-			Privileges:      g.Privileges,
-			WithGrantOption: g.WithGrantOption,
-		})
-	}
-	return opts
-}
-
-// buildClickHouseGrantOptions converts ClickHouseGrant specs to adapter GrantOptions.
-func (s *GrantService) buildClickHouseGrantOptions(grants []dbopsv1alpha1.ClickHouseGrant) []types.GrantOptions {
-	opts := make([]types.GrantOptions, 0, len(grants))
-	for _, g := range grants {
-		opts = append(opts, types.GrantOptions{
-			Level:           string(g.Level),
-			Database:        g.Database,
-			Table:           g.Table,
-			Privileges:      g.Privileges,
-			WithGrantOption: g.WithGrantOption,
-		})
-	}
-	return opts
-}
-
-// extractPrivilegesFromSpec collects all privilege strings from engine-specific grants in the spec.
-func extractPrivilegesFromSpec(spec *dbopsv1alpha1.DatabaseGrantSpec, engine dbopsv1alpha1.EngineType) []string {
-	var privs []string
-	switch engine {
-	case dbopsv1alpha1.EngineTypePostgres, dbopsv1alpha1.EngineTypeCockroachDB:
-		if spec.Postgres != nil {
-			for _, g := range spec.Postgres.Grants {
-				privs = append(privs, g.Privileges...)
-			}
-		}
-	case dbopsv1alpha1.EngineTypeMySQL, dbopsv1alpha1.EngineTypeMariaDB:
-		if spec.MySQL != nil {
-			for _, g := range spec.MySQL.Grants {
-				privs = append(privs, g.Privileges...)
-			}
-		}
-	case dbopsv1alpha1.EngineTypeClickHouse:
-		if spec.ClickHouse != nil {
-			for _, g := range spec.ClickHouse.Grants {
-				privs = append(privs, g.Privileges...)
-			}
-		}
-	}
-	return privs
-}
-
-// buildDefaultPrivilegeOptions converts PostgresDefaultPrivilegeGrant specs to adapter options.
-// This logic was extracted from databasegrant_controller.go
-func (s *GrantService) buildDefaultPrivilegeOptions(defPrivs []dbopsv1alpha1.PostgresDefaultPrivilegeGrant) []types.DefaultPrivilegeGrantOptions {
-	opts := make([]types.DefaultPrivilegeGrantOptions, 0, len(defPrivs))
-	for _, dp := range defPrivs {
-		opts = append(opts, types.DefaultPrivilegeGrantOptions{
-			Database:   dp.Database,
-			Schema:     dp.Schema,
-			GrantedBy:  dp.GrantedBy,
-			ObjectType: dp.ObjectType,
-			Privileges: dp.Privileges,
-		})
-	}
-	return opts
 }

@@ -69,25 +69,24 @@ func (s *Service) DetectDatabaseDrift(ctx context.Context, spec *dbopsv1alpha1.D
 func (s *Service) detectPostgresDatabaseDrift(spec *dbopsv1alpha1.DatabaseSpec, info *types.DatabaseInfo, result *Result) {
 	pgSpec := spec.Postgres
 
-	// Owner comparison
+	// Owner comparison. ALTER DATABASE ... OWNER TO is reversible and does not
+	// drop data, so owner drift is classified as non-destructive.
 	if pgSpec.Ownership != nil && pgSpec.Ownership.AutoOwnership {
 		// With auto-ownership, the expected owner is the derived role
 		expectedRole := deriveOwnershipRoleName(pgSpec.Ownership, spec.Name)
 		if info.Owner != expectedRole {
 			result.AddDiff(Diff{
-				Field:       "owner",
-				Expected:    expectedRole,
-				Actual:      info.Owner,
-				Destructive: true,
+				Field:    "owner",
+				Expected: expectedRole,
+				Actual:   info.Owner,
 			})
 		}
 	} else if spec.Owner != "" && info.Owner != spec.Owner {
 		// Explicit owner set in spec
 		result.AddDiff(Diff{
-			Field:       "owner",
-			Expected:    spec.Owner,
-			Actual:      info.Owner,
-			Destructive: true,
+			Field:    "owner",
+			Expected: spec.Owner,
+			Actual:   info.Owner,
 		})
 	}
 

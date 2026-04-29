@@ -214,6 +214,24 @@ func (s *DatabaseService) Update(ctx context.Context, name string, spec *dbopsv1
 	opts := s.specBuilder.BuildDatabaseUpdateOptions(spec)
 	op.Debug("updating database", "extensions", len(opts.Extensions), "schemas", len(opts.Schemas))
 
+	// Reconcile database owner non-destructively. ALTER DATABASE ... OWNER TO is
+	// reversible and does not drop data; it is safe to apply on every reconcile.
+	// No-op on engines without database ownership (MySQL, ClickHouse).
+	if opts.Owner != "" {
+		info, err := s.adapter.GetDatabaseInfo(ctx, name)
+		if err != nil {
+			op.Error(err, "failed to get database info for owner reconciliation")
+			return nil, s.wrapError(ctx, s.config, "get info", name, err)
+		}
+		if info.Owner != opts.Owner {
+			op.Debug("transferring database ownership", "from", info.Owner, "to", opts.Owner)
+			if err := s.adapter.TransferDatabaseOwnership(ctx, name, opts.Owner); err != nil {
+				op.Error(err, "failed to transfer ownership")
+				return nil, s.wrapError(ctx, s.config, "transfer ownership", name, err)
+			}
+		}
+	}
+
 	// Update the database
 	if err := s.adapter.UpdateDatabase(ctx, name, opts); err != nil {
 		op.Error(err, "failed to update database")
@@ -248,16 +266,11 @@ func (s *DatabaseService) Delete(ctx context.Context, name string, force bool) (
 		return NewSuccessResult(fmt.Sprintf("Database '%s' does not exist", name)), nil
 	}
 
-	// Terminate connections before dropping — best-effort
-	if err := s.adapter.TerminateDatabaseConnections(ctx, name); err != nil {
-		op.Warn("failed to terminate connections (best-effort)", "error", err)
-	}
-
-	// Drop the database (atomic)
-	dropOpts := types.DropDatabaseOptions{
+	// Drop the database
+	opts := types.DropDatabaseOptions{
 		Force: force,
 	}
-	if err := s.adapter.DropDatabase(ctx, name, dropOpts); err != nil {
+	if err := s.adapter.DropDatabase(ctx, name, opts); err != nil {
 		op.Error(err, "failed to drop database")
 		return nil, s.wrapError(ctx, s.config, "delete", name, err)
 	}
@@ -299,118 +312,27 @@ func (s *DatabaseService) Exists(ctx context.Context, name string) (bool, error)
 //
 // Auto-defaults schema ownership: schemas without an explicit owner use the derived role.
 func (s *DatabaseService) CreateWithOwnership(ctx context.Context, spec *dbopsv1alpha1.DatabaseSpec) (*Result, *OwnershipResult, error) {
-	if spec == nil {
-		return nil, nil, &ValidationError{Field: "spec", Message: "spec is required"}
-	}
-	if !HasAutoOwnership(spec) {
-		return nil, nil, &ValidationError{Field: "ownership", Message: "autoOwnership is not enabled"}
+	if err := validateOwnershipCreate(spec); err != nil {
+		return nil, nil, err
 	}
 
-	ownershipCfg := spec.Postgres.Ownership
-	roleName := DeriveRoleName(ownershipCfg, spec.Name)
-	userName := DeriveUserName(ownershipCfg, spec.Name)
-
-	// Auto-default schema ownership: schemas without explicit owner get the derived role
-	for i := range spec.Postgres.Schemas {
-		if spec.Postgres.Schemas[i].Owner == "" {
-			spec.Postgres.Schemas[i].Owner = roleName
-		}
-	}
-
-	// Override the spec owner so CreateDatabase sets OWNER correctly
-	spec.Owner = roleName
-
-	ownerSvc := NewOwnershipService(s.ResourceService)
-
-	// Collect schema names for default privileges
-	var schemaNames []string
-	for _, schema := range spec.Postgres.Schemas {
-		schemaNames = append(schemaNames, schema.Name)
-	}
-
-	// Apply operation timeout
 	ctx, cancel := s.config.Timeouts.WithOperationTimeout(ctx)
 	defer cancel()
 
-	var createResult *Result
+	plan := newOwnershipProvisionPlan(s, spec)
+	return plan.run(ctx)
+}
 
-	pipeline := &ProvisionPipeline{
-		Steps: []ProvisionStep{
-			{
-				Name: "create-owner-role",
-				Execute: func(ctx context.Context) error {
-					return ownerSvc.EnsureOwnerRole(ctx, roleName)
-				},
-			},
-			{
-				Name: "create-database",
-				Execute: func(ctx context.Context) error {
-					result, err := s.CreateOnly(ctx, spec)
-					if err != nil {
-						return err
-					}
-					createResult = result
-					return nil
-				},
-			},
-			{
-				Name: "verify-access",
-				Execute: func(ctx context.Context) error {
-					return s.adapter.VerifyDatabaseAccess(ctx, spec.Name)
-				},
-			},
-			{
-				Name: "transfer-ownership",
-				Execute: func(ctx context.Context) error {
-					return ownerSvc.TransferOwnership(ctx, spec.Name, roleName)
-				},
-			},
-			{
-				Name: "create-app-user",
-				Execute: func(ctx context.Context) error {
-					return ownerSvc.EnsureOwnerUser(ctx, userName, roleName)
-				},
-			},
-		},
+// validateOwnershipCreate enforces preconditions for CreateWithOwnership:
+// the spec must be present and auto-ownership must be enabled.
+func validateOwnershipCreate(spec *dbopsv1alpha1.DatabaseSpec) error {
+	if spec == nil {
+		return &ValidationError{Field: "spec", Message: "spec is required"}
 	}
-
-	// Add default privileges step if enabled
-	if ownershipCfg.ShouldSetDefaultPrivileges() {
-		pipeline.Steps = append(pipeline.Steps, ProvisionStep{
-			Name: "set-default-privileges",
-			Execute: func(ctx context.Context) error {
-				return ownerSvc.SetDefaultPrivileges(ctx, spec.Name, roleName, userName, schemaNames)
-			},
-		})
+	if !HasAutoOwnership(spec) {
+		return &ValidationError{Field: "ownership", Message: "autoOwnership is not enabled"}
 	}
-
-	// Add update step (extensions, schemas, default privileges from spec)
-	pipeline.Steps = append(pipeline.Steps, ProvisionStep{
-		Name: "update-database",
-		Execute: func(ctx context.Context) error {
-			opts := s.specBuilder.BuildDatabaseUpdateOptions(spec)
-			if len(opts.Extensions) == 0 && len(opts.Schemas) == 0 && len(opts.DefaultPrivileges) == 0 {
-				return nil
-			}
-			return s.adapter.UpdateDatabase(ctx, spec.Name, opts)
-		},
-	})
-
-	_, err := pipeline.Run(ctx, s.ResourceService)
-	if err != nil {
-		return createResult, nil, err
-	}
-
-	if createResult == nil {
-		createResult = NewCreatedResult(fmt.Sprintf("Database '%s' created with ownership", spec.Name))
-	}
-
-	ownershipResult := &OwnershipResult{
-		RoleName: roleName,
-		UserName: userName,
-	}
-
-	return createResult, ownershipResult, nil
+	return nil
 }
 
 // DeleteOwnershipResources drops auto-created role and user during database deletion.

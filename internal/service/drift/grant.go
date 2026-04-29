@@ -405,84 +405,101 @@ func (s *Service) applyGrantCorrection(ctx context.Context, spec *dbopsv1alpha1.
 func (s *Service) applyMissingGrants(ctx context.Context, spec *dbopsv1alpha1.DatabaseGrantSpec, grantee string, diff Diff) error {
 	privileges := strings.Split(diff.Expected, ", ")
 
-	// For PostgreSQL grants
 	if spec.Postgres != nil {
-		for _, grant := range spec.Postgres.Grants {
-			// Check if this grant matches the diff
-			for _, table := range grant.Tables {
-				if strings.Contains(diff.Field, table) {
-					opts := []types.GrantOptions{{
-						Database:   grant.Database,
-						Schema:     grant.Schema,
-						Tables:     []string{table},
-						Privileges: privileges,
-					}}
-					return s.adapter.Grant(ctx, grantee, opts)
-				}
-			}
-			for _, seq := range grant.Sequences {
-				if strings.Contains(diff.Field, seq) {
-					opts := []types.GrantOptions{{
-						Database:   grant.Database,
-						Schema:     grant.Schema,
-						Sequences:  []string{seq},
-						Privileges: privileges,
-					}}
-					return s.adapter.Grant(ctx, grantee, opts)
-				}
-			}
-			for _, fn := range grant.Functions {
-				if strings.Contains(diff.Field, fn) {
-					opts := []types.GrantOptions{{
-						Database:   grant.Database,
-						Schema:     grant.Schema,
-						Functions:  []string{fn},
-						Privileges: privileges,
-					}}
-					return s.adapter.Grant(ctx, grantee, opts)
-				}
-			}
+		if found, err := s.applyMissingPostgresGrant(ctx, grantee, spec.Postgres.Grants, diff, privileges); found {
+			return err
 		}
 	}
-
-	// For MySQL grants
 	if spec.MySQL != nil {
-		for _, grant := range spec.MySQL.Grants {
-			tableName := grant.Table
-			if tableName == "" {
-				tableName = "*"
-			}
-			if strings.Contains(diff.Field, tableName) || strings.Contains(diff.Field, grant.Database) {
-				opts := []types.GrantOptions{{
-					Database:   grant.Database,
-					Table:      tableName,
-					Privileges: privileges,
-				}}
-				return s.adapter.Grant(ctx, grantee, opts)
-			}
+		if found, err := s.applyMissingMySQLGrant(ctx, grantee, spec.MySQL.Grants, diff, privileges); found {
+			return err
 		}
 	}
-
-	// For ClickHouse grants
 	if spec.ClickHouse != nil {
-		for _, grant := range spec.ClickHouse.Grants {
-			tableName := grant.Table
-			if tableName == "" {
-				tableName = "*"
-			}
-			if strings.Contains(diff.Field, tableName) || strings.Contains(diff.Field, grant.Database) {
-				opts := []types.GrantOptions{{
-					Level:      string(grant.Level),
-					Database:   grant.Database,
-					Table:      tableName,
-					Privileges: privileges,
-				}}
-				return s.adapter.Grant(ctx, grantee, opts)
-			}
+		if found, err := s.applyMissingClickHouseGrant(ctx, grantee, spec.ClickHouse.Grants, diff, privileges); found {
+			return err
 		}
 	}
 
 	return fmt.Errorf("could not find matching grant for field: %s", diff.Field)
+}
+
+// applyMissingPostgresGrant scans the spec for a grant whose target
+// (table/sequence/function) appears in diff.Field and applies it. Returns
+// (true, err) when a match was attempted; (false, nil) when nothing matched.
+func (s *Service) applyMissingPostgresGrant(ctx context.Context, grantee string, grants []dbopsv1alpha1.PostgresGrant, diff Diff, privileges []string) (bool, error) {
+	for _, grant := range grants {
+		for _, table := range grant.Tables {
+			if strings.Contains(diff.Field, table) {
+				return true, s.adapter.Grant(ctx, grantee, []types.GrantOptions{{
+					Database:   grant.Database,
+					Schema:     grant.Schema,
+					Tables:     []string{table},
+					Privileges: privileges,
+				}})
+			}
+		}
+		for _, seq := range grant.Sequences {
+			if strings.Contains(diff.Field, seq) {
+				return true, s.adapter.Grant(ctx, grantee, []types.GrantOptions{{
+					Database:   grant.Database,
+					Schema:     grant.Schema,
+					Sequences:  []string{seq},
+					Privileges: privileges,
+				}})
+			}
+		}
+		for _, fn := range grant.Functions {
+			if strings.Contains(diff.Field, fn) {
+				return true, s.adapter.Grant(ctx, grantee, []types.GrantOptions{{
+					Database:   grant.Database,
+					Schema:     grant.Schema,
+					Functions:  []string{fn},
+					Privileges: privileges,
+				}})
+			}
+		}
+	}
+	return false, nil
+}
+
+// applyMissingMySQLGrant scans the spec for a MySQL grant whose database or
+// table appears in diff.Field and applies it.
+func (s *Service) applyMissingMySQLGrant(ctx context.Context, grantee string, grants []dbopsv1alpha1.MySQLGrant, diff Diff, privileges []string) (bool, error) {
+	for _, grant := range grants {
+		tableName := grant.Table
+		if tableName == "" {
+			tableName = "*"
+		}
+		if strings.Contains(diff.Field, tableName) || strings.Contains(diff.Field, grant.Database) {
+			return true, s.adapter.Grant(ctx, grantee, []types.GrantOptions{{
+				Database:   grant.Database,
+				Table:      tableName,
+				Privileges: privileges,
+			}})
+		}
+	}
+	return false, nil
+}
+
+// applyMissingClickHouseGrant scans the spec for a ClickHouse grant whose
+// database or table appears in diff.Field and applies it.
+func (s *Service) applyMissingClickHouseGrant(ctx context.Context, grantee string, grants []dbopsv1alpha1.ClickHouseGrant, diff Diff, privileges []string) (bool, error) {
+	for _, grant := range grants {
+		tableName := grant.Table
+		if tableName == "" {
+			tableName = "*"
+		}
+		if strings.Contains(diff.Field, tableName) || strings.Contains(diff.Field, grant.Database) {
+			return true, s.adapter.Grant(ctx, grantee, []types.GrantOptions{{
+				Level:      string(grant.Level),
+				Database:   grant.Database,
+				Table:      tableName,
+				Privileges: privileges,
+			}})
+		}
+	}
+	return false, nil
 }
 
 // revokeExtraGrants revokes extra grant privileges.

@@ -508,7 +508,8 @@ func TestDetectDatabaseDrift_AutoOwnershipDrift(t *testing.T) {
 	assert.Equal(t, "owner", result.Diffs[0].Field)
 	assert.Equal(t, "db_testdb_owner", result.Diffs[0].Expected)
 	assert.Equal(t, "postgres", result.Diffs[0].Actual)
-	assert.True(t, result.Diffs[0].Destructive)
+	assert.False(t, result.Diffs[0].Destructive,
+		"owner drift is non-destructive; ALTER DATABASE ... OWNER TO is reversible")
 }
 
 func TestDetectDatabaseDrift_AutoOwnershipNoDrift(t *testing.T) {
@@ -589,6 +590,36 @@ func TestDetectDatabaseDrift_ExplicitOwnerDrift(t *testing.T) {
 	require.True(t, result.HasDrift())
 	assert.Equal(t, "owner", result.Diffs[0].Field)
 	assert.Equal(t, "app_owner", result.Diffs[0].Expected)
+	assert.False(t, result.Diffs[0].Destructive,
+		"owner drift is non-destructive; ALTER DATABASE ... OWNER TO is reversible")
+}
+
+func TestCorrectDatabaseDrift_OwnerTransferWithoutAllowDestructive(t *testing.T) {
+	// Owner drift is now non-destructive; correction runs under default config.
+	var transferredDB, transferredOwner string
+	adapter := testutil.NewMockAdapter()
+	adapter.TransferDatabaseOwnershipFunc = func(ctx context.Context, dbName, newOwner string) error {
+		transferredDB = dbName
+		transferredOwner = newOwner
+		return nil
+	}
+
+	svc := newTestService(adapter, false) // AllowDestructive = false
+	spec := newTestDatabaseSpec("testdb")
+
+	driftResult := NewResult("database", "testdb")
+	driftResult.AddDiff(Diff{
+		Field:    "owner",
+		Expected: "new_owner",
+		Actual:   "postgres",
+	})
+
+	corrResult, err := svc.CorrectDatabaseDrift(context.Background(), spec, driftResult)
+	require.NoError(t, err)
+	require.Len(t, corrResult.Corrected, 1)
+	assert.Equal(t, "testdb", transferredDB)
+	assert.Equal(t, "new_owner", transferredOwner)
+	assert.Empty(t, corrResult.Skipped)
 }
 
 func TestCorrectDatabaseDrift_OwnerTransfer(t *testing.T) {

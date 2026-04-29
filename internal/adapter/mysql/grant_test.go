@@ -72,6 +72,7 @@ var _ = Describe("Grant Operations", func() {
 
 			mock.ExpectExec(`GRANT SELECT, INSERT, UPDATE ON \*\.\* TO 'testuser'`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
+			testutil.ExpectFlushPrivileges(mock)
 
 			err := adapter.Grant(ctx, "testuser", opts)
 			Expect(err).NotTo(HaveOccurred())
@@ -89,6 +90,7 @@ var _ = Describe("Grant Operations", func() {
 
 			mock.ExpectExec("GRANT SELECT, INSERT ON `mydb`.\\* TO 'testuser'").
 				WillReturnResult(sqlmock.NewResult(0, 0))
+			testutil.ExpectFlushPrivileges(mock)
 
 			err := adapter.Grant(ctx, "testuser", opts)
 			Expect(err).NotTo(HaveOccurred())
@@ -107,6 +109,7 @@ var _ = Describe("Grant Operations", func() {
 
 			mock.ExpectExec("GRANT SELECT, UPDATE ON `mydb`.`users` TO 'testuser'").
 				WillReturnResult(sqlmock.NewResult(0, 0))
+			testutil.ExpectFlushPrivileges(mock)
 
 			err := adapter.Grant(ctx, "testuser", opts)
 			Expect(err).NotTo(HaveOccurred())
@@ -126,6 +129,7 @@ var _ = Describe("Grant Operations", func() {
 
 			mock.ExpectExec("GRANT SELECT \\(`name`, `email`\\) ON `mydb`.`users` TO 'testuser'").
 				WillReturnResult(sqlmock.NewResult(0, 0))
+			testutil.ExpectFlushPrivileges(mock)
 
 			err := adapter.Grant(ctx, "testuser", opts)
 			Expect(err).NotTo(HaveOccurred())
@@ -144,6 +148,7 @@ var _ = Describe("Grant Operations", func() {
 
 			mock.ExpectExec("GRANT EXECUTE ON PROCEDURE `mydb`.`my_proc` TO 'testuser'").
 				WillReturnResult(sqlmock.NewResult(0, 0))
+			testutil.ExpectFlushPrivileges(mock)
 
 			err := adapter.Grant(ctx, "testuser", opts)
 			Expect(err).NotTo(HaveOccurred())
@@ -161,6 +166,25 @@ var _ = Describe("Grant Operations", func() {
 			}
 
 			mock.ExpectExec("GRANT SELECT ON `mydb`.\\* TO 'testuser' WITH GRANT OPTION").
+				WillReturnResult(sqlmock.NewResult(0, 0))
+			testutil.ExpectFlushPrivileges(mock)
+
+			err := adapter.Grant(ctx, "testuser", opts)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(mock.ExpectationsWereMet()).NotTo(HaveOccurred())
+		})
+
+		It("flushes privileges", func() {
+			opts := []types.GrantOptions{
+				{
+					Level:      "global",
+					Privileges: []string{"SELECT"},
+				},
+			}
+
+			mock.ExpectExec(`GRANT SELECT ON \*\.\* TO 'testuser'`).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+			mock.ExpectExec(`FLUSH PRIVILEGES`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
 
 			err := adapter.Grant(ctx, "testuser", opts)
@@ -213,6 +237,7 @@ var _ = Describe("Grant Operations", func() {
 
 			mock.ExpectExec(`REVOKE SELECT, INSERT ON \*\.\* FROM 'testuser'`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
+			testutil.ExpectFlushPrivileges(mock)
 
 			err := adapter.Revoke(ctx, "testuser", opts)
 			Expect(err).NotTo(HaveOccurred())
@@ -230,6 +255,7 @@ var _ = Describe("Grant Operations", func() {
 
 			mock.ExpectExec("REVOKE DELETE ON `mydb`.\\* FROM 'testuser'").
 				WillReturnResult(sqlmock.NewResult(0, 0))
+			testutil.ExpectFlushPrivileges(mock)
 
 			err := adapter.Revoke(ctx, "testuser", opts)
 			Expect(err).NotTo(HaveOccurred())
@@ -248,12 +274,30 @@ var _ = Describe("Grant Operations", func() {
 
 			mock.ExpectExec("REVOKE UPDATE, DELETE ON `mydb`.`orders` FROM 'testuser'").
 				WillReturnResult(sqlmock.NewResult(0, 0))
+			testutil.ExpectFlushPrivileges(mock)
 
 			err := adapter.Revoke(ctx, "testuser", opts)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(mock.ExpectationsWereMet()).NotTo(HaveOccurred())
 		})
 
+		It("flushes privileges", func() {
+			opts := []types.GrantOptions{
+				{
+					Level:      "global",
+					Privileges: []string{"SELECT"},
+				},
+			}
+
+			mock.ExpectExec(`REVOKE SELECT ON \*\.\* FROM 'testuser'`).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+			mock.ExpectExec(`FLUSH PRIVILEGES`).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+
+			err := adapter.Revoke(ctx, "testuser", opts)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(mock.ExpectationsWereMet()).NotTo(HaveOccurred())
+		})
 	})
 
 	Describe("GrantRole", func() {
@@ -709,26 +753,22 @@ var _ = Describe("Grant Operations", func() {
 			Expect(err.Error()).To(ContainSubstring("failed to grant privileges"))
 		})
 
-		It("returns error on multiple grant options when one fails", func() {
+		It("returns error on flush privileges failure", func() {
 			opts := []types.GrantOptions{
 				{
 					Level:      "global",
 					Privileges: []string{"SELECT"},
 				},
-				{
-					Level:      "global",
-					Privileges: []string{"INSERT"},
-				},
 			}
 
 			mock.ExpectExec(`GRANT SELECT ON \*\.\* TO 'testuser'`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
-			mock.ExpectExec(`GRANT INSERT ON \*\.\* TO 'testuser'`).
-				WillReturnError(errors.New("access denied"))
+			mock.ExpectExec(`FLUSH PRIVILEGES`).
+				WillReturnError(errors.New("flush failed"))
 
 			err := adapter.Grant(ctx, "testuser", opts)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("failed to grant privileges"))
+			Expect(err.Error()).To(ContainSubstring("failed to flush privileges"))
 		})
 	})
 
@@ -816,65 +856,6 @@ var _ = Describe("Grant Operations", func() {
 			err := adapter.RevokeRole(ctx, "testuser", []string{"admin"})
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to revoke role"))
-		})
-	})
-
-	Describe("FlushPrivileges", func() {
-		BeforeEach(func() {
-			adapter = NewAdapter(types.ConnectionConfig{
-				Host:     "localhost",
-				Port:     3306,
-				Database: "testdb",
-				Username: "root",
-				Password: "password",
-			})
-			adapter.db = mockDB
-		})
-
-		It("should execute FLUSH PRIVILEGES", func() {
-			mock.ExpectExec(`FLUSH PRIVILEGES`).WillReturnResult(sqlmock.NewResult(0, 0))
-			err := adapter.FlushPrivileges(ctx)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		It("returns error on flush privileges failure", func() {
-			mock.ExpectExec(`FLUSH PRIVILEGES`).
-				WillReturnError(errors.New("flush failed"))
-
-			err := adapter.FlushPrivileges(ctx)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("failed to flush privileges"))
-		})
-
-		It("returns error when not connected", func() {
-			disconnectedAdapter := NewAdapter(types.ConnectionConfig{
-				Host:     "localhost",
-				Port:     3306,
-				Database: "testdb",
-				Username: "root",
-				Password: "password",
-			})
-
-			err := disconnectedAdapter.FlushPrivileges(ctx)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("not connected"))
-		})
-	})
-
-	Describe("ValidatePrivileges", func() {
-		BeforeEach(func() {
-			adapter = NewAdapter(types.ConnectionConfig{
-				Host:     "localhost",
-				Port:     3306,
-				Database: "testdb",
-				Username: "root",
-				Password: "password",
-			})
-		})
-
-		It("should return nil (MySQL validates at execution time)", func() {
-			err := adapter.ValidatePrivileges(ctx, []string{"SELECT", "INSERT"})
-			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 })

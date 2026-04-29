@@ -101,18 +101,6 @@ func (a *Adapter) SetDefaultPrivileges(ctx context.Context, grantee string, opts
 	return nil
 }
 
-// FlushPrivileges is a no-op for CockroachDB.
-// CockroachDB applies privilege changes immediately.
-func (a *Adapter) FlushPrivileges(_ context.Context) error {
-	return nil
-}
-
-// ValidatePrivileges is a no-op for CockroachDB.
-// CockroachDB validates privileges at execution time.
-func (a *Adapter) ValidatePrivileges(_ context.Context, _ []string) error {
-	return nil
-}
-
 // GetGrants retrieves grants for a user or role in CockroachDB.
 // Queries each database for grants to the specified grantee.
 func (a *Adapter) GetGrants(ctx context.Context, grantee string) ([]types.GrantInfo, error) {
@@ -179,107 +167,20 @@ func (a *Adapter) GetGrants(ctx context.Context, grantee string) ([]types.GrantI
 
 // grantPrivileges grants privileges for a single grant option.
 func (a *Adapter) grantPrivileges(ctx context.Context, grantee string, opt types.GrantOptions) error {
-	pool, err := a.getPool()
-	if err != nil {
-		return err
-	}
-
 	database := opt.Database
 	if database == "" {
 		database = a.config.Database
 	}
 
-	var queries []string
-
-	// Handle database-level grants when no schema/table/sequence/function is specified
-	if opt.Schema == "" && len(opt.Tables) == 0 && len(opt.Sequences) == 0 && len(opt.Functions) == 0 && len(opt.Privileges) > 0 {
-		b := sqlbuilder.NewPg().Grant(opt.Privileges...).OnDatabase(database).To(grantee)
-		if opt.WithGrantOption {
-			b.WithGrantOption()
-		}
-		q, buildErr := b.Build()
-		if buildErr != nil {
-			return fmt.Errorf("failed to build grant query: %w", buildErr)
-		}
-		// Database-level grants are executed on the default database
-		if _, err := pool.Exec(ctx, q); err != nil {
-			return fmt.Errorf("failed to grant database privileges: %w", err)
-		}
-		return nil
+	if isDatabaseLevelGrant(opt) {
+		return a.executeDatabaseLevelGrant(ctx, grantee, opt, database)
 	}
 
-	// Handle ALL TABLES IN SCHEMA or schema-level grants
-	if opt.Schema != "" && len(opt.Tables) == 0 && len(opt.Sequences) == 0 && len(opt.Functions) == 0 {
-		hasTablePrivs := false
-		for _, p := range opt.Privileges {
-			upper := strings.ToUpper(p)
-			if upper == "SELECT" || upper == "INSERT" || upper == "UPDATE" || upper == "DELETE" ||
-				upper == "TRUNCATE" || upper == "REFERENCES" || upper == "TRIGGER" || upper == "ALL" {
-				hasTablePrivs = true
-				break
-			}
-		}
-
-		if hasTablePrivs {
-			b := sqlbuilder.NewPg().Grant(opt.Privileges...).OnAllTablesInSchema(opt.Schema).To(grantee)
-			if opt.WithGrantOption {
-				b.WithGrantOption()
-			}
-			q, buildErr := b.Build()
-			if buildErr != nil {
-				return fmt.Errorf("failed to build grant query: %w", buildErr)
-			}
-			queries = append(queries, q)
-		}
-
-		// Schema usage grant
-		q, buildErr := sqlbuilder.NewPg().Grant("USAGE").OnSchema(opt.Schema).To(grantee).Build()
-		if buildErr != nil {
-			return fmt.Errorf("failed to build schema usage grant: %w", buildErr)
-		}
-		queries = append(queries, q)
+	queries, err := buildObjectGrantQueries(grantee, opt)
+	if err != nil {
+		return err
 	}
 
-	// Specific tables
-	for _, table := range opt.Tables {
-		b := sqlbuilder.NewPg().Grant(opt.Privileges...).OnTable(opt.Schema, table).To(grantee)
-		if opt.WithGrantOption {
-			b.WithGrantOption()
-		}
-		q, buildErr := b.Build()
-		if buildErr != nil {
-			return fmt.Errorf("failed to build grant query: %w", buildErr)
-		}
-		queries = append(queries, q)
-	}
-
-	// Specific sequences
-	for _, seq := range opt.Sequences {
-		b := sqlbuilder.NewPg().Grant(opt.Privileges...).OnSequence(opt.Schema, seq).To(grantee)
-		if opt.WithGrantOption {
-			b.WithGrantOption()
-		}
-		q, buildErr := b.Build()
-		if buildErr != nil {
-			return fmt.Errorf("failed to build grant query: %w", buildErr)
-		}
-		queries = append(queries, q)
-	}
-
-	// Specific functions
-	for _, fn := range opt.Functions {
-		b := sqlbuilder.NewPg().Grant(opt.Privileges...).OnFunction(opt.Schema, fn).To(grantee)
-		if opt.WithGrantOption {
-			b.WithGrantOption()
-		}
-		q, buildErr := b.Build()
-		if buildErr != nil {
-			return fmt.Errorf("failed to build grant query: %w", buildErr)
-		}
-		queries = append(queries, q)
-	}
-
-	// Execute all queries
 	for _, query := range queries {
 		if err := a.execWithNewConnection(ctx, database, query); err != nil {
 			return fmt.Errorf("failed to execute grant: %w", err)
@@ -287,6 +188,114 @@ func (a *Adapter) grantPrivileges(ctx context.Context, grantee string, opt types
 	}
 
 	return nil
+}
+
+// isDatabaseLevelGrant returns true when the option targets the database itself
+// (no schema, tables, sequences, or functions specified) and has privileges.
+func isDatabaseLevelGrant(opt types.GrantOptions) bool {
+	return opt.Schema == "" &&
+		len(opt.Tables) == 0 &&
+		len(opt.Sequences) == 0 &&
+		len(opt.Functions) == 0 &&
+		len(opt.Privileges) > 0
+}
+
+// executeDatabaseLevelGrant runs a GRANT ... ON DATABASE statement directly on
+// the pool (not via execWithNewConnection) because database-level grants don't
+// require switching to the target database.
+func (a *Adapter) executeDatabaseLevelGrant(ctx context.Context, grantee string, opt types.GrantOptions, database string) error {
+	pool, err := a.getPool()
+	if err != nil {
+		return err
+	}
+
+	q, err := buildGrantQuery(
+		sqlbuilder.NewPg().Grant(opt.Privileges...).OnDatabase(database).To(grantee),
+		opt.WithGrantOption,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to build grant query: %w", err)
+	}
+
+	if _, err := pool.Exec(ctx, q); err != nil {
+		return fmt.Errorf("failed to grant database privileges: %w", err)
+	}
+	return nil
+}
+
+// buildObjectGrantQueries assembles GRANT statements for schema-level,
+// all-tables-in-schema, and specific-object targets.
+func buildObjectGrantQueries(grantee string, opt types.GrantOptions) ([]string, error) {
+	var queries []string
+
+	if opt.Schema != "" && len(opt.Tables) == 0 && len(opt.Sequences) == 0 && len(opt.Functions) == 0 {
+		schemaQueries, err := buildSchemaScopedGrants(grantee, opt)
+		if err != nil {
+			return nil, err
+		}
+		queries = append(queries, schemaQueries...)
+	}
+
+	for _, table := range opt.Tables {
+		q, err := buildGrantQuery(
+			sqlbuilder.NewPg().Grant(opt.Privileges...).OnTable(opt.Schema, table).To(grantee),
+			opt.WithGrantOption,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build grant query: %w", err)
+		}
+		queries = append(queries, q)
+	}
+
+	for _, seq := range opt.Sequences {
+		q, err := buildGrantQuery(
+			sqlbuilder.NewPg().Grant(opt.Privileges...).OnSequence(opt.Schema, seq).To(grantee),
+			opt.WithGrantOption,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build grant query: %w", err)
+		}
+		queries = append(queries, q)
+	}
+
+	for _, fn := range opt.Functions {
+		q, err := buildGrantQuery(
+			sqlbuilder.NewPg().Grant(opt.Privileges...).OnFunction(opt.Schema, fn).To(grantee),
+			opt.WithGrantOption,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build grant query: %w", err)
+		}
+		queries = append(queries, q)
+	}
+
+	return queries, nil
+}
+
+// buildSchemaScopedGrants assembles GRANT statements for a schema-only option:
+// optional ALL TABLES IN SCHEMA grant when table-level privileges are requested,
+// plus the USAGE grant on the schema itself.
+func buildSchemaScopedGrants(grantee string, opt types.GrantOptions) ([]string, error) {
+	var queries []string
+
+	if hasTablePrivilege(opt.Privileges) {
+		q, err := buildGrantQuery(
+			sqlbuilder.NewPg().Grant(opt.Privileges...).OnAllTablesInSchema(opt.Schema).To(grantee),
+			opt.WithGrantOption,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build grant query: %w", err)
+		}
+		queries = append(queries, q)
+	}
+
+	q, err := sqlbuilder.NewPg().Grant("USAGE").OnSchema(opt.Schema).To(grantee).Build()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build schema usage grant: %w", err)
+	}
+	queries = append(queries, q)
+
+	return queries, nil
 }
 
 // revokePrivileges revokes privileges for a single grant option.

@@ -443,6 +443,112 @@ func TestDatabaseService_Update(t *testing.T) {
 	}
 }
 
+func TestDatabaseService_Update_OwnerReconciliation(t *testing.T) {
+	t.Run("transfers ownership when current differs from spec.Owner", func(t *testing.T) {
+		mock := testutil.NewMockAdapter()
+		mock.DatabaseExistsFunc = func(ctx context.Context, name string) (bool, error) {
+			return true, nil
+		}
+		mock.GetDatabaseInfoFunc = func(ctx context.Context, name string) (*types.DatabaseInfo, error) {
+			return &types.DatabaseInfo{Name: name, Owner: "postgres"}, nil
+		}
+
+		spec := &dbopsv1alpha1.DatabaseSpec{
+			Name:     "testdb",
+			Owner:    "vault",
+			Postgres: &dbopsv1alpha1.PostgresDatabaseConfig{},
+		}
+
+		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
+		svc := NewDatabaseServiceWithAdapter(mock, cfg)
+
+		_, err := svc.Update(context.Background(), "testdb", spec)
+		require.NoError(t, err)
+
+		assert.True(t, mock.WasCalledWith("TransferDatabaseOwnership", "testdb", "vault"),
+			"expected TransferDatabaseOwnership to be called with (testdb, vault)")
+		assert.Equal(t, 1, mock.GetCallCount("TransferDatabaseOwnership"))
+		assert.Equal(t, 1, mock.GetCallCount("UpdateDatabase"))
+	})
+
+	t.Run("skips ownership transfer when owner matches", func(t *testing.T) {
+		mock := testutil.NewMockAdapter()
+		mock.DatabaseExistsFunc = func(ctx context.Context, name string) (bool, error) {
+			return true, nil
+		}
+		mock.GetDatabaseInfoFunc = func(ctx context.Context, name string) (*types.DatabaseInfo, error) {
+			return &types.DatabaseInfo{Name: name, Owner: "vault"}, nil
+		}
+
+		spec := &dbopsv1alpha1.DatabaseSpec{
+			Name:     "testdb",
+			Owner:    "vault",
+			Postgres: &dbopsv1alpha1.PostgresDatabaseConfig{},
+		}
+
+		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
+		svc := NewDatabaseServiceWithAdapter(mock, cfg)
+
+		_, err := svc.Update(context.Background(), "testdb", spec)
+		require.NoError(t, err)
+
+		assert.Equal(t, 0, mock.GetCallCount("TransferDatabaseOwnership"),
+			"expected TransferDatabaseOwnership NOT to be called when owner matches")
+		assert.Equal(t, 1, mock.GetCallCount("UpdateDatabase"))
+	})
+
+	t.Run("skips ownership reconciliation when spec.Owner empty", func(t *testing.T) {
+		mock := testutil.NewMockAdapter()
+		mock.DatabaseExistsFunc = func(ctx context.Context, name string) (bool, error) {
+			return true, nil
+		}
+
+		spec := &dbopsv1alpha1.DatabaseSpec{
+			Name:     "testdb",
+			Postgres: &dbopsv1alpha1.PostgresDatabaseConfig{},
+		}
+
+		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
+		svc := NewDatabaseServiceWithAdapter(mock, cfg)
+
+		_, err := svc.Update(context.Background(), "testdb", spec)
+		require.NoError(t, err)
+
+		assert.Equal(t, 0, mock.GetCallCount("TransferDatabaseOwnership"))
+		assert.Equal(t, 0, mock.GetCallCount("GetDatabaseInfo"),
+			"expected GetDatabaseInfo NOT to be called when spec.Owner is empty")
+		assert.Equal(t, 1, mock.GetCallCount("UpdateDatabase"))
+	})
+
+	t.Run("ownership transfer error aborts update", func(t *testing.T) {
+		mock := testutil.NewMockAdapter()
+		mock.DatabaseExistsFunc = func(ctx context.Context, name string) (bool, error) {
+			return true, nil
+		}
+		mock.GetDatabaseInfoFunc = func(ctx context.Context, name string) (*types.DatabaseInfo, error) {
+			return &types.DatabaseInfo{Name: name, Owner: "postgres"}, nil
+		}
+		mock.TransferDatabaseOwnershipFunc = func(ctx context.Context, dbName, newOwner string) error {
+			return errors.New("permission denied")
+		}
+
+		spec := &dbopsv1alpha1.DatabaseSpec{
+			Name:     "testdb",
+			Owner:    "vault",
+			Postgres: &dbopsv1alpha1.PostgresDatabaseConfig{},
+		}
+
+		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
+		svc := NewDatabaseServiceWithAdapter(mock, cfg)
+
+		_, err := svc.Update(context.Background(), "testdb", spec)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "permission denied")
+		assert.Equal(t, 0, mock.GetCallCount("UpdateDatabase"),
+			"UpdateDatabase must not run after ownership transfer failure")
+	})
+}
+
 func TestDatabaseService_Delete(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -817,76 +923,5 @@ func TestDatabaseService_CallTracking(t *testing.T) {
 		assert.True(t, mock.WasCalledWith("DatabaseExists", "testdb"))
 		assert.True(t, mock.WasCalledWith("CreateDatabase", "testdb"))
 		assert.True(t, mock.WasCalledWith("VerifyDatabaseAccess", "testdb"))
-	})
-}
-
-func TestDatabaseService_Delete_Orchestration(t *testing.T) {
-	t.Run("calls TerminateDatabaseConnections then DropDatabase", func(t *testing.T) {
-		mock := testutil.NewMockAdapter()
-		mock.DatabaseExistsFunc = func(ctx context.Context, name string) (bool, error) {
-			return true, nil
-		}
-
-		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
-		svc := NewDatabaseServiceWithAdapter(mock, cfg)
-
-		result, err := svc.Delete(context.Background(), "testdb", false)
-		require.NoError(t, err)
-		require.NotNil(t, result)
-		assert.True(t, result.Success)
-
-		// Verify call ordering
-		methods := mock.GetCalledMethods()
-		assert.Equal(t, 1, mock.GetCallCount("TerminateDatabaseConnections"))
-		assert.Equal(t, 1, mock.GetCallCount("DropDatabase"))
-
-		var terminateIdx, dropIdx int
-		for i, m := range methods {
-			switch m {
-			case "TerminateDatabaseConnections":
-				terminateIdx = i
-			case "DropDatabase":
-				dropIdx = i
-			}
-		}
-		assert.Less(t, terminateIdx, dropIdx, "TerminateDatabaseConnections must precede DropDatabase")
-	})
-
-	t.Run("terminate error is best-effort and doesnt block deletion", func(t *testing.T) {
-		mock := testutil.NewMockAdapter()
-		mock.DatabaseExistsFunc = func(ctx context.Context, name string) (bool, error) {
-			return true, nil
-		}
-		mock.TerminateDatabaseConnectionsFunc = func(ctx context.Context, name string) error {
-			return errors.New("terminate failed")
-		}
-
-		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
-		svc := NewDatabaseServiceWithAdapter(mock, cfg)
-
-		result, err := svc.Delete(context.Background(), "testdb", false)
-		require.NoError(t, err)
-		require.NotNil(t, result)
-		assert.True(t, result.Success)
-
-		// DropDatabase still called despite terminate error
-		assert.Equal(t, 1, mock.GetCallCount("DropDatabase"))
-	})
-
-	t.Run("database not found skips terminate and drop", func(t *testing.T) {
-		mock := testutil.NewMockAdapter()
-		mock.DatabaseExistsFunc = func(ctx context.Context, name string) (bool, error) {
-			return false, nil
-		}
-
-		cfg := &Config{Engine: "postgres", Host: "localhost", Port: 5432}
-		svc := NewDatabaseServiceWithAdapter(mock, cfg)
-
-		result, err := svc.Delete(context.Background(), "testdb", false)
-		require.NoError(t, err)
-		require.NotNil(t, result)
-
-		assert.Equal(t, 0, mock.GetCallCount("TerminateDatabaseConnections"))
-		assert.Equal(t, 0, mock.GetCallCount("DropDatabase"))
 	})
 }

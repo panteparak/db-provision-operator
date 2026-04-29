@@ -60,13 +60,14 @@ func (a *Adapter) CreateRole(ctx context.Context, opts types.CreateRoleOptions) 
 	return nil
 }
 
-// DropRole drops an existing PostgreSQL role.
-// Callers should invoke ReassignOwnedObjects before DropRole for safe cleanup.
+// DropRole drops an existing PostgreSQL role
 func (a *Adapter) DropRole(ctx context.Context, roleName string) error {
 	pool, err := a.getPool()
 	if err != nil {
 		return err
 	}
+
+	reassignAndDropOwned(ctx, pool, roleName)
 
 	query := sqlbuilder.PgDropRole(roleName).IfExists().Build()
 	_, err = pool.Exec(ctx, query)

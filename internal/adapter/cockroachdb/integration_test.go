@@ -455,8 +455,8 @@ func TestCockroachDBAdapter_Integration(t *testing.T) {
 	})
 
 	t.Run("SafeDropPattern", func(t *testing.T) {
-		// Test the service-level orchestration pattern:
-		// RevokeDatabaseGrants → ReassignOwnedObjects → DropUser (atomic)
+		// Test that DropUser handles REASSIGN OWNED BY + DROP OWNED BY correctly
+		// when the user owns objects in a database
 		testDBName := "owned_objects_db"
 		testUsername := "object_owner"
 
@@ -481,16 +481,9 @@ func TestCockroachDBAdapter_Integration(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// Service-level cleanup before atomic drop
-		err = adapter.RevokeDatabaseGrants(ctx, testUsername)
-		require.NoError(t, err, "RevokeDatabaseGrants should succeed")
-
-		err = adapter.ReassignOwnedObjects(ctx, testUsername)
-		require.NoError(t, err, "ReassignOwnedObjects should succeed")
-
-		// Atomic drop — should succeed now that cleanup is done
+		// Drop user should succeed even with grants (safe pattern handles cleanup)
 		err = adapter.DropUser(ctx, testUsername)
-		require.NoError(t, err, "DropUser should succeed after cleanup")
+		require.NoError(t, err, "DropUser with owned objects should succeed")
 
 		exists, err := adapter.UserExists(ctx, testUsername)
 		require.NoError(t, err)

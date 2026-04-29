@@ -20,6 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/db-provision-operator/internal/adapter/sqlbuilder"
 	"github.com/db-provision-operator/internal/adapter/types"
 )
@@ -70,13 +73,14 @@ func (a *Adapter) CreateUser(ctx context.Context, opts types.CreateUserOptions) 
 	return nil
 }
 
-// DropUser drops an existing PostgreSQL user.
-// Callers should invoke ReassignOwnedObjects before DropUser for safe cleanup.
+// DropUser drops an existing PostgreSQL user
 func (a *Adapter) DropUser(ctx context.Context, username string) error {
 	pool, err := a.getPool()
 	if err != nil {
 		return err
 	}
+
+	reassignAndDropOwned(ctx, pool, username)
 
 	query := sqlbuilder.PgDropRole(username).IfExists().Build()
 	_, err = pool.Exec(ctx, query)
@@ -84,30 +88,6 @@ func (a *Adapter) DropUser(ctx context.Context, username string) error {
 		return fmt.Errorf("failed to drop user %s: %w", username, err)
 	}
 
-	return nil
-}
-
-// ReassignOwnedObjects transfers all objects owned by the specified user/role to
-// CURRENT_USER, then drops remaining owned objects (privileges, etc.).
-func (a *Adapter) ReassignOwnedObjects(ctx context.Context, name string) error {
-	pool, err := a.getPool()
-	if err != nil {
-		return err
-	}
-
-	if _, err := pool.Exec(ctx, fmt.Sprintf("REASSIGN OWNED BY %s TO CURRENT_USER", escapeIdentifier(name))); err != nil {
-		return fmt.Errorf("failed to reassign owned objects for %s: %w", name, err)
-	}
-	if _, err := pool.Exec(ctx, fmt.Sprintf("DROP OWNED BY %s", escapeIdentifier(name))); err != nil {
-		return fmt.Errorf("failed to drop owned objects for %s: %w", name, err)
-	}
-
-	return nil
-}
-
-// RevokeDatabaseGrants is a no-op for PostgreSQL.
-// PostgreSQL's DROP OWNED BY handles database-level grant revocation.
-func (a *Adapter) RevokeDatabaseGrants(_ context.Context, _ string) error {
 	return nil
 }
 
@@ -297,71 +277,94 @@ func (a *Adapter) GetOwnedObjects(ctx context.Context, username string) ([]types
 		return nil, err
 	}
 
-	var objects []types.OwnedObject
+	relations, err := queryOwnedRelations(ctx, pool, username)
+	if err != nil {
+		return nil, err
+	}
 
-	// Query relations (tables, views, sequences, indexes, etc.)
-	relQuery := `
-		SELECT n.nspname, c.relname,
-		       CASE c.relkind
-		         WHEN 'r' THEN 'table'
-		         WHEN 'S' THEN 'sequence'
-		         WHEN 'v' THEN 'view'
-		         WHEN 'm' THEN 'materialized view'
-		         WHEN 'i' THEN 'index'
-		         WHEN 'f' THEN 'foreign table'
-		         WHEN 'p' THEN 'partitioned table'
-		         WHEN 'c' THEN 'composite type'
-		         ELSE c.relkind::text
-		       END as reltype
-		FROM pg_class c
-		JOIN pg_roles r ON c.relowner = r.oid
-		JOIN pg_namespace n ON c.relnamespace = n.oid
-		WHERE r.rolname = $1
-		  AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
-		  AND c.relkind IN ('r', 'S', 'v', 'm', 'f', 'p')
-		ORDER BY n.nspname, c.relname`
+	functions, err := queryOwnedFunctions(ctx, pool, username)
+	if err != nil {
+		return nil, err
+	}
 
-	rows, err := pool.Query(ctx, relQuery, username)
+	return append(relations, functions...), nil
+}
+
+// ownedRelationsQuery returns rows of (schema, name, type) for tables, views,
+// sequences, materialized views, foreign tables, and partitioned tables.
+const ownedRelationsQuery = `
+	SELECT n.nspname, c.relname,
+	       CASE c.relkind
+	         WHEN 'r' THEN 'table'
+	         WHEN 'S' THEN 'sequence'
+	         WHEN 'v' THEN 'view'
+	         WHEN 'm' THEN 'materialized view'
+	         WHEN 'i' THEN 'index'
+	         WHEN 'f' THEN 'foreign table'
+	         WHEN 'p' THEN 'partitioned table'
+	         WHEN 'c' THEN 'composite type'
+	         ELSE c.relkind::text
+	       END as reltype
+	FROM pg_class c
+	JOIN pg_roles r ON c.relowner = r.oid
+	JOIN pg_namespace n ON c.relnamespace = n.oid
+	WHERE r.rolname = $1
+	  AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
+	  AND c.relkind IN ('r', 'S', 'v', 'm', 'f', 'p')
+	ORDER BY n.nspname, c.relname`
+
+const ownedFunctionsQuery = `
+	SELECT n.nspname, p.proname, 'function'
+	FROM pg_proc p
+	JOIN pg_roles r ON p.proowner = r.oid
+	JOIN pg_namespace n ON p.pronamespace = n.oid
+	WHERE r.rolname = $1
+	  AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+	ORDER BY n.nspname, p.proname`
+
+func queryOwnedRelations(ctx context.Context, pool *pgxpool.Pool, username string) ([]types.OwnedObject, error) {
+	rows, err := pool.Query(ctx, ownedRelationsQuery, username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query owned relations: %w", err)
 	}
+	defer rows.Close()
 
-	for rows.Next() {
-		var obj types.OwnedObject
-		if err := rows.Scan(&obj.Schema, &obj.Name, &obj.Type); err != nil {
-			rows.Close()
-			return nil, fmt.Errorf("failed to scan owned relation: %w", err)
-		}
-		objects = append(objects, obj)
+	objs, err := scanOwnedObjects(rows)
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan owned relation: %w", err)
 	}
-	rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating owned relations: %w", err)
 	}
+	return objs, nil
+}
 
-	// Query functions
-	funcQuery := `
-		SELECT n.nspname, p.proname, 'function'
-		FROM pg_proc p
-		JOIN pg_roles r ON p.proowner = r.oid
-		JOIN pg_namespace n ON p.pronamespace = n.oid
-		WHERE r.rolname = $1
-		  AND n.nspname NOT IN ('pg_catalog', 'information_schema')
-		ORDER BY n.nspname, p.proname`
-
-	rows, err = pool.Query(ctx, funcQuery, username)
+func queryOwnedFunctions(ctx context.Context, pool *pgxpool.Pool, username string) ([]types.OwnedObject, error) {
+	rows, err := pool.Query(ctx, ownedFunctionsQuery, username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query owned functions: %w", err)
 	}
 	defer rows.Close()
 
+	objs, err := scanOwnedObjects(rows)
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan owned function: %w", err)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating owned functions: %w", err)
+	}
+	return objs, nil
+}
+
+// scanOwnedObjects iterates rows whose columns are (schema, name, type).
+func scanOwnedObjects(rows pgx.Rows) ([]types.OwnedObject, error) {
+	var objects []types.OwnedObject
 	for rows.Next() {
 		var obj types.OwnedObject
 		if err := rows.Scan(&obj.Schema, &obj.Name, &obj.Type); err != nil {
-			return nil, fmt.Errorf("failed to scan owned function: %w", err)
+			return nil, err
 		}
 		objects = append(objects, obj)
 	}
-
-	return objects, rows.Err()
+	return objects, nil
 }
