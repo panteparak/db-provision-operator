@@ -34,15 +34,23 @@ findings = []
 dead = []  # constants nothing uses: reported, but not a docs failure
 docs = docs_text()
 sources = {p: p.read_text() for p in go_sources("api", "internal", "cmd")}
-uncommented = [re.sub(r"^\s*//.*$", "", t, flags=re.M) for t in sources.values()]
+uncommented = {p: re.sub(r"^\s*//.*$", "", t, flags=re.M) for p, t in sources.items()}
 
 
 def constants(pattern):
     """Yield (const_name, value, is_used) for consts matching pattern.
-    Used = referenced by name anywhere besides its own definition."""
-    for text in sources.values():
+    Used = referenced unqualified inside its own package (besides the
+    definition) or as <alias ending in package name>.Name elsewhere, so
+    same-named constants in two packages don't count each other."""
+    for path, text in sources.items():
+        pkg = re.search(r"^package (\w+)", text, re.M)[1]
         for name, value in re.findall(pattern, text):
-            refs = sum(len(re.findall(rf"\b{name}\b", t)) for t in uncommented)
+            refs = 0
+            for q, t in uncommented.items():
+                if q.parent == path.parent:
+                    refs += len(re.findall(rf"(?<![.\w]){name}\b", t))
+                else:
+                    refs += len(re.findall(rf"\b\w*{pkg}\.{name}\b", t))
             yield name, value, refs > 1
 claude_md = read("CLAUDE.md") if (ROOT / "CLAUDE.md").exists() else ""
 
