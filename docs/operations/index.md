@@ -46,11 +46,10 @@ kubectl get events --field-selector involvedObject.name=myapp-database
 # Get generated credentials
 kubectl get secret myapp-user-credentials -o jsonpath='{.data.password}' | base64 -d
 
-# Rotate password (delete secret, operator regenerates)
+# Rotate password now (delete secret; operator regenerates it and updates the DB user)
 kubectl delete secret myapp-user-credentials
 
-# Or use annotation
-kubectl annotate databaseuser myapp-user dbops.dbprovision.io/rotate-password=true
+# Scheduled rotation: set spec.passwordRotation (see User Guide > Users > Password Rotation)
 ```
 
 ### Backup Operations

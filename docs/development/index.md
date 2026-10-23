@@ -25,8 +25,8 @@ Guides for contributing to and developing DB Provision Operator.
 git clone https://github.com/panteparak/db-provision-operator.git
 cd db-provision-operator
 
-# Install dependencies
-make install-tools
+# Install pre-commit hooks (Go tools download into bin/ on first use)
+make setup-precommit
 
 # Build
 make build
@@ -38,8 +38,8 @@ make test
 ### Local Development
 
 ```bash
-# Start local cluster
-make kind-create
+# Start local k3d cluster
+make e2e-cluster-create
 
 # Install CRDs
 make install
@@ -106,7 +106,7 @@ make uninstall      # Uninstall CRDs
 
 # Testing
 make test           # Unit tests
-make test-e2e       # E2E tests
+make e2e-local-postgresql  # E2E tests (one engine; e2e-local-all for every engine)
 make lint           # Run linters
 
 # Docker
@@ -114,8 +114,8 @@ make docker-build   # Build image
 make docker-push    # Push image
 
 # Cluster
-make kind-create    # Create kind cluster
-make kind-delete    # Delete kind cluster
+make e2e-cluster-create  # Create k3d cluster
+make e2e-cluster-delete  # Delete k3d cluster
 make deploy         # Deploy to cluster
 
 # Documentation

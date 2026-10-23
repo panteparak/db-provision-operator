@@ -15,7 +15,7 @@ user; don't change code to match docs silently.
 python3 .claude/skills/docs-sync/scripts/check_docs.py   # exit 1 = findings
 ```
 
-Each line is `check: detail`. Fix, re-run until clean (or every remaining
+Each line is `check: detail`; only findings set the exit code, `dead-code` notes don't. Fix, re-run until clean (or every remaining
 finding is consciously accepted and listed in your report).
 
 ## Workflow
@@ -32,6 +32,7 @@ finding is consciously accepted and listed in your report).
    | `version-mismatch` | `mkdocs.yml` `extra.version` follows `charts/db-provision-operator/Chart.yaml` `appVersion`. |
    | `nav-missing` / `nav-dangling` | Fix the directory's `.pages` (awesome-pages plugin). |
    | `make-target-unknown` | Replace with the real target (`grep -n '^[a-z-]*:' Makefile`). |
+   | `dead-code …` (note, doesn't fail) | Constant nothing uses. If docs describe it as working, that's a code bug — flag it and mark the doc "not implemented"; otherwise list it for removal. Don't document dead reasons. |
 
 2. **Semantic pass** — the script can't judge prose. For each area touched by
    the change (or all of them for a full audit), read code and doc side by side:

@@ -98,6 +98,8 @@ golangci-lint run ./...# Lint
 | `dbops.dbprovision.io/force-delete` | `"true"` | Bypass deletion protection; with children, triggers cascade confirmation flow |
 | `dbops.dbprovision.io/confirm-force-delete` | `"<hash>"` | Confirm force-delete cascade; hash from `status.deletionConfirmation.hash` |
 | `dbops.dbprovision.io/skip-reconcile` | `"true"` | Skip reconciliation entirely |
+| `dbops.dbprovision.io/pause-reconcile` | `"true"` | Alias of `skip-reconcile` |
+| `dbops.dbprovision.io/adopt-databases` / `adopt-users` / `adopt-roles` | comma-separated names | On DatabaseInstance; defined but **not implemented** (nothing reads them) |
 | `dbops.dbprovision.io/deletion-policy` | `"Delete"` / `"Retain"` | Control external resource cleanup on CR deletion |
 | `dbops.dbprovision.io/deletion-protection` | `"true"` | Block deletion (used by User/Role controllers) |
 | `dbops.dbprovision.io/allow-destructive-drift` | `"true"` | Allow destructive drift corrections |

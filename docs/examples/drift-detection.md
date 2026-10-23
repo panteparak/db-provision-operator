@@ -350,7 +350,7 @@ spec:
         # Alert on any drift detected in production
         - alert: ProductionDriftDetected
           expr: |
-            dbprovision_drift_detected{
+            dbops_drift_detected{
               namespace="production"
             } == 1
           for: 5m

@@ -98,6 +98,8 @@ metadata:
     dbops.dbprovision.io/skip-reconcile: "true"
 ```
 
+`dbops.dbprovision.io/pause-reconcile: "true"` is an equivalent alias. Remove the annotation (or set it to anything other than `"true"`) to resume.
+
 ## Status Phases
 
 All resources report their status through a `phase` field:

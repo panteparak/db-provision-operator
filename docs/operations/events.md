@@ -312,7 +312,7 @@ Kubernetes events have a default TTL of 1 hour. For longer retention:
 3. **Use the operator's metrics** for long-term monitoring:
    ```promql
    dbprovision_reconcile_errors_total
-   dbprovision_drift_detected
+   dbops_drift_detected
    ```
 
 ### Monitoring Strategy

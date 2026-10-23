@@ -31,18 +31,29 @@ def docs_text(exclude=("api/reference.md",)):
 
 
 findings = []
+dead = []  # constants nothing uses: reported, but not a docs failure
 docs = docs_text()
+sources = {p: p.read_text() for p in go_sources("api", "internal", "cmd")}
+uncommented = [re.sub(r"^\s*//.*$", "", t, flags=re.M) for t in sources.values()]
+
+
+def constants(pattern):
+    """Yield (const_name, value, is_used) for consts matching pattern.
+    Used = referenced by name anywhere besides its own definition."""
+    for text in sources.values():
+        for name, value in re.findall(pattern, text):
+            refs = sum(len(re.findall(rf"\b{name}\b", t)) for t in uncommented)
+            yield name, value, refs > 1
 claude_md = read("CLAUDE.md") if (ROOT / "CLAUDE.md").exists() else ""
 
 # 1. Annotations: every Annotation* constant documented; every annotation
 #    named in docs or CLAUDE.md exists in code.
-code_ann = set()
-for p in go_sources("api", "internal"):
-    code_ann |= set(re.findall(r'Annotation\w*\s*=\s*"(dbops\.dbprovision\.io/[a-z0-9-]+)"', p.read_text()))
-for a in sorted(code_ann):
-    if a not in docs:
+for name, a, used in sorted(constants(r'\b(Annotation\w*)\s*=\s*"(dbops\.dbprovision\.io/[a-z0-9-]+)"')):
+    if not used:
+        dead.append(f"dead-code annotation: {name} = {a}")
+    elif a not in docs:
         findings.append(f"annotation-undocumented: {a}")
-all_code = "\n".join(p.read_text() for p in go_sources("api", "internal", "cmd"))
+all_code = "\n".join(sources.values())
 for src, text in (("docs", docs), ("CLAUDE.md", claude_md)):
     # skip kind.group/name references; strip kubectl's trailing "-" (remove syntax)
     found = re.findall(r"(?<![\w.])dbops\.dbprovision\.io/[a-z0-9-]+(?![a-z0-9-]*\.)", text)
@@ -50,11 +61,15 @@ for src, text in (("docs", docs), ("CLAUDE.md", claude_md)):
         if f'"{a}"' not in all_code:
             findings.append(f"annotation-unknown ({src}): {a}")
 
-# 2. Condition reasons: every Reason* value appears in docs.
+# 2. Condition reasons: every reason the code sets appears in docs.
 reasons = set()
-for p in ("internal/util/conditions.go", "api/v1alpha1/common_types.go"):
-    if (ROOT / p).exists():
-        reasons |= set(re.findall(r'\bReason\w*\s*=\s*"(\w+)"', read(p)))
+for name, value, used in sorted(constants(r'\b(Reason\w*)\s*=\s*"(\w+)"')):
+    if used:
+        reasons.add(value)
+    else:
+        dead.append(f"dead-code reason: {name} = {value}")
+for text in sources.values():  # literal reasons: Set*Condition(&c, status, "Reason", ...)
+    reasons |= set(re.findall(r'Set\w*Condition\([^;]*?Condition(?:True|False|Unknown),\s*"(\w+)"', text, re.S))
 for r in sorted(reasons):
     if not re.search(rf"\b{r}\b", docs):
         findings.append(f"reason-undocumented: {r}")
@@ -100,7 +115,7 @@ for src, text in (("docs", docs), ("CLAUDE.md", claude_md)):
         if t not in targets:
             findings.append(f"make-target-unknown ({src}): make {t}")
 
-for f in findings:
+for f in findings + dead:
     print(f)
-print(f"\n{len(findings)} finding(s)", file=sys.stderr)
+print(f"\n{len(findings)} finding(s), {len(dead)} dead-code note(s)", file=sys.stderr)
 sys.exit(1 if findings else 0)

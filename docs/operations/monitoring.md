@@ -23,7 +23,7 @@ metrics:
 !!! warning "Correct Metric Prefix"
     All metrics use the `dbops_` namespace prefix. Do not use `db_provision_` - that prefix is incorrect.
 
-### Available Metrics (27 total)
+### Available Metrics (33 total)
 
 All metrics use the `dbops_` namespace prefix.
 
@@ -85,6 +85,17 @@ All metrics use the `dbops_` namespace prefix.
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
 | `dbops_resource_count` | Gauge | resource_type, phase, namespace | Count of resources by type and phase |
+
+#### Drift & Discovery Metrics
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `dbops_drift_detected` | Gauge | resource_type, name, namespace | 1 if drift is currently detected on the resource, 0 otherwise |
+| `dbops_drift_detections_total` | Counter | resource_type, status, namespace | Drift detection checks performed |
+| `dbops_drift_corrections_total` | Counter | resource_type, status, namespace | Drift corrections applied (`driftPolicy.mode: correct`) |
+| `dbops_discovered_orphans` | Gauge | instance, resource_type, namespace | Unmanaged databases/users/roles found by discovery |
+| `dbops_discovery_scans_total` | Counter | instance, status, namespace | Discovery scans performed |
+| `dbops_adoptions_total` | Counter | resource_type, status, namespace | Resource adoptions (registered, but adoption is not implemented yet — always 0) |
 
 #### Info Metrics (for Grafana Tables)
 
