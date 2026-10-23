@@ -152,6 +152,7 @@ func TestDetectDatabaseDrift_ExtensionVersionMismatch(t *testing.T) {
 	require.NotNil(t, versionDiff)
 	assert.Equal(t, "1.3", versionDiff.Expected)
 	assert.Equal(t, "1.2", versionDiff.Actual)
+	assert.True(t, versionDiff.Destructive, "extension upgrades usually cannot be downgraded")
 }
 
 func TestDetectDatabaseDrift_MissingSchema(t *testing.T) {

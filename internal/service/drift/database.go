@@ -181,9 +181,10 @@ func (s *Service) compareExtensions(expected []dbopsv1alpha1.PostgresExtension, 
 		}
 		if actualVersion, ok := actualMap[name]; ok && actualVersion != expectedVersion {
 			result.AddDiff(Diff{
-				Field:    fmt.Sprintf("extensions.%s.version", name),
-				Expected: expectedVersion,
-				Actual:   actualVersion,
+				Field:       fmt.Sprintf("extensions.%s.version", name),
+				Expected:    expectedVersion,
+				Actual:      actualVersion,
+				Destructive: true, // ALTER EXTENSION UPDATE usually has no downgrade path
 			})
 		}
 	}

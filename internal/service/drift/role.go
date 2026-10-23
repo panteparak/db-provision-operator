@@ -71,9 +71,10 @@ func (s *Service) detectPostgresRoleDrift(spec *dbopsv1alpha1.DatabaseRoleSpec, 
 	// Login attribute
 	if pgSpec.Login != info.Login {
 		result.AddDiff(Diff{
-			Field:    "login",
-			Expected: strconv.FormatBool(pgSpec.Login),
-			Actual:   strconv.FormatBool(info.Login),
+			Field:       "login",
+			Expected:    strconv.FormatBool(pgSpec.Login),
+			Actual:      strconv.FormatBool(info.Login),
+			Destructive: info.Login, // Revoking (NOLOGIN) locks out anything connecting as this role
 		})
 	}
 
@@ -117,18 +118,20 @@ func (s *Service) detectPostgresRoleDrift(spec *dbopsv1alpha1.DatabaseRoleSpec, 
 	// Replication attribute
 	if pgSpec.Replication != info.Replication {
 		result.AddDiff(Diff{
-			Field:    "replication",
-			Expected: strconv.FormatBool(pgSpec.Replication),
-			Actual:   strconv.FormatBool(info.Replication),
+			Field:       "replication",
+			Expected:    strconv.FormatBool(pgSpec.Replication),
+			Actual:      strconv.FormatBool(info.Replication),
+			Destructive: info.Replication, // Revoking breaks replicas/CDC set up out of band
 		})
 	}
 
 	// BypassRLS attribute
 	if pgSpec.BypassRLS != info.BypassRLS {
 		result.AddDiff(Diff{
-			Field:    "bypassrls",
-			Expected: strconv.FormatBool(pgSpec.BypassRLS),
-			Actual:   strconv.FormatBool(info.BypassRLS),
+			Field:       "bypassrls",
+			Expected:    strconv.FormatBool(pgSpec.BypassRLS),
+			Actual:      strconv.FormatBool(info.BypassRLS),
+			Destructive: info.BypassRLS, // Revoking changes which rows an app can see
 		})
 	}
 

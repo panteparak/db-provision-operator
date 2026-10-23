@@ -90,8 +90,8 @@ status:
       - field: "encoding"
         expected: "UTF8"
         actual: "LATIN1"
-        destructive: true
-        immutable: false
+        destructive: false
+        immutable: true
       - field: "connectionLimit"
         expected: "100"
         actual: "50"
@@ -160,14 +160,31 @@ spec:
 
 #### Operator Drift Corrections (automatic)
 
-These are checked by the operator's reconciliation loop and require the `allow-destructive-drift` annotation for destructive corrections:
+These are checked on every reconcile (so a CR edit is picked up immediately; `interval` only controls the periodic re-check) and require the `allow-destructive-drift` annotation for destructive corrections.
 
-| Resource | Non-Destructive | Destructive |
-|----------|-----------------|-------------|
-| Database | Owner, connection limit | Encoding, collation, template |
-| User | Password, connection limit, roles | Username |
-| Role | Privileges, role membership | Role name |
-| Grant | Adding privileges | Revoking privileges |
+The rule of thumb: corrections that only **add** or are trivially reversible run automatically; corrections that **revoke** access or cannot be undone need the annotation; fields that would require recreating the object are only reported.
+
+| Resource | Field | Classification | Correction |
+|----------|-------|----------------|------------|
+| Database (PostgreSQL) | `connectionLimit` | Non-destructive | `ALTER DATABASE ... CONNECTION LIMIT n` (spec `0` = not managed) |
+| Database (PostgreSQL) | `owner` | Non-destructive | `ALTER DATABASE ... OWNER TO` |
+| Database (PostgreSQL) | `extensions.missing` | Non-destructive | `CREATE EXTENSION IF NOT EXISTS` |
+| Database (PostgreSQL) | `extensions.<name>.version` | **Destructive** | `ALTER EXTENSION ... UPDATE` (usually no downgrade path) |
+| Database (PostgreSQL) | `schemas.missing` | Non-destructive | `CREATE SCHEMA IF NOT EXISTS` |
+| Database (PostgreSQL) | `encoding` | Immutable | Reported only |
+| Database (MySQL) | `charset`, `collation` | Non-destructive | `ALTER DATABASE` (affects new tables only) |
+| User / Role | `connectionLimit` (User) | Non-destructive | `ALTER ROLE ... CONNECTION LIMIT` |
+| User / Role | `createdb`, `createrole`, `inherit` | Non-destructive | `ALTER ROLE` |
+| User / Role | `superuser` | **Destructive** | `ALTER ROLE` |
+| Role | `login` | **Destructive when revoking** (granting is not) | `ALTER ROLE ... [NO]LOGIN` |
+| User / Role | `replication`, `bypassrls` | **Destructive when revoking** (granting is not) | `ALTER ROLE` |
+| User / Role | `inRoles.missing` | Non-destructive | `GRANT role TO user` |
+| User / Role | `inRoles.extra` | **Destructive** | `REVOKE role FROM user` |
+| Grant | `*.missing` privileges / roles | Non-destructive | `GRANT` |
+| Grant | `*.extra` privileges / roles | **Destructive** | `REVOKE` |
+
+!!! note "CockroachDB"
+    CockroachDB does not expose a per-database connection limit, so `connectionLimit` drift is not reported for it.
 
 #### Migration Tool Corrections (`dbctl migrate`)
 
@@ -191,7 +208,7 @@ Some fields cannot be changed after resource creation:
 
 | Resource | Immutable Fields |
 |----------|-----------------|
-| Database | Template (PostgreSQL) |
+| Database | Encoding, template (PostgreSQL) |
 | User | Username (in most cases) |
 | DatabaseInstance | Engine type |
 
