@@ -736,22 +736,6 @@ const (
 	ConditionTypeRetentionEnforced   = "RetentionEnforced"
 )
 
-// Condition reasons
-const (
-	ReasonConnectionSuccessful = "ConnectionSuccessful"
-	ReasonConnectionFailed     = "ConnectionFailed"
-	ReasonCertificateValid     = "CertificateValid"
-	ReasonCertificateInvalid   = "CertificateInvalid"
-	ReasonDatabaseReady        = "DatabaseReady"
-	ReasonDatabaseFailed       = "DatabaseFailed"
-	ReasonUserReady            = "UserReady"
-	ReasonUserFailed           = "UserFailed"
-	ReasonBackupSucceeded      = "BackupSucceeded"
-	ReasonBackupFailed         = "BackupFailed"
-	ReasonRestoreSucceeded     = "RestoreSucceeded"
-	ReasonRestoreFailed        = "RestoreFailed"
-)
-
 // ResourceTrackingConfig defines how managed resources are tagged in the database.
 // This enables identification of operator-managed resources at the database level.
 type ResourceTrackingConfig struct {

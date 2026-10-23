@@ -30,8 +30,7 @@ DatabaseInstance / ClusterDatabaseInstance
 ### Condition Reasons
 - `ReasonDependenciesExist` - deletion blocked by child resources
 - `ReasonDeletionProtected` - deletion protection enabled
-- `ReasonInstanceNotReady` - parent instance not in Ready phase
-- `ReasonDatabaseNotReady` - parent database not in Ready phase
+- `ReasonReconcileFailed` - reconcile error, including parent instance/database not Ready yet
 - `ReasonPendingDeletionConfirmation` - force-delete waiting for user confirmation hash
 - `ReasonCascadeDeleting` - cascade-deleting children after force-delete confirmation
 

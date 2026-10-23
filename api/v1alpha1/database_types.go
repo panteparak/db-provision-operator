@@ -18,13 +18,6 @@ package v1alpha1
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-// Annotations for force delete
-const (
-	AnnotationForceDelete        = "dbops.dbprovision.io/force-delete"
-	AnnotationForceDeleteConfirm = "dbops.dbprovision.io/force-delete-confirm"
-	ForceDeleteConfirmValue      = "I-UNDERSTAND-DATA-LOSS"
-)
-
 // DatabaseSpec defines the desired state of Database.
 // +kubebuilder:validation:XValidation:rule="has(self.instanceRef) || has(self.clusterInstanceRef)",message="either instanceRef or clusterInstanceRef must be specified"
 // +kubebuilder:validation:XValidation:rule="!(has(self.instanceRef) && has(self.clusterInstanceRef))",message="instanceRef and clusterInstanceRef are mutually exclusive"
