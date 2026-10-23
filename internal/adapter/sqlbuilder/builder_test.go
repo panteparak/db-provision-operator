@@ -726,3 +726,14 @@ func TestMySQLCreateUserEscapesBackslashInPassword(t *testing.T) {
 		t.Errorf("got  %q\nwant %q", q, want)
 	}
 }
+
+func TestPgAlterDatabaseConnectionLimit(t *testing.T) {
+	q := PgAlterDatabase(`my"db`).ConnectionLimit(50).Build()
+	if q != `ALTER DATABASE "my""db" CONNECTION LIMIT 50` {
+		t.Errorf("got %q", q)
+	}
+	q = PgAlterDatabase("mydb").ConnectionLimit(-1).Build()
+	if q != `ALTER DATABASE "mydb" CONNECTION LIMIT -1` {
+		t.Errorf("got %q", q)
+	}
+}

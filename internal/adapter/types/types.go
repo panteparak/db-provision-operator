@@ -121,6 +121,7 @@ type UpdateDatabaseOptions struct {
 	Extensions        []ExtensionOptions
 	Schemas           []SchemaOptions
 	DefaultPrivileges []DefaultPrivilegeOptions
+	ConnectionLimit   *int32 // ALTER DATABASE ... CONNECTION LIMIT when non-nil
 
 	// MySQL-specific
 	Charset   string
@@ -157,8 +158,9 @@ type DatabaseInfo struct {
 	Collation string
 
 	// PostgreSQL-specific
-	Extensions []ExtensionInfo
-	Schemas    []string
+	Extensions      []ExtensionInfo
+	Schemas         []string
+	ConnectionLimit *int32 // pg_database.datconnlimit; nil when the engine does not report it
 
 	// MySQL-specific
 	Charset string

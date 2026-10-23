@@ -183,6 +183,8 @@ func (b *DatabaseBuilder) buildAlter() string {
 		if b.owner != "" {
 			sb.WriteString(" OWNER TO ")
 			sb.WriteString(b.dialect.EscapeIdentifier(b.owner))
+		} else if b.connectionLimit != 0 {
+			fmt.Fprintf(&sb, " CONNECTION LIMIT %d", b.connectionLimit)
 		}
 	}
 

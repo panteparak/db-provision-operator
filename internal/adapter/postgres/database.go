@@ -121,15 +121,17 @@ func (a *Adapter) GetDatabaseInfo(ctx context.Context, name string) (*types.Data
 	// Get basic database info
 	var info types.DatabaseInfo
 	var ownerOid int64
+	var connLimit int32
 	err = pool.QueryRow(ctx, `
 		SELECT d.datname, d.datdba::int8, pg_database_size(d.datname),
-		       pg_encoding_to_char(d.encoding), d.datcollate
+		       pg_encoding_to_char(d.encoding), d.datcollate, d.datconnlimit
 		FROM pg_database d
 		WHERE d.datname = $1`,
-		name).Scan(&info.Name, &ownerOid, &info.SizeBytes, &info.Encoding, &info.Collation)
+		name).Scan(&info.Name, &ownerOid, &info.SizeBytes, &info.Encoding, &info.Collation, &connLimit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get database info: %w", err)
 	}
+	info.ConnectionLimit = &connLimit
 
 	// Get owner name
 	err = pool.QueryRow(ctx,
@@ -203,6 +205,17 @@ func (a *Adapter) getDatabaseSchemas(ctx context.Context, database string) ([]st
 
 // UpdateDatabase updates database settings
 func (a *Adapter) UpdateDatabase(ctx context.Context, name string, opts types.UpdateDatabaseOptions) error {
+	if opts.ConnectionLimit != nil {
+		pool, err := a.getPool()
+		if err != nil {
+			return err
+		}
+		query := sqlbuilder.PgAlterDatabase(name).ConnectionLimit(int(*opts.ConnectionLimit)).Build()
+		if _, err := pool.Exec(ctx, query); err != nil {
+			return fmt.Errorf("failed to set connection limit on database %s: %w", name, err)
+		}
+	}
+
 	// Handle extensions
 	for _, ext := range opts.Extensions {
 		if err := a.installExtension(ctx, name, ext); err != nil {
