@@ -180,8 +180,8 @@ The rule of thumb: corrections that only **add** or are trivially reversible run
 | User / Role | `replication`, `bypassrls` | **Destructive when revoking** (granting is not) | `ALTER ROLE` |
 | User / Role | `inRoles.missing` | Non-destructive | `GRANT role TO user` |
 | User / Role | `inRoles.extra` | **Destructive** | `REVOKE role FROM user` |
-| Grant | `*.missing` privileges / roles | Non-destructive | `GRANT` |
-| Grant | `*.extra` privileges / roles | **Destructive** | `REVOKE` |
+| Grant | `grants.*.missing`, `roles.missing` | Non-destructive | `GRANT` |
+| Grant | `grants.*.extra`, `roles.extra` | **Destructive** | `REVOKE` |
 
 !!! note "CockroachDB"
     CockroachDB does not expose a per-database connection limit, so `connectionLimit` drift is not reported for it.
