@@ -1,0 +1,127 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# CodeRabbit review config. Project rules come from CLAUDE.md; keep the two in sync.
+language: en-US
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  in_progress_fortune: false
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+
+  # Generated or vendored output: review the source that produces it instead.
+  path_filters:
+    - "!**/zz_generated.*.go"
+    - "!config/crd/bases/**"
+    - "!charts/db-provision-operator/crds/**"
+    - "!docs/api/reference.md"
+    - "!**/*.sum"
+
+  path_instructions:
+    - path: "internal/features/**/controller.go"
+      instructions: |
+        - `+kubebuilder:rbac` markers must START the comment block directly above `Reconcile()`.
+          A marker placed after a doc-comment line is silently ignored by controller-gen. Flag any
+          new or moved marker that is not the first line of that block.
+        - A new or changed RBAC marker must come with the regenerated `config/rbac/role.yaml`
+          (`make manifests`) and the matching `charts/db-provision-operator/templates/clusterrole.yaml`
+          change in the same PR (`make test-templates` enforces Helm/Kustomize parity).
+        - Deletion: parent controllers must check for child resources in `handleDeletion()` before
+          removing the finalizer. With children: `Phase=Failed`, Ready reason `DependenciesExist`,
+          requeue after 10s, return nil error. Dependency-check errors are logged, not blocking.
+          `force-delete` with children must go through `PhasePendingDeletion` and the
+          `confirm-force-delete` hash before cascade deletion.
+        - Before `Status().Update()`, set `Phase`, `Message`, the Ready condition via
+          `util.SetReadyCondition()`, `ObservedGeneration`, `ReconcileID` and `LastReconcileTime`.
+        - Condition reasons must be existing `util.Reason*` constants (or added there), not new
+          ad-hoc string literals.
+
+    - path: "internal/features/**/controller_test.go"
+      instructions: |
+        Controllers with deletion logic need these tests (flag missing ones when deletion code changes):
+        DeletionBlockedByChildDependencies, DeletionSucceedsWhenNoChildren,
+        ForceDeleteBypassesChildCheck, ForceDeleteConfirmedCascadesChildren,
+        ForceDeleteWrongHashBlocksDeletion, ForceDeleteNoChildrenSkipsConfirmation,
+        ForceDeleteCascadeTracksRemainingChildren.
+        Test clients use `fake.NewClientBuilder().WithScheme(scheme).WithObjects(...).WithStatusSubresource(...).Build()`.
+
+    - path: "internal/adapter/**/*.go"
+      instructions: |
+        - All DDL/DCL must be built with `internal/adapter/sqlbuilder` (dialect-specific escaping and
+          privilege allowlists). Flag any SQL assembled with `fmt.Sprintf` or string concatenation that
+          interpolates identifiers, privileges, or values from a CR spec. Values go through query
+          parameters (`$1`, `?`) where the statement supports them.
+        - MySQL must keep `cfg.MultiStatements = false` (prevents stacked-query injection).
+        - New adapter capabilities must be implemented, or be an explicit documented no-op, for every
+          engine behind the interface (postgres, cockroachdb, mysql/mariadb, clickhouse).
+        - Default privileges are bidirectional (owner role -> app user and app user -> owner role),
+          executed via `ExecSQLAsRole`.
+
+    - path: "internal/adapter/sqlbuilder/**/*.go"
+      instructions: |
+        Security-critical. Every identifier must pass through the dialect's EscapeIdentifier and every
+        literal through EscapeLiteral; privileges must be checked against the allowlist. New builder
+        output needs an exact-string test and, for new input paths, coverage in injection_test.go.
+
+    - path: "internal/service/drift/**/*.go"
+      instructions: |
+        Mark a Diff `Destructive` when correcting it would revoke access, lock out a client, or is
+        irreversible (e.g. revoking LOGIN/REPLICATION/BYPASSRLS, extension upgrades, REVOKE), and
+        `Immutable` when it would require recreating the object. Non-destructive corrections run
+        automatically in `driftPolicy.mode: correct`, so misclassification is a production risk.
+        New drift fields need a row in docs/user-guide/drift-detection.md.
+
+    - path: "api/v1alpha1/**/*_types.go"
+      instructions: |
+        - Do not use struct-level CEL `XValidation` over unbounded arrays (`self.list.all(...)`): it
+          exceeds the Kubernetes CEL cost budget. Use `+kubebuilder:validation:items:Pattern` plus
+          `MaxItems` instead.
+        - Type changes need regenerated CRDs (`make manifests generate`), the Helm CRD copy
+          (`make helm-update-crds`), and API docs (`make generate-api-docs`) in the same PR.
+        - New annotations belong with the existing constants and in the CLAUDE.md annotation table.
+
+    - path: "charts/db-provision-operator/templates/**"
+      instructions: |
+        Helm output must stay equivalent to the Kustomize manifests in config/ (`make test-templates`).
+        A ClusterRole change here without the matching config/rbac/role.yaml change (or vice versa)
+        is a bug.
+
+    - path: "config/rbac/role.yaml"
+      instructions: |
+        Generated by `make manifests` from `+kubebuilder:rbac` markers; hand edits are lost. Check the
+        Helm clusterrole template was updated to match.
+
+    - path: "docs/**/*.md"
+      instructions: |
+        Docs must match the code: annotation names, condition reasons, metric names (prefix `dbops_`),
+        make targets, and defaults (`+kubebuilder:default` markers). YAML examples must only use fields
+        that exist in api/v1alpha1. `python3 .claude/skills/docs-sync/scripts/check_docs.py` checks
+        the mechanical parts.
+
+  tools:
+    golangci-lint:
+      enabled: true
+      config_file: .golangci.yml
+    actionlint:
+      enabled: true
+    gitleaks:
+      enabled: true
+    hadolint:
+      enabled: true
+    shellcheck:
+      enabled: true
+    yamllint:
+      enabled: true
+    markdownlint:
+      enabled: false # mkdocs-material syntax (admonitions, tabs) trips it
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - CLAUDE.md
