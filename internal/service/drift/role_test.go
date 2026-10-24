@@ -685,3 +685,29 @@ func TestCorrectRoleDrift_MixedResults(t *testing.T) {
 	assert.Len(t, corrResult.Failed, 1)    // createdb
 	assert.Len(t, corrResult.Skipped, 1)   // superuser (destructive, not allowed)
 }
+
+func TestDetectRoleDrift_RevokingAttributesIsDestructive(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		info types.RoleInfo
+	}{
+		{"login revoked", types.RoleInfo{Login: true}},
+		{"replication revoked", types.RoleInfo{Replication: true}},
+		{"bypassrls revoked", types.RoleInfo{BypassRLS: true}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			adapter := testutil.NewMockAdapter()
+			adapter.GetRoleInfoFunc = func(ctx context.Context, roleName string) (*types.RoleInfo, error) {
+				info := tt.info
+				info.Name = roleName
+				return &info, nil
+			}
+			spec := newTestRoleSpec("testrole") // all attributes false
+
+			result, err := newTestService(adapter, false).DetectRoleDrift(context.Background(), spec)
+			require.NoError(t, err)
+			require.Len(t, result.Diffs, 1)
+			assert.True(t, result.Diffs[0].Destructive)
+		})
+	}
+}

@@ -152,6 +152,7 @@ func TestDetectDatabaseDrift_ExtensionVersionMismatch(t *testing.T) {
 	require.NotNil(t, versionDiff)
 	assert.Equal(t, "1.3", versionDiff.Expected)
 	assert.Equal(t, "1.2", versionDiff.Actual)
+	assert.True(t, versionDiff.Destructive, "extension upgrades usually cannot be downgraded")
 }
 
 func TestDetectDatabaseDrift_MissingSchema(t *testing.T) {
@@ -647,4 +648,58 @@ func TestCorrectDatabaseDrift_OwnerTransfer(t *testing.T) {
 	require.Len(t, corrResult.Corrected, 1)
 	assert.Equal(t, "testdb", transferredDB)
 	assert.Equal(t, "db_testdb_owner", transferredOwner)
+}
+
+func TestDetectDatabaseDrift_ConnectionLimit(t *testing.T) {
+	limit := func(n int32) *int32 { return &n }
+	tests := []struct {
+		name      string
+		spec      int32
+		actual    *int32
+		wantDrift bool
+	}{
+		{"differs", 50, limit(20), true},
+		{"matches", 50, limit(50), false},
+		{"unlimited matches", -1, limit(-1), false},
+		{"spec unset is unmanaged", 0, limit(20), false},
+		{"engine does not report", 50, nil, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			adapter := testutil.NewMockAdapter()
+			adapter.GetDatabaseInfoFunc = func(ctx context.Context, name string) (*types.DatabaseInfo, error) {
+				return &types.DatabaseInfo{Name: name, Encoding: "UTF8", ConnectionLimit: tt.actual}, nil
+			}
+			spec := newTestDatabaseSpec("vault")
+			spec.Postgres.ConnectionLimit = tt.spec
+
+			result, err := newTestService(adapter, false).DetectDatabaseDrift(context.Background(), spec)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantDrift, result.HasDrift())
+			if tt.wantDrift {
+				require.Len(t, result.Diffs, 1)
+				assert.Equal(t, Diff{Field: "connectionLimit", Expected: "50", Actual: "20"}, result.Diffs[0])
+			}
+		})
+	}
+}
+
+func TestCorrectDatabaseDrift_ConnectionLimit(t *testing.T) {
+	var capturedOpts types.UpdateDatabaseOptions
+	adapter := testutil.NewMockAdapter()
+	adapter.UpdateDatabaseFunc = func(ctx context.Context, name string, opts types.UpdateDatabaseOptions) error {
+		capturedOpts = opts
+		return nil
+	}
+
+	spec := newTestDatabaseSpec("vault")
+	spec.Postgres.ConnectionLimit = 50
+	driftResult := NewResult("database", "vault")
+	driftResult.AddDiff(Diff{Field: "connectionLimit", Expected: "50", Actual: "20"})
+
+	corrResult, err := newTestService(adapter, false).CorrectDatabaseDrift(context.Background(), spec, driftResult)
+	require.NoError(t, err)
+	require.Len(t, corrResult.Corrected, 1)
+	require.NotNil(t, capturedOpts.ConnectionLimit)
+	assert.Equal(t, int32(50), *capturedOpts.ConnectionLimit)
 }

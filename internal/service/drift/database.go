@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	dbopsv1alpha1 "github.com/db-provision-operator/api/v1alpha1"
@@ -100,6 +101,16 @@ func (s *Service) detectPostgresDatabaseDrift(spec *dbopsv1alpha1.DatabaseSpec, 
 		})
 	}
 
+	// Connection limit. Spec 0 means unmanaged (same as the create path);
+	// nil actual means the engine does not report it (e.g. CockroachDB).
+	if pgSpec.ConnectionLimit != 0 && info.ConnectionLimit != nil && pgSpec.ConnectionLimit != *info.ConnectionLimit {
+		result.AddDiff(Diff{
+			Field:    "connectionLimit",
+			Expected: strconv.FormatInt(int64(pgSpec.ConnectionLimit), 10),
+			Actual:   strconv.FormatInt(int64(*info.ConnectionLimit), 10),
+		})
+	}
+
 	// Extensions comparison
 	s.compareExtensions(pgSpec.Extensions, info.Extensions, result)
 
@@ -170,9 +181,10 @@ func (s *Service) compareExtensions(expected []dbopsv1alpha1.PostgresExtension, 
 		}
 		if actualVersion, ok := actualMap[name]; ok && actualVersion != expectedVersion {
 			result.AddDiff(Diff{
-				Field:    fmt.Sprintf("extensions.%s.version", name),
-				Expected: expectedVersion,
-				Actual:   actualVersion,
+				Field:       fmt.Sprintf("extensions.%s.version", name),
+				Expected:    expectedVersion,
+				Actual:      actualVersion,
+				Destructive: true, // ALTER EXTENSION UPDATE usually has no downgrade path
 			})
 		}
 	}
@@ -250,6 +262,10 @@ func (s *Service) applyDatabaseCorrection(ctx context.Context, spec *dbopsv1alph
 		// Owner change is handled by ALTER DATABASE ... OWNER TO
 		// This is destructive and requires special handling
 		return s.correctDatabaseOwner(ctx, spec.Name, diff.Expected)
+
+	case diff.Field == "connectionLimit":
+		limit := spec.Postgres.ConnectionLimit
+		return s.adapter.UpdateDatabase(ctx, spec.Name, types.UpdateDatabaseOptions{ConnectionLimit: &limit})
 
 	case strings.HasPrefix(diff.Field, "extensions.missing"):
 		// Install missing extensions
