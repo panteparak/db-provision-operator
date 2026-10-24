@@ -22,8 +22,8 @@ cd db-provision-operator
 # Add upstream remote
 git remote add upstream https://github.com/panteparak/db-provision-operator.git
 
-# Install tools
-make install-tools
+# Install pre-commit hooks (Go tools such as controller-gen and golangci-lint download into bin/ on first use)
+make setup-precommit
 
 # Verify setup
 make test
@@ -60,8 +60,8 @@ make test
 # Run linters
 make lint
 
-# Run E2E tests (requires cluster)
-make test-e2e
+# Run E2E tests (Docker + k3d; starts the database, cluster and operator)
+make e2e-local-postgresql   # or e2e-local-all
 ```
 
 ### 4. Submit PR

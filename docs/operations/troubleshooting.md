@@ -30,6 +30,37 @@ kubectl describe databaseinstance postgres-primary
 kubectl get databaseinstance postgres-primary -o yaml
 ```
 
+## Condition Reasons
+
+The `reason` on a resource's `Ready` or `Synced` condition tells you where it is stuck:
+
+```bash
+kubectl get <kind> <name> -o jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason}: {.message}{"\n"}{end}'
+```
+
+| Reason | Set on | Meaning | What to do |
+|--------|--------|---------|------------|
+| `Reconciling` | Backup, Restore, Grant, ClusterGrant | Work in progress | Wait; check events if it doesn't advance |
+| `ReconcileSuccess` | Most resources | Last reconcile succeeded | — |
+| `ReconcileFailed` | Most resources | Last reconcile returned an error; the message has it. Also used when the parent instance/database is not `Ready` yet | Read the message; fix the parent or the database-side error. The operator retries with backoff |
+| `ConnectionSuccess` / `HealthCheckPassed` | DatabaseInstance, ClusterDatabaseInstance | Operator can connect and the health check passes | — |
+| `ConnectionFailed` | DatabaseInstance, ClusterDatabaseInstance | Cannot connect with the admin credentials | See [Instance Stuck in Pending](#instance-stuck-in-pending) |
+| `Creating` | Database | Database exists but init steps (extensions, schemas, init SQL) are still running | Wait |
+| `InitSQLFailed` | Database (`Synced`) | `spec.initSQL` failed; details in `status.initSQL.error` | Fix the SQL. With `failurePolicy: Block` the database stays failed and retries; otherwise reconcile continues |
+| `DeletionProtected` | All protected resources | Delete requested but deletion protection is on | [Cannot Delete Protected Resource](#cannot-delete-protected-resource) |
+| `DependenciesExist` | Instance, Database, User, Role | Delete blocked by child resources | Delete the children first, or use force-delete |
+| `PendingDeletionConfirmation` | Instance, Database, User, Role | Force-delete with children waits for the confirmation hash | Set `dbops.dbprovision.io/confirm-force-delete` to `status.deletionConfirmation.hash` ([Deletion Protection](../user-guide/deletion-protection.md)) |
+| `CascadeDeleting` | Instance, Database, User, Role | Confirmed cascade is deleting children | Wait; `status.deletionConfirmation.remainingCount` shows progress |
+| `OwnershipBlocks` | DatabaseUser | Delete blocked because the user still owns database objects | Run the command in `status.ownershipBlock.resolution`, then the delete proceeds |
+| `BackupCompleted` | DatabaseBackup | Backup finished | — |
+| `BackupFailed` | DatabaseBackup | Backup failed | [Backup Failed](#backup-failed) |
+| `RestoreCompleted` | DatabaseRestore | Restore finished | — |
+| `ValidationFailed` | DatabaseRestore | Restore spec or source backup is invalid | Fix the spec per the message |
+| `DeadlineExceeded` | DatabaseRestore | Restore ran longer than `spec.activeDeadlineSeconds` | Check database load and backup size; raise the deadline |
+| `Active` / `Paused` | DatabaseBackupSchedule | Schedule running / paused (`spec.paused`) | — |
+| `WaitingForCompletion` | DatabaseBackupSchedule | Next run is held by the concurrency policy until the previous backup finishes | Wait, or check the running backup |
+| `Error` | DatabaseBackupSchedule | Reconcile failed (e.g. invalid `spec.schedule`, missing database); phase stays `Active` | Read the message and the `ReconcileFailed` event |
+
 ## Common Issues
 
 ### DatabaseInstance Issues
@@ -248,7 +279,7 @@ kubectl get database myapp -o jsonpath='{.status.drift.lastChecked}'
 
 **Verify interval has passed:**
 ```bash
-# Default is 5m, check configured interval
+# Default is 8h (--default-drift-interval); spec edits are checked immediately
 kubectl get database myapp -o jsonpath='{.spec.driftPolicy.interval}'
 ```
 

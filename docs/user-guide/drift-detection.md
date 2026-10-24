@@ -74,7 +74,7 @@ spec:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `mode` | string | `detect` | `ignore`, `detect`, or `correct` |
-| `interval` | string | `5m` | How often to check for drift (Go duration) |
+| `interval` | string | `8h` (operator flag `--default-drift-interval`) | How often to re-check for drift (Go duration). Spec changes are checked immediately on the next reconcile |
 
 ## Status Fields
 
@@ -263,7 +263,11 @@ metadata:
   annotations:
     dbops.dbprovision.io/adopt-databases: "legacy_app,temp_data"
     dbops.dbprovision.io/adopt-users: "old_admin"
+    dbops.dbprovision.io/adopt-roles: "reporting"
 ```
+
+!!! warning "Not implemented yet"
+    The `adopt-databases`, `adopt-users`, and `adopt-roles` annotations are defined in the API but the operator does not act on them yet: no CRs are created and `dbops_adoptions_total` stays at 0. To manage a discovered resource today, create the CR yourself with a matching `name` / `username` / `roleName`.
 
 When adopted:
 
@@ -277,13 +281,13 @@ The operator exposes drift-related metrics:
 
 | Metric | Description |
 |--------|-------------|
-| `dbprovision_drift_detected` | Gauge: 1 if drift detected, 0 otherwise |
-| `dbprovision_drift_corrections_total` | Counter of drift corrections |
+| `dbops_drift_detected` | Gauge: 1 if drift detected, 0 otherwise |
+| `dbops_drift_corrections_total` | Counter of drift corrections |
 
 Example Prometheus query to alert on drift:
 
 ```promql
-dbprovision_drift_detected{resource_type="database"} == 1
+dbops_drift_detected{resource_type="database"} == 1
 ```
 
 ## Best Practices
@@ -313,7 +317,7 @@ Set up alerts for `DriftDetected` events:
 ```yaml
 # Example Prometheus alert rule
 - alert: DatabaseDriftDetected
-  expr: dbprovision_drift_detected == 1
+  expr: dbops_drift_detected == 1
   for: 5m
   labels:
     severity: warning
